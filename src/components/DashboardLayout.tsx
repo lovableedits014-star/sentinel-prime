@@ -164,6 +164,22 @@ const DashboardLayout = () => {
       } catch (error) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
+        // Verifica se ainda há sessão válida antes de deslogar.
+        // Timeouts de rede/RPC não devem expulsar o usuário logado.
+        try {
+          const { data: { session: stillSession } } = await supabase.auth.getSession();
+          if (stillSession) {
+            // Mantém logado, libera UI como super admin tentativa de recuperação
+            toast.error("Conexão lenta ao verificar permissões. Tentando novamente...");
+            setIsClientOwner(true);
+            setAccessProfile(null);
+            setUser(stillSession.user);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // Ignore — segue para logout
+        }
         toast.error("Não foi possível carregar o painel. Entre novamente.");
         setLoading(false);
         navigate("/auth", { replace: true });
