@@ -12,7 +12,20 @@ import { isPathAllowed, getRoleLabels, type AccessProfile } from "@/lib/access-c
 import { CoringaButton } from "@/components/coringa/CoringaButton";
 import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
-const AUTH_CHECK_TIMEOUT_MS = 30000;
+const AUTH_CHECK_TIMEOUT_MS = 12000;
+
+const hasStoredAuthSession = () => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("sb-") && key.endsWith("-auth-token")) {
+        const raw = localStorage.getItem(key);
+        if (raw && raw.length > 20) return true;
+      }
+    }
+  } catch {}
+  return false;
+};
 
 const withTimeout = async <T,>(promise: PromiseLike<T>, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -99,6 +112,12 @@ const DashboardLayout = () => {
 
     const checkUser = async () => {
       try {
+        if (hasStoredAuthSession()) {
+          setIsClientOwner(true);
+          setAccessProfile(null);
+          setLoading(false);
+        }
+
         const { data: { session } } = await withTimeout(
           supabase.auth.getSession(),
           "Tempo esgotado ao verificar sua sessão"
@@ -168,18 +187,7 @@ const DashboardLayout = () => {
         if (!mounted) return;
         // Modo otimista: se há token persistido em localStorage, libera acesso
         // mesmo com timeout — evita travar a UI por lentidão de rede.
-        let hasStoredSession = false;
-        try {
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
-              const raw = localStorage.getItem(k);
-              if (raw && raw.length > 20) { hasStoredSession = true; break; }
-            }
-          }
-        } catch {}
-
-        if (hasStoredSession) {
+        if (hasStoredAuthSession()) {
           toast.error("Conexão lenta ao verificar permissões. Liberando acesso...");
           setIsClientOwner(true);
           setAccessProfile(null);
