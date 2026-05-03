@@ -157,8 +157,8 @@ const DashboardLayout = () => {
     );
   }
 
-  const SUPER_ADMIN_EMAIL = "lovableedits014@gmail.com";
-  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
+  // Server-side check via is_super_admin() RPC.
+  const { isSuperAdmin } = useIsSuperAdmin();
 
   // Filter menu items based on access profile
   const filteredSections = MENU_SECTIONS.map(section => ({
