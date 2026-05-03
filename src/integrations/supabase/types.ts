@@ -393,6 +393,53 @@ export type Database = {
           },
         ]
       }
+      ied_scores: {
+        Row: {
+          checkin_score: number
+          client_id: string
+          created_at: string
+          details: Json | null
+          engagement_score: number
+          growth_score: number
+          id: string
+          score: number
+          sentiment_score: number
+          week_start: string
+        }
+        Insert: {
+          checkin_score?: number
+          client_id: string
+          created_at?: string
+          details?: Json | null
+          engagement_score?: number
+          growth_score?: number
+          id?: string
+          score?: number
+          sentiment_score?: number
+          week_start: string
+        }
+        Update: {
+          checkin_score?: number
+          client_id?: string
+          created_at?: string
+          details?: Json | null
+          engagement_score?: number
+          growth_score?: number
+          id?: string
+          score?: number
+          sentiment_score?: number
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ied_scores_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integrations: {
         Row: {
           ai_custom_prompt: string | null
@@ -636,6 +683,74 @@ export type Database = {
         }
         Relationships: []
       }
+      push_dispatch_jobs: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          elapsed_seconds: number | null
+          error_message: string | null
+          expired_removed: number | null
+          failed_count: number | null
+          id: string
+          message: string | null
+          sent_count: number | null
+          skipped_count: number | null
+          started_at: string | null
+          status: string
+          title: string | null
+          total_subscribers: number | null
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          elapsed_seconds?: number | null
+          error_message?: string | null
+          expired_removed?: number | null
+          failed_count?: number | null
+          id?: string
+          message?: string | null
+          sent_count?: number | null
+          skipped_count?: number | null
+          started_at?: string | null
+          status?: string
+          title?: string | null
+          total_subscribers?: number | null
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          elapsed_seconds?: number | null
+          error_message?: string | null
+          expired_removed?: number | null
+          failed_count?: number | null
+          id?: string
+          message?: string | null
+          sent_count?: number | null
+          skipped_count?: number | null
+          started_at?: string | null
+          status?: string
+          title?: string | null
+          total_subscribers?: number | null
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_dispatch_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -782,6 +897,91 @@ export type Database = {
           },
         ]
       }
+      referral_codes: {
+        Row: {
+          client_id: string
+          code: string
+          created_at: string
+          id: string
+          supporter_account_id: string
+        }
+        Insert: {
+          client_id: string
+          code: string
+          created_at?: string
+          id?: string
+          supporter_account_id: string
+        }
+        Update: {
+          client_id?: string
+          code?: string
+          created_at?: string
+          id?: string
+          supporter_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_codes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_codes_supporter_account_id_fkey"
+            columns: ["supporter_account_id"]
+            isOneToOne: false
+            referencedRelation: "supporter_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          referred_account_id: string
+          referrer_account_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          referred_account_id: string
+          referrer_account_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          referred_account_id?: string
+          referrer_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_account_id_fkey"
+            columns: ["referred_account_id"]
+            isOneToOne: false
+            referencedRelation: "supporter_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referrer_account_id_fkey"
+            columns: ["referrer_account_id"]
+            isOneToOne: false
+            referencedRelation: "supporter_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_profiles: {
         Row: {
           avatar_url: string | null
@@ -831,6 +1031,7 @@ export type Database = {
       }
       supporter_accounts: {
         Row: {
+          city: string | null
           client_id: string
           created_at: string
           email: string
@@ -838,11 +1039,15 @@ export type Database = {
           id: string
           instagram_username: string | null
           name: string
+          neighborhood: string | null
+          referred_by: string | null
+          state: string | null
           supporter_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          city?: string | null
           client_id: string
           created_at?: string
           email: string
@@ -850,11 +1055,15 @@ export type Database = {
           id?: string
           instagram_username?: string | null
           name: string
+          neighborhood?: string | null
+          referred_by?: string | null
+          state?: string | null
           supporter_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          city?: string | null
           client_id?: string
           created_at?: string
           email?: string
@@ -862,6 +1071,9 @@ export type Database = {
           id?: string
           instagram_username?: string | null
           name?: string
+          neighborhood?: string | null
+          referred_by?: string | null
+          state?: string | null
           supporter_id?: string | null
           updated_at?: string
           user_id?: string
@@ -872,6 +1084,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supporter_accounts_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "supporter_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -973,6 +1192,7 @@ export type Database = {
           last_interaction_date: string | null
           name: string
           notes: string | null
+          referral_count: number
           updated_at: string | null
         }
         Insert: {
@@ -987,6 +1207,7 @@ export type Database = {
           last_interaction_date?: string | null
           name: string
           notes?: string | null
+          referral_count?: number
           updated_at?: string | null
         }
         Update: {
@@ -1001,11 +1222,50 @@ export type Database = {
           last_interaction_date?: string | null
           name?: string
           notes?: string | null
+          referral_count?: number
           updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "supporters_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      territorial_zones: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          supporter_count: number
+          updated_at: string
+          zone_name: string
+          zone_type: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          supporter_count?: number
+          updated_at?: string
+          zone_name: string
+          zone_type?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          supporter_count?: number
+          updated_at?: string
+          zone_name?: string
+          zone_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "territorial_zones_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
