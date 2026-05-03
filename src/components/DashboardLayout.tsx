@@ -105,23 +105,34 @@ const DashboardLayout = () => {
         if (!session) { navigate("/auth", { replace: true }); return; }
         setUser(session.user);
 
-        // Check if user is a client owner
-        const { data: clientData, error: clientError } = await withTimeout(
-          supabase
-            .from("clients")
-            .select("id")
-            .eq("user_id", session.user.id)
-            .limit(1)
-            .maybeSingle(),
-          "Tempo esgotado ao carregar suas permissões"
+        // Super admin gets full access regardless of clients/team_members
+        const { data: isSuperAdmin } = await withTimeout(
+          supabase.rpc("is_super_admin"),
+          "Tempo esgotado ao verificar super admin"
         );
         if (!mounted) return;
-        if (clientError) throw clientError;
 
-        if (clientData) {
+        if (isSuperAdmin === true) {
           setIsClientOwner(true);
           setAccessProfile(null); // full access
         } else {
+          // Check if user is a client owner
+          const { data: clientData, error: clientError } = await withTimeout(
+            supabase
+              .from("clients")
+              .select("id")
+              .eq("user_id", session.user.id)
+              .limit(1)
+              .maybeSingle(),
+            "Tempo esgotado ao carregar suas permissões"
+          );
+          if (!mounted) return;
+          if (clientError) throw clientError;
+
+          if (clientData) {
+            setIsClientOwner(true);
+            setAccessProfile(null); // full access
+          } else {
           // Check if user is a team member
           const { data: teamData, error: teamError } = await withTimeout(
             supabase
