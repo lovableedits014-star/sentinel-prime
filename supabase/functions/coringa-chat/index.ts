@@ -106,6 +106,69 @@ const TOOLS = [
       parameters: { type: "object", properties: {} },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_comentarios_recentes",
+      description:
+        "Lista comentários recentes coletados de redes sociais (Facebook/Instagram), com sentimento. Use para perguntas sobre engajamento, reação do público, comentários positivos/negativos.",
+      parameters: {
+        type: "object",
+        properties: {
+          sentiment: { type: "string", enum: ["positive", "negative", "neutral"], description: "Filtra por sentimento. Opcional." },
+          dias: { type: "number", description: "Janela em dias (default 7)." },
+          texto: { type: "string", description: "Busca por trecho dentro do comentário. Opcional." },
+          limit: { type: "number", description: "Máximo de resultados (default 15, máx 30)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_dossie_narrativa",
+      description:
+        "Retorna o último dossiê de narrativa gerado (município, indicadores, conteúdos prontos como discursos/manchetes/ataques).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_adversarios",
+      description: "Lista os adversários políticos cadastrados (nome, cargo, partido, observações).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_checkins_recentes",
+      description: "Últimos check-ins de apoiadores em eventos/territórios.",
+      parameters: {
+        type: "object",
+        properties: {
+          dias: { type: "number", description: "Janela em dias (default 14)." },
+          limit: { type: "number", description: "Máximo (default 20, máx 50)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ajuda_sistema",
+      description:
+        "Explica como usar uma tela ou recurso do Sentinelle (CRM, Inteligência de Conteúdo, Dashboard, Disparos, Narrativa, Militância, Configurações). Use sempre que o usuário pedir 'como faço para…', 'onde encontro…', 'como funciona…'.",
+      parameters: {
+        type: "object",
+        properties: {
+          topico: { type: "string", description: "Tópico/recurso perguntado (ex.: 'crm', 'transcricao', 'disparo', 'integracoes', 'narrativa')." },
+        },
+        required: ["topico"],
+      },
+    },
+  },
 ];
 
 // =============== TOOL EXECUTORS ===============
@@ -210,6 +273,79 @@ async function execTool(admin: any, clientId: string, name: string, args: any): 
           .limit(20);
         return { count: data?.length || 0, sugestoes: data || [] };
       }
+      case "consultar_comentarios_recentes": {
+        const dias = Math.min(Math.max(Number(args.dias) || 7, 1), 60);
+        const since = new Date(Date.now() - dias * 86400000).toISOString();
+        let q = admin
+          .from("comments")
+          .select("id, message, sentiment, author_name, created_time, post_id")
+          .eq("client_id", clientId)
+          .gte("created_time", since)
+          .order("created_time", { ascending: false })
+          .limit(Math.min(Number(args.limit) || 15, 30));
+        if (args.sentiment) q = q.eq("sentiment", args.sentiment);
+        if (args.texto) q = q.ilike("message", `%${String(args.texto)}%`);
+        const { data, error } = await q;
+        if (error) return { error: error.message };
+        return { count: data?.length || 0, comentarios: data || [], janela_dias: dias };
+      }
+      case "consultar_dossie_narrativa": {
+        const { data } = await admin
+          .from("narrativa_dossies")
+          .select("id, status, conteudos, dados_brutos, generated_at, created_at")
+          .eq("client_id", clientId)
+          .eq("status", "pronto")
+          .order("generated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!data) return { vazio: true };
+        return {
+          id: data.id,
+          gerado_em: data.generated_at,
+          municipio: data.dados_brutos?.meta || null,
+          conteudos: data.conteudos || null,
+        };
+      }
+      case "consultar_adversarios": {
+        const { data, error } = await admin
+          .from("adversarios_politicos")
+          .select("nome, cargo, partido, observacoes, created_at")
+          .eq("client_id", clientId)
+          .limit(30);
+        if (error) return { error: error.message };
+        return { count: data?.length || 0, adversarios: data || [] };
+      }
+      case "consultar_checkins_recentes": {
+        const dias = Math.min(Math.max(Number(args.dias) || 14, 1), 90);
+        const since = new Date(Date.now() - dias * 86400000).toISOString();
+        const { data, error } = await admin
+          .from("supporter_checkins")
+          .select("id, pessoa_id, local, observacao, created_at")
+          .eq("client_id", clientId)
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(Math.min(Number(args.limit) || 20, 50));
+        if (error) return { error: error.message };
+        return { count: data?.length || 0, checkins: data || [], janela_dias: dias };
+      }
+      case "ajuda_sistema": {
+        const t = String(args.topico || "").toLowerCase();
+        const guia: Record<string, string> = {
+          crm: "CRM (menu Pessoas): cadastre apoiadores, defina nivel_apoio, bairro, cidade, telefone. Use filtros para segmentar e exporte/dispare.",
+          transcricao: "Inteligência de Conteúdo → Transcrições: faça upload de áudios/vídeos do candidato. O sistema transcreve, extrai fatos para a memória e alimenta o radar.",
+          disparo: "Disparos: a IA sugere mensagens segmentadas por bairro/perfil. Aprove em Disparos → Sugestões. Configure WhatsApp em Configurações → Integrações.",
+          integracoes: "Configurações → Integrações: conecte Meta (FB/IG) com token de longa duração e configure o Provedor de IA (OpenAI/Groq/Gemini/Lovable AI).",
+          narrativa: "Narrativa: gere dossiês por município com discursos, ataques, manchetes e roteiro estratégico — alimentado por dados públicos e pelo perfil do candidato.",
+          radar: "Radar IC: snapshot diário com hot topics, perguntas em aberto, narrativas hostis e alertas de crise.",
+          dashboard: "Dashboard: visão geral com novos cadastros, check-ins, sentimento de comentários e principais bairros ativos.",
+          militancia: "Militância: rede de apoiadores ativos, indicações e check-ins em eventos.",
+          configuracoes: "Configurações: Provedor de IA (escolha provedor + modelo + API key), Integrações Meta, Equipe e dados do candidato.",
+        };
+        const matched = Object.keys(guia).find((k) => t.includes(k));
+        return matched
+          ? { topico: matched, instrucoes: guia[matched] }
+          : { topico: t, instrucoes: "Tópicos disponíveis: crm, transcricao, disparo, integracoes, narrativa, radar, dashboard, militancia, configuracoes." };
+      }
       default:
         return { error: `Tool desconhecida: ${name}` };
     }
@@ -271,18 +407,29 @@ Deno.serve(async (req) => {
       .eq("id", clientId)
       .maybeSingle();
 
-    const systemPrompt = `Você é o "Coringa", assistente IA estratégico do mandato/campanha de ${client?.nome_candidato || "o candidato"} (${client?.cargo_pretendido || "candidato"}).
+    const systemPrompt = `Você é o **Sentinelle Bot**, assistente IA estratégico do mandato/campanha de ${client?.nome_candidato || "o candidato"} (${client?.cargo_pretendido || "candidato"}${client?.partido ? ` — ${client.partido}` : ""}${client?.regiao_atuacao ? `, ${client.regiao_atuacao}` : ""}).
 
-Você tem acesso direto ao banco de dados real (CRM, métricas, memória da fala do candidato, radar de inteligência) através de ferramentas. SEMPRE use as ferramentas para responder com dados reais — NUNCA invente números ou nomes.
+Você é o **super assistente** do sistema Sentinelle. Você tem acesso TOTAL ao banco de dados real do cliente através de ferramentas:
+- **CRM**: pessoas/apoiadores, bairros, contatos (consultar_pessoas, contar_pessoas)
+- **Inteligência de Conteúdo**: memória da fala do candidato, transcrições, radar diário (consultar_memoria, consultar_transcricoes_recentes, consultar_radar_ic)
+- **Engajamento social**: comentários FB/IG com sentimento (consultar_comentarios_recentes)
+- **Dashboard**: métricas-chave (consultar_metricas, consultar_checkins_recentes)
+- **Narrativa**: dossiês, discursos, ataques (consultar_dossie_narrativa)
+- **Disparos**: sugestões de mensagem (consultar_sugestoes_disparo)
+- **Adversários**: base política (consultar_adversarios)
+- **Ajuda do sistema**: como usar cada tela (ajuda_sistema)
 
-REGRAS:
-- Português do Brasil, tom direto e estratégico.
-- Quando o usuário pedir números, use 'consultar_metricas' ou 'contar_pessoas'.
-- Quando perguntar o que o candidato falou/prometeu, use 'consultar_memoria'.
-- Quando perguntar sobre território/bairro, combine 'consultar_memoria' (com bairro) e 'contar_pessoas' (com bairro).
-- Apresente respostas em markdown (use **negrito**, listas, etc).
-- Se a ferramenta retornar vazio, diga claramente que não há dados — não invente.
-- Sempre que possível, sugira UMA ação prática no final (ex: "posso preparar um disparo para a Moreninha 4?").`;
+REGRAS DE OURO:
+1. **SEMPRE chame as ferramentas** para responder com dados reais — NUNCA invente números, nomes ou bairros.
+2. Para perguntas sobre quantidade/números → use \`contar_pessoas\` ou \`consultar_metricas\`.
+3. Para perguntas sobre território/bairro → combine \`contar_pessoas\` (filtro bairro) + \`consultar_memoria\` (filtro bairro).
+4. Para perguntas sobre o que o candidato falou/prometeu → \`consultar_memoria\`.
+5. Para "como faço/onde encontro/como funciona X no sistema" → \`ajuda_sistema\`.
+6. Para reações do público → \`consultar_comentarios_recentes\` (filtre por sentimento se útil).
+7. Se a ferramenta retornar vazio, diga claramente "não há dados sobre X no sistema" — não invente.
+8. Português do Brasil, tom direto, estratégico, em **markdown** (negrito, listas).
+9. Termine sempre com **UMA** sugestão prática (ex.: "Quer que eu prepare um disparo para o bairro X?").
+10. Ao chamar funções, use SEMPRE booleanos verdadeiros (true/false) e números — nunca strings como "falso" ou "não informada". Se um filtro não se aplica, **omita** o campo.`;
 
     // Monta histórico
     const baseMessages: any[] = [{ role: "system", content: systemPrompt }];
@@ -342,10 +489,35 @@ REGRAS:
             status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (status === 400 && /tool calling/i.test(e?.message || "")) {
-          return new Response(JSON.stringify({ error: e.message }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+        // tool_use_failed (Groq) ou similar: o modelo é fraco para tools.
+        // Faz fallback: refaz a chamada SEM tools para obter ao menos uma resposta textual.
+        const body = e?.providerBody || e?.message || "";
+        if (status === 400 && /tool_use_failed|failed to call a function|tool calling/i.test(body)) {
+          try {
+            const fallback = await callLLMRaw(llmConfig, {
+              messages: [
+                ...messages,
+                {
+                  role: "system",
+                  content:
+                    "Importante: o provedor de IA atual não conseguiu chamar funções. Responda com base no contexto já disponível, em português, e oriente o usuário a reformular a pergunta de forma mais simples — ou recomende trocar o modelo nas Configurações para um mais robusto (ex.: llama-3.3-70b, gpt-4o-mini ou Lovable AI).",
+                },
+              ],
+              temperature: 0.3,
+            });
+            finalText =
+              fallback?.choices?.[0]?.message?.content ||
+              "O modelo de IA configurado não suporta bem chamadas de ferramentas. Troque para um modelo mais robusto em Configurações → Provedor de IA (ex.: llama-3.3-70b-versatile, gpt-4o-mini ou Lovable AI).";
+            break;
+          } catch (_) {
+            return new Response(
+              JSON.stringify({
+                error:
+                  "O modelo configurado não suporta tool calling de forma confiável. Troque o modelo em Configurações → Provedor de IA (recomendado: llama-3.3-70b-versatile, gpt-4o-mini ou Lovable AI).",
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
         }
         console.error("LLM error:", e?.message);
         throw e;

@@ -112,6 +112,21 @@ export function isOpenAICompatible(provider: LLMProvider): boolean {
   return OPENAI_COMPATIBLE.includes(provider);
 }
 
+// Models that don't reliably support OpenAI-style tool calling.
+// When these are selected and tools are requested, we auto-upgrade to a tools-capable sibling.
+const TOOLS_UPGRADE_MAP: Record<string, string> = {
+  // Groq: 8b is fraco para tools — sobe para 70b versatile
+  'llama-3.1-8b-instant': 'llama-3.3-70b-versatile',
+  'llama3-8b-8192': 'llama-3.3-70b-versatile',
+  'mixtral-8x7b-32768': 'llama-3.3-70b-versatile',
+};
+
+/** Returns a tools-capable model for the given provider/model pair. */
+export function pickToolsCapableModel(provider: LLMProvider, model: string): string {
+  if (provider === 'groq' && TOOLS_UPGRADE_MAP[model]) return TOOLS_UPGRADE_MAP[model];
+  return model;
+}
+
 export async function callLLMRaw(
   config: LLMConfig,
   body: Record<string, any>,
@@ -123,6 +138,9 @@ export async function callLLMRaw(
     err.status = 400;
     throw err;
   }
+  // Auto-upgrade weak models when caller is using tools
+  const usesTools = Array.isArray((body as any).tools) && (body as any).tools.length > 0;
+  const effectiveModel = usesTools ? pickToolsCapableModel(config.provider, config.model) : config.model;
   const endpoint = PROVIDER_ENDPOINTS[config.provider];
   const resp = await fetch(endpoint, {
     method: 'POST',
@@ -130,7 +148,7 @@ export async function callLLMRaw(
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ model: config.model, ...body }),
+    body: JSON.stringify({ model: effectiveModel, ...body }),
   });
   if (!resp.ok) {
     const txt = await resp.text();
