@@ -309,27 +309,8 @@ async function registerContratadoHandler(req: Request): Promise<Response> {
     if (createError) {
       console.error("Error creating user:", createError);
       if (createError.code === "email_exists" || createError.message.includes("already been registered")) {
-        let page = 1;
-        const perPage = 200;
-        while (true) {
-          const { data: usersPage, error: listError } = await adminClient.auth.admin.listUsers({ page, perPage });
-          if (listError) {
-            console.error("Error listing users:", listError);
-            break;
-          }
-          const found = usersPage.users.find((user) => (user.email || "").toLowerCase() === normalizedEmail);
-          if (found) {
-            authUserId = found.id;
-            await adminClient.auth.admin.updateUserById(found.id, { password: senha });
-            break;
-          }
-          if (usersPage.users.length < perPage) break;
-          page += 1;
-        }
-
-        if (!authUserId) {
-          return jsonResponse(409, { error: "Este e-mail já possui conta, mas não foi possível vinculá-la agora. Tente novamente." });
-        }
+        // SECURITY: refuse to reset an existing account's password from a public endpoint.
+        return jsonResponse(409, { error: "Este e-mail já possui uma conta. Faça login ou recupere a senha." });
       } else {
         return jsonResponse(400, { error: createError.message });
       }
@@ -438,21 +419,8 @@ async function registerFuncionarioHandler(req: Request): Promise<Response> {
 
     if (createError) {
       if (createError.code === "email_exists" || createError.message.includes("already been registered")) {
-        let page = 1;
-        const perPage = 200;
-        while (true) {
-          const { data: usersPage, error: listError } = await adminClient.auth.admin.listUsers({ page, perPage });
-          if (listError) break;
-          const found = usersPage.users.find((user) => (user.email || "").toLowerCase() === normalizedEmail);
-          if (found) {
-            authUserId = found.id;
-            await adminClient.auth.admin.updateUserById(found.id, { password: senha });
-            break;
-          }
-          if (usersPage.users.length < perPage) break;
-          page += 1;
-        }
-        if (!authUserId) return jsonResponse(409, { error: "Este e-mail já possui conta, mas não foi possível vinculá-la." });
+        // SECURITY: refuse to reset an existing account's password from a public endpoint.
+        return jsonResponse(409, { error: "Este e-mail já possui uma conta. Faça login ou recupere a senha." });
       } else {
         return jsonResponse(400, { error: createError.message });
       }
