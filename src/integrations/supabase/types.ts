@@ -5367,6 +5367,16 @@ export type Database = {
         Args: { p_client_id: string; p_nome: string; p_redes: Json }
         Returns: string
       }
+      get_active_campaign_frames: {
+        Args: { _client_id: string }
+        Returns: {
+          composition: Json
+          display_order: number
+          id: string
+          image_url: string
+          nome: string
+        }[]
+      }
       get_candidate_breakdown: {
         Args: {
           p_anos?: number[]

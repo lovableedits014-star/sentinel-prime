@@ -48,12 +48,7 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
   useEffect(() => {
     if (!open || !clientId) return;
     (async () => {
-      const { data } = await supabase
-        .from("campaign_frames")
-        .select("id, nome, image_url, composition")
-        .eq("client_id", clientId)
-        .eq("is_active", true)
-        .order("display_order", { ascending: true });
+      const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
       const list = (data ?? []) as any as Frame[];
       setFrames(list);
       if (list.length > 0 && !selectedFrame) setSelectedFrame(list[0]);
@@ -64,14 +59,8 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
   useEffect(() => {
     if (variant !== "showcase" || !clientId) return;
     (async () => {
-      const { data } = await supabase
-        .from("campaign_frames")
-        .select("id, nome, image_url, composition")
-        .eq("client_id", clientId)
-        .eq("is_active", true)
-        .order("display_order", { ascending: true })
-        .limit(1);
-      const first = (data?.[0] ?? null) as any as Frame | null;
+      const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
+      const first = ((data ?? [])[0] ?? null) as any as Frame | null;
       setShowcaseFrame(first);
     })();
   }, [variant, clientId]);
