@@ -111,7 +111,16 @@ export default function Engagement() {
         </TabsList>
 
         <TabsContent value="influenciadores">
-          {client?.id && <InfluenciadoresTab clientId={client.id} />}
+          {client?.id ? (
+            <InfluenciadoresTab clientId={client.id} />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Nenhum cliente vinculado a este usuário. Esta página exibe influenciadores
+                por cliente — acesse com uma conta vinculada a um cliente para visualizar os dados.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="config">
