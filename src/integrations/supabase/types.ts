@@ -88,15 +88,24 @@ export type Database = {
           author_id: string | null
           author_name: string | null
           author_profile_picture: string | null
+          author_unavailable: boolean
+          author_unavailable_reason: string | null
           client_id: string
+          comment_created_time: string | null
           comment_id: string
           created_at: string | null
           final_response: string | null
           id: string
           platform: string | null
+          platform_user_id: string | null
+          post_full_picture: string | null
           post_id: string
+          post_media_type: string | null
+          post_message: string | null
+          post_permalink_url: string | null
           responded_at: string | null
           sentiment: Database["public"]["Enums"]["sentiment_type"] | null
+          social_profile_id: string | null
           status: Database["public"]["Enums"]["comment_status"] | null
           text: string
           updated_at: string | null
@@ -106,15 +115,24 @@ export type Database = {
           author_id?: string | null
           author_name?: string | null
           author_profile_picture?: string | null
+          author_unavailable?: boolean
+          author_unavailable_reason?: string | null
           client_id: string
+          comment_created_time?: string | null
           comment_id: string
           created_at?: string | null
           final_response?: string | null
           id?: string
           platform?: string | null
+          platform_user_id?: string | null
+          post_full_picture?: string | null
           post_id: string
+          post_media_type?: string | null
+          post_message?: string | null
+          post_permalink_url?: string | null
           responded_at?: string | null
           sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
+          social_profile_id?: string | null
           status?: Database["public"]["Enums"]["comment_status"] | null
           text: string
           updated_at?: string | null
@@ -124,15 +142,24 @@ export type Database = {
           author_id?: string | null
           author_name?: string | null
           author_profile_picture?: string | null
+          author_unavailable?: boolean
+          author_unavailable_reason?: string | null
           client_id?: string
+          comment_created_time?: string | null
           comment_id?: string
           created_at?: string | null
           final_response?: string | null
           id?: string
           platform?: string | null
+          platform_user_id?: string | null
+          post_full_picture?: string | null
           post_id?: string
+          post_media_type?: string | null
+          post_message?: string | null
+          post_permalink_url?: string | null
           responded_at?: string | null
           sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
+          social_profile_id?: string | null
           status?: Database["public"]["Enums"]["comment_status"] | null
           text?: string
           updated_at?: string | null
@@ -142,6 +169,117 @@ export type Database = {
             foreignKeyName: "comments_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_social_profile_id_fkey"
+            columns: ["social_profile_id"]
+            isOneToOne: false
+            referencedRelation: "social_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_actions: {
+        Row: {
+          action_date: string
+          action_type: string
+          client_id: string
+          comment_id: string | null
+          created_at: string
+          id: string
+          platform: string
+          platform_user_id: string | null
+          platform_username: string | null
+          post_id: string | null
+          reaction_type: string | null
+          supporter_id: string | null
+        }
+        Insert: {
+          action_date?: string
+          action_type: string
+          client_id: string
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          platform?: string
+          platform_user_id?: string | null
+          platform_username?: string | null
+          post_id?: string | null
+          reaction_type?: string | null
+          supporter_id?: string | null
+        }
+        Update: {
+          action_date?: string
+          action_type?: string
+          client_id?: string
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          platform?: string
+          platform_user_id?: string | null
+          platform_username?: string | null
+          post_id?: string | null
+          reaction_type?: string | null
+          supporter_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_actions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_actions_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_config: {
+        Row: {
+          client_id: string
+          comment_points: number
+          created_at: string
+          id: string
+          inactivity_days: number
+          like_points: number
+          reaction_points: number
+          share_points: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          comment_points?: number
+          created_at?: string
+          id?: string
+          inactivity_days?: number
+          like_points?: number
+          reaction_points?: number
+          share_points?: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          comment_points?: number
+          created_at?: string
+          id?: string
+          inactivity_days?: number
+          like_points?: number
+          reaction_points?: number
+          share_points?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
@@ -262,6 +400,144 @@ export type Database = {
           },
         ]
       }
+      social_profiles: {
+        Row: {
+          avatar_url: string | null
+          client_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          last_seen: string
+          platform: string
+          platform_user_id: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          client_id: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_seen?: string
+          platform: string
+          platform_user_id: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          client_id?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_seen?: string
+          platform?: string
+          platform_user_id?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supporter_profiles: {
+        Row: {
+          created_at: string | null
+          id: string
+          platform: string
+          platform_user_id: string
+          platform_username: string | null
+          profile_picture_url: string | null
+          supporter_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          platform: string
+          platform_user_id: string
+          platform_username?: string | null
+          profile_picture_url?: string | null
+          supporter_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          platform?: string
+          platform_user_id?: string
+          platform_username?: string | null
+          profile_picture_url?: string | null
+          supporter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supporter_profiles_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supporters: {
+        Row: {
+          classification:
+            | Database["public"]["Enums"]["supporter_classification"]
+            | null
+          client_id: string
+          created_at: string | null
+          engagement_score: number | null
+          first_contact_date: string | null
+          id: string
+          last_interaction_date: string | null
+          name: string
+          notes: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          classification?:
+            | Database["public"]["Enums"]["supporter_classification"]
+            | null
+          client_id: string
+          created_at?: string | null
+          engagement_score?: number | null
+          first_contact_date?: string | null
+          id?: string
+          last_interaction_date?: string | null
+          name: string
+          notes?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          classification?:
+            | Database["public"]["Enums"]["supporter_classification"]
+            | null
+          client_id?: string
+          created_at?: string | null
+          engagement_score?: number | null
+          first_contact_date?: string | null
+          id?: string
+          last_interaction_date?: string | null
+          name?: string
+          notes?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supporters_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -288,6 +564,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_engagement_score: {
+        Args: { p_days?: number; p_supporter_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -307,6 +587,11 @@ export type Database = {
         | "mistral"
         | "cohere"
       sentiment_type: "positive" | "neutral" | "negative"
+      supporter_classification:
+        | "apoiador_ativo"
+        | "apoiador_passivo"
+        | "neutro"
+        | "critico"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -445,6 +730,12 @@ export const Constants = {
         "cohere",
       ],
       sentiment_type: ["positive", "neutral", "negative"],
+      supporter_classification: [
+        "apoiador_ativo",
+        "apoiador_passivo",
+        "neutro",
+        "critico",
+      ],
     },
   },
 } as const
