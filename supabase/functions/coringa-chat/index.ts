@@ -305,46 +305,53 @@ REGRAS:
       }).then(() => {});
     }
 
-    // Loop de tool calling (até 4 rodadas) — não-streaming na fase 1 p/ permitir tools simples
+    // Configuração de IA central (Settings → Provedor de IA)
+    let llmConfig;
+    try {
+      llmConfig = await getClientLLMConfig(admin, clientId);
+    } catch (e) {
+      return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "IA não configurada" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Loop de tool calling (até 4 rodadas)
     let messages = baseMessages;
     let finalText = "";
     const toolsExecuted: any[] = [];
 
     for (let round = 0; round < 4; round++) {
-      const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+      let data: any;
+      try {
+        data = await callLLMRaw(llmConfig, {
           messages,
           tools: TOOLS,
           tool_choice: "auto",
           temperature: 0.4,
-        }),
-      });
-
-      if (!aiResp.ok) {
-        const errText = await aiResp.text();
-        if (aiResp.status === 429) {
+        });
+      } catch (e: any) {
+        const status = e?.status || 500;
+        if (status === 429) {
           return new Response(JSON.stringify({ error: "Limite de requisições atingido. Tente em alguns segundos." }), {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (aiResp.status === 402) {
-          return new Response(JSON.stringify({ error: "Créditos da IA esgotados. Adicione créditos no workspace." }), {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        if (status === 402) {
+          return new Response(JSON.stringify({ error: "Créditos da IA esgotados. Adicione créditos no provedor configurado." }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        console.error("AI gateway error:", aiResp.status, errText);
-        throw new Error(`AI gateway: ${aiResp.status}`);
+        if (status === 400 && /tool calling/i.test(e?.message || "")) {
+          return new Response(JSON.stringify({ error: e.message }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        console.error("LLM error:", e?.message);
+        throw e;
       }
 
-      const data = await aiResp.json();
+
       const choice = data.choices?.[0];
       const msg = choice?.message;
       if (!msg) throw new Error("Resposta vazia da IA");
