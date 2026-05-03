@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Phone, Plus, Trash2, Copy, ExternalLink, CheckCircle2, KeyRound } from "lucide-react";
+import { Phone, Plus, Trash2, KeyRound, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Operador {
@@ -150,6 +150,15 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
                       {op.ativo ? "Ativo" : "Inativo"}
                     </Badge>
                     <Switch checked={op.ativo} onCheckedChange={() => toggleAtivo(op)} />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      title="Redefinir senha"
+                      onClick={() => { setResetTarget(op); setResetSenha(""); }}
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                    </Button>
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDelete(op.id)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -159,6 +168,37 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
             </div>
           )}
         </div>
+
+        {resetTarget && (
+          <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+            <p className="text-sm font-medium">Redefinir senha de {resetTarget.nome}</p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nova senha"
+                value={resetSenha}
+                onChange={(e) => setResetSenha(e.target.value)}
+                className="h-9 text-sm flex-1"
+              />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  if (!resetSenha.trim()) { toast.error("Informe a nova senha"); return; }
+                  const { error } = await supabase
+                    .from("telemarketing_operadores")
+                    .update({ senha: resetSenha.trim() } as any)
+                    .eq("id", resetTarget.id);
+                  if (error) { toast.error("Erro: " + error.message); return; }
+                  toast.success("Senha atualizada");
+                  setResetTarget(null);
+                  setResetSenha("");
+                }}
+              >
+                Salvar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setResetTarget(null)}>Cancelar</Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
