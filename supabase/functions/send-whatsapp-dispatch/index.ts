@@ -617,8 +617,29 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Fallback legado
-          if (!bridgeUrl && hasLegacyBridge) {
+          // Fallback 1: se o RPC não escolheu (ex.: health-check atrasado),
+          // mas existe uma instância conectada e ativa do pool, use-a direto.
+          // A chave legada salva em clients.* costuma estar vencida, então
+          // SÓ caímos no legado quando NÃO há instância ativa no pool.
+          if (!bridgeUrl) {
+            const { data: anyActive } = await adminClient
+              .from("whatsapp_instances")
+              .select("id, bridge_url, bridge_api_key, status")
+              .eq("client_id", client_id)
+              .eq("is_active", true)
+              .not("bridge_api_key", "is", null)
+              .order("status", { ascending: true }) // 'connected' < 'connecting' alfabeticamente
+              .limit(1)
+              .maybeSingle();
+            if (anyActive?.bridge_url && anyActive?.bridge_api_key) {
+              bridgeUrl = anyActive.bridge_url;
+              bridgeApiKey = anyActive.bridge_api_key;
+              instanceId = anyActive.id;
+            }
+          }
+
+          // Fallback 2 (legado): só se NÃO existe nenhuma instância no pool
+          if (!bridgeUrl && hasLegacyBridge && (poolCount ?? 0) === 0) {
             bridgeUrl = clientData.whatsapp_bridge_url!;
             bridgeApiKey = clientData.whatsapp_bridge_api_key!;
           }
