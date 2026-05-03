@@ -297,13 +297,13 @@ const DashboardLayout = () => {
     );
   }
 
-  // Filter menu items based on access profile
-  const filteredSections = MENU_SECTIONS.map(section => ({
+  // Filter menu items based on access profile (memoized — evita recriar a cada render)
+  const filteredSections = useMemo(() => MENU_SECTIONS.map(section => ({
     ...section,
     items: section.items.filter(item =>
       isClientOwner || !accessProfile || isPathAllowed(accessProfile, item.path)
     ),
-  })).filter(section => section.items.length > 0);
+  })).filter(section => section.items.length > 0), [isClientOwner, accessProfile]);
 
   const NavItem = ({ item, mobile = false }: { item: { icon: any; label: string; path: string }; mobile?: boolean }) => {
     const Icon = item.icon;
