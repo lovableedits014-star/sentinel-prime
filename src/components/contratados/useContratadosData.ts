@@ -120,6 +120,22 @@ export interface DiagStep {
   detail?: string;
 }
 
+const CACHE_TTL_MS = 5 * 60_000;
+const cacheKey = (uid: string) => `contratados-cache:${uid}`;
+type CacheShape = { ts: number; clientId: string; clientName: string; contratados: Contratado[]; indicados: Indicado[]; checkinStats: Record<string, CheckinAgg> };
+const readCache = (uid: string): CacheShape | null => {
+  try {
+    const raw = sessionStorage.getItem(cacheKey(uid));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CacheShape;
+    if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
+    return parsed;
+  } catch { return null; }
+};
+const writeCache = (uid: string, data: Omit<CacheShape, "ts">) => {
+  try { sessionStorage.setItem(cacheKey(uid), JSON.stringify({ ...data, ts: Date.now() })); } catch {}
+};
+
 export function useContratadosData() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
@@ -133,6 +149,21 @@ export function useContratadosData() {
   const loadSeq = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Hidratação instantânea via snapshot da sessão
+  useEffect(() => {
+    const u = getStoredAuthState()?.user || getStoredAuthUser();
+    if (!u) return;
+    const snap = readCache(u.id);
+    if (snap) {
+      setClientId(snap.clientId);
+      setClientName(snap.clientName);
+      setContratados(snap.contratados);
+      setIndicados(snap.indicados);
+      setCheckinStats(snap.checkinStats);
+      setLoading(false);
+    }
+  }, []);
+
   const clearRetryTimer = useCallback(() => {
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
@@ -143,7 +174,8 @@ export function useContratadosData() {
   const load = useCallback(async (attempt = 0): Promise<void> => {
     clearRetryTimer();
     const seq = ++loadSeq.current;
-    setLoading(true);
+    // Só mostra spinner global se não há dados em tela (evita "piscar" ao revalidar)
+    setContratados((prev) => { if (prev.length === 0) setLoading(true); return prev; });
     setLoadError(null);
     setRetryAttempt(attempt);
     setDiagnostics([]);
@@ -258,8 +290,10 @@ export function useContratadosData() {
         return rows as T[];
       };
 
-      setContratados(readRows<Contratado>(contRes, "contratados", contStep));
-      setIndicados(readRows<Indicado>(indRes, "indicados", indStep));
+      const cont = readRows<Contratado>(contRes, "contratados", contStep);
+      const ind = readRows<Indicado>(indRes, "indicados", indStep);
+      setContratados(cont);
+      setIndicados(ind);
 
       const stats: Record<string, CheckinAgg> = {};
       readRows<any>(checkRes, "check-ins", checkStep).forEach((c: any) => {
@@ -268,6 +302,10 @@ export function useContratadosData() {
         if (!stats[c.contratado_id].last) stats[c.contratado_id].last = c.checkin_date;
       });
       setCheckinStats(stats);
+
+      if (!hadFailure && user?.id) {
+        writeCache(user.id, { clientId: client.id, clientName: client.name, contratados: cont, indicados: ind, checkinStats: stats });
+      }
     } catch (err) {
       console.error("[Contratados] ✗ erro fatal:", err);
       fatalError = err;

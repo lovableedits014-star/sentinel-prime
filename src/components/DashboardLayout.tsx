@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { isPathAllowed, getRoleLabels, type AccessProfile } from "@/lib/access-control";
 import { CoringaButton } from "@/components/coringa/CoringaButton";
-import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 const AUTH_CHECK_TIMEOUT_MS = 12000;
 
@@ -115,8 +114,7 @@ const DashboardLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accessProfile, setAccessProfile] = useState<AccessProfile | null>(null);
   const [isClientOwner, setIsClientOwner] = useState(false);
-  // Server-side check via is_super_admin() RPC.
-  const { isSuperAdmin } = useIsSuperAdmin();
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const refreshAllData = useCallback(() => {
     queryClient.invalidateQueries();
@@ -151,9 +149,11 @@ const DashboardLayout = () => {
         if (!mounted) return;
 
         if (isSuperAdmin === true) {
+          setIsSuperAdmin(true);
           setIsClientOwner(true);
           setAccessProfile(null); // full access
         } else {
+          setIsSuperAdmin(false);
           // Check if user is a client owner
           const { data: clientData, error: clientError } = await withTimeout(
             supabase
@@ -198,7 +198,6 @@ const DashboardLayout = () => {
         }
 
         setLoading(false);
-        refreshAllData();
       } catch (error: any) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
@@ -226,7 +225,8 @@ const DashboardLayout = () => {
         navigate("/auth", { replace: true });
       } else {
         setUser(session.user);
-        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") refreshAllData();
+        // Só invalida cache em SIGNED_IN explícito; TOKEN_REFRESHED não deve forçar refetch geral.
+        if (event === "SIGNED_IN") refreshAllData();
       }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
@@ -297,13 +297,13 @@ const DashboardLayout = () => {
     );
   }
 
-  // Filter menu items based on access profile
-  const filteredSections = MENU_SECTIONS.map(section => ({
+  // Filter menu items based on access profile (memoized — evita recriar a cada render)
+  const filteredSections = useMemo(() => MENU_SECTIONS.map(section => ({
     ...section,
     items: section.items.filter(item =>
       isClientOwner || !accessProfile || isPathAllowed(accessProfile, item.path)
     ),
-  })).filter(section => section.items.length > 0);
+  })).filter(section => section.items.length > 0), [isClientOwner, accessProfile]);
 
   const NavItem = ({ item, mobile = false }: { item: { icon: any; label: string; path: string }; mobile?: boolean }) => {
     const Icon = item.icon;
