@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Briefcase, Search, Users, QrCode, Loader2, FileText,
   CheckCircle2, AlertCircle, PhoneCall, Crown, Copy, RefreshCw,
-  ChevronLeft, ChevronRight, Inbox, UserX,
+  ChevronLeft, ChevronRight, Inbox, UserX, Circle, ClipboardCopy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,14 +18,68 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import ContratadosSubNav from "@/components/contratados/ContratadosSubNav";
 import KpiCard from "@/components/contratados/KpiCard";
 import TeamTree from "@/components/contratados/TeamTree";
-import { useContratadosData } from "@/components/contratados/useContratadosData";
+import { useContratadosData, type DiagStep } from "@/components/contratados/useContratadosData";
 import ContractTemplatesManager from "@/components/contratados/ContractTemplatesManager";
 import TelemarketingResultsPanel from "@/components/contratados/TelemarketingResultsPanel";
+
+function DiagnosticsPanel({ steps, loadError, retryAttempt }: { steps: DiagStep[]; loadError: string | null; retryAttempt: number }) {
+  if (!steps || steps.length === 0) return null;
+  const copy = async () => {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      retryAttempt,
+      loadError,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      steps,
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      toast.success("Diagnóstico copiado");
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
+  };
+  const Icon = ({ s }: { s: DiagStep }) => {
+    if (s.status === "ok") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
+    if (s.status === "error") return <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />;
+    if (s.status === "pending") return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />;
+    return <Circle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />;
+  };
+  return (
+    <details className="mt-3 rounded-md border border-border/60 bg-background/60 text-xs">
+      <summary className="cursor-pointer select-none px-3 py-2 font-medium text-foreground/80 hover:text-foreground">
+        Ver diagnóstico detalhado ({steps.length} etapas)
+      </summary>
+      <div className="border-t border-border/60 p-3 space-y-1.5">
+        {steps.map((s) => (
+          <div key={s.key} className="flex items-start gap-2">
+            <Icon s={s} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-foreground/90">{s.label}</span>
+                {typeof s.durationMs === "number" && (
+                  <span className="text-[10px] text-muted-foreground tabular-nums">{s.durationMs}ms</span>
+                )}
+              </div>
+              {s.detail && <div className="mt-0.5 break-all font-mono text-[10px] text-muted-foreground">{s.detail}</div>}
+            </div>
+          </div>
+        ))}
+        <div className="pt-2 flex justify-end">
+          <Button size="sm" variant="ghost" onClick={copy} className="h-7 gap-1.5 text-xs">
+            <ClipboardCopy className="h-3 w-3" />
+            Copiar diagnóstico
+          </Button>
+        </div>
+      </div>
+    </details>
+  );
+}
 
 export default function Contratados() {
   const {
     clientId, clientName, contratados, setContratados,
-    indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, reload,
+    indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, diagnostics, reload,
   } = useContratadosData();
 
   const [search, setSearch] = useState("");
@@ -91,31 +145,47 @@ export default function Contratados() {
   const registrationUrl = clientId ? `${window.location.origin}/contratado/${clientId}` : "";
   const portalUrl = clientId ? `${window.location.origin}/portal-contratado/${clientId}` : "";
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (loading) return (
+    <div className="p-4 md:p-6">
+      <ContratadosSubNav />
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Carregando aba Contratados…</p>
+        {diagnostics.length > 0 && (
+          <div className="w-full max-w-xl rounded-lg border border-border/60 bg-muted/30 p-4">
+            <DiagnosticsPanel steps={diagnostics} loadError={loadError} retryAttempt={retryAttempt} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   // Sem cliente vinculado → estado vazio dedicado
   if (!clientId) {
     return (
       <div className="p-4 md:p-6">
         <ContratadosSubNav />
-        {loadError && (
-          <div className="mb-4 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm md:flex-row md:items-center md:justify-between">
-            <div className="flex items-start gap-2 text-destructive">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{loadError}</span>
+        {(loadError || diagnostics.length > 0) && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-2 text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{loadError || "Diagnóstico do carregamento"}</span>
+              </div>
+              <div className="flex items-center gap-2 self-start md:self-auto">
+                {retryAttempt > 0 && loading && (
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Tentativa {retryAttempt}/3
+                  </span>
+                )}
+                <Button size="sm" variant="outline" onClick={reload} className="gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Recarregar agora
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 self-start md:self-auto">
-              {retryAttempt > 0 && loading && (
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Tentativa {retryAttempt}/3
-                </span>
-              )}
-              <Button size="sm" variant="outline" onClick={reload} className="gap-1.5">
-                <RefreshCw className="h-3.5 w-3.5" />
-                Recarregar agora
-              </Button>
-            </div>
+            <DiagnosticsPanel steps={diagnostics} loadError={loadError} retryAttempt={retryAttempt} />
           </div>
         )}
         <Card className="py-16 text-center text-muted-foreground border-dashed mt-6">
@@ -141,24 +211,27 @@ export default function Contratados() {
     <div className="p-4 md:p-6">
       <ContratadosSubNav />
 
-      {loadError && (
-        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-2 text-destructive">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{loadError}</span>
+      {(loadError || diagnostics.length > 0) && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-2 text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{loadError || "Diagnóstico do carregamento"}</span>
+            </div>
+            <div className="flex items-center gap-2 self-start md:self-auto">
+              {retryAttempt > 0 && loading && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Tentativa {retryAttempt}/3
+                </span>
+              )}
+              <Button size="sm" variant="outline" onClick={reload} className="gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Recarregar agora
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            {retryAttempt > 0 && loading && (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Tentativa {retryAttempt}/3
-              </span>
-            )}
-            <Button size="sm" variant="outline" onClick={reload} className="gap-1.5">
-              <RefreshCw className="h-3.5 w-3.5" />
-              Recarregar agora
-            </Button>
-          </div>
+          {loadError && <DiagnosticsPanel steps={diagnostics} loadError={loadError} retryAttempt={retryAttempt} />}
         </div>
       )}
 

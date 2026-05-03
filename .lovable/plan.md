@@ -1,46 +1,45 @@
 ## Objetivo
 
-Adicionar retry automático com backoff exponencial e um botão claro de "Recarregar" quando o carregamento da aba Contratados falhar ou der timeout, mantendo a UI sempre responsiva.
+Adicionar diagnóstico passo-a-passo (sessão → cliente → contratados → indicados → check-ins) com logs no console e um banner expansível na aba Contratados, para identificar exatamente qual etapa trava ou falha.
 
 ## Mudanças
 
 ### 1. `src/components/contratados/useContratadosData.ts`
 
-- Adicionar constantes `MAX_RETRIES = 3` e helper `sleep`.
-- Novo estado `retryAttempt` (número da tentativa atual, 0 = primeira).
-- `useRef` `retryTimerRef` para o `setTimeout` agendado, com `clearRetryTimer` chamado no início de cada `load`, em `reload` e no `cleanup` do `useEffect`.
-- Refatorar `load(attempt = 0)`:
-  - Rastrear `hadFailure` (qualquer query rejeitada/erro) e `fatalError` (erro fatal do try/catch).
-  - Manter o comportamento atual de `Promise.allSettled` — falhas parciais agora também marcam `hadFailure`.
-  - Após o `finally`, se `hadFailure && attempt < MAX_RETRIES && seq === loadSeq.current`:
-    - Calcular `delay = min(4000, 1000 * 2^attempt)` (1s, 2s, 4s).
-    - Atualizar `loadError` com mensagem informativa: `"<motivo> — tentando novamente (n/3) em Xs..."`.
-    - Agendar `retryTimerRef.current = setTimeout(() => load(attempt+1), delay)`.
-  - Não fazer retry quando o erro for "sessão ausente" ou "cliente não vinculado" (esses retornam antes de marcar `hadFailure`).
-- `reload` exposto: limpa timer e chama `load(0)` (reinicia contagem de tentativas).
-- Retornar `retryAttempt` no objeto do hook.
+- Exportar tipos `DiagStatus = "pending" | "ok" | "error" | "skipped"` e `DiagStep { key, label, status, durationMs?, detail? }`.
+- Novo estado `diagnostics: DiagStep[]` exposto pelo hook.
+- Helpers internos `startStep(key, label)` e `finishStep(step, status, detail)` que:
+  - Atualizam o array `steps` e chamam `setDiagnostics([...steps])` (somente se `seq` ainda é o atual).
+  - Marcam `durationMs` relativo a `t0 = performance.now()`.
+- Instrumentar cada etapa do `load()`:
+  1. **Sessão** — registrar fonte (`localStorage(token+user)` / `localStorage(user)` / `supabase.auth.getSession`) e `userId` truncado.
+  2. **Cliente** — registrar se veio via `supabase-js` ou via `REST fallback`; detalhar quando não há vínculo.
+  3. **Contratados / Indicados / Check-ins** — uma `DiagStep` para cada query, status `ok` com contagem de linhas ou `error` com `result.reason.message` / `result.value.error.message`.
+- Adicionar `console.info` / `console.warn` / `console.error` prefixados com `[Contratados]` em cada transição (início, sucesso, falha, fim com tempo total).
+- Erros agora incluem o `detail` na `loadError` (ex.: `"Não foi possível carregar contratados: timeout..."`).
+- Em caso de erro fatal no `catch`, adicionar uma `DiagStep "fatal"`.
 
 ### 2. `src/pages/Contratados.tsx`
 
-- Consumir `retryAttempt` do hook.
-- Banner de erro existente: ao lado da mensagem, mostrar:
-  - Spinner pequeno + texto "Tentando novamente..." quando `retryAttempt > 0 && loading`.
-  - Botão "Recarregar agora" (chama `reload`) sempre visível enquanto houver erro, mesmo durante o retry agendado (dispara imediatamente, cancelando o timer pendente via `reload`).
-- No empty state "Nenhum cliente vinculado", botão já chama `reload` — apenas adicionar indicação de tentativa atual quando `retryAttempt > 0`.
+- Consumir `diagnostics` do hook.
+- Componente local `DiagnosticsPanel` (collapsible com `<details>`) renderizado dentro do banner de erro existente:
+  - Cabeçalho: "Ver diagnóstico detalhado".
+  - Lista vertical de steps: ícone por status (`CheckCircle2` verde, `AlertCircle` vermelho, `Loader2` girando, `Circle` cinza), label, tempo decorrido, e `detail` em texto pequeno mono.
+  - Botão "Copiar diagnóstico" que serializa `diagnostics` + `loadError` + `retryAttempt` + `userAgent` em JSON e chama `navigator.clipboard.writeText`, com `toast.success("Diagnóstico copiado")`.
+- O painel também é mostrado no estado vazio "Nenhum cliente vinculado" e no banner do fluxo principal.
 
-### 3. Sem mudanças em `TeamTree.tsx` ou outros arquivos.
+### 3. Sem mudanças em outros arquivos.
 
 ## Detalhes técnicos
 
-- Backoff exponencial: 1s, 2s, 4s (total ~7s de espera distribuída).
-- `loadSeq` continua garantindo que retries antigos não sobrescrevam um `reload` manual mais recente.
-- Cleanup do `useEffect` cancela qualquer timer pendente ao desmontar.
-- Erros não-recuperáveis (sem sessão, sem cliente) não disparam retry — eles retornam cedo sem setar `hadFailure`.
+- `diagnostics` é resetado a cada `load(attempt)` (novo array começa vazio).
+- `flush()` só atualiza estado quando `seq === loadSeq.current` para evitar overwrite por chamadas antigas.
+- O painel é colapsado por padrão para não poluir a UI; abre sob demanda.
+- Logs no console usam ▶ / ✓ / ✗ / ◼ para facilitar leitura.
 
 ## Critério de aceitação
 
-1. Quando uma query falha/timeout, a aba tenta novamente sozinha até 3 vezes com backoff (1s/2s/4s).
-2. Mensagem de erro mostra contagem de tentativas e tempo até o próximo retry.
-3. Botão "Recarregar agora" cancela o retry agendado e reinicia o ciclo do zero.
-4. Ao sair da página, nenhum timer fica pendurado.
-5. Falhas "sem cliente" / "sem sessão" não entram no loop de retry (mostram empty state com botão manual).
+1. Console mostra cada etapa com status e tempo total.
+2. Banner de erro tem um "Ver diagnóstico detalhado" que lista todas as etapas com ícone, duração e mensagem.
+3. Botão "Copiar diagnóstico" copia um JSON pronto para colar.
+4. Erro de uma query específica (ex.: indicados) aparece com a mensagem real do PostgREST/Supabase, não mais como genérico.
