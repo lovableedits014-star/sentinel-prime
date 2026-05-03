@@ -166,6 +166,27 @@ const DashboardLayout = () => {
       } catch (error: any) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
+        // Modo otimista: se há token persistido em localStorage, libera acesso
+        // mesmo com timeout — evita travar a UI por lentidão de rede.
+        let hasStoredSession = false;
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+              const raw = localStorage.getItem(k);
+              if (raw && raw.length > 20) { hasStoredSession = true; break; }
+            }
+          }
+        } catch {}
+
+        if (hasStoredSession) {
+          toast.error("Conexão lenta ao verificar permissões. Liberando acesso...");
+          setIsClientOwner(true);
+          setAccessProfile(null);
+          setLoading(false);
+          return;
+        }
+        // Sem token: mostra tela de erro com retry / voltar ao login.
         const message = error?.message || "Não foi possível verificar sua sessão.";
         setTimeoutError(message);
         setLoading(false);
