@@ -77,6 +77,10 @@ Deno.serve(async (req) => {
     const { clientId, knowledgeIds, minRecipients = 5, expiresInDays = 7 } = (await req.json()) as Req;
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // 1) Pega fatos candidatos (territoriais ou pessoais)

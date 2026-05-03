@@ -21,6 +21,10 @@ serve(async (req) => {
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
     if (!tema) return errorResponse("tema é obrigatório", 400);
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!

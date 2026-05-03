@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { isPathAllowed, getRoleLabels, type AccessProfile } from "@/lib/access-control";
 import { CoringaButton } from "@/components/coringa/CoringaButton";
+import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 type MenuSection = {
   label: string;
@@ -157,8 +158,8 @@ const DashboardLayout = () => {
     );
   }
 
-  const SUPER_ADMIN_EMAIL = "lovableedits014@gmail.com";
-  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
+  // Server-side check via is_super_admin() RPC.
+  const { isSuperAdmin } = useIsSuperAdmin();
 
   // Filter menu items based on access profile
   const filteredSections = MENU_SECTIONS.map(section => ({

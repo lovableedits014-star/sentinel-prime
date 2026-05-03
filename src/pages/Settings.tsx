@@ -13,19 +13,17 @@ import CampaignFramesCard from "@/components/settings/CampaignFramesCard";
 import PresenceSettingsCard from "@/components/settings/PresenceSettingsCard";
 import CampaignIdentityCard from "@/components/settings/CampaignIdentityCard";
 import CandidateAssetsCard from "@/components/settings/CandidateAssetsCard";
-
-const SUPER_ADMIN_EMAIL = "lovableedits014@gmail.com";
+import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 const Settings = () => {
   const [clientId, setClientId] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const { isSuperAdmin } = useIsSuperAdmin();
 
   useEffect(() => {
     const fetchClient = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      setIsSuperAdmin(user.email === SUPER_ADMIN_EMAIL);
       const { data } = await supabase
         .from("clients")
         .select("id, name")

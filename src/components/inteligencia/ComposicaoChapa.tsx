@@ -12,8 +12,8 @@ import { Download, Filter, Search, Users, ArrowUpDown, ArrowDown, ArrowUp, Refre
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
-const SUPER_ADMIN_EMAIL = "lovableedits014@gmail.com";
 const CARGOS_DISPONIVEIS = [
   "Prefeito", "Vereador", "Presidente", "Governador",
   "Senador", "Deputado Federal", "Deputado Estadual", "Deputado Distrital",
@@ -35,12 +35,7 @@ type SortKey = "total" | "votos_2024" | "votos_2022" | "nome_completo" | "partid
 type SortDir = "asc" | "desc";
 
 export default function ComposicaoChapa() {
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsSuperAdmin((user?.email || "").toLowerCase() === SUPER_ADMIN_EMAIL);
-    });
-  }, []);
+  const { isSuperAdmin } = useIsSuperAdmin();
 
   // Filtros
   const [minVotos, setMinVotos] = useState<string>("0");

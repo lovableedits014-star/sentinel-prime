@@ -102,6 +102,24 @@ Deno.serve(async (req) => {
       return json({ error: "client_id query param is required" }, 400);
     }
 
+    // Shared-secret authentication. The bridge must present WHATSAPP_BRIDGE_TOKEN
+    // via header (x-bridge-token / x-webhook-secret / Authorization: Bearer) OR query (?token=).
+    const expectedToken = Deno.env.get("WHATSAPP_BRIDGE_TOKEN");
+    if (!expectedToken) {
+      console.error("[whatsapp-inbound-webhook] WHATSAPP_BRIDGE_TOKEN not configured");
+      return json({ error: "server misconfigured" }, 500);
+    }
+    const headerToken =
+      req.headers.get("x-bridge-token") ||
+      req.headers.get("x-webhook-secret") ||
+      (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "") ||
+      url.searchParams.get("token") ||
+      "";
+    if (headerToken !== expectedToken) {
+      console.warn("[whatsapp-inbound-webhook] invalid bridge token");
+      return json({ error: "unauthorized" }, 401);
+    }
+
     const payload = await req.json().catch(() => ({}));
     console.log("[whatsapp-inbound-webhook] FULL PAYLOAD", clientId, JSON.stringify(payload));
 
