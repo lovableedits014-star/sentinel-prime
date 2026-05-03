@@ -69,7 +69,7 @@ const PageFallback = () => (
 );
 
 const AppRouter = () => {
-  const [history, setHistory] = useState<History | null>(null);
+  const [history, setHistory] = useState<BrowserHistory | null>(null);
 
   useEffect(() => {
     setHistory(createBrowserHistory({ window }));
