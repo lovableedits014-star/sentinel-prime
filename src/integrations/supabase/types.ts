@@ -96,6 +96,8 @@ export type Database = {
           created_at: string | null
           final_response: string | null
           id: string
+          is_page_owner: boolean
+          parent_comment_id: string | null
           platform: string | null
           platform_user_id: string | null
           post_full_picture: string | null
@@ -123,6 +125,8 @@ export type Database = {
           created_at?: string | null
           final_response?: string | null
           id?: string
+          is_page_owner?: boolean
+          parent_comment_id?: string | null
           platform?: string | null
           platform_user_id?: string | null
           post_full_picture?: string | null
@@ -150,6 +154,8 @@ export type Database = {
           created_at?: string | null
           final_response?: string | null
           id?: string
+          is_page_owner?: boolean
+          parent_comment_id?: string | null
           platform?: string | null
           platform_user_id?: string | null
           post_full_picture?: string | null
@@ -285,8 +291,54 @@ export type Database = {
           },
         ]
       }
+      engagement_score_history: {
+        Row: {
+          action_count: number
+          client_id: string
+          created_at: string
+          id: string
+          month_year: string
+          score: number
+          supporter_id: string
+        }
+        Insert: {
+          action_count?: number
+          client_id: string
+          created_at?: string
+          id?: string
+          month_year: string
+          score?: number
+          supporter_id: string
+        }
+        Update: {
+          action_count?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          month_year?: string
+          score?: number
+          supporter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_score_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_score_history_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integrations: {
         Row: {
+          ai_custom_prompt: string | null
           client_id: string
           created_at: string | null
           id: string
@@ -296,10 +348,13 @@ export type Database = {
           meta_access_token: string | null
           meta_instagram_id: string | null
           meta_page_id: string | null
+          meta_token_expires_at: string | null
+          meta_token_type: string | null
           meta_webhook_url: string | null
           updated_at: string | null
         }
         Insert: {
+          ai_custom_prompt?: string | null
           client_id: string
           created_at?: string | null
           id?: string
@@ -309,10 +364,13 @@ export type Database = {
           meta_access_token?: string | null
           meta_instagram_id?: string | null
           meta_page_id?: string | null
+          meta_token_expires_at?: string | null
+          meta_token_type?: string | null
           meta_webhook_url?: string | null
           updated_at?: string | null
         }
         Update: {
+          ai_custom_prompt?: string | null
           client_id?: string
           created_at?: string | null
           id?: string
@@ -322,6 +380,8 @@ export type Database = {
           meta_access_token?: string | null
           meta_instagram_id?: string | null
           meta_page_id?: string | null
+          meta_token_expires_at?: string | null
+          meta_token_type?: string | null
           meta_webhook_url?: string | null
           updated_at?: string | null
         }
@@ -574,6 +634,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      link_orphan_engagement_actions: {
+        Args: { p_client_id: string }
+        Returns: number
+      }
+      snapshot_monthly_scores: {
+        Args: { p_client_id: string }
+        Returns: number
       }
     }
     Enums: {
