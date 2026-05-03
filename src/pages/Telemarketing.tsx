@@ -66,15 +66,13 @@ export default function Telemarketing() {
     }
     setLoading(true);
 
-    // Validate operator credentials
-    const { data: opData } = await supabase
-      .from("telemarketing_operadores")
-      .select("id, nome")
-      .eq("client_id", clientId!)
-      .eq("nome", operadorNome.trim())
-      .eq("senha", operadorSenha.trim())
-      .eq("ativo", true)
-      .maybeSingle();
+    // Validate operator credentials via SECURITY DEFINER function (senha não trafega na tabela)
+    const { data: opRows } = await supabase.rpc("verify_telemarketing_operador" as any, {
+      _client_id: clientId!,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+    });
+    const opData = Array.isArray(opRows) && opRows.length > 0 ? opRows[0] : null;
 
     if (!opData) {
       toast.error("Nome ou senha inválidos");
