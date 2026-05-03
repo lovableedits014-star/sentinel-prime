@@ -47,31 +47,43 @@ export function useContratadosData() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: client } = await supabase
-      .from("clients").select("id, name").eq("user_id", user.id).maybeSingle();
-    if (!client) { setLoading(false); return; }
-    setClientId(client.id);
-    setClientName(client.name);
+    const withTimeout = <T,>(p: PromiseLike<T>, ms = 10000) =>
+      Promise.race<T>([
+        Promise.resolve(p) as Promise<T>,
+        new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms)),
+      ]);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) { setLoading(false); return; }
+      const { data: client } = await withTimeout(
+        supabase.from("clients").select("id, name").eq("user_id", user.id).maybeSingle()
+      );
+      if (!client) { setLoading(false); return; }
+      setClientId(client.id);
+      setClientName(client.name);
 
-    const [contRes, indRes, checkRes] = await Promise.all([
-      supabase.from("contratados").select("*").eq("client_id", client.id).order("created_at", { ascending: false }),
-      supabase.from("contratado_indicados").select("*").eq("client_id", client.id).order("created_at", { ascending: false }),
-      supabase.from("contratado_checkins").select("contratado_id, checkin_date").eq("client_id", client.id).order("checkin_date", { ascending: false }),
-    ]);
+      const [contRes, indRes, checkRes] = await Promise.all([
+        withTimeout(supabase.from("contratados").select("*").eq("client_id", client.id).order("created_at", { ascending: false })).catch(() => ({ data: [] as any })),
+        withTimeout(supabase.from("contratado_indicados").select("*").eq("client_id", client.id).order("created_at", { ascending: false })).catch(() => ({ data: [] as any })),
+        withTimeout(supabase.from("contratado_checkins").select("contratado_id, checkin_date").eq("client_id", client.id).order("checkin_date", { ascending: false })).catch(() => ({ data: [] as any })),
+      ]);
 
-    setContratados((contRes.data || []) as any);
-    setIndicados((indRes.data || []) as any);
+      setContratados(((contRes as any).data || []) as any);
+      setIndicados(((indRes as any).data || []) as any);
 
-    const stats: Record<string, CheckinAgg> = {};
-    (checkRes.data || []).forEach((c: any) => {
-      if (!stats[c.contratado_id]) stats[c.contratado_id] = { total: 0, last: null };
-      stats[c.contratado_id].total++;
-      if (!stats[c.contratado_id].last) stats[c.contratado_id].last = c.checkin_date;
-    });
-    setCheckinStats(stats);
-    setLoading(false);
+      const stats: Record<string, CheckinAgg> = {};
+      ((checkRes as any).data || []).forEach((c: any) => {
+        if (!stats[c.contratado_id]) stats[c.contratado_id] = { total: 0, last: null };
+        stats[c.contratado_id].total++;
+        if (!stats[c.contratado_id].last) stats[c.contratado_id].last = c.checkin_date;
+      });
+      setCheckinStats(stats);
+    } catch (err) {
+      console.error("[useContratadosData] erro ao carregar:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);

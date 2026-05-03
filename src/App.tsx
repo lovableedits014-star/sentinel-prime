@@ -11,7 +11,7 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
-import { createBrowserHistory, type History } from "@remix-run/router";
+import { createBrowserHistory, type BrowserHistory } from "history";
 import DashboardLayout from "./components/DashboardLayout";
 
 // Lazy-load all pages so each route loads only its own chunk on demand.
@@ -69,7 +69,7 @@ const PageFallback = () => (
 );
 
 const AppRouter = () => {
-  const [history, setHistory] = useState<History | null>(null);
+  const [history, setHistory] = useState<BrowserHistory | null>(null);
 
   useEffect(() => {
     setHistory(createBrowserHistory({ window }));
@@ -78,7 +78,7 @@ const AppRouter = () => {
   if (!history) return <PageFallback />;
 
   return (
-    <HistoryRouter history={history} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <HistoryRouter history={history as any} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Suspense fallback={<PageFallback />}>
         <Routes>
             <Route path="/" element={<Index />} />
