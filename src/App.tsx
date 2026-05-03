@@ -60,7 +60,17 @@ const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
   return <Navigate to={target} replace />;
 };
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      retry: 1,
+    },
+  },
+});
 
 const PageFallback = () => (
   <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
