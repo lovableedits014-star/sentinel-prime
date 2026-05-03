@@ -1,41 +1,46 @@
 ## Objetivo
 
-Garantir que a aba **Contratados** sempre mostre uma mensagem clara quando não houver dados (em vez de espaço em branco ou spinner) e adicionar paginação client-side aos indicados, evitando travar a UI quando a lista crescer. Aplicar tudo de forma defensiva (sem assumir que `clientId`/listas existem).
+Adicionar retry automático com backoff exponencial e um botão claro de "Recarregar" quando o carregamento da aba Contratados falhar ou der timeout, mantendo a UI sempre responsiva.
 
 ## Mudanças
 
-### 1. `src/pages/Contratados.tsx`
+### 1. `src/components/contratados/useContratadosData.ts`
 
-- **Empty state global** (após `loading`): se `clientId` for `null` (usuário sem cliente vinculado) → card central com ícone, título "Nenhum cliente vinculado" e botão "Tentar novamente" (chama `reload`). Não tentar renderizar Tabs/KPIs nesse caso.
-- **Empty state de equipe**: quando `contratados.length === 0`, renderizar apenas o card "Nenhum contratado ainda" (já existe em `TeamTree`) e ocultar filtros (Search/Líder/Status) para reduzir ruído.
-- **Paginação na aba Indicados**:
-  - Adicionar `useState` para `indPage` (default 1) e constante `PAGE_SIZE = 20`.
-  - Adicionar busca local `indSearch` (filtra por nome/telefone/cidade).
-  - Filtro por status (`pendente`/`confirmado`/`falso`/`all`).
-  - Slice da lista filtrada por página; controles "Anterior / Próximo" + indicador `página X de Y`.
-  - Reset de `indPage` quando filtros mudam (`useEffect`).
-  - Empty state diferenciado: "Nenhum indicado encontrado" (quando há filtro) vs "Nenhum indicado ainda" (lista vazia).
-- **KPI defensivo**: garantir que `Object.keys(liderMap).length` e divisões por `totalContratados` não quebrem (já tratado, manter).
+- Adicionar constantes `MAX_RETRIES = 3` e helper `sleep`.
+- Novo estado `retryAttempt` (número da tentativa atual, 0 = primeira).
+- `useRef` `retryTimerRef` para o `setTimeout` agendado, com `clearRetryTimer` chamado no início de cada `load`, em `reload` e no `cleanup` do `useEffect`.
+- Refatorar `load(attempt = 0)`:
+  - Rastrear `hadFailure` (qualquer query rejeitada/erro) e `fatalError` (erro fatal do try/catch).
+  - Manter o comportamento atual de `Promise.allSettled` — falhas parciais agora também marcam `hadFailure`.
+  - Após o `finally`, se `hadFailure && attempt < MAX_RETRIES && seq === loadSeq.current`:
+    - Calcular `delay = min(4000, 1000 * 2^attempt)` (1s, 2s, 4s).
+    - Atualizar `loadError` com mensagem informativa: `"<motivo> — tentando novamente (n/3) em Xs..."`.
+    - Agendar `retryTimerRef.current = setTimeout(() => load(attempt+1), delay)`.
+  - Não fazer retry quando o erro for "sessão ausente" ou "cliente não vinculado" (esses retornam antes de marcar `hadFailure`).
+- `reload` exposto: limpa timer e chama `load(0)` (reinicia contagem de tentativas).
+- Retornar `retryAttempt` no objeto do hook.
 
-### 2. `src/components/contratados/TeamTree.tsx`
+### 2. `src/pages/Contratados.tsx`
 
-- Manter o empty state existente; adicionar mensagem específica quando `visibleLiderIds.length === 0 && noLeaderList.length === 0 && contratados.length > 0` (filtro elimina tudo) — já existe, mas simplificar a condição para evitar falsos negativos.
-- Defensivo: envolver `indicadosOf` e `checkinStats[c.id]` em fallback (`|| []` / `|| { total:0, last:null }`) — já parcialmente feito.
+- Consumir `retryAttempt` do hook.
+- Banner de erro existente: ao lado da mensagem, mostrar:
+  - Spinner pequeno + texto "Tentando novamente..." quando `retryAttempt > 0 && loading`.
+  - Botão "Recarregar agora" (chama `reload`) sempre visível enquanto houver erro, mesmo durante o retry agendado (dispara imediatamente, cancelando o timer pendente via `reload`).
+- No empty state "Nenhum cliente vinculado", botão já chama `reload` — apenas adicionar indicação de tentativa atual quando `retryAttempt > 0`.
 
-### 3. Sem mudanças em `useContratadosData.ts`
-
-A camada de dados já lida com sessão/timeout/erros. Apenas confirmar que `contratados`, `indicados`, `checkinStats` sempre são arrays/objetos (já são, inicializados como `[]`/`{}`).
+### 3. Sem mudanças em `TeamTree.tsx` ou outros arquivos.
 
 ## Detalhes técnicos
 
-- Paginação puramente client-side (sem nova query) — o volume esperado é baixo e evita complexidade de RLS/cursors.
-- Reset de página via `useEffect([indSearch, indStatusFilter])`.
-- Nenhum acesso direto a `window`/`localStorage` novo.
-- Sem alterações de schema, RLS ou rotas.
+- Backoff exponencial: 1s, 2s, 4s (total ~7s de espera distribuída).
+- `loadSeq` continua garantindo que retries antigos não sobrescrevam um `reload` manual mais recente.
+- Cleanup do `useEffect` cancela qualquer timer pendente ao desmontar.
+- Erros não-recuperáveis (sem sessão, sem cliente) não disparam retry — eles retornam cedo sem setar `hadFailure`.
 
 ## Critério de aceitação
 
-1. Usuário sem `client` vinculado vê card "Nenhum cliente vinculado" + botão de retry, sem Tabs vazios.
-2. Cliente sem contratados vê card "Nenhum contratado ainda" e filtros ocultos.
-3. Aba Indicados com 0 itens mostra empty state; com >20 mostra paginação funcional; busca/status filtram e resetam página.
-4. Nenhum crash quando `liderMap`, `indicados` ou `checkinStats` estão vazios.
+1. Quando uma query falha/timeout, a aba tenta novamente sozinha até 3 vezes com backoff (1s/2s/4s).
+2. Mensagem de erro mostra contagem de tentativas e tempo até o próximo retry.
+3. Botão "Recarregar agora" cancela o retry agendado e reinicia o ciclo do zero.
+4. Ao sair da página, nenhum timer fica pendurado.
+5. Falhas "sem cliente" / "sem sessão" não entram no loop de retry (mostram empty state com botão manual).
