@@ -109,8 +109,8 @@ export default function StatusWhatsApp() {
   const failedRetries = retryStats.find((r) => r.status === "falha_definitiva")?.count ?? 0;
 
   const callBridge = async (action: string, instanceId: string) => {
-    if (!clientId) return null;
-    return supabase.functions.invoke("manage-whatsapp-instance", {
+    if (!clientId) return { data: null as any, error: new Error("client missing") };
+    return await supabase.functions.invoke("manage-whatsapp-instance", {
       body: { action, client_id: clientId, instance_id: instanceId },
     });
   };

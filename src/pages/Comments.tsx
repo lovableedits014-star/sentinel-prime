@@ -146,7 +146,7 @@ const Comments = () => {
         .range(from, to);
 
       if (error) throw error;
-      allComments = [...allComments, ...(data || [])];
+      allComments = [...allComments, ...((data || []) as any[])];
       hasMore = (data?.length || 0) === PAGE_SIZE;
       page++;
     }
@@ -260,7 +260,7 @@ const Comments = () => {
         .range(from, to);
 
       if (error) throw error;
-      allComments = [...allComments, ...(data || [])];
+      allComments = [...allComments, ...((data || []) as any[])];
       hasMore = (data?.length || 0) === PAGE_SIZE;
       page++;
     }

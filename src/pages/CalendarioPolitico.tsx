@@ -62,7 +62,7 @@ export default function CalendarioPolitico() {
     queryFn: async () => {
       const qs = `years=${yearsToLoad.join(",")}`;
       const { data, error } = await supabase.functions.invoke(`holidays-fetch?${qs}`, {
-        body: null,
+        body: undefined,
         method: "GET",
       });
       if (error) throw error;

@@ -63,7 +63,7 @@ export function FeriadosWidget() {
       const qs = `years=${yearOptions.join(",")}`;
       const { data, error } = await supabase.functions.invoke(
         `holidays-fetch?${qs}`,
-        { body: null, method: "GET" },
+        { body: undefined, method: "GET" },
       );
       if (error) throw error;
       return data as { holidays: Holiday[] };

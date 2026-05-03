@@ -197,7 +197,7 @@ export default function Telemarketing() {
 
     const { data: updatedRows, error } = await supabase
       .from(current.tabela)
-      .update(updateData)
+      .update(updateData as any)
       .eq("id", current.id)
       .select();
 

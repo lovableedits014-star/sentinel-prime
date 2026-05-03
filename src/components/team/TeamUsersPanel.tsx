@@ -37,7 +37,7 @@ export default function TeamUsersPanel({ clientId }: { clientId: string }) {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [selectedRoles, setSelectedRoles] = useState<string[]>(["gestor_social"]);
 
-  const { data: members = [], isLoading } = useQuery<TeamMember[]>({
+  const { data: members = [], isLoading } = useQuery({
     queryKey: ["team-members", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -46,7 +46,7 @@ export default function TeamUsersPanel({ clientId }: { clientId: string }) {
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data || [];
+      return (data || []) as TeamMember[];
     },
     enabled: !!clientId,
   });

@@ -170,7 +170,7 @@ export default function Pessoas() {
         .select("pessoa_id")
         .eq("tag_id", filterTagId) as any;
       tagFilterIds = (ptData || []).map((pt: any) => pt.pessoa_id);
-      if (tagFilterIds.length === 0) {
+      if (!tagFilterIds || tagFilterIds.length === 0) {
         setPessoas([]);
         setTotal(0);
         setSupporterMap({});
