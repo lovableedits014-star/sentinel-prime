@@ -53,10 +53,20 @@ export default function MissoesIA() {
         </TabsContent>
 
         <TabsContent value="missoes">
-          {client?.id ? (
+          {clientLoading ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
+          ) : client?.id ? (
             <PortalMissionsPanel clientId={client.id} />
           ) : (
-            <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
+            <Card>
+              <CardContent className="py-10 text-center space-y-2">
+                <AlertCircle className="w-8 h-8 mx-auto text-muted-foreground" />
+                <p className="text-sm font-medium">Nenhum cliente vinculado</p>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  Sua conta não está associada a nenhum cliente. Vincule um cliente para gerenciar Missões Ativas.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
