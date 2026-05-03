@@ -163,34 +163,16 @@ const DashboardLayout = () => {
 
         setLoading(false);
         refreshAllData();
-      } catch (error) {
+      } catch (error: any) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
-        // Não desloga em timeout. Verifica token persistido em localStorage.
-        // Se existe um token, mantém a UI carregada (modo otimista) e tenta novamente em background.
-        let hasStoredSession = false;
-        try {
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
-              const raw = localStorage.getItem(k);
-              if (raw && raw.length > 20) { hasStoredSession = true; break; }
-            }
-          }
-        } catch {}
-
-        if (hasStoredSession) {
-          toast.error("Conexão lenta ao verificar permissões. Liberando acesso...");
-          setIsClientOwner(true);
-          setAccessProfile(null);
-          setLoading(false);
-          return;
-        }
-        toast.error("Sessão expirada. Entre novamente.");
+        const message = error?.message || "Não foi possível verificar sua sessão.";
+        setTimeoutError(message);
         setLoading(false);
-        navigate("/auth", { replace: true });
       }
     };
+    setTimeoutError(null);
+    setLoading(true);
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -202,7 +184,7 @@ const DashboardLayout = () => {
       }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
-  }, [navigate, refreshAllData]);
+  }, [navigate, refreshAllData, retryCount]);
 
   // Close mobile sidebar on route change
   useEffect(() => {
