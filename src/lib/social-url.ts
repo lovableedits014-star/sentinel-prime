@@ -5,7 +5,8 @@
 export function getSocialProfileUrl(
   platform: string,
   platformUserId: string,
-  platformUsername?: string | null
+  platformUsername?: string | null,
+  authorName?: string | null
 ): string | null {
   if (platform === "instagram") {
     // Instagram: prefer username, fall back to user ID
@@ -16,13 +17,21 @@ export function getSocialProfileUrl(
   }
 
   if (platform === "facebook") {
-    // Facebook: numeric ID → profile.php, otherwise slug
-    if (/^\d+$/.test(platformUserId)) {
-      return `https://www.facebook.com/profile.php?id=${platformUserId}`;
+    // Se temos um username/slug não-numérico, é um vanity real → link direto
+    if (platformUsername && !/^\d+$/.test(platformUsername)) {
+      return `https://www.facebook.com/${platformUsername.replace(/^@/, "")}`;
     }
-    const slug = platformUsername || platformUserId;
-    if (!slug) return null;
-    return `https://www.facebook.com/${slug.replace(/^@/, "")}`;
+    if (platformUserId && !/^\d+$/.test(platformUserId)) {
+      return `https://www.facebook.com/${platformUserId.replace(/^@/, "")}`;
+    }
+    // IDs numéricos vindos da Graph API são PSIDs (page-scoped) e NÃO
+    // resolvem em facebook.com/profile.php?id=... — sempre dá "conteúdo
+    // indisponível". Como fallback, abrir uma busca pelo nome do autor.
+    if (authorName && authorName.trim()) {
+      const q = encodeURIComponent(authorName.trim());
+      return `https://www.facebook.com/search/people/?q=${q}`;
+    }
+    return null;
   }
 
   return null;

@@ -92,7 +92,7 @@ function MilitantList({
             </div>
           </button>
           {(() => {
-            const url = getSocialProfileUrl(m.platform, m.platform_user_id);
+            const url = getSocialProfileUrl(m.platform, m.platform_user_id, null, m.author_name);
             return url ? (
               <a
                 href={url}
