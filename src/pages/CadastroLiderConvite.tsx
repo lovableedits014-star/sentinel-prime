@@ -21,23 +21,22 @@ export default function CadastroLiderConvite() {
       return;
     }
     (async () => {
-      const { data, error } = await supabase
-        .from("lider_invite_tokens" as any)
-        .select("client_id, expires_at, used_at, note")
-        .eq("token", token)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc("validate_lider_invite_token" as any, {
+        _token: token,
+      });
 
-      if (error || !data) {
+      const row = Array.isArray(data) && data.length > 0 ? (data[0] as any) : null;
+      if (error || !row) {
         setState({ status: "invalid", reason: "Convite inválido ou inexistente." });
         return;
       }
-      const row = data as any;
-      if (row.used_at) {
-        setState({ status: "invalid", reason: "Este convite já foi utilizado." });
-        return;
-      }
-      if (row.expires_at && new Date(row.expires_at) < new Date()) {
-        setState({ status: "invalid", reason: "Este convite expirou. Solicite um novo ao administrador." });
+      if (!row.valid) {
+        const reasonMap: Record<string, string> = {
+          invalid: "Convite inválido ou inexistente.",
+          used: "Este convite já foi utilizado.",
+          expired: "Este convite expirou. Solicite um novo ao administrador.",
+        };
+        setState({ status: "invalid", reason: reasonMap[row.reason] || "Convite indisponível." });
         return;
       }
       setState({ status: "valid", clientId: row.client_id, note: row.note });
