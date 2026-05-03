@@ -290,8 +290,10 @@ export function useContratadosData() {
         return rows as T[];
       };
 
-      setContratados(readRows<Contratado>(contRes, "contratados", contStep));
-      setIndicados(readRows<Indicado>(indRes, "indicados", indStep));
+      const cont = readRows<Contratado>(contRes, "contratados", contStep);
+      const ind = readRows<Indicado>(indRes, "indicados", indStep);
+      setContratados(cont);
+      setIndicados(ind);
 
       const stats: Record<string, CheckinAgg> = {};
       readRows<any>(checkRes, "check-ins", checkStep).forEach((c: any) => {
@@ -300,6 +302,10 @@ export function useContratadosData() {
         if (!stats[c.contratado_id].last) stats[c.contratado_id].last = c.checkin_date;
       });
       setCheckinStats(stats);
+
+      if (!hadFailure && user?.id) {
+        writeCache(user.id, { clientId: client.id, clientName: client.name, contratados: cont, indicados: ind, checkinStats: stats });
+      }
     } catch (err) {
       console.error("[Contratados] ✗ erro fatal:", err);
       fatalError = err;
