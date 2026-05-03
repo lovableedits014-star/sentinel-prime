@@ -127,7 +127,17 @@ function RadarPanel({ clientId, onSeed }: { clientId: string | null | undefined;
     onSeed();
   }
 
-  if (!clientId) return <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando…</CardContent></Card>;
+  if (!clientId) return (
+    <Card>
+      <CardContent className="py-8 text-center space-y-2">
+        <AlertTriangle className="w-6 h-6 text-muted-foreground mx-auto" />
+        <p className="text-sm font-medium">Sem cliente vinculado</p>
+        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+          Sua conta não está associada a nenhum cliente em <code>clients</code> ou <code>team_members</code>. Vincule um cliente para ver o Radar.
+        </p>
+      </CardContent>
+    </Card>
+  );
   if (isLoading) return <Card><CardContent className="py-10 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></CardContent></Card>;
   if (error) return (
     <Card>
