@@ -1,9 +1,17 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
+import {
+  unstable_HistoryRouter as HistoryRouter,
+  Routes,
+  Route,
+  Navigate,
+  useParams,
+  useLocation,
+} from "react-router-dom";
+import { createBrowserHistory, type History } from "@remix-run/router";
 import DashboardLayout from "./components/DashboardLayout";
 
 // Lazy-load all pages so each route loads only its own chunk on demand.
@@ -60,14 +68,19 @@ const PageFallback = () => (
   </div>
 );
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Suspense fallback={<PageFallback />}>
-          <Routes>
+const AppRouter = () => {
+  const [history, setHistory] = useState<History | null>(null);
+
+  useEffect(() => {
+    setHistory(createBrowserHistory({ window }));
+  }, []);
+
+  if (!history) return <PageFallback />;
+
+  return (
+    <HistoryRouter history={history} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/signup/:token" element={<Signup />} />
@@ -113,9 +126,18 @@ const App = () => (
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
+        </Routes>
+      </Suspense>
+    </HistoryRouter>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <AppRouter />
     </TooltipProvider>
   </QueryClientProvider>
 );
