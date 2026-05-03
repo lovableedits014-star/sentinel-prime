@@ -3,17 +3,22 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import AIMissionsPanel from "@/components/engagement/AIMissionsPanel";
 import { PortalMissionsPanel } from "@/components/engagement/PortalMissionsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sparkles, Target } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Sparkles, Target, AlertCircle } from "lucide-react";
 
 export default function MissoesIA() {
-  const { data: client } = useQuery({
+  const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ["client"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data } = await supabase
+      const { data: owned } = await supabase
         .from("clients").select("id").eq("user_id", user.id).maybeSingle();
-      return data;
+      if (owned) return owned;
+      const { data: tm } = await supabase
+        .from("team_members").select("client_id")
+        .eq("user_id", user.id).eq("status", "active").maybeSingle();
+      return tm?.client_id ? { id: tm.client_id } : null;
     },
   });
 
