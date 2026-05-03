@@ -25,7 +25,7 @@ import TelemarketingResultsPanel from "@/components/contratados/TelemarketingRes
 export default function Contratados() {
   const {
     clientId, clientName, contratados, setContratados,
-    indicados, setIndicados, checkinStats, loading, loadError, reload,
+    indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, reload,
   } = useContratadosData();
 
   const [search, setSearch] = useState("");
