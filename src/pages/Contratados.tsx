@@ -147,10 +147,18 @@ export default function Contratados() {
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{loadError}</span>
           </div>
-          <Button size="sm" variant="outline" onClick={reload} className="gap-1.5 self-start md:self-auto">
-            <RefreshCw className="h-3.5 w-3.5" />
-            Tentar novamente
-          </Button>
+          <div className="flex items-center gap-2 self-start md:self-auto">
+            {retryAttempt > 0 && loading && (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Tentativa {retryAttempt}/3
+              </span>
+            )}
+            <Button size="sm" variant="outline" onClick={reload} className="gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5" />
+              Recarregar agora
+            </Button>
+          </div>
         </div>
       )}
 
