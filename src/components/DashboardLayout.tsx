@@ -156,6 +156,7 @@ const DashboardLayout = () => {
             navigate("/auth", { replace: true });
             return;
           }
+          }
         }
 
         setLoading(false);
