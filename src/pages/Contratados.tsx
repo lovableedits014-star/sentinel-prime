@@ -93,6 +93,38 @@ export default function Contratados() {
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
+  // Sem cliente vinculado → estado vazio dedicado
+  if (!clientId) {
+    return (
+      <div className="p-4 md:p-6">
+        <ContratadosSubNav />
+        {loadError && (
+          <div className="mb-4 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-2 text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{loadError}</span>
+            </div>
+          </div>
+        )}
+        <Card className="py-16 text-center text-muted-foreground border-dashed mt-6">
+          <CardContent className="flex flex-col items-center gap-3">
+            <UserX className="w-12 h-12 opacity-30" />
+            <p className="font-medium text-foreground">Nenhum cliente vinculado</p>
+            <p className="text-sm max-w-md">
+              Sua conta ainda não está associada a um cliente, ou a sessão não foi restaurada. Tente recarregar.
+            </p>
+            <Button size="sm" variant="outline" onClick={reload} className="gap-1.5 mt-2">
+              <RefreshCw className="h-3.5 w-3.5" />
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const hasContratados = contratados.length > 0;
+
   return (
     <div className="p-4 md:p-6">
       <ContratadosSubNav />
