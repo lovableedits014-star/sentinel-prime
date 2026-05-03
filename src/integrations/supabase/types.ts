@@ -204,6 +204,53 @@ export type Database = {
           },
         ]
       }
+      campaign_frames: {
+        Row: {
+          client_id: string
+          composition: Json | null
+          created_at: string
+          display_order: number
+          id: string
+          image_url: string
+          is_active: boolean
+          kind: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          composition?: Json | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url: string
+          is_active?: boolean
+          kind?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          composition?: Json | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          kind?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_frames_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campanha_tarefa_items: {
         Row: {
           client_id: string
@@ -367,9 +414,19 @@ export type Database = {
           id: string
           logo_url: string | null
           name: string
+          presence_absence_days_threshold: number
+          presence_absence_message_template: string
           updated_at: string | null
           user_id: string
+          whatsapp_bridge_api_key: string | null
+          whatsapp_bridge_url: string | null
+          whatsapp_inter_instance_delay_max: number
+          whatsapp_inter_instance_delay_min: number
           whatsapp_oficial: string | null
+          whatsapp_rotation_strategy: string
+          whatsapp_window_enabled: boolean
+          whatsapp_window_end: string
+          whatsapp_window_start: string
         }
         Insert: {
           cargo?: string | null
@@ -377,9 +434,19 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name: string
+          presence_absence_days_threshold?: number
+          presence_absence_message_template?: string
           updated_at?: string | null
           user_id: string
+          whatsapp_bridge_api_key?: string | null
+          whatsapp_bridge_url?: string | null
+          whatsapp_inter_instance_delay_max?: number
+          whatsapp_inter_instance_delay_min?: number
           whatsapp_oficial?: string | null
+          whatsapp_rotation_strategy?: string
+          whatsapp_window_enabled?: boolean
+          whatsapp_window_end?: string
+          whatsapp_window_start?: string
         }
         Update: {
           cargo?: string | null
@@ -387,9 +454,19 @@ export type Database = {
           id?: string
           logo_url?: string | null
           name?: string
+          presence_absence_days_threshold?: number
+          presence_absence_message_template?: string
           updated_at?: string | null
           user_id?: string
+          whatsapp_bridge_api_key?: string | null
+          whatsapp_bridge_url?: string | null
+          whatsapp_inter_instance_delay_max?: number
+          whatsapp_inter_instance_delay_min?: number
           whatsapp_oficial?: string | null
+          whatsapp_rotation_strategy?: string
+          whatsapp_window_enabled?: boolean
+          whatsapp_window_end?: string
+          whatsapp_window_start?: string
         }
         Relationships: []
       }
@@ -801,6 +878,7 @@ export type Database = {
           nome: string
           notas: string | null
           operador_nome: string | null
+          presenca_obrigatoria: boolean
           quota_indicados: number
           redes_sociais: Json | null
           secao_eleitoral: string | null
@@ -830,6 +908,7 @@ export type Database = {
           nome: string
           notas?: string | null
           operador_nome?: string | null
+          presenca_obrigatoria?: boolean
           quota_indicados?: number
           redes_sociais?: Json | null
           secao_eleitoral?: string | null
@@ -859,6 +938,7 @@ export type Database = {
           nome?: string
           notas?: string | null
           operador_nome?: string | null
+          presenca_obrigatoria?: boolean
           quota_indicados?: number
           redes_sociais?: Json | null
           secao_eleitoral?: string | null
@@ -883,6 +963,41 @@ export type Database = {
             columns: ["lider_id"]
             isOneToOne: false
             referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_themes: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          keywords: string[]
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          keywords?: string[]
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          keywords?: string[]
+          label?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_themes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -1201,6 +1316,7 @@ export type Database = {
           endereco: string | null
           id: string
           nome: string
+          presenca_obrigatoria: boolean
           redes_sociais: Json | null
           referral_code: string
           referral_count: number
@@ -1209,6 +1325,7 @@ export type Database = {
           telefone: string
           updated_at: string
           user_id: string | null
+          whatsapp_confirmado: boolean
         }
         Insert: {
           bairro?: string | null
@@ -1219,6 +1336,7 @@ export type Database = {
           endereco?: string | null
           id?: string
           nome: string
+          presenca_obrigatoria?: boolean
           redes_sociais?: Json | null
           referral_code?: string
           referral_count?: number
@@ -1227,6 +1345,7 @@ export type Database = {
           telefone: string
           updated_at?: string
           user_id?: string | null
+          whatsapp_confirmado?: boolean
         }
         Update: {
           bairro?: string | null
@@ -1237,6 +1356,7 @@ export type Database = {
           endereco?: string | null
           id?: string
           nome?: string
+          presenca_obrigatoria?: boolean
           redes_sociais?: Json | null
           referral_code?: string
           referral_count?: number
@@ -1245,6 +1365,7 @@ export type Database = {
           telefone?: string
           updated_at?: string
           user_id?: string | null
+          whatsapp_confirmado?: boolean
         }
         Relationships: [
           {
@@ -1446,6 +1567,57 @@ export type Database = {
           used_by?: string | null
         }
         Relationships: []
+      }
+      lider_invite_tokens: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          note: string | null
+          token: string
+          used_at: string | null
+          used_by_contratado_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          id?: string
+          note?: string | null
+          token?: string
+          used_at?: string | null
+          used_by_contratado_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          note?: string | null
+          token?: string
+          used_at?: string | null
+          used_by_contratado_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lider_invite_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lider_invite_tokens_used_by_contratado_id_fkey"
+            columns: ["used_by_contratado_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       message_dispatches: {
         Row: {
@@ -1775,6 +1947,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_portal_missions_client"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      presence_absence_notifications: {
+        Row: {
+          client_id: string
+          days_absent: number
+          id: string
+          person_id: string
+          person_name: string
+          person_type: string
+          sent_at: string
+          telefone: string | null
+          whatsapp_error: string | null
+          whatsapp_status: string
+        }
+        Insert: {
+          client_id: string
+          days_absent: number
+          id?: string
+          person_id: string
+          person_name: string
+          person_type: string
+          sent_at?: string
+          telefone?: string | null
+          whatsapp_error?: string | null
+          whatsapp_status?: string
+        }
+        Update: {
+          client_id?: string
+          days_absent?: number
+          id?: string
+          person_id?: string
+          person_name?: string
+          person_type?: string
+          sent_at?: string
+          telefone?: string | null
+          whatsapp_error?: string | null
+          whatsapp_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "presence_absence_notifications_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
@@ -2166,11 +2385,13 @@ export type Database = {
           instagram_username: string | null
           name: string
           neighborhood: string | null
+          presenca_obrigatoria: boolean
           referred_by: string | null
           state: string | null
           supporter_id: string | null
           updated_at: string
           user_id: string
+          whatsapp_confirmado: boolean
         }
         Insert: {
           city?: string | null
@@ -2182,11 +2403,13 @@ export type Database = {
           instagram_username?: string | null
           name: string
           neighborhood?: string | null
+          presenca_obrigatoria?: boolean
           referred_by?: string | null
           state?: string | null
           supporter_id?: string | null
           updated_at?: string
           user_id: string
+          whatsapp_confirmado?: boolean
         }
         Update: {
           city?: string | null
@@ -2198,11 +2421,13 @@ export type Database = {
           instagram_username?: string | null
           name?: string
           neighborhood?: string | null
+          presenca_obrigatoria?: boolean
           referred_by?: string | null
           state?: string | null
           supporter_id?: string | null
           updated_at?: string
           user_id?: string
+          whatsapp_confirmado?: boolean
         }
         Relationships: [
           {
@@ -2768,6 +2993,8 @@ export type Database = {
           falhas: number
           id: string
           mensagem_template: string
+          pause_reason: string | null
+          paused_until: string | null
           started_at: string | null
           status: string
           tag_filtro: string | null
@@ -2789,6 +3016,8 @@ export type Database = {
           falhas?: number
           id?: string
           mensagem_template: string
+          pause_reason?: string | null
+          paused_until?: string | null
           started_at?: string | null
           status?: string
           tag_filtro?: string | null
@@ -2810,6 +3039,8 @@ export type Database = {
           falhas?: number
           id?: string
           mensagem_template?: string
+          pause_reason?: string | null
+          paused_until?: string | null
           started_at?: string | null
           status?: string
           tag_filtro?: string | null
@@ -2828,45 +3059,125 @@ export type Database = {
           },
         ]
       }
-      whatsapp_instances: {
+      whatsapp_instance_send_log: {
         Row: {
           client_id: string
-          created_at: string
+          dispatch_id: string | null
+          error_message: string | null
           id: string
-          instance_name: string
-          instance_token: string | null
-          phone_number: string | null
-          qr_code: string | null
-          status: string
-          updated_at: string
+          instance_id: string
+          sent_at: string
+          success: boolean
         }
         Insert: {
           client_id: string
-          created_at?: string
+          dispatch_id?: string | null
+          error_message?: string | null
           id?: string
-          instance_name: string
-          instance_token?: string | null
-          phone_number?: string | null
-          qr_code?: string | null
-          status?: string
-          updated_at?: string
+          instance_id: string
+          sent_at?: string
+          success: boolean
         }
         Update: {
           client_id?: string
+          dispatch_id?: string | null
+          error_message?: string | null
+          id?: string
+          instance_id?: string
+          sent_at?: string
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instance_send_log_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_instances: {
+        Row: {
+          apelido: string | null
+          bridge_api_key: string | null
+          bridge_url: string | null
+          client_id: string
+          connected_since: string | null
+          consecutive_failures: number
+          created_at: string
+          id: string
+          instance_name: string | null
+          instance_token: string | null
+          is_active: boolean
+          is_primary: boolean
+          last_health_check_at: string | null
+          last_send_at: string | null
+          messages_sent_today: number
+          messages_sent_today_date: string
+          notes: string | null
+          phone_number: string | null
+          qr_code: string | null
+          status: string
+          total_failed: number
+          total_sent: number
+          updated_at: string
+        }
+        Insert: {
+          apelido?: string | null
+          bridge_api_key?: string | null
+          bridge_url?: string | null
+          client_id: string
+          connected_since?: string | null
+          consecutive_failures?: number
           created_at?: string
           id?: string
-          instance_name?: string
+          instance_name?: string | null
           instance_token?: string | null
+          is_active?: boolean
+          is_primary?: boolean
+          last_health_check_at?: string | null
+          last_send_at?: string | null
+          messages_sent_today?: number
+          messages_sent_today_date?: string
+          notes?: string | null
           phone_number?: string | null
           qr_code?: string | null
           status?: string
+          total_failed?: number
+          total_sent?: number
+          updated_at?: string
+        }
+        Update: {
+          apelido?: string | null
+          bridge_api_key?: string | null
+          bridge_url?: string | null
+          client_id?: string
+          connected_since?: string | null
+          consecutive_failures?: number
+          created_at?: string
+          id?: string
+          instance_name?: string | null
+          instance_token?: string | null
+          is_active?: boolean
+          is_primary?: boolean
+          last_health_check_at?: string | null
+          last_send_at?: string | null
+          messages_sent_today?: number
+          messages_sent_today_date?: string
+          notes?: string | null
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: string
+          total_failed?: number
+          total_sent?: number
           updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "whatsapp_instances_client_id_fkey"
             columns: ["client_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
@@ -2881,6 +3192,28 @@ export type Database = {
         Args: { p_days?: number; p_supporter_id: string }
         Returns: number
       }
+      confirm_whatsapp_by_phone: {
+        Args: { p_client_id: string; p_phone: string }
+        Returns: Json
+      }
+      ensure_supporter_for_entity: {
+        Args: { p_client_id: string; p_nome: string; p_redes: Json }
+        Returns: string
+      }
+      get_presence_overview: {
+        Args: { p_client_id: string }
+        Returns: {
+          days_since_checkin: number
+          email: string
+          last_checkin_date: string
+          nome: string
+          notified_at: string
+          person_id: string
+          person_type: string
+          presenca_obrigatoria: boolean
+          telefone: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2893,21 +3226,52 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: number
       }
-      register_pessoa_public: {
+      log_whatsapp_send: {
         Args: {
-          p_bairro?: string
-          p_cidade?: string
           p_client_id: string
-          p_email?: string
-          p_endereco?: string
-          p_nome: string
-          p_notas?: string
-          p_socials?: Json
-          p_telefone: string
-          p_tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          p_dispatch_id: string
+          p_error_message?: string
+          p_instance_id: string
+          p_success: boolean
         }
+        Returns: undefined
+      }
+      pick_healthy_whatsapp_instance: {
+        Args: { p_client_id: string }
         Returns: string
       }
+      register_pessoa_public:
+        | {
+            Args: {
+              p_bairro?: string
+              p_cidade?: string
+              p_client_id: string
+              p_email?: string
+              p_endereco?: string
+              p_nome: string
+              p_notas?: string
+              p_socials?: Json
+              p_telefone: string
+              p_tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_bairro?: string
+              p_cidade?: string
+              p_client_id: string
+              p_data_nascimento?: string
+              p_email?: string
+              p_endereco?: string
+              p_nome: string
+              p_notas?: string
+              p_socials?: Json
+              p_telefone: string
+              p_tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+            }
+            Returns: string
+          }
       snapshot_monthly_scores: {
         Args: { p_client_id: string }
         Returns: number
@@ -2921,6 +3285,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      whatsapp_phone_variants: { Args: { p_phone: string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "client" | "funcionario"
