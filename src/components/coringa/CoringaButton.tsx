@@ -110,7 +110,7 @@ export function CoringaButton() {
         </div>
       </div>
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={handleOpenChange}>
         <SheetContent
           side="right"
           className="w-full sm:max-w-lg flex flex-col p-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100 border-l border-blue-500/20"
