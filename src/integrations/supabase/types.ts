@@ -540,6 +540,69 @@ export type Database = {
           },
         ]
       }
+      candidate_knowledge: {
+        Row: {
+          aprovado: boolean
+          client_id: string
+          confidence: number | null
+          contexto: string | null
+          created_at: string
+          entidades: Json | null
+          extraction_run_id: string | null
+          id: string
+          model: string | null
+          provider: string | null
+          source_date: string | null
+          source_id: string | null
+          source_type: string
+          source_url: string | null
+          tema: string | null
+          texto: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          aprovado?: boolean
+          client_id: string
+          confidence?: number | null
+          contexto?: string | null
+          created_at?: string
+          entidades?: Json | null
+          extraction_run_id?: string | null
+          id?: string
+          model?: string | null
+          provider?: string | null
+          source_date?: string | null
+          source_id?: string | null
+          source_type: string
+          source_url?: string | null
+          tema?: string | null
+          texto: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          aprovado?: boolean
+          client_id?: string
+          confidence?: number | null
+          contexto?: string | null
+          created_at?: string
+          entidades?: Json | null
+          extraction_run_id?: string | null
+          id?: string
+          model?: string | null
+          provider?: string | null
+          source_date?: string | null
+          source_id?: string | null
+          source_type?: string
+          source_url?: string | null
+          tema?: string | null
+          texto?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           cargo: string | null
@@ -716,6 +779,174 @@ export type Database = {
             columns: ["social_profile_id"]
             isOneToOne: false
             referencedRelation: "social_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_dna: {
+        Row: {
+          auto_apply: boolean
+          client_id: string
+          emojis_assinatura: string[] | null
+          estruturas: Json | null
+          horarios_pico: Json | null
+          sample_size: number | null
+          tamanho_ideal: Json | null
+          tom: string | null
+          updated_at: string
+          vocabulario: string[] | null
+        }
+        Insert: {
+          auto_apply?: boolean
+          client_id: string
+          emojis_assinatura?: string[] | null
+          estruturas?: Json | null
+          horarios_pico?: Json | null
+          sample_size?: number | null
+          tamanho_ideal?: Json | null
+          tom?: string | null
+          updated_at?: string
+          vocabulario?: string[] | null
+        }
+        Update: {
+          auto_apply?: boolean
+          client_id?: string
+          emojis_assinatura?: string[] | null
+          estruturas?: Json | null
+          horarios_pico?: Json | null
+          sample_size?: number | null
+          tamanho_ideal?: Json | null
+          tom?: string | null
+          updated_at?: string
+          vocabulario?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_dna_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_ideas: {
+        Row: {
+          client_id: string
+          created_at: string
+          descricao: string | null
+          generated_text: Json | null
+          id: string
+          origem: string | null
+          projection: Json | null
+          score: number
+          source_refs: Json | null
+          status: string
+          tema: string | null
+          tipo: string | null
+          titulo: string
+          updated_at: string
+          user_feedback: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          descricao?: string | null
+          generated_text?: Json | null
+          id?: string
+          origem?: string | null
+          projection?: Json | null
+          score?: number
+          source_refs?: Json | null
+          status?: string
+          tema?: string | null
+          tipo?: string | null
+          titulo: string
+          updated_at?: string
+          user_feedback?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          descricao?: string | null
+          generated_text?: Json | null
+          id?: string
+          origem?: string | null
+          projection?: Json | null
+          score?: number
+          source_refs?: Json | null
+          status?: string
+          tema?: string | null
+          tipo?: string | null
+          titulo?: string
+          updated_at?: string
+          user_feedback?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_ideas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_radar_snapshots: {
+        Row: {
+          base_signals: Json | null
+          calendar_hooks: Json | null
+          client_id: string
+          created_at: string
+          crisis_alerts: Json | null
+          defender_pulse: Json | null
+          hostile_narratives: Json | null
+          hot_topics: Json | null
+          id: string
+          meta: Json | null
+          mobilizing_pautas: Json | null
+          open_questions: Json | null
+          snapshot_date: string
+          total_signals: number | null
+        }
+        Insert: {
+          base_signals?: Json | null
+          calendar_hooks?: Json | null
+          client_id: string
+          created_at?: string
+          crisis_alerts?: Json | null
+          defender_pulse?: Json | null
+          hostile_narratives?: Json | null
+          hot_topics?: Json | null
+          id?: string
+          meta?: Json | null
+          mobilizing_pautas?: Json | null
+          open_questions?: Json | null
+          snapshot_date?: string
+          total_signals?: number | null
+        }
+        Update: {
+          base_signals?: Json | null
+          calendar_hooks?: Json | null
+          client_id?: string
+          created_at?: string
+          crisis_alerts?: Json | null
+          defender_pulse?: Json | null
+          hostile_narratives?: Json | null
+          hot_topics?: Json | null
+          id?: string
+          meta?: Json | null
+          mobilizing_pautas?: Json | null
+          open_questions?: Json | null
+          snapshot_date?: string
+          total_signals?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_radar_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -1112,6 +1343,86 @@ export type Database = {
           },
         ]
       }
+      coringa_conversations: {
+        Row: {
+          client_id: string
+          contexto: Json
+          created_at: string
+          id: string
+          titulo: string | null
+          ultima_mensagem_em: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          contexto?: Json
+          created_at?: string
+          id?: string
+          titulo?: string | null
+          ultima_mensagem_em?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          contexto?: Json
+          created_at?: string
+          id?: string
+          titulo?: string | null
+          ultima_mensagem_em?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coringa_messages: {
+        Row: {
+          client_id: string
+          content: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          metadata: Json
+          role: string
+          tool_call_id: string | null
+          tool_calls: Json | null
+          tool_name: string | null
+        }
+        Insert: {
+          client_id: string
+          content?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          role: string
+          tool_call_id?: string | null
+          tool_calls?: Json | null
+          tool_name?: string | null
+        }
+        Update: {
+          client_id?: string
+          content?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          role?: string
+          tool_call_id?: string | null
+          tool_calls?: Json | null
+          tool_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coringa_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "coringa_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_themes: {
         Row: {
           client_id: string
@@ -1143,6 +1454,80 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      disparo_sugestoes: {
+        Row: {
+          bairro: string | null
+          cidade: string | null
+          client_id: string
+          created_at: string
+          destinatarios_filtro: Json | null
+          expires_at: string | null
+          fonte_knowledge_id: string | null
+          fonte_url: string | null
+          id: string
+          mensagem_sugerida: string
+          pessoa_alvo_nome: string | null
+          score: number | null
+          status: string
+          tema: string | null
+          tipo: string
+          titulo: string
+          total_estimado: number | null
+          updated_at: string
+          whatsapp_dispatch_id: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cidade?: string | null
+          client_id: string
+          created_at?: string
+          destinatarios_filtro?: Json | null
+          expires_at?: string | null
+          fonte_knowledge_id?: string | null
+          fonte_url?: string | null
+          id?: string
+          mensagem_sugerida: string
+          pessoa_alvo_nome?: string | null
+          score?: number | null
+          status?: string
+          tema?: string | null
+          tipo: string
+          titulo: string
+          total_estimado?: number | null
+          updated_at?: string
+          whatsapp_dispatch_id?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cidade?: string | null
+          client_id?: string
+          created_at?: string
+          destinatarios_filtro?: Json | null
+          expires_at?: string | null
+          fonte_knowledge_id?: string | null
+          fonte_url?: string | null
+          id?: string
+          mensagem_sugerida?: string
+          pessoa_alvo_nome?: string | null
+          score?: number | null
+          status?: string
+          tema?: string | null
+          tipo?: string
+          titulo?: string
+          total_estimado?: number | null
+          updated_at?: string
+          whatsapp_dispatch_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disparo_sugestoes_fonte_knowledge_id_fkey"
+            columns: ["fonte_knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_knowledge"
             referencedColumns: ["id"]
           },
         ]
@@ -1629,6 +2014,48 @@ export type Database = {
           },
         ]
       }
+      ic_transcriptions: {
+        Row: {
+          client_id: string
+          created_at: string
+          duration_sec: number | null
+          filename: string
+          full_text: string | null
+          id: string
+          language: string | null
+          model: string | null
+          segments: Json
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          duration_sec?: number | null
+          filename: string
+          full_text?: string | null
+          id?: string
+          language?: string | null
+          model?: string | null
+          segments?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          duration_sec?: number | null
+          filename?: string
+          full_text?: string | null
+          id?: string
+          language?: string | null
+          model?: string | null
+          segments?: Json
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ied_scores: {
         Row: {
           checkin_score: number
@@ -1860,6 +2287,136 @@ export type Database = {
             columns: ["used_by_contratado_id"]
             isOneToOne: false
             referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      materias_geradas: {
+        Row: {
+          client_id: string
+          corpo: string
+          created_at: string
+          fontes: Json
+          id: string
+          metadata: Json
+          model: string | null
+          prompt_input: string | null
+          provider: string | null
+          status: string
+          subtitulo: string | null
+          tema: string | null
+          tipo: string
+          titulo: string
+          tom: string | null
+          transcription_id: string | null
+          updated_at: string
+          user_id: string | null
+          versao: number
+        }
+        Insert: {
+          client_id: string
+          corpo: string
+          created_at?: string
+          fontes?: Json
+          id?: string
+          metadata?: Json
+          model?: string | null
+          prompt_input?: string | null
+          provider?: string | null
+          status?: string
+          subtitulo?: string | null
+          tema?: string | null
+          tipo?: string
+          titulo: string
+          tom?: string | null
+          transcription_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          versao?: number
+        }
+        Update: {
+          client_id?: string
+          corpo?: string
+          created_at?: string
+          fontes?: Json
+          id?: string
+          metadata?: Json
+          model?: string | null
+          prompt_input?: string | null
+          provider?: string | null
+          status?: string
+          subtitulo?: string | null
+          tema?: string | null
+          tipo?: string
+          titulo?: string
+          tom?: string | null
+          transcription_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "materias_geradas_transcription_id_fkey"
+            columns: ["transcription_id"]
+            isOneToOne: false
+            referencedRelation: "ic_transcriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      materias_versions: {
+        Row: {
+          client_id: string
+          corpo: string
+          created_at: string
+          fontes: Json
+          id: string
+          materia_id: string
+          metadata: Json
+          model: string | null
+          prompt_input: string | null
+          provider: string | null
+          subtitulo: string | null
+          titulo: string
+          versao: number
+        }
+        Insert: {
+          client_id: string
+          corpo: string
+          created_at?: string
+          fontes?: Json
+          id?: string
+          materia_id: string
+          metadata?: Json
+          model?: string | null
+          prompt_input?: string | null
+          provider?: string | null
+          subtitulo?: string | null
+          titulo: string
+          versao: number
+        }
+        Update: {
+          client_id?: string
+          corpo?: string
+          created_at?: string
+          fontes?: Json
+          id?: string
+          materia_id?: string
+          metadata?: Json
+          model?: string | null
+          prompt_input?: string | null
+          provider?: string | null
+          subtitulo?: string | null
+          titulo?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "materias_versions_materia_id_fkey"
+            columns: ["materia_id"]
+            isOneToOne: false
+            referencedRelation: "materias_geradas"
             referencedColumns: ["id"]
           },
         ]
@@ -4785,6 +5342,14 @@ export type Database = {
       confirm_whatsapp_by_phone: {
         Args: { p_client_id: string; p_phone: string }
         Returns: Json
+      }
+      count_pessoas_by_bairro: {
+        Args: {
+          p_bairro: string
+          p_client_id: string
+          p_only_whatsapp?: boolean
+        }
+        Returns: number
       }
       enqueue_whatsapp_retry: {
         Args: {
