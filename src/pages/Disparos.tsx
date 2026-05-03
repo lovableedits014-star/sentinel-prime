@@ -121,17 +121,28 @@ export default function Disparos() {
     enabled: !!clientId,
   });
 
+  // History filters & pagination
+  const [historyStatus, setHistoryStatus] = useState<string>("_all");
+  const [historySort, setHistorySort] = useState<"recent" | "oldest">("recent");
+  const [historyPage, setHistoryPage] = useState(0);
+  const PAGE_SIZE = 10;
+
+  // Reset page when filters change
+  useEffect(() => { setHistoryPage(0); }, [historyStatus, historySort]);
+
   // Dispatch history
-  const { data: dispatches = [], refetch } = useQuery<DispatchRow[]>({
-    queryKey: ["whatsapp-dispatches", clientId],
+  const { data: historyResult, refetch } = useQuery<{ rows: DispatchRow[]; count: number }>({
+    queryKey: ["whatsapp-dispatches", clientId, historyStatus, historySort, historyPage],
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("whatsapp_dispatches" as any)
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .limit(30);
-      return (data as unknown as DispatchRow[]) || [];
+        .order("created_at", { ascending: historySort === "oldest" })
+        .range(historyPage * PAGE_SIZE, historyPage * PAGE_SIZE + PAGE_SIZE - 1);
+      if (historyStatus !== "_all") q = q.eq("status", historyStatus);
+      const { data, count } = await q;
+      return { rows: (data as unknown as DispatchRow[]) || [], count: count || 0 };
     },
     enabled: !!clientId,
     refetchInterval: (data: any) => {
