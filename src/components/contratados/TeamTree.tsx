@@ -206,7 +206,7 @@ export default function TeamTree({
         const matchesLeaderSelf = matchesSearch(lider) && matchesStatus(lider);
 
         // se filtro está aplicado e nem o líder nem membros batem, oculta
-        if (filterLider !== filterLider && !matchesLeaderSelf && membros.length === 0) return null;
+        if (filterLider !== "all" && filterLider !== "none" && !matchesLeaderSelf && membros.length === 0) return null;
         if ((search || filterStatus !== "all") && !matchesLeaderSelf && membros.length === 0) return null;
 
         const totalInds = membros.reduce((s, c) => s + indicadosOf(c.id).length, 0)
@@ -299,6 +299,19 @@ export default function TeamTree({
               {noLeaderList.map(m => renderMember(m, 1))}
             </div>
           )}
+        </div>
+      )}
+
+      {((visibleLiderIds.length === 0 && noLeaderList.length === 0) ||
+        (contratados.length > 0 &&
+          visibleLiderIds.every((liderId) => {
+            const lider = contratados.find(c => c.id === liderId);
+            if (!lider) return true;
+            const membros = contratados.filter(c => c.lider_id === liderId && matchesSearch(c) && matchesStatus(c));
+            return !matchesSearch(lider) && membros.length === 0;
+          }) && noLeaderList.length === 0)) && (
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          Nenhum contratado encontrado com os filtros aplicados.
         </div>
       )}
     </Card>
