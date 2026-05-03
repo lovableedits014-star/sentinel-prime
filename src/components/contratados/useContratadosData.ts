@@ -111,6 +111,15 @@ const restSelect = async <T,>(path: string, token: string, label: string): Promi
 
 const MAX_RETRIES = 3;
 
+export type DiagStatus = "pending" | "ok" | "error" | "skipped";
+export interface DiagStep {
+  key: string;
+  label: string;
+  status: DiagStatus;
+  durationMs?: number;
+  detail?: string;
+}
+
 export function useContratadosData() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
@@ -120,6 +129,7 @@ export function useContratadosData() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [diagnostics, setDiagnostics] = useState<DiagStep[]>([]);
   const loadSeq = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -136,6 +146,23 @@ export function useContratadosData() {
     setLoading(true);
     setLoadError(null);
     setRetryAttempt(attempt);
+    setDiagnostics([]);
+
+    const t0 = performance.now();
+    const steps: DiagStep[] = [];
+    const flush = () => { if (seq === loadSeq.current) setDiagnostics([...steps]); };
+    const startStep = (key: string, label: string): DiagStep => {
+      const s: DiagStep = { key, label, status: "pending" };
+      steps.push(s); flush(); return s;
+    };
+    const finishStep = (s: DiagStep, status: DiagStatus, detail?: string) => {
+      s.status = status;
+      s.durationMs = Math.round(performance.now() - t0);
+      if (detail) s.detail = detail;
+      flush();
+    };
+
+    console.info(`[Contratados] ▶ Carregamento iniciado (tentativa ${attempt + 1})`);
 
     const safeSetLoading = (value: boolean) => {
       if (seq === loadSeq.current) setLoading(value);
@@ -145,18 +172,27 @@ export function useContratadosData() {
     let fatalError: unknown = null;
 
     try {
+      const sessionStep = startStep("session", "Sessão de usuário");
       const storedAuth = getStoredAuthState();
       let user = storedAuth?.user || getStoredAuthUser();
+      const sessionSource = storedAuth?.user ? "localStorage(token+user)" : (user ? "localStorage(user)" : "supabase.auth.getSession");
       if (!user) {
         const { data: { session } } = await withTimeout(supabase.auth.getSession(), "Sessão", 5000);
         user = session?.user;
       }
       if (!user) {
-        setLoadError(hasStoredAuthSession() ? "Sua sessão ainda está sendo restaurada. Tente recarregar." : "Faça login novamente para acessar Contratados.");
+        finishStep(sessionStep, "error", `Sem sessão (storedToken=${!!storedAuth?.accessToken}, hasStoredAuth=${hasStoredAuthSession()})`);
+        const msg = hasStoredAuthSession() ? "Sua sessão ainda está sendo restaurada. Tente recarregar." : "Faça login novamente para acessar Contratados.";
+        console.warn(`[Contratados] ✗ ${msg}`);
+        setLoadError(msg);
         return;
       }
+      finishStep(sessionStep, "ok", `userId=${user.id.slice(0, 8)}…, fonte=${sessionSource}`);
+      console.info(`[Contratados] ✓ Sessão OK (${sessionSource})`);
 
+      const clientStep = startStep("client", "Vínculo com cliente");
       let client: { id: string; name: string } | null = null;
+      let clientSource = "supabase-js";
       try {
         const { data, error } = await withTimeout(
           supabase.from("clients").select("id, name").eq("user_id", user.id).maybeSingle(),
@@ -165,75 +201,90 @@ export function useContratadosData() {
         if (error) throw error;
         client = data;
       } catch (err) {
+        console.warn("[Contratados] supabase-js falhou para clients, tentando REST", err);
         if (!storedAuth?.accessToken) throw err;
+        clientSource = "REST fallback";
         const rows = await restSelect<{ id: string; name: string }>(`clients?select=id,name&user_id=eq.${user.id}&limit=1`, storedAuth.accessToken, "Cliente");
         client = rows[0] || null;
       }
       if (!client) {
-        setClientId(null);
-        setClientName("");
-        setContratados([]);
-        setIndicados([]);
-        setCheckinStats({});
+        finishStep(clientStep, "error", `Sem cliente vinculado (via ${clientSource})`);
+        console.warn("[Contratados] ✗ Sem cliente vinculado");
+        setClientId(null); setClientName(""); setContratados([]); setIndicados([]); setCheckinStats({});
         setLoadError("Sua conta não está vinculada a um cliente.");
         return;
       }
+      finishStep(clientStep, "ok", `clientId=${client.id.slice(0, 8)}… via ${clientSource}`);
+      console.info(`[Contratados] ✓ Cliente OK (${client.name})`);
 
       setClientId(client.id);
       setClientName(client.name);
 
-      const [contRes, indRes, checkRes] = storedAuth?.accessToken ? await Promise.allSettled([
-        restSelect<Contratado>(`contratados?select=*&client_id=eq.${client.id}&order=created_at.desc`, storedAuth.accessToken, "Contratados"),
-        restSelect<Indicado>(`contratado_indicados?select=*&client_id=eq.${client.id}&order=created_at.desc`, storedAuth.accessToken, "Indicados"),
-        restSelect<any>(`contratado_checkins?select=contratado_id,checkin_date&client_id=eq.${client.id}&order=checkin_date.desc`, storedAuth.accessToken, "Check-ins"),
+      const useRest = !!storedAuth?.accessToken;
+      const contStep = startStep("contratados", `Contratados (${useRest ? "REST" : "supabase-js"})`);
+      const indStep = startStep("indicados", `Indicados (${useRest ? "REST" : "supabase-js"})`);
+      const checkStep = startStep("checkins", `Check-ins (${useRest ? "REST" : "supabase-js"})`);
+
+      const [contRes, indRes, checkRes] = useRest ? await Promise.allSettled([
+        restSelect<Contratado>(`contratados?select=*&client_id=eq.${client.id}&order=created_at.desc`, storedAuth!.accessToken, "Contratados"),
+        restSelect<Indicado>(`contratado_indicados?select=*&client_id=eq.${client.id}&order=created_at.desc`, storedAuth!.accessToken, "Indicados"),
+        restSelect<any>(`contratado_checkins?select=contratado_id,checkin_date&client_id=eq.${client.id}&order=checkin_date.desc`, storedAuth!.accessToken, "Check-ins"),
       ]) : await Promise.allSettled([
         withTimeout(supabase.from("contratados").select("*").eq("client_id", client.id).order("created_at", { ascending: false }), "Contratados"),
         withTimeout(supabase.from("contratado_indicados").select("*").eq("client_id", client.id).order("created_at", { ascending: false }), "Indicados"),
         withTimeout(supabase.from("contratado_checkins").select("contratado_id, checkin_date").eq("client_id", client.id).order("checkin_date", { ascending: false }), "Check-ins"),
       ]);
 
-      const readRows = <T,>(result: PromiseSettledResult<any>, label: string): T[] => {
+      const readRows = <T,>(result: PromiseSettledResult<any>, label: string, step: DiagStep): T[] => {
         if (result.status === "rejected") {
-          console.error(`[useContratadosData] ${label}:`, result.reason);
+          const detail = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          console.error(`[Contratados] ✗ ${label}:`, result.reason);
+          finishStep(step, "error", detail);
           hadFailure = true;
-          setLoadError((prev) => prev || `Não foi possível carregar ${label}.`);
+          setLoadError((prev) => prev || `Não foi possível carregar ${label}: ${detail}`);
           return [];
         }
         if (result.value?.error) {
-          console.error(`[useContratadosData] ${label}:`, result.value.error);
+          const detail = result.value.error.message || JSON.stringify(result.value.error);
+          console.error(`[Contratados] ✗ ${label}:`, result.value.error);
+          finishStep(step, "error", detail);
           hadFailure = true;
-          setLoadError((prev) => prev || `Não foi possível carregar ${label}.`);
+          setLoadError((prev) => prev || `Não foi possível carregar ${label}: ${detail}`);
           return [];
         }
-        if (Array.isArray(result.value)) return result.value as T[];
-        return (result.value?.data || []) as T[];
+        const rows = Array.isArray(result.value) ? result.value : (result.value?.data || []);
+        finishStep(step, "ok", `${rows.length} registro(s)`);
+        console.info(`[Contratados] ✓ ${label}: ${rows.length} linha(s)`);
+        return rows as T[];
       };
 
-      setContratados(readRows<Contratado>(contRes, "contratados"));
-      setIndicados(readRows<Indicado>(indRes, "indicados"));
+      setContratados(readRows<Contratado>(contRes, "contratados", contStep));
+      setIndicados(readRows<Indicado>(indRes, "indicados", indStep));
 
       const stats: Record<string, CheckinAgg> = {};
-      readRows<any>(checkRes, "check-ins").forEach((c: any) => {
+      readRows<any>(checkRes, "check-ins", checkStep).forEach((c: any) => {
         if (!stats[c.contratado_id]) stats[c.contratado_id] = { total: 0, last: null };
         stats[c.contratado_id].total++;
         if (!stats[c.contratado_id].last) stats[c.contratado_id].last = c.checkin_date;
       });
       setCheckinStats(stats);
     } catch (err) {
-      console.error("[useContratadosData] erro ao carregar:", err);
+      console.error("[Contratados] ✗ erro fatal:", err);
       fatalError = err;
       hadFailure = true;
-      setLoadError(err instanceof Error ? err.message : "Não foi possível carregar a aba Contratados.");
+      const msg = err instanceof Error ? err.message : "Não foi possível carregar a aba Contratados.";
+      setLoadError(msg);
+      steps.push({ key: "fatal", label: "Erro inesperado", status: "error", detail: msg, durationMs: Math.round(performance.now() - t0) });
+      flush();
     } finally {
       safeSetLoading(false);
+      console.info(`[Contratados] ◼ Concluído em ${Math.round(performance.now() - t0)}ms (falha=${hadFailure})`);
     }
 
     if (hadFailure && attempt < MAX_RETRIES && seq === loadSeq.current) {
       const delay = Math.min(4000, 1000 * Math.pow(2, attempt));
       const nextAttempt = attempt + 1;
-      const baseMsg = fatalError instanceof Error
-        ? fatalError.message
-        : "Falha ao carregar dados";
+      const baseMsg = fatalError instanceof Error ? fatalError.message : "Falha ao carregar dados";
       setLoadError(`${baseMsg} — tentando novamente (${nextAttempt}/${MAX_RETRIES}) em ${Math.round(delay / 1000)}s...`);
       retryTimerRef.current = setTimeout(() => {
         if (seq === loadSeq.current) void load(nextAttempt);
@@ -251,5 +302,5 @@ export function useContratadosData() {
     return () => clearRetryTimer();
   }, [load, clearRetryTimer]);
 
-  return { clientId, clientName, contratados, setContratados, indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, reload };
+  return { clientId, clientName, contratados, setContratados, indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, diagnostics, reload };
 }
