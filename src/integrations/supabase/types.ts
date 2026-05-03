@@ -96,6 +96,7 @@ export type Database = {
           created_at: string | null
           final_response: string | null
           id: string
+          is_hidden: boolean
           is_page_owner: boolean
           parent_comment_id: string | null
           platform: string | null
@@ -125,6 +126,7 @@ export type Database = {
           created_at?: string | null
           final_response?: string | null
           id?: string
+          is_hidden?: boolean
           is_page_owner?: boolean
           parent_comment_id?: string | null
           platform?: string | null
@@ -154,6 +156,7 @@ export type Database = {
           created_at?: string | null
           final_response?: string | null
           id?: string
+          is_hidden?: boolean
           is_page_owner?: boolean
           parent_comment_id?: string | null
           platform?: string | null
@@ -183,6 +186,60 @@ export type Database = {
             columns: ["social_profile_id"]
             isOneToOne: false
             referencedRelation: "social_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dispatch_items: {
+        Row: {
+          created_at: string
+          dispatch_id: string
+          error_message: string | null
+          id: string
+          platform: string
+          platform_user_id: string | null
+          sent_at: string | null
+          status: string
+          supporter_id: string
+          supporter_name: string
+        }
+        Insert: {
+          created_at?: string
+          dispatch_id: string
+          error_message?: string | null
+          id?: string
+          platform: string
+          platform_user_id?: string | null
+          sent_at?: string | null
+          status?: string
+          supporter_id: string
+          supporter_name: string
+        }
+        Update: {
+          created_at?: string
+          dispatch_id?: string
+          error_message?: string | null
+          id?: string
+          platform?: string
+          platform_user_id?: string | null
+          sent_at?: string | null
+          status?: string
+          supporter_id?: string
+          supporter_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_items_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "message_dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_items_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
             referencedColumns: ["id"]
           },
         ]
@@ -395,6 +452,163 @@ export type Database = {
           },
         ]
       }
+      invite_tokens: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          note: string | null
+          token: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          id?: string
+          note?: string | null
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          note?: string | null
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
+      message_dispatches: {
+        Row: {
+          batch_delay_seconds: number
+          batch_size: number
+          cancelled_at: string | null
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          failed_count: number
+          id: string
+          message_delay_max_seconds: number
+          message_delay_min_seconds: number
+          message_template: string
+          post_id: string
+          post_permalink_url: string | null
+          post_platform: string
+          sent_count: number
+          started_at: string | null
+          status: string
+          total_recipients: number
+          updated_at: string
+        }
+        Insert: {
+          batch_delay_seconds?: number
+          batch_size?: number
+          cancelled_at?: string | null
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          failed_count?: number
+          id?: string
+          message_delay_max_seconds?: number
+          message_delay_min_seconds?: number
+          message_template: string
+          post_id: string
+          post_permalink_url?: string | null
+          post_platform?: string
+          sent_count?: number
+          started_at?: string | null
+          status?: string
+          total_recipients?: number
+          updated_at?: string
+        }
+        Update: {
+          batch_delay_seconds?: number
+          batch_size?: number
+          cancelled_at?: string | null
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          failed_count?: number
+          id?: string
+          message_delay_max_seconds?: number
+          message_delay_min_seconds?: number
+          message_template?: string
+          post_id?: string
+          post_permalink_url?: string | null
+          post_platform?: string
+          sent_count?: number
+          started_at?: string | null
+          status?: string
+          total_recipients?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      portal_missions: {
+        Row: {
+          client_id: string
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          is_active: boolean
+          platform: string
+          post_url: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          platform: string
+          post_url: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          platform?: string
+          post_url?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_portal_missions_client"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -421,6 +635,54 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          client_id: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          supporter_account_id: string
+          updated_at: string
+        }
+        Insert: {
+          auth: string
+          client_id: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          supporter_account_id: string
+          updated_at?: string
+        }
+        Update: {
+          auth?: string
+          client_id?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          supporter_account_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_supporter_account_id_fkey"
+            columns: ["supporter_account_id"]
+            isOneToOne: false
+            referencedRelation: "supporter_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reactions: {
         Row: {
@@ -456,6 +718,66 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_notification_tokens: {
+        Row: {
+          client_id: string
+          created_at: string
+          expires_at: string | null
+          frequency: string
+          id: string
+          last_used_at: string | null
+          opted_in_at: string
+          platform_user_id: string
+          supporter_id: string
+          token: string
+          token_status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          expires_at?: string | null
+          frequency?: string
+          id?: string
+          last_used_at?: string | null
+          opted_in_at?: string
+          platform_user_id: string
+          supporter_id: string
+          token: string
+          token_status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          expires_at?: string | null
+          frequency?: string
+          id?: string
+          last_used_at?: string | null
+          opted_in_at?: string
+          platform_user_id?: string
+          supporter_id?: string
+          token?: string
+          token_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_notification_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_notification_tokens_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
             referencedColumns: ["id"]
           },
         ]
@@ -503,6 +825,99 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supporter_accounts: {
+        Row: {
+          client_id: string
+          created_at: string
+          email: string
+          facebook_username: string | null
+          id: string
+          instagram_username: string | null
+          name: string
+          supporter_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          email: string
+          facebook_username?: string | null
+          id?: string
+          instagram_username?: string | null
+          name: string
+          supporter_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          email?: string
+          facebook_username?: string | null
+          id?: string
+          instagram_username?: string | null
+          name?: string
+          supporter_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supporter_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supporter_accounts_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supporter_checkins: {
+        Row: {
+          checkin_at: string
+          checkin_date: string
+          client_id: string
+          id: string
+          supporter_account_id: string
+        }
+        Insert: {
+          checkin_at?: string
+          checkin_date?: string
+          client_id: string
+          id?: string
+          supporter_account_id: string
+        }
+        Update: {
+          checkin_at?: string
+          checkin_date?: string
+          client_id?: string
+          id?: string
+          supporter_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supporter_checkins_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supporter_checkins_supporter_account_id_fkey"
+            columns: ["supporter_account_id"]
+            isOneToOne: false
+            referencedRelation: "supporter_accounts"
             referencedColumns: ["id"]
           },
         ]
@@ -635,6 +1050,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_super_admin: { Args: never; Returns: boolean }
       link_orphan_engagement_actions: {
         Args: { p_client_id: string }
         Returns: number
