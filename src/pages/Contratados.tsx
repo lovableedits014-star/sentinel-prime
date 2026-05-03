@@ -256,45 +256,92 @@ export default function Contratados() {
               <CardTitle className="text-base">Indicados aguardando verificação</CardTitle>
               <p className="text-xs text-muted-foreground">Pessoas indicadas pelos contratados que precisam ser confirmadas por telemarketing.</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              {/* Filtros (somente quando há indicados) */}
+              {indicados.length > 0 && (
+                <div className="flex flex-col md:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input value={indSearch} onChange={e => setIndSearch(e.target.value)} placeholder="Buscar indicado por nome, telefone ou cidade..." className="pl-9" />
+                  </div>
+                  <Select value={indStatusFilter} onValueChange={setIndStatusFilter}>
+                    <SelectTrigger className="w-full md:w-[160px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos status</SelectItem>
+                      <SelectItem value="pendente">⏳ Pendente</SelectItem>
+                      <SelectItem value="confirmado">✅ Confirmado</SelectItem>
+                      <SelectItem value="falso">❌ Falso</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {indicados.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
-                  <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <Inbox className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">Nenhum indicado ainda.</p>
+                  <p className="text-xs mt-1">Indicados aparecem aqui quando seus contratados cadastram pessoas.</p>
+                </div>
+              ) : filteredIndicados.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">Nenhum indicado encontrado com os filtros aplicados.</p>
+                  <Button variant="ghost" size="sm" className="mt-2" onClick={() => { setIndSearch(""); setIndStatusFilter("all"); }}>
+                    Limpar filtros
+                  </Button>
                 </div>
               ) : (
-                <div className="divide-y">
-                  {indicados.map(ind => {
-                    const cNome = contratados.find(c => c.id === ind.contratado_id)?.nome || "—";
-                    return (
-                      <div key={ind.id} className="flex items-center justify-between gap-3 py-3">
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{ind.nome}</p>
-                          <p className="text-xs text-muted-foreground truncate">📞 {ind.telefone}{ind.cidade ? ` • ${ind.cidade}` : ""}</p>
-                          <p className="text-xs text-muted-foreground">Indicado por: <span className="font-medium">{cNome}</span></p>
+                <>
+                  <div className="divide-y">
+                    {pagedIndicados.map(ind => {
+                      const cNome = contratados.find(c => c.id === ind.contratado_id)?.nome || "—";
+                      return (
+                        <div key={ind.id} className="flex items-center justify-between gap-3 py-3">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{ind.nome}</p>
+                            <p className="text-xs text-muted-foreground truncate">📞 {ind.telefone}{ind.cidade ? ` • ${ind.cidade}` : ""}</p>
+                            <p className="text-xs text-muted-foreground">Indicado por: <span className="font-medium">{cNome}</span></p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant={
+                              ind.status === "confirmado" ? "default" :
+                              ind.status === "falso" ? "destructive" : "secondary"
+                            } className="text-[10px]">{ind.status}</Badge>
+                            <Select defaultValue={ind.status} onValueChange={async (v) => {
+                              await supabase.from("contratado_indicados").update({ status: v, verified_at: new Date().toISOString() } as any).eq("id", ind.id);
+                              setIndicados(prev => prev.map(i => i.id === ind.id ? { ...i, status: v } : i));
+                              toast.success("Status atualizado!");
+                            }}>
+                              <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pendente">⏳ Pendente</SelectItem>
+                                <SelectItem value="confirmado">✅ Confirmado</SelectItem>
+                                <SelectItem value="falso">❌ Falso</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant={
-                            ind.status === "confirmado" ? "default" :
-                            ind.status === "falso" ? "destructive" : "secondary"
-                          } className="text-[10px]">{ind.status}</Badge>
-                          <Select defaultValue={ind.status} onValueChange={async (v) => {
-                            await supabase.from("contratado_indicados").update({ status: v, verified_at: new Date().toISOString() } as any).eq("id", ind.id);
-                            setIndicados(prev => prev.map(i => i.id === ind.id ? { ...i, status: v } : i));
-                            toast.success("Status atualizado!");
-                          }}>
-                            <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pendente">⏳ Pendente</SelectItem>
-                              <SelectItem value="confirmado">✅ Confirmado</SelectItem>
-                              <SelectItem value="falso">❌ Falso</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {totalIndPages > 1 && (
+                    <div className="flex items-center justify-between gap-3 pt-2 text-xs text-muted-foreground">
+                      <span>
+                        Mostrando {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredIndicados.length)} de {filteredIndicados.length}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" className="h-7 gap-1" disabled={safePage <= 1} onClick={() => setIndPage(p => Math.max(1, p - 1))}>
+                          <ChevronLeft className="w-3.5 h-3.5" />Anterior
+                        </Button>
+                        <span className="tabular-nums">Página {safePage} de {totalIndPages}</span>
+                        <Button variant="outline" size="sm" className="h-7 gap-1" disabled={safePage >= totalIndPages} onClick={() => setIndPage(p => Math.min(totalIndPages, p + 1))}>
+                          Próximo<ChevronRight className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
