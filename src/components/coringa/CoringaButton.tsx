@@ -95,14 +95,14 @@ export function CoringaButton() {
             onClick={() => setOpen(true)}
             size="icon"
             className="relative h-14 w-14 rounded-full border border-white/20 bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-2xl hover:scale-105 transition-all"
-            title="Coringa — assistente IA"
+            title="Sentinelle Bot"
           >
             <Sparkles className="w-6 h-6 drop-shadow" />
           </Button>
           {/* botão peek — esconde/mostra para não atrapalhar */}
           <button
             onClick={(e) => { e.stopPropagation(); setHidden((v) => !v); }}
-            title={hidden ? "Mostrar Coringa" : "Esconder Coringa"}
+            title={hidden ? "Mostrar Sentinelle Bot" : "Esconder Sentinelle Bot"}
             className="absolute -top-1 -left-1 h-5 w-5 rounded-full bg-background border border-border text-[10px] leading-none text-muted-foreground hover:text-foreground hover:bg-muted shadow"
           >
             {hidden ? "›" : "‹"}
@@ -130,7 +130,7 @@ export function CoringaButton() {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div className="flex flex-col items-start">
-                <span className="text-lg font-bold tracking-tight">Coringa</span>
+                <span className="text-lg font-bold tracking-tight">Sentinelle Bot</span>
                 <span className="text-[11px] text-blue-100/80 font-normal">
                   Assistente inteligente da Sentinelle
                 </span>
@@ -193,7 +193,7 @@ export function CoringaButton() {
                 <div className="flex justify-start">
                   <div className="bg-slate-800/80 border border-blue-500/15 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm flex items-center gap-2 text-slate-200">
                     <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-                    <span className="text-slate-300">Coringa pensando...</span>
+                    <span className="text-slate-300">Sentinelle Bot pensando...</span>
                   </div>
                 </div>
               )}
@@ -202,7 +202,7 @@ export function CoringaButton() {
 
           <div className="p-3 border-t border-blue-500/20 bg-slate-950/80 backdrop-blur flex gap-2">
             <Input
-              placeholder="Pergunte algo ao Coringa..."
+              placeholder="Pergunte algo ao Sentinelle Bot..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), send())}
