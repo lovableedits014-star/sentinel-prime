@@ -174,7 +174,8 @@ export function useContratadosData() {
   const load = useCallback(async (attempt = 0): Promise<void> => {
     clearRetryTimer();
     const seq = ++loadSeq.current;
-    setLoading(true);
+    // Só mostra spinner global se não há dados em tela (evita "piscar" ao revalidar)
+    setContratados((prev) => { if (prev.length === 0) setLoading(true); return prev; });
     setLoadError(null);
     setRetryAttempt(attempt);
     setDiagnostics([]);
