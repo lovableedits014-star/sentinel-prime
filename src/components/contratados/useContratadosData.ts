@@ -109,6 +109,8 @@ const restSelect = async <T,>(path: string, token: string, label: string): Promi
   return await response.json() as T[];
 };
 
+const MAX_RETRIES = 3;
+
 export function useContratadosData() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
@@ -117,16 +119,30 @@ export function useContratadosData() {
   const [checkinStats, setCheckinStats] = useState<Record<string, CheckinAgg>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const loadSeq = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = useCallback(async () => {
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, []);
+
+  const load = useCallback(async (attempt = 0): Promise<void> => {
+    clearRetryTimer();
     const seq = ++loadSeq.current;
     setLoading(true);
     setLoadError(null);
+    setRetryAttempt(attempt);
 
     const safeSetLoading = (value: boolean) => {
       if (seq === loadSeq.current) setLoading(value);
     };
+
+    let hadFailure = false;
+    let fatalError: unknown = null;
 
     try {
       const storedAuth = getStoredAuthState();
@@ -179,11 +195,13 @@ export function useContratadosData() {
       const readRows = <T,>(result: PromiseSettledResult<any>, label: string): T[] => {
         if (result.status === "rejected") {
           console.error(`[useContratadosData] ${label}:`, result.reason);
+          hadFailure = true;
           setLoadError((prev) => prev || `Não foi possível carregar ${label}.`);
           return [];
         }
         if (result.value?.error) {
           console.error(`[useContratadosData] ${label}:`, result.value.error);
+          hadFailure = true;
           setLoadError((prev) => prev || `Não foi possível carregar ${label}.`);
           return [];
         }
@@ -203,13 +221,35 @@ export function useContratadosData() {
       setCheckinStats(stats);
     } catch (err) {
       console.error("[useContratadosData] erro ao carregar:", err);
+      fatalError = err;
+      hadFailure = true;
       setLoadError(err instanceof Error ? err.message : "Não foi possível carregar a aba Contratados.");
     } finally {
       safeSetLoading(false);
     }
-  }, []);
 
-  useEffect(() => { load(); }, [load]);
+    if (hadFailure && attempt < MAX_RETRIES && seq === loadSeq.current) {
+      const delay = Math.min(4000, 1000 * Math.pow(2, attempt));
+      const nextAttempt = attempt + 1;
+      const baseMsg = fatalError instanceof Error
+        ? fatalError.message
+        : "Falha ao carregar dados";
+      setLoadError(`${baseMsg} — tentando novamente (${nextAttempt}/${MAX_RETRIES}) em ${Math.round(delay / 1000)}s...`);
+      retryTimerRef.current = setTimeout(() => {
+        if (seq === loadSeq.current) void load(nextAttempt);
+      }, delay);
+    }
+  }, [clearRetryTimer]);
 
-  return { clientId, clientName, contratados, setContratados, indicados, setIndicados, checkinStats, loading, loadError, reload: load };
+  const reload = useCallback(() => {
+    clearRetryTimer();
+    return load(0);
+  }, [load, clearRetryTimer]);
+
+  useEffect(() => {
+    void load(0);
+    return () => clearRetryTimer();
+  }, [load, clearRetryTimer]);
+
+  return { clientId, clientName, contratados, setContratados, indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, reload };
 }
