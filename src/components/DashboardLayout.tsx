@@ -207,6 +207,42 @@ const DashboardLayout = () => {
     navigate("/auth");
   };
 
+  if (timeoutError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-sm w-full text-center space-y-4 rounded-lg border bg-card p-6 shadow-sm">
+          <div className="mx-auto h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+            <X className="h-5 w-5 text-destructive" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">Não conseguimos verificar sua sessão</h2>
+            <p className="text-sm text-muted-foreground">{timeoutError}</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={() => {
+                setTimeoutError(null);
+                setLoading(true);
+                setRetryCount((c) => c + 1);
+              }}
+            >
+              Tentar novamente
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await supabase.auth.signOut().catch(() => {});
+                navigate("/auth", { replace: true });
+              }}
+            >
+              Voltar ao login
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
