@@ -19,6 +19,16 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Require CRON_SECRET for this destructive endpoint
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const provided = req.headers.get("x-cron-token") ?? req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!cronSecret || provided !== cronSecret) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
   const result: Record<string, number | string> = {};
 

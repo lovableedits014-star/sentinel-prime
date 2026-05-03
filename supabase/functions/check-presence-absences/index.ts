@@ -42,6 +42,16 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Require CRON_SECRET — this endpoint sends WhatsApp messages and must not be publicly callable
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const provided = req.headers.get("x-cron-token") ?? req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (!cronSecret || provided !== cronSecret) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const admin = createClient(supabaseUrl, serviceKey);
 
     // For manual runs we accept an optional client_id; otherwise process all clients
