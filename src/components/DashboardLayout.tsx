@@ -14,14 +14,14 @@ import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 const AUTH_CHECK_TIMEOUT_MS = 12000;
 
-const withTimeout = async <T,>(promise: Promise<T>, message: string): Promise<T> => {
+const withTimeout = async <T,>(promise: PromiseLike<T>, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error(message)), AUTH_CHECK_TIMEOUT_MS);
   });
 
   try {
-    return await Promise.race([promise, timeout]);
+    return await Promise.race([Promise.resolve(promise), timeout]);
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
