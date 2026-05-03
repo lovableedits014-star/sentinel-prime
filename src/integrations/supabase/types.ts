@@ -5670,6 +5670,12 @@ export type Database = {
           valid: boolean
         }[]
       }
+      validate_referral_code: {
+        Args: { _client_id: string; _code: string }
+        Returns: {
+          referrer_name: string
+        }[]
+      }
       verify_telemarketing_operador: {
         Args: { _client_id: string; _nome: string; _senha: string }
         Returns: {
