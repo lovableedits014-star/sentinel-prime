@@ -27,6 +27,21 @@ const hasStoredAuthSession = () => {
   return false;
 };
 
+const getStoredAuthUser = () => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const storedUser = parsed?.user || parsed?.currentSession?.user;
+      if (storedUser?.id) return storedUser;
+    }
+  } catch {}
+  return null;
+};
+
 const withTimeout = async <T,>(promise: PromiseLike<T>, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -113,6 +128,8 @@ const DashboardLayout = () => {
     const checkUser = async () => {
       try {
         if (hasStoredAuthSession()) {
+          const storedUser = getStoredAuthUser();
+          if (storedUser) setUser(storedUser);
           setIsClientOwner(true);
           setAccessProfile(null);
           setLoading(false);

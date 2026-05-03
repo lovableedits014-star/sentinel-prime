@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 
 export interface Contratado {
@@ -38,6 +38,77 @@ export interface Indicado {
 
 export interface CheckinAgg { total: number; last: string | null }
 
+const DATA_TIMEOUT_MS = 8000;
+
+const hasStoredAuthSession = () => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("sb-") && key.endsWith("-auth-token")) {
+        const raw = localStorage.getItem(key);
+        if (raw && raw.length > 20) return true;
+      }
+    }
+  } catch {}
+  return false;
+};
+
+const getStoredAuthUser = () => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const user = parsed?.user || parsed?.currentSession?.user;
+      if (user?.id) return user;
+    }
+  } catch {}
+  return null;
+};
+
+const getStoredAuthState = () => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const session = parsed?.currentSession || parsed;
+      const user = session?.user || parsed?.user;
+      const accessToken = session?.access_token || parsed?.access_token;
+      if (user?.id && accessToken) return { user, accessToken };
+    }
+  } catch {}
+  return null;
+};
+
+const withTimeout = async <T,>(promise: PromiseLike<T>, label: string, ms = DATA_TIMEOUT_MS): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} demorou demais para responder`)), ms);
+  });
+
+  try {
+    return await Promise.race([Promise.resolve(promise), timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+const restSelect = async <T,>(path: string, token: string, label: string): Promise<T[]> => {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) throw new Error("Configuração do Supabase ausente");
+  const response = await withTimeout(fetch(`${url}/rest/v1/${path}`, {
+    headers: { apikey: key, Authorization: `Bearer ${token}`, Accept: "application/json" },
+  }), label);
+  if (!response.ok) throw new Error(`${label}: ${response.status}`);
+  return await response.json() as T[];
+};
+
 export function useContratadosData() {
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
@@ -45,35 +116,86 @@ export function useContratadosData() {
   const [indicados, setIndicados] = useState<Indicado[]>([]);
   const [checkinStats, setCheckinStats] = useState<Record<string, CheckinAgg>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
-    const withTimeout = <T,>(p: PromiseLike<T>, ms = 10000) =>
-      Promise.race<T>([
-        Promise.resolve(p) as Promise<T>,
-        new Promise<T>((_, rej) => setTimeout(() => rej(new Error("timeout")), ms)),
-      ]);
+    const seq = ++loadSeq.current;
+    setLoading(true);
+    setLoadError(null);
+
+    const safeSetLoading = (value: boolean) => {
+      if (seq === loadSeq.current) setLoading(value);
+    };
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user) { setLoading(false); return; }
-      const { data: client } = await withTimeout(
-        supabase.from("clients").select("id, name").eq("user_id", user.id).maybeSingle()
-      );
-      if (!client) { setLoading(false); return; }
+      const storedAuth = getStoredAuthState();
+      let user = storedAuth?.user || getStoredAuthUser();
+      if (!user) {
+        const { data: { session } } = await withTimeout(supabase.auth.getSession(), "Sessão", 5000);
+        user = session?.user;
+      }
+      if (!user) {
+        setLoadError(hasStoredAuthSession() ? "Sua sessão ainda está sendo restaurada. Tente recarregar." : "Faça login novamente para acessar Contratados.");
+        return;
+      }
+
+      let client: { id: string; name: string } | null = null;
+      try {
+        const { data, error } = await withTimeout(
+          supabase.from("clients").select("id, name").eq("user_id", user.id).maybeSingle(),
+          "Cliente"
+        );
+        if (error) throw error;
+        client = data;
+      } catch (err) {
+        if (!storedAuth?.accessToken) throw err;
+        const rows = await restSelect<{ id: string; name: string }>(`clients?select=id,name&user_id=eq.${user.id}&limit=1`, storedAuth.accessToken, "Cliente");
+        client = rows[0] || null;
+      }
+      if (!client) {
+        setClientId(null);
+        setClientName("");
+        setContratados([]);
+        setIndicados([]);
+        setCheckinStats({});
+        setLoadError("Sua conta não está vinculada a um cliente.");
+        return;
+      }
+
       setClientId(client.id);
       setClientName(client.name);
 
-      const [contRes, indRes, checkRes] = await Promise.all([
-        withTimeout(supabase.from("contratados").select("*").eq("client_id", client.id).order("created_at", { ascending: false })).catch(() => ({ data: [] as any })),
-        withTimeout(supabase.from("contratado_indicados").select("*").eq("client_id", client.id).order("created_at", { ascending: false })).catch(() => ({ data: [] as any })),
-        withTimeout(supabase.from("contratado_checkins").select("contratado_id, checkin_date").eq("client_id", client.id).order("checkin_date", { ascending: false })).catch(() => ({ data: [] as any })),
+      const [contRes, indRes, checkRes] = storedAuth?.accessToken ? await Promise.allSettled([
+        restSelect<Contratado>(`contratados?select=*&client_id=eq.${client.id}&order=created_at.desc`, storedAuth.accessToken, "Contratados"),
+        restSelect<Indicado>(`contratado_indicados?select=*&client_id=eq.${client.id}&order=created_at.desc`, storedAuth.accessToken, "Indicados"),
+        restSelect<any>(`contratado_checkins?select=contratado_id,checkin_date&client_id=eq.${client.id}&order=checkin_date.desc`, storedAuth.accessToken, "Check-ins"),
+      ]) : await Promise.allSettled([
+        withTimeout(supabase.from("contratados").select("*").eq("client_id", client.id).order("created_at", { ascending: false }), "Contratados"),
+        withTimeout(supabase.from("contratado_indicados").select("*").eq("client_id", client.id).order("created_at", { ascending: false }), "Indicados"),
+        withTimeout(supabase.from("contratado_checkins").select("contratado_id, checkin_date").eq("client_id", client.id).order("checkin_date", { ascending: false }), "Check-ins"),
       ]);
 
-      setContratados(((contRes as any).data || []) as any);
-      setIndicados(((indRes as any).data || []) as any);
+      const readRows = <T,>(result: PromiseSettledResult<any>, label: string): T[] => {
+        if (result.status === "rejected") {
+          console.error(`[useContratadosData] ${label}:`, result.reason);
+          setLoadError((prev) => prev || `Não foi possível carregar ${label}.`);
+          return [];
+        }
+        if (result.value?.error) {
+          console.error(`[useContratadosData] ${label}:`, result.value.error);
+          setLoadError((prev) => prev || `Não foi possível carregar ${label}.`);
+          return [];
+        }
+        if (Array.isArray(result.value)) return result.value as T[];
+        return (result.value?.data || []) as T[];
+      };
+
+      setContratados(readRows<Contratado>(contRes, "contratados"));
+      setIndicados(readRows<Indicado>(indRes, "indicados"));
 
       const stats: Record<string, CheckinAgg> = {};
-      ((checkRes as any).data || []).forEach((c: any) => {
+      readRows<any>(checkRes, "check-ins").forEach((c: any) => {
         if (!stats[c.contratado_id]) stats[c.contratado_id] = { total: 0, last: null };
         stats[c.contratado_id].total++;
         if (!stats[c.contratado_id].last) stats[c.contratado_id].last = c.checkin_date;
@@ -81,12 +203,13 @@ export function useContratadosData() {
       setCheckinStats(stats);
     } catch (err) {
       console.error("[useContratadosData] erro ao carregar:", err);
+      setLoadError(err instanceof Error ? err.message : "Não foi possível carregar a aba Contratados.");
     } finally {
-      setLoading(false);
+      safeSetLoading(false);
     }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  return { clientId, clientName, contratados, setContratados, indicados, setIndicados, checkinStats, loading, reload: load };
+  return { clientId, clientName, contratados, setContratados, indicados, setIndicados, checkinStats, loading, loadError, reload: load };
 }
