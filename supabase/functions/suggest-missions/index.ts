@@ -21,6 +21,10 @@ serve(async (req) => {
       );
     }
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+
     if (!themes || themes.length === 0) {
       return new Response(
         JSON.stringify({ suggestions: [] }),
