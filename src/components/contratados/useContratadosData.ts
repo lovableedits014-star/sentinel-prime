@@ -68,6 +68,23 @@ const getStoredAuthUser = () => {
   return null;
 };
 
+const getStoredAuthState = () => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const session = parsed?.currentSession || parsed;
+      const user = session?.user || parsed?.user;
+      const accessToken = session?.access_token || parsed?.access_token;
+      if (user?.id && accessToken) return { user, accessToken };
+    }
+  } catch {}
+  return null;
+};
+
 const withTimeout = async <T,>(promise: PromiseLike<T>, label: string, ms = DATA_TIMEOUT_MS): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -79,6 +96,17 @@ const withTimeout = async <T,>(promise: PromiseLike<T>, label: string, ms = DATA
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
+};
+
+const restSelect = async <T,>(path: string, token: string, label: string): Promise<T[]> => {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) throw new Error("Configuração do Supabase ausente");
+  const response = await withTimeout(fetch(`${url}/rest/v1/${path}`, {
+    headers: { apikey: key, Authorization: `Bearer ${token}`, Accept: "application/json" },
+  }), label);
+  if (!response.ok) throw new Error(`${label}: ${response.status}`);
+  return await response.json() as T[];
 };
 
 export function useContratadosData() {
@@ -101,7 +129,8 @@ export function useContratadosData() {
     };
 
     try {
-      let user = getStoredAuthUser();
+      const storedAuth = getStoredAuthState();
+      let user = storedAuth?.user || getStoredAuthUser();
       if (!user) {
         const { data: { session } } = await withTimeout(supabase.auth.getSession(), "Sessão", 5000);
         user = session?.user;
@@ -111,11 +140,19 @@ export function useContratadosData() {
         return;
       }
 
-      const { data: client, error: clientError } = await withTimeout(
-        supabase.from("clients").select("id, name").eq("user_id", user.id).maybeSingle(),
-        "Cliente"
-      );
-      if (clientError) throw clientError;
+      let client: { id: string; name: string } | null = null;
+      try {
+        const { data, error } = await withTimeout(
+          supabase.from("clients").select("id, name").eq("user_id", user.id).maybeSingle(),
+          "Cliente"
+        );
+        if (error) throw error;
+        client = data;
+      } catch (err) {
+        if (!storedAuth?.accessToken) throw err;
+        const rows = await restSelect<{ id: string; name: string }>(`clients?select=id,name&user_id=eq.${user.id}&limit=1`, storedAuth.accessToken, "Cliente");
+        client = rows[0] || null;
+      }
       if (!client) {
         setClientId(null);
         setClientName("");
@@ -129,7 +166,11 @@ export function useContratadosData() {
       setClientId(client.id);
       setClientName(client.name);
 
-      const [contRes, indRes, checkRes] = await Promise.allSettled([
+      const [contRes, indRes, checkRes] = storedAuth?.accessToken ? await Promise.allSettled([
+        restSelect<Contratado>(`contratados?select=*&client_id=eq.${client.id}&order=created_at.desc`, storedAuth.accessToken, "Contratados"),
+        restSelect<Indicado>(`contratado_indicados?select=*&client_id=eq.${client.id}&order=created_at.desc`, storedAuth.accessToken, "Indicados"),
+        restSelect<any>(`contratado_checkins?select=contratado_id,checkin_date&client_id=eq.${client.id}&order=checkin_date.desc`, storedAuth.accessToken, "Check-ins"),
+      ]) : await Promise.allSettled([
         withTimeout(supabase.from("contratados").select("*").eq("client_id", client.id).order("created_at", { ascending: false }), "Contratados"),
         withTimeout(supabase.from("contratado_indicados").select("*").eq("client_id", client.id).order("created_at", { ascending: false }), "Indicados"),
         withTimeout(supabase.from("contratado_checkins").select("contratado_id, checkin_date").eq("client_id", client.id).order("checkin_date", { ascending: false }), "Check-ins"),
@@ -146,6 +187,7 @@ export function useContratadosData() {
           setLoadError((prev) => prev || `Não foi possível carregar ${label}.`);
           return [];
         }
+        if (Array.isArray(result.value)) return result.value as T[];
         return (result.value?.data || []) as T[];
       };
 
