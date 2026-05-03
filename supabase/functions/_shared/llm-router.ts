@@ -148,7 +148,7 @@ export async function callLLMRaw(
       Authorization: `Bearer ${config.apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ model: config.model, ...body }),
+    body: JSON.stringify({ model: effectiveModel, ...body }),
   });
   if (!resp.ok) {
     const txt = await resp.text();
