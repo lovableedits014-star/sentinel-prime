@@ -78,7 +78,7 @@ const AppRouter = () => {
   if (!history) return <PageFallback />;
 
   return (
-    <HistoryRouter history={history} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <HistoryRouter history={history as any} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Suspense fallback={<PageFallback />}>
         <Routes>
             <Route path="/" element={<Index />} />
