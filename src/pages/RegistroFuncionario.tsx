@@ -41,7 +41,7 @@ export default function RegistroFuncionario() {
 
   useEffect(() => {
     const loadClient = async () => {
-      const { data } = await supabase.from("clients").select("name").eq("id", clientId).maybeSingle();
+      const { data } = await supabase.from("clients").select("name").eq("id", clientId!).maybeSingle();
       if (data) setClientName(data.name);
       setLoadingClient(false);
     };

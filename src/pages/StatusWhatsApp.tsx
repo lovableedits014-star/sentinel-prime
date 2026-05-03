@@ -110,7 +110,7 @@ export default function StatusWhatsApp() {
 
   const callBridge = async (action: string, instanceId: string) => {
     if (!clientId) return null;
-    return supabase.functions.invoke("manage-whatsapp-instance", {
+    return await supabase.functions.invoke("manage-whatsapp-instance", {
       body: { action, client_id: clientId, instance_id: instanceId },
     });
   };
