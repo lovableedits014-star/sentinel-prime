@@ -14,6 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
+      acao_externa_funcionarios: {
+        Row: {
+          acao_id: string
+          cadastros_coletados: number
+          client_id: string
+          created_at: string
+          funcionario_id: string
+          id: string
+        }
+        Insert: {
+          acao_id: string
+          cadastros_coletados?: number
+          client_id: string
+          created_at?: string
+          funcionario_id: string
+          id?: string
+        }
+        Update: {
+          acao_id?: string
+          cadastros_coletados?: number
+          client_id?: string
+          created_at?: string
+          funcionario_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acao_externa_funcionarios_acao_id_fkey"
+            columns: ["acao_id"]
+            isOneToOne: false
+            referencedRelation: "acoes_externas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acao_externa_funcionarios_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acao_externa_funcionarios_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      acoes_externas: {
+        Row: {
+          cadastros_coletados: number
+          client_id: string
+          created_at: string
+          data_fim: string
+          data_inicio: string
+          descricao: string | null
+          id: string
+          local: string | null
+          meta_cadastros: number
+          status: string
+          tag_nome: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          cadastros_coletados?: number
+          client_id: string
+          created_at?: string
+          data_fim: string
+          data_inicio: string
+          descricao?: string | null
+          id?: string
+          local?: string | null
+          meta_cadastros?: number
+          status?: string
+          tag_nome: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          cadastros_coletados?: number
+          client_id?: string
+          created_at?: string
+          data_fim?: string
+          data_inicio?: string
+          descricao?: string | null
+          id?: string
+          local?: string | null
+          meta_cadastros?: number
+          status?: string
+          tag_nome?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "acoes_externas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       action_logs: {
         Row: {
           action: string
@@ -52,6 +157,209 @@ export type Database = {
           },
         ]
       }
+      alertas: {
+        Row: {
+          client_id: string
+          created_at: string
+          dados: Json | null
+          descartado: boolean
+          descricao: string | null
+          id: string
+          lido: boolean
+          severidade: string
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          dados?: Json | null
+          descartado?: boolean
+          descricao?: string | null
+          id?: string
+          lido?: boolean
+          severidade?: string
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          dados?: Json | null
+          descartado?: boolean
+          descricao?: string | null
+          id?: string
+          lido?: boolean
+          severidade?: string
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alertas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campanha_tarefa_items: {
+        Row: {
+          client_id: string
+          concluido: boolean
+          created_at: string
+          display_order: number
+          id: string
+          tarefa_id: string
+          titulo: string
+        }
+        Insert: {
+          client_id: string
+          concluido?: boolean
+          created_at?: string
+          display_order?: number
+          id?: string
+          tarefa_id: string
+          titulo: string
+        }
+        Update: {
+          client_id?: string
+          concluido?: boolean
+          created_at?: string
+          display_order?: number
+          id?: string
+          tarefa_id?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanha_tarefa_items_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanha_tarefa_items_tarefa_id_fkey"
+            columns: ["tarefa_id"]
+            isOneToOne: false
+            referencedRelation: "campanha_tarefas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campanha_tarefas: {
+        Row: {
+          campanha_id: string
+          client_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          prazo: string | null
+          prioridade: string
+          responsavel_id: string | null
+          status: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          campanha_id: string
+          client_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          prazo?: string | null
+          prioridade?: string
+          responsavel_id?: string | null
+          status?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          campanha_id?: string
+          client_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          prazo?: string | null
+          prioridade?: string
+          responsavel_id?: string | null
+          status?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanha_tarefas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanha_tarefas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanha_tarefas_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campanhas: {
+        Row: {
+          client_id: string
+          created_at: string
+          data_fim: string | null
+          data_inicio: string
+          descricao: string | null
+          id: string
+          meta_principal: string | null
+          status: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          descricao?: string | null
+          id?: string
+          meta_principal?: string | null
+          status?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          descricao?: string | null
+          id?: string
+          meta_principal?: string | null
+          status?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanhas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           cargo: string | null
@@ -61,6 +369,7 @@ export type Database = {
           name: string
           updated_at: string | null
           user_id: string
+          whatsapp_oficial: string | null
         }
         Insert: {
           cargo?: string | null
@@ -70,6 +379,7 @@ export type Database = {
           name: string
           updated_at?: string | null
           user_id: string
+          whatsapp_oficial?: string | null
         }
         Update: {
           cargo?: string | null
@@ -79,6 +389,7 @@ export type Database = {
           name?: string
           updated_at?: string | null
           user_id?: string
+          whatsapp_oficial?: string | null
         }
         Relationships: []
       }
@@ -186,6 +497,392 @@ export type Database = {
             columns: ["social_profile_id"]
             isOneToOne: false
             referencedRelation: "social_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_templates: {
+        Row: {
+          client_id: string
+          conteudo: string
+          created_at: string
+          id: string
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          conteudo: string
+          created_at?: string
+          id?: string
+          tipo?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          conteudo?: string
+          created_at?: string
+          id?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratado_checkins: {
+        Row: {
+          checkin_at: string
+          checkin_date: string
+          client_id: string
+          contratado_id: string
+          id: string
+        }
+        Insert: {
+          checkin_at?: string
+          checkin_date?: string
+          client_id: string
+          contratado_id: string
+          id?: string
+        }
+        Update: {
+          checkin_at?: string
+          checkin_date?: string
+          client_id?: string
+          contratado_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratado_checkins_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratado_checkins_contratado_id_fkey"
+            columns: ["contratado_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratado_indicados: {
+        Row: {
+          bairro: string | null
+          candidato_alternativo: string | null
+          cidade: string | null
+          client_id: string
+          contratado_id: string
+          created_at: string
+          endereco: string | null
+          id: string
+          ligacao_em: string | null
+          ligacao_status: string | null
+          nome: string
+          operador_nome: string | null
+          status: string
+          telefone: string
+          verified_at: string | null
+          verified_by: string | null
+          vota_candidato: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          client_id: string
+          contratado_id: string
+          created_at?: string
+          endereco?: string | null
+          id?: string
+          ligacao_em?: string | null
+          ligacao_status?: string | null
+          nome: string
+          operador_nome?: string | null
+          status?: string
+          telefone: string
+          verified_at?: string | null
+          verified_by?: string | null
+          vota_candidato?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          client_id?: string
+          contratado_id?: string
+          created_at?: string
+          endereco?: string | null
+          id?: string
+          ligacao_em?: string | null
+          ligacao_status?: string | null
+          nome?: string
+          operador_nome?: string | null
+          status?: string
+          telefone?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          vota_candidato?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratado_indicados_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratado_indicados_contratado_id_fkey"
+            columns: ["contratado_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratado_missao_dispatches: {
+        Row: {
+          batch_pause_seconds: number
+          batch_size: number
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          delay_max_seconds: number
+          delay_min_seconds: number
+          enviados: number
+          falhas: number
+          id: string
+          link_missao: string | null
+          mensagem_template: string
+          mission_id: string | null
+          started_at: string | null
+          status: string
+          titulo: string
+          total_destinatarios: number
+          updated_at: string
+        }
+        Insert: {
+          batch_pause_seconds?: number
+          batch_size?: number
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          delay_max_seconds?: number
+          delay_min_seconds?: number
+          enviados?: number
+          falhas?: number
+          id?: string
+          link_missao?: string | null
+          mensagem_template: string
+          mission_id?: string | null
+          started_at?: string | null
+          status?: string
+          titulo: string
+          total_destinatarios?: number
+          updated_at?: string
+        }
+        Update: {
+          batch_pause_seconds?: number
+          batch_size?: number
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          delay_max_seconds?: number
+          delay_min_seconds?: number
+          enviados?: number
+          falhas?: number
+          id?: string
+          link_missao?: string | null
+          mensagem_template?: string
+          mission_id?: string | null
+          started_at?: string | null
+          status?: string
+          titulo?: string
+          total_destinatarios?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratado_missao_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratado_missao_dispatches_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "portal_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratado_missao_items: {
+        Row: {
+          contratado_id: string
+          contratado_nome: string
+          created_at: string
+          dispatch_id: string
+          enviado_em: string | null
+          erro: string | null
+          id: string
+          status: string
+          telefone: string
+        }
+        Insert: {
+          contratado_id: string
+          contratado_nome: string
+          created_at?: string
+          dispatch_id: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          status?: string
+          telefone: string
+        }
+        Update: {
+          contratado_id?: string
+          contratado_nome?: string
+          created_at?: string
+          dispatch_id?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          status?: string
+          telefone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratado_missao_items_contratado_id_fkey"
+            columns: ["contratado_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratado_missao_items_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "contratado_missao_dispatches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contratados: {
+        Row: {
+          bairro: string | null
+          candidato_alternativo: string | null
+          cidade: string | null
+          client_id: string
+          contrato_aceito: boolean
+          contrato_aceito_em: string | null
+          created_at: string
+          email: string | null
+          endereco: string | null
+          id: string
+          is_lider: boolean
+          lider_id: string | null
+          ligacao_em: string | null
+          ligacao_status: string | null
+          nome: string
+          notas: string | null
+          operador_nome: string | null
+          quota_indicados: number
+          redes_sociais: Json | null
+          secao_eleitoral: string | null
+          status: string
+          telefone: string
+          updated_at: string
+          user_id: string | null
+          vota_candidato: string | null
+          whatsapp_confirmado: boolean
+          zona_eleitoral: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          client_id: string
+          contrato_aceito?: boolean
+          contrato_aceito_em?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          is_lider?: boolean
+          lider_id?: string | null
+          ligacao_em?: string | null
+          ligacao_status?: string | null
+          nome: string
+          notas?: string | null
+          operador_nome?: string | null
+          quota_indicados?: number
+          redes_sociais?: Json | null
+          secao_eleitoral?: string | null
+          status?: string
+          telefone: string
+          updated_at?: string
+          user_id?: string | null
+          vota_candidato?: string | null
+          whatsapp_confirmado?: boolean
+          zona_eleitoral?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          client_id?: string
+          contrato_aceito?: boolean
+          contrato_aceito_em?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          is_lider?: boolean
+          lider_id?: string | null
+          ligacao_em?: string | null
+          ligacao_status?: string | null
+          nome?: string
+          notas?: string | null
+          operador_nome?: string | null
+          quota_indicados?: number
+          redes_sociais?: Json | null
+          secao_eleitoral?: string | null
+          status?: string
+          telefone?: string
+          updated_at?: string
+          user_id?: string | null
+          vota_candidato?: string | null
+          whatsapp_confirmado?: boolean
+          zona_eleitoral?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratados_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratados_lider_id_fkey"
+            columns: ["lider_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
             referencedColumns: ["id"]
           },
         ]
@@ -393,6 +1090,179 @@ export type Database = {
           },
         ]
       }
+      funcionario_checkins: {
+        Row: {
+          checkin_at: string
+          checkin_date: string
+          client_id: string
+          funcionario_id: string
+          id: string
+        }
+        Insert: {
+          checkin_at?: string
+          checkin_date?: string
+          client_id: string
+          funcionario_id: string
+          id?: string
+        }
+        Update: {
+          checkin_at?: string
+          checkin_date?: string
+          client_id?: string
+          funcionario_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funcionario_checkins_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funcionario_checkins_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funcionario_referrals: {
+        Row: {
+          client_id: string
+          created_at: string
+          funcionario_id: string
+          id: string
+          pessoa_id: string | null
+          referred_name: string
+          referred_phone: string | null
+          supporter_account_id: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          funcionario_id: string
+          id?: string
+          pessoa_id?: string | null
+          referred_name: string
+          referred_phone?: string | null
+          supporter_account_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          funcionario_id?: string
+          id?: string
+          pessoa_id?: string | null
+          referred_name?: string
+          referred_phone?: string | null
+          supporter_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funcionario_referrals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funcionario_referrals_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funcionario_referrals_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funcionario_referrals_supporter_account_id_fkey"
+            columns: ["supporter_account_id"]
+            isOneToOne: false
+            referencedRelation: "supporter_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      funcionarios: {
+        Row: {
+          bairro: string | null
+          cidade: string | null
+          client_id: string
+          created_at: string
+          email: string | null
+          endereco: string | null
+          id: string
+          nome: string
+          redes_sociais: Json | null
+          referral_code: string
+          referral_count: number
+          status: string
+          supporter_id: string | null
+          telefone: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cidade?: string | null
+          client_id: string
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          nome: string
+          redes_sociais?: Json | null
+          referral_code?: string
+          referral_count?: number
+          status?: string
+          supporter_id?: string | null
+          telefone: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cidade?: string | null
+          client_id?: string
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          nome?: string
+          redes_sociais?: Json | null
+          referral_code?: string
+          referral_count?: number
+          status?: string
+          supporter_id?: string | null
+          telefone?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funcionarios_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funcionarios_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ied_scores: {
         Row: {
           checkin_score: number
@@ -495,6 +1365,51 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interacoes_pessoa: {
+        Row: {
+          client_id: string
+          criado_em: string
+          criado_por: string
+          descricao: string
+          id: string
+          pessoa_id: string
+          tipo_interacao: string
+        }
+        Insert: {
+          client_id: string
+          criado_em?: string
+          criado_por: string
+          descricao: string
+          id?: string
+          pessoa_id: string
+          tipo_interacao: string
+        }
+        Update: {
+          client_id?: string
+          criado_em?: string
+          criado_por?: string
+          descricao?: string
+          id?: string
+          pessoa_id?: string
+          tipo_interacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interacoes_pessoa_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interacoes_pessoa_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
             referencedColumns: ["id"]
           },
         ]
@@ -608,6 +1523,217 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pessoa_social: {
+        Row: {
+          created_at: string
+          id: string
+          pessoa_id: string
+          plataforma: string
+          url_perfil: string | null
+          usuario: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pessoa_id: string
+          plataforma: string
+          url_perfil?: string | null
+          usuario?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pessoa_id?: string
+          plataforma?: string
+          url_perfil?: string | null
+          usuario?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pessoa_social_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pessoas: {
+        Row: {
+          bairro: string | null
+          candidato_alternativo: string | null
+          cidade: string | null
+          classificacao_politica: string
+          client_id: string
+          contratado_id: string | null
+          created_at: string
+          data_nascimento: string | null
+          email: string | null
+          endereco: string | null
+          id: string
+          lider_id: string | null
+          nivel_apoio: Database["public"]["Enums"]["nivel_apoio"]
+          nome: string
+          notas_internas: string | null
+          origem_contato: Database["public"]["Enums"]["origem_contato"]
+          secao_eleitoral: string | null
+          status_lead: string
+          supporter_id: string | null
+          tags: string[] | null
+          telefone: string | null
+          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa"]
+          updated_at: string
+          vota_candidato: string | null
+          whatsapp_confirmado: boolean
+          zona_eleitoral: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          classificacao_politica?: string
+          client_id: string
+          contratado_id?: string | null
+          created_at?: string
+          data_nascimento?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          lider_id?: string | null
+          nivel_apoio?: Database["public"]["Enums"]["nivel_apoio"]
+          nome: string
+          notas_internas?: string | null
+          origem_contato?: Database["public"]["Enums"]["origem_contato"]
+          secao_eleitoral?: string | null
+          status_lead?: string
+          supporter_id?: string | null
+          tags?: string[] | null
+          telefone?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          updated_at?: string
+          vota_candidato?: string | null
+          whatsapp_confirmado?: boolean
+          zona_eleitoral?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          classificacao_politica?: string
+          client_id?: string
+          contratado_id?: string | null
+          created_at?: string
+          data_nascimento?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          lider_id?: string | null
+          nivel_apoio?: Database["public"]["Enums"]["nivel_apoio"]
+          nome?: string
+          notas_internas?: string | null
+          origem_contato?: Database["public"]["Enums"]["origem_contato"]
+          secao_eleitoral?: string | null
+          status_lead?: string
+          supporter_id?: string | null
+          tags?: string[] | null
+          telefone?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          updated_at?: string
+          vota_candidato?: string | null
+          whatsapp_confirmado?: boolean
+          zona_eleitoral?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pessoas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_contratado_id_fkey"
+            columns: ["contratado_id"]
+            isOneToOne: false
+            referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_lider_id_fkey"
+            columns: ["lider_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pessoas_tags: {
+        Row: {
+          criado_em: string
+          id: string
+          pessoa_id: string
+          tag_id: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          pessoa_id: string
+          tag_id: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          pessoa_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pessoas_tags_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoas_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_config: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string
+        }
+        Relationships: []
       }
       portal_missions: {
         Row: {
@@ -1235,6 +2361,162 @@ export type Database = {
           },
         ]
       }
+      tags: {
+        Row: {
+          client_id: string
+          criado_em: string
+          descricao: string | null
+          id: string
+          nome: string
+        }
+        Insert: {
+          client_id: string
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+        }
+        Update: {
+          client_id?: string
+          criado_em?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tags_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          email: string
+          id: string
+          name: string
+          permissions: Json | null
+          role: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          email: string
+          id?: string
+          name: string
+          permissions?: Json | null
+          role?: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          name?: string
+          permissions?: Json | null
+          role?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_supporter_assignments: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          id: string
+          notes: string | null
+          supporter_id: string
+          team_member_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          notes?: string | null
+          supporter_id: string
+          team_member_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          notes?: string | null
+          supporter_id?: string
+          team_member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_supporter_assignments_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_supporter_assignments_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telemarketing_operadores: {
+        Row: {
+          ativo: boolean
+          client_id: string
+          created_at: string
+          id: string
+          nome: string
+          senha: string
+        }
+        Insert: {
+          ativo?: boolean
+          client_id: string
+          created_at?: string
+          id?: string
+          nome: string
+          senha: string
+        }
+        Update: {
+          ativo?: boolean
+          client_id?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          senha?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemarketing_operadores_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       territorial_zones: {
         Row: {
           client_id: string
@@ -1273,6 +2555,54 @@ export type Database = {
           },
         ]
       }
+      timeline_pessoa: {
+        Row: {
+          client_id: string
+          criado_em: string
+          criado_por: string
+          descricao: string | null
+          id: string
+          pessoa_id: string
+          tipo_evento: string
+          titulo: string
+        }
+        Insert: {
+          client_id: string
+          criado_em?: string
+          criado_por: string
+          descricao?: string | null
+          id?: string
+          pessoa_id: string
+          tipo_evento: string
+          titulo: string
+        }
+        Update: {
+          client_id?: string
+          criado_em?: string
+          criado_por?: string
+          descricao?: string | null
+          id?: string
+          pessoa_id?: string
+          tipo_evento?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_pessoa_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_pessoa_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1293,6 +2623,254 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      whatsapp_birthday_config: {
+        Row: {
+          client_id: string
+          created_at: string
+          enabled: boolean
+          hora_envio: string
+          id: string
+          image_url: string | null
+          mensagem_template: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          enabled?: boolean
+          hora_envio?: string
+          id?: string
+          image_url?: string | null
+          mensagem_template?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          enabled?: boolean
+          hora_envio?: string
+          id?: string
+          image_url?: string | null
+          mensagem_template?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_birthday_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_birthday_log: {
+        Row: {
+          client_id: string
+          enviado_em: string
+          erro: string | null
+          id: string
+          pessoa_id: string
+          pessoa_nome: string
+          status: string
+          telefone: string
+        }
+        Insert: {
+          client_id: string
+          enviado_em?: string
+          erro?: string | null
+          id?: string
+          pessoa_id: string
+          pessoa_nome: string
+          status?: string
+          telefone: string
+        }
+        Update: {
+          client_id?: string
+          enviado_em?: string
+          erro?: string | null
+          id?: string
+          pessoa_id?: string
+          pessoa_nome?: string
+          status?: string
+          telefone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_birthday_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_birthday_log_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_dispatch_items: {
+        Row: {
+          created_at: string
+          dispatch_id: string
+          enviado_em: string | null
+          erro: string | null
+          id: string
+          nome: string
+          status: string
+          telefone: string
+        }
+        Insert: {
+          created_at?: string
+          dispatch_id: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          nome: string
+          status?: string
+          telefone: string
+        }
+        Update: {
+          created_at?: string
+          dispatch_id?: string
+          enviado_em?: string | null
+          erro?: string | null
+          id?: string
+          nome?: string
+          status?: string
+          telefone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_dispatch_items_dispatch_id_fkey"
+            columns: ["dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_dispatches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_dispatches: {
+        Row: {
+          batch_pause_seconds: number
+          batch_size: number
+          client_id: string
+          completed_at: string | null
+          created_at: string
+          delay_max_seconds: number
+          delay_min_seconds: number
+          enviados: number
+          error_message: string | null
+          falhas: number
+          id: string
+          mensagem_template: string
+          started_at: string | null
+          status: string
+          tag_filtro: string | null
+          tipo: string
+          titulo: string
+          total_destinatarios: number
+          updated_at: string
+        }
+        Insert: {
+          batch_pause_seconds?: number
+          batch_size?: number
+          client_id: string
+          completed_at?: string | null
+          created_at?: string
+          delay_max_seconds?: number
+          delay_min_seconds?: number
+          enviados?: number
+          error_message?: string | null
+          falhas?: number
+          id?: string
+          mensagem_template: string
+          started_at?: string | null
+          status?: string
+          tag_filtro?: string | null
+          tipo?: string
+          titulo: string
+          total_destinatarios?: number
+          updated_at?: string
+        }
+        Update: {
+          batch_pause_seconds?: number
+          batch_size?: number
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string
+          delay_max_seconds?: number
+          delay_min_seconds?: number
+          enviados?: number
+          error_message?: string | null
+          falhas?: number
+          id?: string
+          mensagem_template?: string
+          started_at?: string | null
+          status?: string
+          tag_filtro?: string | null
+          tipo?: string
+          titulo?: string
+          total_destinatarios?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_instances: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          instance_name: string
+          instance_token: string | null
+          phone_number: string | null
+          qr_code: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          instance_name: string
+          instance_token?: string | null
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          instance_name?: string
+          instance_token?: string | null
+          phone_number?: string | null
+          qr_code?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1315,13 +2893,37 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: number
       }
+      register_pessoa_public: {
+        Args: {
+          p_bairro?: string
+          p_cidade?: string
+          p_client_id: string
+          p_email?: string
+          p_endereco?: string
+          p_nome: string
+          p_notas?: string
+          p_socials?: Json
+          p_telefone: string
+          p_tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+        }
+        Returns: string
+      }
       snapshot_monthly_scores: {
         Args: { p_client_id: string }
         Returns: number
       }
+      tag_pessoa_acao_externa: {
+        Args: {
+          p_client_id: string
+          p_pessoa_id: string
+          p_tag_descricao?: string
+          p_tag_nome: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
-      app_role: "admin" | "client"
+      app_role: "admin" | "client" | "funcionario"
       comment_status: "pending" | "responded" | "ignored"
       llm_provider:
         | "groq"
@@ -1330,12 +2932,37 @@ export type Database = {
         | "gemini"
         | "mistral"
         | "cohere"
+      nivel_apoio:
+        | "desconhecido"
+        | "simpatizante"
+        | "apoiador"
+        | "militante"
+        | "opositor"
+      origem_contato:
+        | "rede_social"
+        | "formulario"
+        | "evento"
+        | "importacao"
+        | "manual"
       sentiment_type: "positive" | "neutral" | "negative"
       supporter_classification:
         | "apoiador_ativo"
         | "apoiador_passivo"
         | "neutro"
         | "critico"
+      tipo_pessoa:
+        | "eleitor"
+        | "apoiador"
+        | "lideranca"
+        | "jornalista"
+        | "influenciador"
+        | "voluntario"
+        | "adversario"
+        | "cidadao"
+        | "contratado"
+        | "liderado"
+        | "indicado"
+        | "lider"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1463,7 +3090,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "client"],
+      app_role: ["admin", "client", "funcionario"],
       comment_status: ["pending", "responded", "ignored"],
       llm_provider: [
         "groq",
@@ -1473,12 +3100,40 @@ export const Constants = {
         "mistral",
         "cohere",
       ],
+      nivel_apoio: [
+        "desconhecido",
+        "simpatizante",
+        "apoiador",
+        "militante",
+        "opositor",
+      ],
+      origem_contato: [
+        "rede_social",
+        "formulario",
+        "evento",
+        "importacao",
+        "manual",
+      ],
       sentiment_type: ["positive", "neutral", "negative"],
       supporter_classification: [
         "apoiador_ativo",
         "apoiador_passivo",
         "neutro",
         "critico",
+      ],
+      tipo_pessoa: [
+        "eleitor",
+        "apoiador",
+        "lideranca",
+        "jornalista",
+        "influenciador",
+        "voluntario",
+        "adversario",
+        "cidadao",
+        "contratado",
+        "liderado",
+        "indicado",
+        "lider",
       ],
     },
   },
