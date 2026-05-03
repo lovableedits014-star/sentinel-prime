@@ -106,6 +106,69 @@ const TOOLS = [
       parameters: { type: "object", properties: {} },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "consultar_comentarios_recentes",
+      description:
+        "Lista comentários recentes coletados de redes sociais (Facebook/Instagram), com sentimento. Use para perguntas sobre engajamento, reação do público, comentários positivos/negativos.",
+      parameters: {
+        type: "object",
+        properties: {
+          sentiment: { type: "string", enum: ["positive", "negative", "neutral"], description: "Filtra por sentimento. Opcional." },
+          dias: { type: "number", description: "Janela em dias (default 7)." },
+          texto: { type: "string", description: "Busca por trecho dentro do comentário. Opcional." },
+          limit: { type: "number", description: "Máximo de resultados (default 15, máx 30)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_dossie_narrativa",
+      description:
+        "Retorna o último dossiê de narrativa gerado (município, indicadores, conteúdos prontos como discursos/manchetes/ataques).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_adversarios",
+      description: "Lista os adversários políticos cadastrados (nome, cargo, partido, observações).",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "consultar_checkins_recentes",
+      description: "Últimos check-ins de apoiadores em eventos/territórios.",
+      parameters: {
+        type: "object",
+        properties: {
+          dias: { type: "number", description: "Janela em dias (default 14)." },
+          limit: { type: "number", description: "Máximo (default 20, máx 50)." },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ajuda_sistema",
+      description:
+        "Explica como usar uma tela ou recurso do Sentinelle (CRM, Inteligência de Conteúdo, Dashboard, Disparos, Narrativa, Militância, Configurações). Use sempre que o usuário pedir 'como faço para…', 'onde encontro…', 'como funciona…'.",
+      parameters: {
+        type: "object",
+        properties: {
+          topico: { type: "string", description: "Tópico/recurso perguntado (ex.: 'crm', 'transcricao', 'disparo', 'integracoes', 'narrativa')." },
+        },
+        required: ["topico"],
+      },
+    },
+  },
 ];
 
 // =============== TOOL EXECUTORS ===============
