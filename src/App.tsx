@@ -11,7 +11,7 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
-import { createBrowserHistory, type History } from "@remix-run/router";
+import { createBrowserHistory, type BrowserHistory } from "history";
 import DashboardLayout from "./components/DashboardLayout";
 
 // Lazy-load all pages so each route loads only its own chunk on demand.
