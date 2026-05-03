@@ -51,7 +51,9 @@ export default function SuperAdmin() {
   const checkAccess = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { navigate("/auth"); return; }
-    if (session.user.email !== SUPER_ADMIN_EMAIL) {
+    // Server-side super-admin verification (bypasses client-side email tampering).
+    const { data: isAdmin, error: adminErr } = await supabase.rpc("is_super_admin");
+    if (adminErr || isAdmin !== true) {
       navigate("/dashboard");
       toast.error("Acesso negado");
       return;
