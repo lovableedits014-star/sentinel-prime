@@ -3,17 +3,22 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import AIMissionsPanel from "@/components/engagement/AIMissionsPanel";
 import { PortalMissionsPanel } from "@/components/engagement/PortalMissionsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sparkles, Target } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Sparkles, Target, AlertCircle } from "lucide-react";
 
 export default function MissoesIA() {
-  const { data: client } = useQuery({
+  const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ["client"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data } = await supabase
+      const { data: owned } = await supabase
         .from("clients").select("id").eq("user_id", user.id).maybeSingle();
-      return data;
+      if (owned) return owned;
+      const { data: tm } = await supabase
+        .from("team_members").select("client_id")
+        .eq("user_id", user.id).eq("status", "active").maybeSingle();
+      return tm?.client_id ? { id: tm.client_id } : null;
     },
   });
 
@@ -48,10 +53,20 @@ export default function MissoesIA() {
         </TabsContent>
 
         <TabsContent value="missoes">
-          {client?.id ? (
+          {clientLoading ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
+          ) : client?.id ? (
             <PortalMissionsPanel clientId={client.id} />
           ) : (
-            <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
+            <Card>
+              <CardContent className="py-10 text-center space-y-2">
+                <AlertCircle className="w-8 h-8 mx-auto text-muted-foreground" />
+                <p className="text-sm font-medium">Nenhum cliente vinculado</p>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  Sua conta não está associada a nenhum cliente. Vincule um cliente para gerenciar Missões Ativas.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
