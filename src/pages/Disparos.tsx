@@ -146,12 +146,17 @@ export default function Disparos() {
     },
     enabled: !!clientId,
     refetchInterval: (data: any) => {
-      const hasActive = (data?.state?.data as DispatchRow[] | undefined)?.some(
+      const rows = (data?.state?.data?.rows as DispatchRow[] | undefined) || [];
+      const hasActive = rows.some(
         (d) => ["pendente","enviando","pausado_timeout","pausado_janela"].includes(d.status)
       );
       return hasActive ? 3000 : false;
     },
   });
+
+  const dispatches = historyResult?.rows || [];
+  const totalCount = historyResult?.count || 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   // Realtime for dispatches
   useEffect(() => {
