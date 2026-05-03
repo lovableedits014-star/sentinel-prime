@@ -53,6 +53,21 @@ const hasStoredAuthSession = () => {
   return false;
 };
 
+const getStoredAuthUser = () => {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const user = parsed?.user || parsed?.currentSession?.user;
+      if (user?.id) return user;
+    }
+  } catch {}
+  return null;
+};
+
 const withTimeout = async <T,>(promise: PromiseLike<T>, label: string, ms = DATA_TIMEOUT_MS): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -86,8 +101,11 @@ export function useContratadosData() {
     };
 
     try {
-      const { data: { session } } = await withTimeout(supabase.auth.getSession(), "Sessão", 5000);
-      const user = session?.user;
+      let user = getStoredAuthUser();
+      if (!user) {
+        const { data: { session } } = await withTimeout(supabase.auth.getSession(), "Sessão", 5000);
+        user = session?.user;
+      }
       if (!user) {
         setLoadError(hasStoredAuthSession() ? "Sua sessão ainda está sendo restaurada. Tente recarregar." : "Faça login novamente para acessar Contratados.");
         return;
