@@ -102,6 +102,47 @@ export async function getClientLLMConfig(
 }
 
 /**
+ * Low-level call for OpenAI-compatible providers — supports tool calling and any extra body fields.
+ * Use this when you need tool_calls/tool_choice/response_format.
+ * Throws an Error with `.status` set on non-2xx so callers can map 429/402.
+ */
+const OPENAI_COMPATIBLE: LLMProvider[] = ['lovable', 'openai', 'groq', 'mistral'];
+
+export function isOpenAICompatible(provider: LLMProvider): boolean {
+  return OPENAI_COMPATIBLE.includes(provider);
+}
+
+export async function callLLMRaw(
+  config: LLMConfig,
+  body: Record<string, any>,
+): Promise<any> {
+  if (!OPENAI_COMPATIBLE.includes(config.provider)) {
+    const err: any = new Error(
+      `Provedor "${config.provider}" não suporta tool calling. Use OpenAI, Groq, Mistral ou Lovable AI nas Configurações.`,
+    );
+    err.status = 400;
+    throw err;
+  }
+  const endpoint = PROVIDER_ENDPOINTS[config.provider];
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model: config.model, ...body }),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text();
+    const err: any = new Error(`${config.provider} error: ${resp.status} - ${txt}`);
+    err.status = resp.status;
+    err.providerBody = txt;
+    throw err;
+  }
+  return resp.json();
+}
+
+/**
  * Route request to the appropriate LLM provider
  */
 export async function callLLM(config: LLMConfig, request: LLMRequest): Promise<LLMResponse> {
