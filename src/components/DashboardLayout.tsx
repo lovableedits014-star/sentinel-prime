@@ -70,6 +70,8 @@ const DashboardLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accessProfile, setAccessProfile] = useState<AccessProfile | null>(null);
   const [isClientOwner, setIsClientOwner] = useState(false);
+  // Server-side check via is_super_admin() RPC.
+  const { isSuperAdmin } = useIsSuperAdmin();
 
   const refreshAllData = useCallback(() => {
     queryClient.invalidateQueries();
@@ -157,9 +159,6 @@ const DashboardLayout = () => {
       </div>
     );
   }
-
-  // Server-side check via is_super_admin() RPC.
-  const { isSuperAdmin } = useIsSuperAdmin();
 
   // Filter menu items based on access profile
   const filteredSections = MENU_SECTIONS.map(section => ({
