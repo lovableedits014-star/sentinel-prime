@@ -21,7 +21,8 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
   const [nome, setNome] = useState("");
   const [senha, setSenha] = useState("");
   const [adding, setAdding] = useState(false);
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [resetTarget, setResetTarget] = useState<Operador | null>(null);
+  const [resetSenha, setResetSenha] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
 
   const teleUrl = `${window.location.origin}/telemarketing/${clientId}`;
@@ -29,7 +30,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
   const fetchOps = async () => {
     const { data } = await supabase
       .from("telemarketing_operadores")
-      .select("*")
+      .select("id, nome, ativo, created_at")
       .eq("client_id", clientId)
       .order("created_at", { ascending: true });
     setOperadores((data as any[]) || []);
@@ -141,18 +142,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div>
                       <p className="text-sm font-medium">{op.nome}</p>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <span>Senha:</span>
-                        <code className="bg-muted px-1 rounded">
-                          {showPasswords[op.id] ? op.senha : "••••••"}
-                        </code>
-                        <button
-                          onClick={() => setShowPasswords((p) => ({ ...p, [op.id]: !p[op.id] }))}
-                          className="hover:text-foreground"
-                        >
-                          {showPasswords[op.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        </button>
-                      </div>
+                      <p className="text-xs text-muted-foreground">Senha protegida (hash)</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
