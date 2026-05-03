@@ -273,6 +273,79 @@ async function execTool(admin: any, clientId: string, name: string, args: any): 
           .limit(20);
         return { count: data?.length || 0, sugestoes: data || [] };
       }
+      case "consultar_comentarios_recentes": {
+        const dias = Math.min(Math.max(Number(args.dias) || 7, 1), 60);
+        const since = new Date(Date.now() - dias * 86400000).toISOString();
+        let q = admin
+          .from("comments")
+          .select("id, message, sentiment, author_name, created_time, post_id")
+          .eq("client_id", clientId)
+          .gte("created_time", since)
+          .order("created_time", { ascending: false })
+          .limit(Math.min(Number(args.limit) || 15, 30));
+        if (args.sentiment) q = q.eq("sentiment", args.sentiment);
+        if (args.texto) q = q.ilike("message", `%${String(args.texto)}%`);
+        const { data, error } = await q;
+        if (error) return { error: error.message };
+        return { count: data?.length || 0, comentarios: data || [], janela_dias: dias };
+      }
+      case "consultar_dossie_narrativa": {
+        const { data } = await admin
+          .from("narrativa_dossies")
+          .select("id, status, conteudos, dados_brutos, generated_at, created_at")
+          .eq("client_id", clientId)
+          .eq("status", "pronto")
+          .order("generated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!data) return { vazio: true };
+        return {
+          id: data.id,
+          gerado_em: data.generated_at,
+          municipio: data.dados_brutos?.meta || null,
+          conteudos: data.conteudos || null,
+        };
+      }
+      case "consultar_adversarios": {
+        const { data, error } = await admin
+          .from("adversarios_politicos")
+          .select("nome, cargo, partido, observacoes, created_at")
+          .eq("client_id", clientId)
+          .limit(30);
+        if (error) return { error: error.message };
+        return { count: data?.length || 0, adversarios: data || [] };
+      }
+      case "consultar_checkins_recentes": {
+        const dias = Math.min(Math.max(Number(args.dias) || 14, 1), 90);
+        const since = new Date(Date.now() - dias * 86400000).toISOString();
+        const { data, error } = await admin
+          .from("supporter_checkins")
+          .select("id, pessoa_id, local, observacao, created_at")
+          .eq("client_id", clientId)
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(Math.min(Number(args.limit) || 20, 50));
+        if (error) return { error: error.message };
+        return { count: data?.length || 0, checkins: data || [], janela_dias: dias };
+      }
+      case "ajuda_sistema": {
+        const t = String(args.topico || "").toLowerCase();
+        const guia: Record<string, string> = {
+          crm: "CRM (menu Pessoas): cadastre apoiadores, defina nivel_apoio, bairro, cidade, telefone. Use filtros para segmentar e exporte/dispare.",
+          transcricao: "Inteligência de Conteúdo → Transcrições: faça upload de áudios/vídeos do candidato. O sistema transcreve, extrai fatos para a memória e alimenta o radar.",
+          disparo: "Disparos: a IA sugere mensagens segmentadas por bairro/perfil. Aprove em Disparos → Sugestões. Configure WhatsApp em Configurações → Integrações.",
+          integracoes: "Configurações → Integrações: conecte Meta (FB/IG) com token de longa duração e configure o Provedor de IA (OpenAI/Groq/Gemini/Lovable AI).",
+          narrativa: "Narrativa: gere dossiês por município com discursos, ataques, manchetes e roteiro estratégico — alimentado por dados públicos e pelo perfil do candidato.",
+          radar: "Radar IC: snapshot diário com hot topics, perguntas em aberto, narrativas hostis e alertas de crise.",
+          dashboard: "Dashboard: visão geral com novos cadastros, check-ins, sentimento de comentários e principais bairros ativos.",
+          militancia: "Militância: rede de apoiadores ativos, indicações e check-ins em eventos.",
+          configuracoes: "Configurações: Provedor de IA (escolha provedor + modelo + API key), Integrações Meta, Equipe e dados do candidato.",
+        };
+        const matched = Object.keys(guia).find((k) => t.includes(k));
+        return matched
+          ? { topico: matched, instrucoes: guia[matched] }
+          : { topico: t, instrucoes: "Tópicos disponíveis: crm, transcricao, disparo, integracoes, narrativa, radar, dashboard, militancia, configuracoes." };
+      }
       default:
         return { error: `Tool desconhecida: ${name}` };
     }
