@@ -542,7 +542,15 @@ export default function Disparos() {
         </TabsContent>
 
         <TabsContent value="aniversario">
-          {clientId && <BirthdayConfigPanel clientId={clientId} />}
+          {clientId ? (
+            <BirthdayConfigPanel clientId={clientId} />
+          ) : (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                Sua conta não está vinculada a nenhum cliente. Vincule um cliente para configurar disparos de aniversário.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
