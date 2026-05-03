@@ -42,6 +42,62 @@ const NOMES_MES = [
 ];
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+function easterDate(year: number) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month, day, 12);
+}
+
+function addDays(date: Date, days: number) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function fallbackHolidays(years: number[]): { holidays: Holiday[] } {
+  const holidays = years.flatMap((year) => {
+    const easter = easterDate(year);
+    const movable = [
+      { date: addDays(easter, -47), localName: "Carnaval", name: "Carnival" },
+      { date: addDays(easter, -2), localName: "Sexta-feira Santa", name: "Good Friday" },
+      { date: addDays(easter, 60), localName: "Corpus Christi", name: "Corpus Christi" },
+    ].map((h) => ({ ...h, date: ymd(h.date.getFullYear(), h.date.getMonth(), h.date.getDate()), global: true, year }));
+
+    return [
+      { date: `${year}-01-01`, localName: "Confraternização Universal", name: "New Year's Day", global: true, year },
+      ...movable,
+      { date: `${year}-04-21`, localName: "Tiradentes", name: "Tiradentes", global: true, year },
+      { date: `${year}-05-01`, localName: "Dia do Trabalhador", name: "Labour Day", global: true, year },
+      { date: `${year}-09-07`, localName: "Independência do Brasil", name: "Independence Day", global: true, year },
+      { date: `${year}-10-12`, localName: "Nossa Senhora Aparecida", name: "Our Lady of Aparecida", global: true, year },
+      { date: `${year}-11-02`, localName: "Finados", name: "All Souls' Day", global: true, year },
+      { date: `${year}-11-15`, localName: "Proclamação da República", name: "Republic Proclamation Day", global: true, year },
+      { date: `${year}-11-20`, localName: "Dia da Consciência Negra", name: "Black Awareness Day", global: true, year },
+      { date: `${year}-12-25`, localName: "Natal", name: "Christmas Day", global: true, year },
+    ];
+  });
+  return { holidays };
+}
+
+function withHolidayTimeout<T>(promise: PromiseLike<T>, fallback: T): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), 7000)),
+  ]);
+}
+
 export default function CalendarioPolitico() {
   // "hoje" sempre no fuso da campanha (America/Sao_Paulo) para evitar drift entre fusos
   const todayYMD = todayCampaignYMD();
@@ -61,12 +117,13 @@ export default function CalendarioPolitico() {
     queryKey: ["calendario-politico-holidays", yearsToLoad.join(",")],
     queryFn: async () => {
       const qs = `years=${yearsToLoad.join(",")}`;
-      const { data, error } = await supabase.functions.invoke(`holidays-fetch?${qs}`, {
+      const fallback = fallbackHolidays(yearsToLoad);
+      const { data, error } = await withHolidayTimeout(supabase.functions.invoke(`holidays-fetch?${qs}`, {
         body: undefined,
         method: "GET",
-      });
-      if (error) throw error;
-      return data as { holidays: Holiday[] };
+      }), { data: fallback, error: null });
+      if (error) return fallback;
+      return (data as { holidays: Holiday[] }) || fallback;
     },
     staleTime: 1000 * 60 * 60 * 12,
     refetchOnWindowFocus: false,
