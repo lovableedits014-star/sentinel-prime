@@ -1,5 +1,4 @@
-UPDATE auth.users
-SET encrypted_password = crypt('25896589Ba@23479612', gen_salt('bf')),
-    email_confirmed_at = COALESCE(email_confirmed_at, now()),
-    updated_at = now()
-WHERE email = 'lovableedits014@gmail.com';
+-- REDACTED: This migration previously set a plaintext password for the super-admin
+-- account. The plaintext value has been removed. Rotate the password via the
+-- Supabase Auth dashboard. This file is now a no-op to preserve migration order.
+SELECT 1;

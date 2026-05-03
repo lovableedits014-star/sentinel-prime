@@ -75,33 +75,11 @@ Deno.serve(async (req) => {
       console.error("Error creating user:", createError);
 
       if (createError.code === "email_exists" || createError.message.includes("already been registered")) {
-        let page = 1;
-        const perPage = 200;
-
-        while (true) {
-          const { data: usersPage, error: listError } = await adminClient.auth.admin.listUsers({ page, perPage });
-          if (listError) {
-            console.error("Error listing users:", listError);
-            break;
-          }
-
-          const found = usersPage.users.find((u) => (u.email || "").toLowerCase() === normalizedEmail);
-          if (found) {
-            authUserId = found.id;
-            // Update password for the existing user
-            await adminClient.auth.admin.updateUserById(found.id, { password: senha });
-            break;
-          }
-
-          if (usersPage.users.length < perPage) break;
-          page += 1;
-        }
-
-        if (!authUserId) {
-          return new Response(JSON.stringify({ error: "Este e-mail já possui conta, mas não foi possível vinculá-la agora. Tente novamente." }), {
-            status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        // SECURITY: Do NOT reset the password of an existing auth user from a public endpoint.
+        // This would allow account takeover. Require the user to sign in / use password reset.
+        return new Response(JSON.stringify({ error: "Este e-mail já possui uma conta. Faça login ou recupere a senha." }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       } else {
         return new Response(JSON.stringify({ error: createError.message }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
