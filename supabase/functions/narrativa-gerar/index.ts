@@ -413,7 +413,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY ausente");
     const { dossie_id } = await req.json();
     if (!dossie_id) {
       return new Response(JSON.stringify({ error: "dossie_id obrigatório" }), {
@@ -429,6 +428,18 @@ Deno.serve(async (req) => {
       .eq("id", dossie_id)
       .maybeSingle();
     if (dErr || !dossie) throw new Error("Dossiê não encontrado");
+
+    // Provedor de IA central (Settings → Provedor de IA)
+    let llmConfig;
+    try {
+      llmConfig = await getClientLLMConfig(supa, dossie.client_id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "IA não configurada";
+      await supa.from("narrativa_dossies").update({ status: "erro", erro_msg: msg }).eq("id", dossie_id);
+      return new Response(JSON.stringify({ error: msg }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: perfil } = await supa
       .from("narrativa_perfil_candidato")
@@ -456,7 +467,6 @@ Deno.serve(async (req) => {
     }
 
     // Busca contexto web em tempo real (Wikipedia + Google News + sites .gov.br)
-    // Sem persistência — apenas em memória para enriquecer este prompt.
     let contextoWeb: any = null;
     try {
       const meta: any = dossie.dados_brutos?.meta || {};
@@ -480,41 +490,35 @@ Deno.serve(async (req) => {
       console.warn("contexto web erro (seguindo sem):", (webErr as Error).message);
     }
 
-    const aiRes = await fetch(AI_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
+    let aiJson: any;
+    try {
+      aiJson = await callLLMRaw(llmConfig, {
         messages: [
           { role: "system", content: buildSystemPrompt(perfil) },
           { role: "user", content: buildUserPrompt(dossie, rankingMap, contextoWeb) },
         ],
         tools: [TOOL_SCHEMA],
         tool_choice: { type: "function", function: { name: "gerar_pacote_narrativa" } },
-      }),
-    });
-
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      if (aiRes.status === 429) {
+      });
+    } catch (e: any) {
+      const status = e?.status || 500;
+      if (status === 429) {
         await supa.from("narrativa_dossies").update({ status: "erro", erro_msg: "Limite de requisições atingido. Tente novamente em alguns instantes." }).eq("id", dossie_id);
         return new Response(JSON.stringify({ error: "Limite de requisições da IA. Aguarde e tente de novo." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (aiRes.status === 402) {
+      if (status === 402) {
         await supa.from("narrativa_dossies").update({ status: "erro", erro_msg: "Créditos da IA esgotados." }).eq("id", dossie_id);
-        return new Response(JSON.stringify({ error: "Créditos da IA esgotados. Adicione créditos no workspace." }), {
+        return new Response(JSON.stringify({ error: "Créditos da IA esgotados. Adicione créditos no provedor configurado." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`AI gateway: ${aiRes.status} ${errText}`);
+      const msg = e?.message || "Erro IA";
+      await supa.from("narrativa_dossies").update({ status: "erro", erro_msg: msg }).eq("id", dossie_id);
+      throw e;
     }
 
-    const aiJson = await aiRes.json();
     const tcArgs = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     if (!tcArgs) throw new Error("IA não retornou tool_call estruturada");
     const conteudos = JSON.parse(tcArgs);
