@@ -12,7 +12,7 @@ import { isPathAllowed, getRoleLabels, type AccessProfile } from "@/lib/access-c
 import { CoringaButton } from "@/components/coringa/CoringaButton";
 import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
-const AUTH_CHECK_TIMEOUT_MS = 12000;
+const AUTH_CHECK_TIMEOUT_MS = 30000;
 
 const withTimeout = async <T,>(promise: PromiseLike<T>, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
