@@ -121,26 +121,42 @@ export default function Disparos() {
     enabled: !!clientId,
   });
 
+  // History filters & pagination
+  const [historyStatus, setHistoryStatus] = useState<string>("_all");
+  const [historySort, setHistorySort] = useState<"recent" | "oldest">("recent");
+  const [historyPage, setHistoryPage] = useState(0);
+  const PAGE_SIZE = 10;
+
+  // Reset page when filters change
+  useEffect(() => { setHistoryPage(0); }, [historyStatus, historySort]);
+
   // Dispatch history
-  const { data: dispatches = [], refetch } = useQuery<DispatchRow[]>({
-    queryKey: ["whatsapp-dispatches", clientId],
+  const { data: historyResult, refetch } = useQuery<{ rows: DispatchRow[]; count: number }>({
+    queryKey: ["whatsapp-dispatches", clientId, historyStatus, historySort, historyPage],
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("whatsapp_dispatches" as any)
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .limit(30);
-      return (data as unknown as DispatchRow[]) || [];
+        .order("created_at", { ascending: historySort === "oldest" })
+        .range(historyPage * PAGE_SIZE, historyPage * PAGE_SIZE + PAGE_SIZE - 1);
+      if (historyStatus !== "_all") q = q.eq("status", historyStatus);
+      const { data, count } = await q;
+      return { rows: (data as unknown as DispatchRow[]) || [], count: count || 0 };
     },
     enabled: !!clientId,
     refetchInterval: (data: any) => {
-      const hasActive = (data?.state?.data as DispatchRow[] | undefined)?.some(
+      const rows = (data?.state?.data?.rows as DispatchRow[] | undefined) || [];
+      const hasActive = rows.some(
         (d) => ["pendente","enviando","pausado_timeout","pausado_janela"].includes(d.status)
       );
       return hasActive ? 3000 : false;
     },
   });
+
+  const dispatches = historyResult?.rows || [];
+  const totalCount = historyResult?.count || 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   // Realtime for dispatches
   useEffect(() => {
@@ -479,66 +495,128 @@ export default function Disparos() {
       )}
 
       {/* Dispatch history */}
-      {dispatches.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Zap className="w-4 h-4" /> Histórico de Disparos
+              {totalCount > 0 && (
+                <span className="text-xs font-normal text-muted-foreground">({totalCount})</span>
+              )}
             </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <ScrollArea className="max-h-[400px]">
-              <div className="space-y-2">
-                {dispatches.map((d) => {
-                  const cfg = statusConfig[d.status] || statusConfig.pendente;
-                  const StatusIcon = cfg.icon;
-                  const progress = d.total_destinatarios > 0
-                    ? Math.round(((d.enviados + d.falhas) / d.total_destinatarios) * 100)
-                    : 0;
+            <div className="flex flex-wrap gap-2">
+              <Select value={historyStatus} onValueChange={setHistoryStatus}>
+                <SelectTrigger className="h-8 w-[160px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos os status</SelectItem>
+                  <SelectItem value="pendente">Aguardando</SelectItem>
+                  <SelectItem value="enviando">Enviando</SelectItem>
+                  <SelectItem value="concluido">Concluído</SelectItem>
+                  <SelectItem value="falhou">Falhou</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={historySort} onValueChange={(v) => setHistorySort(v as "recent" | "oldest")}>
+                <SelectTrigger className="h-8 w-[140px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Mais recentes</SelectItem>
+                  <SelectItem value="oldest">Mais antigos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {dispatches.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              {historyStatus !== "_all"
+                ? "Nenhum disparo encontrado com este filtro."
+                : "Nenhum disparo realizado ainda. Crie seu primeiro acima."}
+            </div>
+          ) : (
+            <>
+              <ScrollArea className="max-h-[400px]">
+                <div className="space-y-2">
+                  {dispatches.map((d) => {
+                    const cfg = statusConfig[d.status] || statusConfig.pendente;
+                    const StatusIcon = cfg.icon;
+                    const progress = d.total_destinatarios > 0
+                      ? Math.round(((d.enviados + d.falhas) / d.total_destinatarios) * 100)
+                      : 0;
 
-                  return (
-                    <div key={d.id} className="rounded-lg border p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{d.titulo}</p>
-                          <p className="text-xs text-muted-foreground truncate">{d.mensagem_template.slice(0, 80)}…</p>
-                        </div>
-                        <Badge className={`${cfg.color} shrink-0 text-xs flex items-center gap-1`}>
-                          <StatusIcon className={`h-3 w-3 ${d.status === "enviando" ? "animate-spin" : ""}`} />
-                          {cfg.label}
-                        </Badge>
-                      </div>
-
-                      {(d.status === "enviando" || d.status === "concluido") && d.total_destinatarios > 0 && (
-                        <Progress value={progress} className="h-1.5" />
-                      )}
-
-                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span>👥 {d.total_destinatarios}</span>
-                        {d.enviados > 0 && <span>✅ {d.enviados}</span>}
-                        {d.falhas > 0 && <span className="text-destructive">❌ {d.falhas}</span>}
-                        {d.tag_filtro && (
-                          <Badge variant="outline" className="text-xs h-4 px-1">
-                            🏷 {d.tag_filtro}
+                    return (
+                      <div key={d.id} className="rounded-lg border p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{d.titulo}</p>
+                            <p className="text-xs text-muted-foreground truncate">{d.mensagem_template.slice(0, 80)}…</p>
+                          </div>
+                          <Badge className={`${cfg.color} shrink-0 text-xs flex items-center gap-1`}>
+                            <StatusIcon className={`h-3 w-3 ${d.status === "enviando" ? "animate-spin" : ""}`} />
+                            {cfg.label}
                           </Badge>
-                        )}
-                        <DispatchLogDialog dispatchId={d.id} titulo={d.titulo} />
-                        <span className="ml-auto">
-                          {new Date(d.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
+                        </div>
 
-                      {d.error_message && (
-                        <p className="text-xs text-destructive bg-destructive/10 rounded p-1.5">{d.error_message}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
+                        {(d.status === "enviando" || d.status === "concluido") && d.total_destinatarios > 0 && (
+                          <Progress value={progress} className="h-1.5" />
+                        )}
+
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <span>👥 {d.total_destinatarios}</span>
+                          {d.enviados > 0 && <span>✅ {d.enviados}</span>}
+                          {d.falhas > 0 && <span className="text-destructive">❌ {d.falhas}</span>}
+                          {d.tag_filtro && (
+                            <Badge variant="outline" className="text-xs h-4 px-1">
+                              🏷 {d.tag_filtro}
+                            </Badge>
+                          )}
+                          <DispatchLogDialog dispatchId={d.id} titulo={d.titulo} />
+                          <span className="ml-auto">
+                            {new Date(d.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+
+                        {d.error_message && (
+                          <p className="text-xs text-destructive bg-destructive/10 rounded p-1.5">{d.error_message}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between gap-2 pt-3 mt-2 border-t">
+                  <span className="text-xs text-muted-foreground">
+                    Página {historyPage + 1} de {totalPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={historyPage === 0}
+                      onClick={() => setHistoryPage((p) => Math.max(0, p - 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={historyPage >= totalPages - 1}
+                      onClick={() => setHistoryPage((p) => p + 1)}
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
         </TabsContent>
 
         <TabsContent value="aniversario">
