@@ -158,6 +158,10 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  // Auth: cron secret OR a valid JWT scoped to a single rule's client.
+  const { isCronCaller, requireClientAccess } = await import("../_shared/auth-guard.ts");
+  const isCron = isCronCaller(req);
+
   // Suporta execução manual de uma única regra
   let onlyRuleId: string | null = null;
   if (req.method === "POST") {
@@ -165,6 +169,24 @@ Deno.serve(async (req) => {
       const body = await req.json();
       onlyRuleId = body?.rule_id || null;
     } catch {/* ignora */}
+  }
+
+  if (!isCron) {
+    // Manual invocations must target a single rule and be authorised for that rule's client.
+    if (!onlyRuleId) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: ruleRow } = await supabase
+      .from("media_alert_rules").select("client_id").eq("id", onlyRuleId).maybeSingle();
+    if (!ruleRow) {
+      return new Response(JSON.stringify({ error: "not_found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const guard = await requireClientAccess(req, (ruleRow as any).client_id);
+    if (!guard.ok) return guard.response;
   }
 
   let q = supabase
