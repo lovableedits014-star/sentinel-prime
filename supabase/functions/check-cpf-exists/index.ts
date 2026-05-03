@@ -59,13 +59,10 @@ Deno.serve(async (req) => {
       admin.from("supporter_accounts").select("id").eq("client_id", client_id).eq("cpf", cpfClean).limit(1).maybeSingle(),
     ]);
 
-    let where: string | null = null;
-    if (pessoas.data) where = "pessoas";
-    else if (funcionarios.data) where = "funcionarios";
-    else if (contratados.data) where = "contratados";
-    else if (supporters.data || accounts.data) where = "apoiadores";
+    const exists =
+      !!(pessoas.data || funcionarios.data || contratados.data || supporters.data || accounts.data);
 
-    return new Response(JSON.stringify({ exists: !!where, valid: true, where }), {
+    return new Response(JSON.stringify({ exists, valid: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
