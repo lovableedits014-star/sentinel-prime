@@ -197,7 +197,7 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
     link.click();
   };
 
-  let Trigger: JSX.Element;
+  let Trigger: any;
   if (variant === "button") {
     Trigger = (
       <Button className="gap-2"><Sparkles className="w-4 h-4" />{triggerLabel}</Button>
