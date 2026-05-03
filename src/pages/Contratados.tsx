@@ -145,7 +145,20 @@ export default function Contratados() {
   const registrationUrl = clientId ? `${window.location.origin}/contratado/${clientId}` : "";
   const portalUrl = clientId ? `${window.location.origin}/portal-contratado/${clientId}` : "";
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (loading) return (
+    <div className="p-4 md:p-6">
+      <ContratadosSubNav />
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Carregando aba Contratados…</p>
+        {diagnostics.length > 0 && (
+          <div className="w-full max-w-xl rounded-lg border border-border/60 bg-muted/30 p-4">
+            <DiagnosticsPanel steps={diagnostics} loadError={loadError} retryAttempt={retryAttempt} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   // Sem cliente vinculado → estado vazio dedicado
   if (!clientId) {
