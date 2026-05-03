@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, FileText, Copy, Trash2, Sparkles, RefreshCw, History, Facebook, Instagram, ExternalLink, MessageSquare, ThumbsUp, ThumbsDown, FileDown, Send, Star, Pencil, X, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import DOMPurify from "dompurify";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -281,7 +282,9 @@ async function buildBoletimPdf(boletim: any, download = true): Promise<jsPDF> {
   container.style.width = "794px";
   container.style.background = "#ffffff";
   container.style.zIndex = "-1";
-  container.innerHTML = `<style>${BOLETIM_CSS}</style>${html}`;
+  // Sanitize the LLM-generated HTML before injecting into the DOM (XSS defense).
+  const sanitized = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+  container.innerHTML = `<style>${BOLETIM_CSS}</style>${sanitized}`;
   document.body.appendChild(container);
 
   // Aguarda a fonte Inter carregar (caso já não esteja em cache)
