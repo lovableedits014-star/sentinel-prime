@@ -208,45 +208,45 @@ export default function Contratados() {
 
         {/* Equipe */}
         <TabsContent value="equipe" className="mt-4 space-y-4">
-          {/* Filtros */}
-          <div className="flex flex-col md:flex-row gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome, telefone, cidade ou zona..." className="pl-9" />
+          {/* Filtros (somente quando há contratados) */}
+          {hasContratados && (
+            <div className="flex flex-col md:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome, telefone, cidade ou zona..." className="pl-9" />
+              </div>
+              <Select value={filterLider} onValueChange={setFilterLider}>
+                <SelectTrigger className="w-full md:w-[200px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os líderes</SelectItem>
+                  {Object.entries(liderMap).map(([id, nome]) => (
+                    <SelectItem key={id} value={id}><span className="flex items-center gap-1"><Crown className="w-3 h-3" />{nome}</span></SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full md:w-[140px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos status</SelectItem>
+                  <SelectItem value="ativo">Ativos</SelectItem>
+                  <SelectItem value="inativo">Inativos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={filterLider} onValueChange={setFilterLider}>
-              <SelectTrigger className="w-full md:w-[200px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os líderes</SelectItem>
-                {Object.entries(liderMap).map(([id, nome]) => (
-                  <SelectItem key={id} value={id}><span className="flex items-center gap-1"><Crown className="w-3 h-3" />{nome}</span></SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full md:w-[140px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos status</SelectItem>
-                <SelectItem value="ativo">Ativos</SelectItem>
-                <SelectItem value="inativo">Inativos</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {clientId && (
-            <TeamTree
-              clientId={clientId}
-              clientName={clientName}
-              contratados={contratados}
-              setContratados={setContratados}
-              indicados={indicados}
-              setIndicados={setIndicados}
-              checkinStats={checkinStats}
-              search={search}
-              filterLider={filterLider}
-              filterStatus={filterStatus}
-            />
           )}
+
+          <TeamTree
+            clientId={clientId}
+            clientName={clientName}
+            contratados={contratados}
+            setContratados={setContratados}
+            indicados={indicados}
+            setIndicados={setIndicados}
+            checkinStats={checkinStats}
+            search={search}
+            filterLider={filterLider}
+            filterStatus={filterStatus}
+          />
         </TabsContent>
 
         {/* Indicados */}
