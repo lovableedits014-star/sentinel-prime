@@ -34,6 +34,30 @@ export default function Contratados() {
   const [showLinks, setShowLinks] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
 
+  // Indicados: busca, filtro de status e paginação client-side
+  const PAGE_SIZE = 20;
+  const [indSearch, setIndSearch] = useState("");
+  const [indStatusFilter, setIndStatusFilter] = useState<string>("all");
+  const [indPage, setIndPage] = useState(1);
+  useEffect(() => { setIndPage(1); }, [indSearch, indStatusFilter]);
+
+  const filteredIndicados = useMemo(() => {
+    const q = indSearch.trim().toLowerCase();
+    return (indicados || []).filter(i => {
+      if (indStatusFilter !== "all" && i.status !== indStatusFilter) return false;
+      if (!q) return true;
+      return (
+        i.nome.toLowerCase().includes(q) ||
+        (i.telefone || "").toLowerCase().includes(q) ||
+        (i.cidade || "").toLowerCase().includes(q)
+      );
+    });
+  }, [indicados, indSearch, indStatusFilter]);
+
+  const totalIndPages = Math.max(1, Math.ceil(filteredIndicados.length / PAGE_SIZE));
+  const safePage = Math.min(indPage, totalIndPages);
+  const pagedIndicados = filteredIndicados.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   const liderMap = useMemo(() => {
     const m: Record<string, string> = {};
     contratados.filter(c => c.is_lider).forEach(c => { m[c.id] = c.nome; });
