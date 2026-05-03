@@ -75,7 +75,7 @@ export function MilitanciaCharts({ militants, platform }: Props) {
         comentários: m.total_comments,
         positivos: m.total_positive,
         negativos: m.total_negative,
-        url: getSocialProfileUrl(m.platform, m.platform_user_id),
+        url: getSocialProfileUrl(m.platform, m.platform_user_id, null, m.author_name),
         fullName: m.author_name || "—",
       }));
   }, [list]);
