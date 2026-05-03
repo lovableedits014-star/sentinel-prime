@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_logs: {
+        Row: {
+          action: string
+          client_id: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          client_id: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          client_id?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           cargo: string | null
@@ -49,11 +87,13 @@ export type Database = {
           ai_response: string | null
           author_id: string | null
           author_name: string | null
+          author_profile_picture: string | null
           client_id: string
           comment_id: string
           created_at: string | null
           final_response: string | null
           id: string
+          platform: string | null
           post_id: string
           responded_at: string | null
           sentiment: Database["public"]["Enums"]["sentiment_type"] | null
@@ -65,11 +105,13 @@ export type Database = {
           ai_response?: string | null
           author_id?: string | null
           author_name?: string | null
+          author_profile_picture?: string | null
           client_id: string
           comment_id: string
           created_at?: string | null
           final_response?: string | null
           id?: string
+          platform?: string | null
           post_id: string
           responded_at?: string | null
           sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
@@ -81,11 +123,13 @@ export type Database = {
           ai_response?: string | null
           author_id?: string | null
           author_name?: string | null
+          author_profile_picture?: string | null
           client_id?: string
           comment_id?: string
           created_at?: string | null
           final_response?: string | null
           id?: string
+          platform?: string | null
           post_id?: string
           responded_at?: string | null
           sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
