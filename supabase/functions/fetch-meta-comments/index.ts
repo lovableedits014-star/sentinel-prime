@@ -854,6 +854,7 @@ Deno.serve(async (req) => {
     }
 
     // ==== SENTIMENT ANALYSIS (only if time left) ====
+    // Now also fills sentiment_confidence + needs_review so the review queue stays populated.
     let sentimentAnalyzed = 0;
     if (hasTimeLeft(10000)) {
       syncLog.push('--- SENTIMENT ANALYSIS ---');
@@ -865,14 +866,14 @@ Deno.serve(async (req) => {
           .from('comments')
           .select('id, text')
           .eq('client_id', clientId)
-          .eq('sentiment', 'neutral')
+          .is('sentiment_confidence', null)
           .eq('is_page_owner', false)
           .order('created_at', { ascending: false })
-          .limit(50); // Reduced from 100
+          .limit(50);
 
         if (unanalyzed && unanalyzed.length > 0) {
           syncLog.push(`Comments to analyze: ${unanalyzed.length}`);
-          
+
           for (const batch of chunkArray(unanalyzed, 10)) {
             if (!hasTimeLeft(5000)) {
               syncLog.push('Skipping remaining sentiment (time limit)');
@@ -880,25 +881,44 @@ Deno.serve(async (req) => {
             }
 
             const batchTexts = batch.map((c: any, i: number) => `[${i + 1}] ${c.text.slice(0, 200)}`).join('\n');
-            
+
             const messages: LLMMessage[] = [{
               role: 'user',
-              content: `Classifique o sentimento de cada comentário abaixo. Responda APENAS com o número e o sentimento, um por linha, no formato: "1:positive", "2:negative" ou "3:neutral".\n\n${batchTexts}\n\nResposta:`,
+              content: `Classifique o sentimento de cada comentário abaixo e dê sua confiança (0.0 a 1.0). Responda APENAS um por linha no formato: "N|sentimento|confiança" (ex: "1|positive|0.9", "2|negative|0.55", "3|neutral|0.7"). Use confiança < 0.7 quando estiver em dúvida.\n\n${batchTexts}\n\nResposta:`,
             }];
 
             try {
-              const response = await callLLM(llmConfig, { messages, maxTokens: 200, temperature: 0 });
+              const response = await callLLM(llmConfig, { messages, maxTokens: 400, temperature: 0 });
               const lines = response.content.trim().split('\n');
-              
+
               for (const line of lines) {
-                const match = line.match(/(\d+)\s*[:.\-)\s]\s*(positive|negative|neutral)/i);
-                if (match) {
-                  const idx = parseInt(match[1]) - 1;
-                  const sentiment = match[2].toLowerCase();
-                  if (idx >= 0 && idx < batch.length && ['positive', 'negative', 'neutral'].includes(sentiment)) {
-                    await supabaseClient.from('comments').update({ sentiment }).eq('id', batch[idx].id);
-                    sentimentAnalyzed++;
+                // Try "N|sentiment|conf" first, then legacy "N:sentiment"
+                let idx = -1;
+                let sentiment = '';
+                let confidence = 0.6;
+                const m1 = line.match(/(\d+)\s*[|:.\-)\s]\s*(positive|negative|neutral)\s*[|:\-,\s]\s*([01]?\.\d+|0|1)/i);
+                if (m1) {
+                  idx = parseInt(m1[1]) - 1;
+                  sentiment = m1[2].toLowerCase();
+                  confidence = Math.max(0, Math.min(1, parseFloat(m1[3])));
+                } else {
+                  const m2 = line.match(/(\d+)\s*[:.\-)\s]\s*(positive|negative|neutral)/i);
+                  if (m2) {
+                    idx = parseInt(m2[1]) - 1;
+                    sentiment = m2[2].toLowerCase();
+                    confidence = 0.5; // default low so it surfaces for review
                   }
+                }
+
+                if (idx >= 0 && idx < batch.length && ['positive', 'negative', 'neutral'].includes(sentiment)) {
+                  const needsReview = confidence < 0.7;
+                  await supabaseClient.from('comments').update({
+                    sentiment,
+                    sentiment_source: 'ai',
+                    sentiment_confidence: confidence,
+                    needs_review: needsReview,
+                  }).eq('id', batch[idx].id);
+                  sentimentAnalyzed++;
                 }
               }
             } catch (llmErr) {

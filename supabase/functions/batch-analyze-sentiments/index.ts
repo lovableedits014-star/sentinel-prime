@@ -136,17 +136,25 @@ Deno.serve(async (req) => {
       }
 
       const batch = allComments.slice(i, i + BATCH_SIZE);
-      
+
       try {
         const sentiments = await analyzeBatch(llmConfig, batch, politicalContext);
-        
-        // Update each comment
+
+        // Update each comment — also populate confidence + needs_review so the review queue surfaces them
         for (const { id, sentiment } of sentiments) {
+          // Default confidence: batch prompt doesn't return one. Mark for review so user can confirm.
+          const confidence = 0.6;
+          const needsReview = confidence < 0.7;
           await supabaseClient
             .from('comments')
-            .update({ sentiment })
+            .update({
+              sentiment,
+              sentiment_source: 'ai',
+              sentiment_confidence: confidence,
+              needs_review: needsReview,
+            })
             .eq('id', id);
-          
+
           if (sentiment === 'positive') results.positive++;
           else if (sentiment === 'negative') results.negative++;
           else results.neutral++;
