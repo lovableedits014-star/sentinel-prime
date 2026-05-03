@@ -131,10 +131,7 @@ function RegistroContratadoWrapper({
         clearInterval(interval);
         onDone();
         try {
-          await supabase
-            .from("lider_invite_tokens" as any)
-            .update({ used_at: new Date().toISOString() })
-            .eq("token", token);
+          await supabase.rpc("consume_lider_invite_token" as any, { _token: token });
         } catch (err) {
           console.warn("Falha ao marcar token como usado", err);
         }
