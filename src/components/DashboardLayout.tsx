@@ -225,7 +225,8 @@ const DashboardLayout = () => {
         navigate("/auth", { replace: true });
       } else {
         setUser(session.user);
-        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") refreshAllData();
+        // Só invalida cache em SIGNED_IN explícito; TOKEN_REFRESHED não deve forçar refetch geral.
+        if (event === "SIGNED_IN") refreshAllData();
       }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
