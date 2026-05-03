@@ -1,5 +1,5 @@
 // Service Worker para Push Notifications do Portal do Apoiador
-// v3 - Direct registration, no Workbox wrapper
+// v4 - sem cache de navegação; limpa caches antigos para evitar tela presa após refresh
 const WB_MANIFEST = self.__WB_MANIFEST || [];
 
 self.addEventListener('install', (event) => {
@@ -7,7 +7,12 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then(() => clients.claim())
+  );
 });
 
 // Recebe push notification

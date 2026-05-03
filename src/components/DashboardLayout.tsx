@@ -12,6 +12,21 @@ import { isPathAllowed, getRoleLabels, type AccessProfile } from "@/lib/access-c
 import { CoringaButton } from "@/components/coringa/CoringaButton";
 import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
+const AUTH_CHECK_TIMEOUT_MS = 12000;
+
+const withTimeout = async <T,>(promise: PromiseLike<T>, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), AUTH_CHECK_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([Promise.resolve(promise), timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 type MenuSection = {
   label: string;
   items: { icon: any; label: string; path: string }[];
@@ -78,57 +93,81 @@ const DashboardLayout = () => {
   }, [queryClient]);
 
   useEffect(() => {
+    let mounted = true;
+
     const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/auth"); return; }
-      setUser(session.user);
+      try {
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          "Tempo esgotado ao verificar sua sessão"
+        );
+        if (!mounted) return;
+        if (!session) { navigate("/auth", { replace: true }); return; }
+        setUser(session.user);
 
-      // Check if user is a client owner
-      const { data: clientData } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("user_id", session.user.id)
-        .limit(1)
-        .maybeSingle();
+        // Check if user is a client owner
+        const { data: clientData, error: clientError } = await withTimeout(
+          supabase
+            .from("clients")
+            .select("id")
+            .eq("user_id", session.user.id)
+            .limit(1)
+            .maybeSingle(),
+          "Tempo esgotado ao carregar suas permissões"
+        );
+        if (!mounted) return;
+        if (clientError) throw clientError;
 
-      if (clientData) {
-        setIsClientOwner(true);
-        setAccessProfile(null); // full access
-      } else {
-        // Check if user is a team member
-        const { data: teamData } = await supabase
-          .from("team_members")
-          .select("role")
-          .eq("user_id", session.user.id)
-          .eq("status", "active")
-          .limit(1)
-          .maybeSingle();
-
-        if (teamData) {
-          setAccessProfile(teamData.role as AccessProfile);
+        if (clientData) {
+          setIsClientOwner(true);
+          setAccessProfile(null); // full access
         } else {
-          // No access at all - redirect
-          toast.error("Você não tem permissão para acessar o painel");
-          await supabase.auth.signOut();
-          navigate("/auth");
-          return;
-        }
-      }
+          // Check if user is a team member
+          const { data: teamData, error: teamError } = await withTimeout(
+            supabase
+              .from("team_members")
+              .select("role")
+              .eq("user_id", session.user.id)
+              .eq("status", "active")
+              .limit(1)
+              .maybeSingle(),
+            "Tempo esgotado ao carregar suas permissões"
+          );
+          if (!mounted) return;
+          if (teamError) throw teamError;
 
-      setLoading(false);
-      refreshAllData();
+          if (teamData) {
+            setAccessProfile(teamData.role as AccessProfile);
+          } else {
+            // No access at all - redirect
+            toast.error("Você não tem permissão para acessar o painel");
+            await supabase.auth.signOut();
+            navigate("/auth", { replace: true });
+            return;
+          }
+        }
+
+        setLoading(false);
+        refreshAllData();
+      } catch (error) {
+        console.error("Falha ao carregar acesso ao painel:", error);
+        if (!mounted) return;
+        toast.error("Não foi possível carregar o painel. Entre novamente.");
+        setLoading(false);
+        navigate("/auth", { replace: true });
+      }
     };
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
-        navigate("/auth");
+        navigate("/auth", { replace: true });
       } else {
         setUser(session.user);
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") refreshAllData();
       }
     });
-    return () => subscription.unsubscribe();
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, [navigate, refreshAllData]);
 
   // Close mobile sidebar on route change
