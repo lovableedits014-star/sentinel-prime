@@ -198,24 +198,27 @@ export default function Contratados() {
     <div className="p-4 md:p-6">
       <ContratadosSubNav />
 
-      {loadError && (
-        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-2 text-destructive">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{loadError}</span>
+      {(loadError || diagnostics.length > 0) && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-2 text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{loadError || "Diagnóstico do carregamento"}</span>
+            </div>
+            <div className="flex items-center gap-2 self-start md:self-auto">
+              {retryAttempt > 0 && loading && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Tentativa {retryAttempt}/3
+                </span>
+              )}
+              <Button size="sm" variant="outline" onClick={reload} className="gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Recarregar agora
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            {retryAttempt > 0 && loading && (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Tentativa {retryAttempt}/3
-              </span>
-            )}
-            <Button size="sm" variant="outline" onClick={reload} className="gap-1.5">
-              <RefreshCw className="h-3.5 w-3.5" />
-              Recarregar agora
-            </Button>
-          </div>
+          {loadError && <DiagnosticsPanel steps={diagnostics} loadError={loadError} retryAttempt={retryAttempt} />}
         </div>
       )}
 
