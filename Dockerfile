@@ -25,7 +25,8 @@ ENV HOST=0.0.0.0
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/server-entry.mjs ./server-entry.mjs
 
 EXPOSE 3000
 
-CMD ["node", "dist/server/server.js"]
+CMD ["node", "server-entry.mjs"]
