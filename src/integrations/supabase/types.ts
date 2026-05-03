@@ -157,6 +157,80 @@ export type Database = {
           },
         ]
       }
+      adversarios_politicos: {
+        Row: {
+          ativo: boolean
+          cargo: string | null
+          client_id: string
+          created_at: string
+          foto_url: string | null
+          id: string
+          id_assembleia_estadual: string | null
+          id_camara_federal: number | null
+          id_senado_federal: number | null
+          legislatura_atual: number | null
+          municipio: string | null
+          nivel: Database["public"]["Enums"]["nivel_parlamentar"]
+          nome: string
+          nome_parlamentar: string | null
+          observacoes: string | null
+          partido: string | null
+          uf: string | null
+          updated_at: string
+          url_camara_municipal: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          cargo?: string | null
+          client_id: string
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          id_assembleia_estadual?: string | null
+          id_camara_federal?: number | null
+          id_senado_federal?: number | null
+          legislatura_atual?: number | null
+          municipio?: string | null
+          nivel: Database["public"]["Enums"]["nivel_parlamentar"]
+          nome: string
+          nome_parlamentar?: string | null
+          observacoes?: string | null
+          partido?: string | null
+          uf?: string | null
+          updated_at?: string
+          url_camara_municipal?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          cargo?: string | null
+          client_id?: string
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          id_assembleia_estadual?: string | null
+          id_camara_federal?: number | null
+          id_senado_federal?: number | null
+          legislatura_atual?: number | null
+          municipio?: string | null
+          nivel?: Database["public"]["Enums"]["nivel_parlamentar"]
+          nome?: string
+          nome_parlamentar?: string | null
+          observacoes?: string | null
+          partido?: string | null
+          uf?: string | null
+          updated_at?: string
+          url_camara_municipal?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "adversarios_politicos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alertas: {
         Row: {
           client_id: string
@@ -545,6 +619,7 @@ export type Database = {
           id: string
           is_hidden: boolean
           is_page_owner: boolean
+          needs_review: boolean
           parent_comment_id: string | null
           platform: string | null
           platform_user_id: string | null
@@ -555,6 +630,8 @@ export type Database = {
           post_permalink_url: string | null
           responded_at: string | null
           sentiment: Database["public"]["Enums"]["sentiment_type"] | null
+          sentiment_confidence: number | null
+          sentiment_source: string
           social_profile_id: string | null
           status: Database["public"]["Enums"]["comment_status"] | null
           text: string
@@ -575,6 +652,7 @@ export type Database = {
           id?: string
           is_hidden?: boolean
           is_page_owner?: boolean
+          needs_review?: boolean
           parent_comment_id?: string | null
           platform?: string | null
           platform_user_id?: string | null
@@ -585,6 +663,8 @@ export type Database = {
           post_permalink_url?: string | null
           responded_at?: string | null
           sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
+          sentiment_confidence?: number | null
+          sentiment_source?: string
           social_profile_id?: string | null
           status?: Database["public"]["Enums"]["comment_status"] | null
           text: string
@@ -605,6 +685,7 @@ export type Database = {
           id?: string
           is_hidden?: boolean
           is_page_owner?: boolean
+          needs_review?: boolean
           parent_comment_id?: string | null
           platform?: string | null
           platform_user_id?: string | null
@@ -615,6 +696,8 @@ export type Database = {
           post_permalink_url?: string | null
           responded_at?: string | null
           sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
+          sentiment_confidence?: number | null
+          sentiment_source?: string
           social_profile_id?: string | null
           status?: Database["public"]["Enums"]["comment_status"] | null
           text?: string
@@ -2081,6 +2164,764 @@ export type Database = {
           },
         ]
       }
+      midia_alvos_monitoramento: {
+        Row: {
+          ativo: boolean
+          client_id: string
+          created_at: string
+          id: string
+          termo: string
+          tipo: string
+        }
+        Insert: {
+          ativo?: boolean
+          client_id: string
+          created_at?: string
+          id?: string
+          termo: string
+          tipo?: string
+        }
+        Update: {
+          ativo?: boolean
+          client_id?: string
+          created_at?: string
+          id?: string
+          termo?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "midia_alvos_monitoramento_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      midia_coleta_log: {
+        Row: {
+          client_id: string
+          creditos_firecrawl: number | null
+          erros: Json | null
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string
+          noticias_analisadas: number | null
+          noticias_novas: number | null
+          portais_processados: number | null
+          status: string
+        }
+        Insert: {
+          client_id: string
+          creditos_firecrawl?: number | null
+          erros?: Json | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          noticias_analisadas?: number | null
+          noticias_novas?: number | null
+          portais_processados?: number | null
+          status?: string
+        }
+        Update: {
+          client_id?: string
+          creditos_firecrawl?: number | null
+          erros?: Json | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          noticias_analisadas?: number | null
+          noticias_novas?: number | null
+          portais_processados?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "midia_coleta_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      midia_noticias: {
+        Row: {
+          alerta_critico: boolean
+          alvos_mencionados: string[] | null
+          client_id: string
+          conteudo_md: string | null
+          created_at: string
+          data_coleta: string
+          data_publicacao: string | null
+          id: string
+          portal_id: string | null
+          portal_nome: string | null
+          raw_metadata: Json | null
+          relevancia_politica: number | null
+          resumo: string | null
+          resumo_ia: string | null
+          sentimento: string | null
+          sentimento_score: number | null
+          tags_assunto: string[] | null
+          titulo: string
+          url: string
+        }
+        Insert: {
+          alerta_critico?: boolean
+          alvos_mencionados?: string[] | null
+          client_id: string
+          conteudo_md?: string | null
+          created_at?: string
+          data_coleta?: string
+          data_publicacao?: string | null
+          id?: string
+          portal_id?: string | null
+          portal_nome?: string | null
+          raw_metadata?: Json | null
+          relevancia_politica?: number | null
+          resumo?: string | null
+          resumo_ia?: string | null
+          sentimento?: string | null
+          sentimento_score?: number | null
+          tags_assunto?: string[] | null
+          titulo: string
+          url: string
+        }
+        Update: {
+          alerta_critico?: boolean
+          alvos_mencionados?: string[] | null
+          client_id?: string
+          conteudo_md?: string | null
+          created_at?: string
+          data_coleta?: string
+          data_publicacao?: string | null
+          id?: string
+          portal_id?: string | null
+          portal_nome?: string | null
+          raw_metadata?: Json | null
+          relevancia_politica?: number | null
+          resumo?: string | null
+          resumo_ia?: string | null
+          sentimento?: string | null
+          sentimento_score?: number | null
+          tags_assunto?: string[] | null
+          titulo?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "midia_noticias_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "midia_noticias_portal_id_fkey"
+            columns: ["portal_id"]
+            isOneToOne: false
+            referencedRelation: "midia_portais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      midia_portais: {
+        Row: {
+          ativo: boolean
+          camada: string
+          created_at: string
+          id: string
+          municipio: string | null
+          nome: string
+          observacoes: string | null
+          ordem: number
+          uf: string | null
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          ativo?: boolean
+          camada?: string
+          created_at?: string
+          id?: string
+          municipio?: string | null
+          nome: string
+          observacoes?: string | null
+          ordem?: number
+          uf?: string | null
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          ativo?: boolean
+          camada?: string
+          created_at?: string
+          id?: string
+          municipio?: string | null
+          nome?: string
+          observacoes?: string | null
+          ordem?: number
+          uf?: string | null
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      municipios_indicadores: {
+        Row: {
+          cobertura_sus_pct: number | null
+          codigo_ibge: number
+          created_at: string
+          datasus_ano: number | null
+          id: string
+          ideb_ano: number | null
+          ideb_anos_finais: number | null
+          ideb_anos_iniciais: number | null
+          ideb_ensino_medio: number | null
+          idh: number | null
+          idh_ano: number | null
+          indicadores: Json | null
+          leitos_sus_total: number | null
+          mortalidade_infantil: number | null
+          nome: string
+          num_escolas: number | null
+          pib_ano: number | null
+          pib_per_capita: number | null
+          pib_total: number | null
+          populacao: number | null
+          populacao_ano: number | null
+          renda_media: number | null
+          uf: string
+          ultima_atualizacao: string
+        }
+        Insert: {
+          cobertura_sus_pct?: number | null
+          codigo_ibge: number
+          created_at?: string
+          datasus_ano?: number | null
+          id?: string
+          ideb_ano?: number | null
+          ideb_anos_finais?: number | null
+          ideb_anos_iniciais?: number | null
+          ideb_ensino_medio?: number | null
+          idh?: number | null
+          idh_ano?: number | null
+          indicadores?: Json | null
+          leitos_sus_total?: number | null
+          mortalidade_infantil?: number | null
+          nome: string
+          num_escolas?: number | null
+          pib_ano?: number | null
+          pib_per_capita?: number | null
+          pib_total?: number | null
+          populacao?: number | null
+          populacao_ano?: number | null
+          renda_media?: number | null
+          uf: string
+          ultima_atualizacao?: string
+        }
+        Update: {
+          cobertura_sus_pct?: number | null
+          codigo_ibge?: number
+          created_at?: string
+          datasus_ano?: number | null
+          id?: string
+          ideb_ano?: number | null
+          ideb_anos_finais?: number | null
+          ideb_anos_iniciais?: number | null
+          ideb_ensino_medio?: number | null
+          idh?: number | null
+          idh_ano?: number | null
+          indicadores?: Json | null
+          leitos_sus_total?: number | null
+          mortalidade_infantil?: number | null
+          nome?: string
+          num_escolas?: number | null
+          pib_ano?: number | null
+          pib_per_capita?: number | null
+          pib_total?: number | null
+          populacao?: number | null
+          populacao_ano?: number | null
+          renda_media?: number | null
+          uf?: string
+          ultima_atualizacao?: string
+        }
+        Relationships: []
+      }
+      municipios_sync_log: {
+        Row: {
+          created_at: string
+          duracao_ms: number | null
+          erro_mensagem: string | null
+          fonte: string
+          id: string
+          municipios_processados: number | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          duracao_ms?: number | null
+          erro_mensagem?: string | null
+          fonte: string
+          id?: string
+          municipios_processados?: number | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          duracao_ms?: number | null
+          erro_mensagem?: string | null
+          fonte?: string
+          id?: string
+          municipios_processados?: number | null
+          status?: string
+        }
+        Relationships: []
+      }
+      narrativa_dossies: {
+        Row: {
+          analise: Json
+          analyzed_at: string | null
+          client_id: string
+          collected_at: string | null
+          conteudos: Json
+          created_at: string
+          created_by: string | null
+          dados_brutos: Json
+          erro_msg: string | null
+          generated_at: string | null
+          ibge_code: string | null
+          id: string
+          municipio: string
+          status: string
+          uf: string
+          updated_at: string
+        }
+        Insert: {
+          analise?: Json
+          analyzed_at?: string | null
+          client_id: string
+          collected_at?: string | null
+          conteudos?: Json
+          created_at?: string
+          created_by?: string | null
+          dados_brutos?: Json
+          erro_msg?: string | null
+          generated_at?: string | null
+          ibge_code?: string | null
+          id?: string
+          municipio: string
+          status?: string
+          uf: string
+          updated_at?: string
+        }
+        Update: {
+          analise?: Json
+          analyzed_at?: string | null
+          client_id?: string
+          collected_at?: string | null
+          conteudos?: Json
+          created_at?: string
+          created_by?: string | null
+          dados_brutos?: Json
+          erro_msg?: string | null
+          generated_at?: string | null
+          ibge_code?: string | null
+          id?: string
+          municipio?: string
+          status?: string
+          uf?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narrativa_dossies_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      narrativa_perfil_candidato: {
+        Row: {
+          bandeiras: Json
+          cargo_pretendido: string | null
+          client_id: string
+          created_at: string
+          estilo_discurso: string | null
+          id: string
+          nome_candidato: string | null
+          observacoes: string | null
+          partido: string | null
+          proposta_central: string | null
+          publico_alvo: string | null
+          ref_ano: number | null
+          ref_cargo: string | null
+          ref_lado: string | null
+          ref_municipio: string | null
+          ref_nome: string | null
+          ref_partido: string | null
+          ref_uf: string | null
+          tom_voz: string | null
+          updated_at: string
+        }
+        Insert: {
+          bandeiras?: Json
+          cargo_pretendido?: string | null
+          client_id: string
+          created_at?: string
+          estilo_discurso?: string | null
+          id?: string
+          nome_candidato?: string | null
+          observacoes?: string | null
+          partido?: string | null
+          proposta_central?: string | null
+          publico_alvo?: string | null
+          ref_ano?: number | null
+          ref_cargo?: string | null
+          ref_lado?: string | null
+          ref_municipio?: string | null
+          ref_nome?: string | null
+          ref_partido?: string | null
+          ref_uf?: string | null
+          tom_voz?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bandeiras?: Json
+          cargo_pretendido?: string | null
+          client_id?: string
+          created_at?: string
+          estilo_discurso?: string | null
+          id?: string
+          nome_candidato?: string | null
+          observacoes?: string | null
+          partido?: string | null
+          proposta_central?: string | null
+          publico_alvo?: string | null
+          ref_ano?: number | null
+          ref_cargo?: string | null
+          ref_lado?: string | null
+          ref_municipio?: string | null
+          ref_nome?: string | null
+          ref_partido?: string | null
+          ref_uf?: string | null
+          tom_voz?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narrativa_perfil_candidato_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      narrativa_visitas_realizadas: {
+        Row: {
+          bairros_visitados: Json
+          client_id: string
+          created_at: string
+          created_by: string | null
+          data_visita: string
+          dossie_id: string | null
+          id: string
+          municipio: string
+          observacoes: string | null
+          resultado_percebido: string | null
+          temas_abordados: Json
+          uf: string
+          updated_at: string
+        }
+        Insert: {
+          bairros_visitados?: Json
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          data_visita?: string
+          dossie_id?: string | null
+          id?: string
+          municipio: string
+          observacoes?: string | null
+          resultado_percebido?: string | null
+          temas_abordados?: Json
+          uf: string
+          updated_at?: string
+        }
+        Update: {
+          bairros_visitados?: Json
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_visita?: string
+          dossie_id?: string | null
+          id?: string
+          municipio?: string
+          observacoes?: string | null
+          resultado_percebido?: string | null
+          temas_abordados?: Json
+          uf?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "narrativa_visitas_realizadas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "narrativa_visitas_realizadas_dossie_id_fkey"
+            columns: ["dossie_id"]
+            isOneToOne: false
+            referencedRelation: "narrativa_dossies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parlamentar_presenca: {
+        Row: {
+          adversario_id: string
+          client_id: string
+          created_at: string
+          data_sessao: string
+          id: string
+          id_externo: string | null
+          justificada: boolean
+          legislatura: number | null
+          motivo_ausencia: string | null
+          presente: boolean
+          tipo_sessao: string | null
+        }
+        Insert: {
+          adversario_id: string
+          client_id: string
+          created_at?: string
+          data_sessao: string
+          id?: string
+          id_externo?: string | null
+          justificada?: boolean
+          legislatura?: number | null
+          motivo_ausencia?: string | null
+          presente: boolean
+          tipo_sessao?: string | null
+        }
+        Update: {
+          adversario_id?: string
+          client_id?: string
+          created_at?: string
+          data_sessao?: string
+          id?: string
+          id_externo?: string | null
+          justificada?: boolean
+          legislatura?: number | null
+          motivo_ausencia?: string | null
+          presente?: boolean
+          tipo_sessao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parlamentar_presenca_adversario_id_fkey"
+            columns: ["adversario_id"]
+            isOneToOne: false
+            referencedRelation: "adversarios_politicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parlamentar_presenca_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parlamentar_proposicoes: {
+        Row: {
+          adversario_id: string
+          ano: number | null
+          client_id: string
+          created_at: string
+          data_apresentacao: string | null
+          ementa: string | null
+          id: string
+          id_externo: string | null
+          numero: string | null
+          situacao: string | null
+          tema: string | null
+          tipo: string
+          url_detalhes: string | null
+        }
+        Insert: {
+          adversario_id: string
+          ano?: number | null
+          client_id: string
+          created_at?: string
+          data_apresentacao?: string | null
+          ementa?: string | null
+          id?: string
+          id_externo?: string | null
+          numero?: string | null
+          situacao?: string | null
+          tema?: string | null
+          tipo: string
+          url_detalhes?: string | null
+        }
+        Update: {
+          adversario_id?: string
+          ano?: number | null
+          client_id?: string
+          created_at?: string
+          data_apresentacao?: string | null
+          ementa?: string | null
+          id?: string
+          id_externo?: string | null
+          numero?: string | null
+          situacao?: string | null
+          tema?: string | null
+          tipo?: string
+          url_detalhes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parlamentar_proposicoes_adversario_id_fkey"
+            columns: ["adversario_id"]
+            isOneToOne: false
+            referencedRelation: "adversarios_politicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parlamentar_proposicoes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parlamentar_sync_log: {
+        Row: {
+          adversario_id: string | null
+          client_id: string
+          created_at: string
+          duracao_ms: number | null
+          erro_mensagem: string | null
+          fonte: string
+          id: string
+          registros_atualizados: number | null
+          registros_inseridos: number | null
+          status: string
+          tipo_dado: string
+        }
+        Insert: {
+          adversario_id?: string | null
+          client_id: string
+          created_at?: string
+          duracao_ms?: number | null
+          erro_mensagem?: string | null
+          fonte: string
+          id?: string
+          registros_atualizados?: number | null
+          registros_inseridos?: number | null
+          status: string
+          tipo_dado: string
+        }
+        Update: {
+          adversario_id?: string | null
+          client_id?: string
+          created_at?: string
+          duracao_ms?: number | null
+          erro_mensagem?: string | null
+          fonte?: string
+          id?: string
+          registros_atualizados?: number | null
+          registros_inseridos?: number | null
+          status?: string
+          tipo_dado?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parlamentar_sync_log_adversario_id_fkey"
+            columns: ["adversario_id"]
+            isOneToOne: false
+            referencedRelation: "adversarios_politicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parlamentar_sync_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parlamentar_votacoes: {
+        Row: {
+          adversario_id: string
+          client_id: string
+          created_at: string
+          data_votacao: string
+          id: string
+          id_externo: string | null
+          proposicao_codigo: string | null
+          proposicao_ementa: string | null
+          resultado_geral: string | null
+          tema: string | null
+          url_detalhes: string | null
+          voto: string
+        }
+        Insert: {
+          adversario_id: string
+          client_id: string
+          created_at?: string
+          data_votacao: string
+          id?: string
+          id_externo?: string | null
+          proposicao_codigo?: string | null
+          proposicao_ementa?: string | null
+          resultado_geral?: string | null
+          tema?: string | null
+          url_detalhes?: string | null
+          voto: string
+        }
+        Update: {
+          adversario_id?: string
+          client_id?: string
+          created_at?: string
+          data_votacao?: string
+          id?: string
+          id_externo?: string | null
+          proposicao_codigo?: string | null
+          proposicao_ementa?: string | null
+          resultado_geral?: string | null
+          tema?: string | null
+          url_detalhes?: string | null
+          voto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parlamentar_votacoes_adversario_id_fkey"
+            columns: ["adversario_id"]
+            isOneToOne: false
+            referencedRelation: "adversarios_politicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parlamentar_votacoes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pessoa_social: {
         Row: {
           created_at: string
@@ -2532,6 +3373,47 @@ export type Database = {
           },
         ]
       }
+      quick_contacts: {
+        Row: {
+          client_id: string
+          context_message: string | null
+          created_at: string
+          display_order: number
+          id: string
+          label: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          context_message?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          label: string
+          phone: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          context_message?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          label?: string
+          phone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reactions: {
         Row: {
           client_id: string
@@ -2714,6 +3596,105 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sentiment_corrections: {
+        Row: {
+          ai_predicted: string | null
+          client_id: string
+          comment_id: string | null
+          comment_text: string
+          corrected_by: string | null
+          created_at: string
+          human_corrected: string
+          id: string
+        }
+        Insert: {
+          ai_predicted?: string | null
+          client_id: string
+          comment_id?: string | null
+          comment_text: string
+          corrected_by?: string | null
+          created_at?: string
+          human_corrected: string
+          id?: string
+        }
+        Update: {
+          ai_predicted?: string | null
+          client_id?: string
+          comment_id?: string | null
+          comment_text?: string
+          corrected_by?: string | null
+          created_at?: string
+          human_corrected?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      social_militants: {
+        Row: {
+          author_name: string | null
+          avatar_url: string | null
+          client_id: string
+          created_at: string
+          current_badge: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          notes: string | null
+          platform: string
+          platform_user_id: string
+          promoted_to_supporter_id: string | null
+          total_30d_negative: number
+          total_30d_positive: number
+          total_comments: number
+          total_negative: number
+          total_neutral: number
+          total_positive: number
+          updated_at: string
+        }
+        Insert: {
+          author_name?: string | null
+          avatar_url?: string | null
+          client_id: string
+          created_at?: string
+          current_badge?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          notes?: string | null
+          platform: string
+          platform_user_id: string
+          promoted_to_supporter_id?: string | null
+          total_30d_negative?: number
+          total_30d_positive?: number
+          total_comments?: number
+          total_negative?: number
+          total_neutral?: number
+          total_positive?: number
+          updated_at?: string
+        }
+        Update: {
+          author_name?: string | null
+          avatar_url?: string | null
+          client_id?: string
+          created_at?: string
+          current_badge?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          notes?: string | null
+          platform?: string
+          platform_user_id?: string
+          promoted_to_supporter_id?: string | null
+          total_30d_negative?: number
+          total_30d_positive?: number
+          total_comments?: number
+          total_negative?: number
+          total_neutral?: number
+          total_positive?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       social_profiles: {
         Row: {
@@ -3589,6 +4570,8 @@ export type Database = {
           error_message: string | null
           id: string
           instance_id: string
+          preflight_reconnected: boolean
+          preflight_status: string | null
           sent_at: string
           success: boolean
         }
@@ -3598,6 +4581,8 @@ export type Database = {
           error_message?: string | null
           id?: string
           instance_id: string
+          preflight_reconnected?: boolean
+          preflight_status?: string | null
           sent_at?: string
           success: boolean
         }
@@ -3607,6 +4592,8 @@ export type Database = {
           error_message?: string | null
           id?: string
           instance_id?: string
+          preflight_reconnected?: boolean
+          preflight_status?: string | null
           sent_at?: string
           success?: boolean
         }
@@ -3634,6 +4621,7 @@ export type Database = {
           instance_token: string | null
           is_active: boolean
           is_primary: boolean
+          last_disconnected_at: string | null
           last_health_check_at: string | null
           last_send_at: string | null
           messages_sent_today: number
@@ -3659,6 +4647,7 @@ export type Database = {
           instance_token?: string | null
           is_active?: boolean
           is_primary?: boolean
+          last_disconnected_at?: string | null
           last_health_check_at?: string | null
           last_send_at?: string | null
           messages_sent_today?: number
@@ -3684,6 +4673,7 @@ export type Database = {
           instance_token?: string | null
           is_active?: boolean
           is_primary?: boolean
+          last_disconnected_at?: string | null
           last_health_check_at?: string | null
           last_send_at?: string | null
           messages_sent_today?: number
@@ -3706,6 +4696,71 @@ export type Database = {
           },
         ]
       }
+      whatsapp_send_retry_queue: {
+        Row: {
+          attempts: number
+          client_id: string
+          created_at: string
+          enviado_em: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          max_attempts: number
+          mensagem: string
+          next_attempt_at: string
+          nome: string | null
+          origem: string
+          origem_ref: string | null
+          status: string
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          client_id: string
+          created_at?: string
+          enviado_em?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          max_attempts?: number
+          mensagem: string
+          next_attempt_at?: string
+          nome?: string | null
+          origem?: string
+          origem_ref?: string | null
+          status?: string
+          telefone: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          client_id?: string
+          created_at?: string
+          enviado_em?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          max_attempts?: number
+          mensagem?: string
+          next_attempt_at?: string
+          nome?: string | null
+          origem?: string
+          origem_ref?: string | null
+          status?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_send_retry_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -3715,9 +4770,32 @@ export type Database = {
         Args: { p_days?: number; p_supporter_id: string }
         Returns: number
       }
+      compute_militant_badge: {
+        Args: {
+          p_30d_neg: number
+          p_30d_pos: number
+          p_first_seen: string
+          p_last_seen: string
+          p_total_comments: number
+          p_total_neg: number
+          p_total_pos: number
+        }
+        Returns: string
+      }
       confirm_whatsapp_by_phone: {
         Args: { p_client_id: string; p_phone: string }
         Returns: Json
+      }
+      enqueue_whatsapp_retry: {
+        Args: {
+          p_client_id: string
+          p_mensagem: string
+          p_nome?: string
+          p_origem?: string
+          p_origem_ref?: string
+          p_telefone: string
+        }
+        Returns: string
       }
       ensure_supporter_for_entity: {
         Args: { p_client_id: string; p_nome: string; p_redes: Json }
@@ -3863,9 +4941,55 @@ export type Database = {
           p_dispatch_id: string
           p_error_message?: string
           p_instance_id: string
+          p_preflight_reconnected?: boolean
+          p_preflight_status?: string
           p_success: boolean
         }
         Returns: undefined
+      }
+      municipio_ranking: {
+        Args: { p_codigo_ibge: number }
+        Returns: {
+          ano: number
+          area: string
+          delta_pct: number
+          fonte: string
+          higher_is_worse: boolean
+          indicador_id: string
+          indicador_label: string
+          max_uf: number
+          media_uf: number
+          min_uf: number
+          percentil: number
+          posicao: number
+          total_uf: number
+          unidade: string
+          valor: number
+        }[]
+      }
+      municipios_ranking_uf: {
+        Args: { p_uf: string }
+        Returns: {
+          ano: number
+          area: string
+          codigo_ibge: number
+          delta_pct: number
+          delta_vs_media: number
+          fonte: string
+          higher_is_worse: boolean
+          indicador_id: string
+          indicador_label: string
+          max_uf: number
+          media_uf: number
+          mediana_uf: number
+          min_uf: number
+          nome: string
+          percentil: number
+          posicao: number
+          total_uf: number
+          unidade: string
+          valor: number
+        }[]
       }
       normalize_br_phone: { Args: { p_raw: string }; Returns: string }
       normalize_locality: { Args: { p_input: string }; Returns: string }
@@ -3874,6 +4998,14 @@ export type Database = {
       pick_healthy_whatsapp_instance: {
         Args: { p_client_id: string }
         Returns: string
+      }
+      recompute_militant: {
+        Args: {
+          p_client_id: string
+          p_platform: string
+          p_platform_user_id: string
+        }
+        Returns: undefined
       }
       register_pessoa_public: {
         Args: {
@@ -3924,6 +5056,11 @@ export type Database = {
         | "apoiador"
         | "militante"
         | "opositor"
+      nivel_parlamentar:
+        | "federal_deputado"
+        | "federal_senador"
+        | "estadual_deputado"
+        | "municipal_vereador"
       origem_contato:
         | "rede_social"
         | "formulario"
@@ -4092,6 +5229,12 @@ export const Constants = {
         "apoiador",
         "militante",
         "opositor",
+      ],
+      nivel_parlamentar: [
+        "federal_deputado",
+        "federal_senador",
+        "estadual_deputado",
+        "municipal_vereador",
       ],
       origem_contato: [
         "rede_social",
