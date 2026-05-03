@@ -1,49 +1,47 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Comments from "./pages/Comments";
-import Engagement from "./pages/Engagement";
-import Settings from "./pages/Settings";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import DashboardLayout from "./components/DashboardLayout";
-import NotFound from "./pages/NotFound";
-import SupporterRegister from "./pages/SupporterRegister";
-import SupporterPortal from "./pages/SupporterPortal";
-import PwaStart from "./pages/PwaStart";
-import Signup from "./pages/Signup";
-import ResetPassword from "./pages/ResetPassword";
-import SuperAdmin from "./pages/SuperAdmin";
-import Disparos from "./pages/Disparos";
-import Territorial from "./pages/Territorial";
-import Pessoas from "./pages/Pessoas";
-import PessoaPerfil from "./pages/PessoaPerfil";
-import RegistroPessoa from "./pages/RegistroPessoa";
 
-import MissoesIA from "./pages/MissoesIA";
-import Funcionarios from "./pages/Funcionarios";
-import ControlePresenca from "./pages/ControlePresenca";
-import Contratados from "./pages/Contratados";
-import ContratadosDisparos from "./pages/ContratadosDisparos";
-import ContratadosRelatorios from "./pages/ContratadosRelatorios";
-import RegistroContratado from "./pages/RegistroContratado";
-import PortalContratado from "./pages/PortalContratado";
-import RegistroFuncionario from "./pages/RegistroFuncionario";
-import PortalFuncionario from "./pages/PortalFuncionario";
-import Telemarketing from "./pages/Telemarketing";
-import CadastroUnificado from "./pages/CadastroUnificado";
-import CadastroLiderConvite from "./pages/CadastroLiderConvite";
-import PortalUnificado from "./pages/PortalUnificado";
-import InteligenciaEleitoral from "./pages/InteligenciaEleitoral";
-import CalendarioPolitico from "./pages/CalendarioPolitico";
-import Midia from "./pages/Midia";
-import StatusWhatsApp from "./pages/StatusWhatsApp";
-import Militancia from "./pages/Militancia";
-import InteligenciaConteudo from "./pages/InteligenciaConteudo";
-import { Navigate, useParams, useLocation } from "react-router-dom";
+// Lazy-load all pages so each route loads only its own chunk on demand.
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Comments = lazy(() => import("./pages/Comments"));
+const Engagement = lazy(() => import("./pages/Engagement"));
+const Settings = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const SupporterPortal = lazy(() => import("./pages/SupporterPortal"));
+const PwaStart = lazy(() => import("./pages/PwaStart"));
+const Signup = lazy(() => import("./pages/Signup"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
+const Disparos = lazy(() => import("./pages/Disparos"));
+const Territorial = lazy(() => import("./pages/Territorial"));
+const Pessoas = lazy(() => import("./pages/Pessoas"));
+const PessoaPerfil = lazy(() => import("./pages/PessoaPerfil"));
+const MissoesIA = lazy(() => import("./pages/MissoesIA"));
+const Funcionarios = lazy(() => import("./pages/Funcionarios"));
+const ControlePresenca = lazy(() => import("./pages/ControlePresenca"));
+const Contratados = lazy(() => import("./pages/Contratados"));
+const ContratadosDisparos = lazy(() => import("./pages/ContratadosDisparos"));
+const ContratadosRelatorios = lazy(() => import("./pages/ContratadosRelatorios"));
+const RegistroContratado = lazy(() => import("./pages/RegistroContratado"));
+const PortalContratado = lazy(() => import("./pages/PortalContratado"));
+const PortalFuncionario = lazy(() => import("./pages/PortalFuncionario"));
+const Telemarketing = lazy(() => import("./pages/Telemarketing"));
+const CadastroUnificado = lazy(() => import("./pages/CadastroUnificado"));
+const CadastroLiderConvite = lazy(() => import("./pages/CadastroLiderConvite"));
+const PortalUnificado = lazy(() => import("./pages/PortalUnificado"));
+const InteligenciaEleitoral = lazy(() => import("./pages/InteligenciaEleitoral"));
+const CalendarioPolitico = lazy(() => import("./pages/CalendarioPolitico"));
+const Midia = lazy(() => import("./pages/Midia"));
+const StatusWhatsApp = lazy(() => import("./pages/StatusWhatsApp"));
+const Militancia = lazy(() => import("./pages/Militancia"));
+const InteligenciaConteudo = lazy(() => import("./pages/InteligenciaConteudo"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
@@ -56,63 +54,70 @@ const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
 
 const queryClient = new QueryClient();
 
+const PageFallback = () => (
+  <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+    Carregando…
+  </div>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/signup/:token" element={<Signup />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/super-admin" element={<SuperAdmin />} />
-          <Route path="/cadastro/:clientId" element={<CadastroUnificado />} />
-          <Route path="/cadastro-lider/:token" element={<CadastroLiderConvite />} />
-          {/* Redirects de rotas antigas de cadastro (mantém compatibilidade com links já compartilhados) */}
-          <Route path="/registro/:clientId" element={<RedirectToCadastro extraQuery="modo=detalhado" />} />
-          <Route path="/funcionario/:clientId" element={<RedirectToCadastro extraQuery="papel=funcionario" />} />
-          {/* Portais antigos seguem ativos até a Entrega 2 (Portal Unificado) */}
-          <Route path="/portal-funcionario/:clientId" element={<PortalFuncionario />} />
-          <Route path="/portal-contratado/:clientId" element={<PortalContratado />} />
-          <Route path="/contratado/:clientId" element={<RegistroContratado />} />
-          <Route path="/contratado/:clientId/:liderId" element={<RegistroContratado />} />
-          <Route path="/telemarketing/:clientId" element={<Telemarketing />} />
-          {/* Portal unificado: detecta papéis e direciona */}
-          <Route path="/portal/:clientId" element={<PortalUnificado />} />
-          <Route path="/portal-apoiador/:clientId" element={<SupporterPortal />} />
-          <Route path="/pwa-start" element={<PwaStart />} />
-          <Route element={<DashboardLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/comments" element={<Comments />} />
-            <Route path="/militancia" element={<Militancia />} />
-            <Route path="/engagement" element={<Engagement />} />
-            <Route path="/inteligencia-conteudo" element={<InteligenciaConteudo />} />
-            <Route path="/disparos" element={<Disparos />} />
-            <Route path="/territorial" element={<Territorial />} />
-            <Route path="/pessoas" element={<Pessoas />} />
-            <Route path="/pessoas/:id" element={<PessoaPerfil />} />
-            <Route path="/recrutamento" element={<Territorial />} />
-            <Route path="/missoes-ia" element={<MissoesIA />} />
-            <Route path="/funcionarios" element={<Funcionarios />} />
-            <Route path="/presenca" element={<ControlePresenca />} />
-            <Route path="/contratados" element={<Contratados />} />
-            <Route path="/contratados/disparos" element={<ContratadosDisparos />} />
-            <Route path="/contratados/relatorios" element={<ContratadosRelatorios />} />
-            <Route path="/inteligencia-eleitoral" element={<InteligenciaEleitoral />} />
-            <Route path="/calendario-politico" element={<CalendarioPolitico />} />
-            <Route path="/midia" element={<Midia />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/status-whatsapp" element={<StatusWhatsApp />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/signup/:token" element={<Signup />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/super-admin" element={<SuperAdmin />} />
+            <Route path="/cadastro/:clientId" element={<CadastroUnificado />} />
+            <Route path="/cadastro-lider/:token" element={<CadastroLiderConvite />} />
+            {/* Redirects de rotas antigas de cadastro (mantém compatibilidade com links já compartilhados) */}
+            <Route path="/registro/:clientId" element={<RedirectToCadastro extraQuery="modo=detalhado" />} />
+            <Route path="/funcionario/:clientId" element={<RedirectToCadastro extraQuery="papel=funcionario" />} />
+            {/* Portais antigos seguem ativos até a Entrega 2 (Portal Unificado) */}
+            <Route path="/portal-funcionario/:clientId" element={<PortalFuncionario />} />
+            <Route path="/portal-contratado/:clientId" element={<PortalContratado />} />
+            <Route path="/contratado/:clientId" element={<RegistroContratado />} />
+            <Route path="/contratado/:clientId/:liderId" element={<RegistroContratado />} />
+            <Route path="/telemarketing/:clientId" element={<Telemarketing />} />
+            {/* Portal unificado: detecta papéis e direciona */}
+            <Route path="/portal/:clientId" element={<PortalUnificado />} />
+            <Route path="/portal-apoiador/:clientId" element={<SupporterPortal />} />
+            <Route path="/pwa-start" element={<PwaStart />} />
+            <Route element={<DashboardLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/comments" element={<Comments />} />
+              <Route path="/militancia" element={<Militancia />} />
+              <Route path="/engagement" element={<Engagement />} />
+              <Route path="/inteligencia-conteudo" element={<InteligenciaConteudo />} />
+              <Route path="/disparos" element={<Disparos />} />
+              <Route path="/territorial" element={<Territorial />} />
+              <Route path="/pessoas" element={<Pessoas />} />
+              <Route path="/pessoas/:id" element={<PessoaPerfil />} />
+              <Route path="/recrutamento" element={<Territorial />} />
+              <Route path="/missoes-ia" element={<MissoesIA />} />
+              <Route path="/funcionarios" element={<Funcionarios />} />
+              <Route path="/presenca" element={<ControlePresenca />} />
+              <Route path="/contratados" element={<Contratados />} />
+              <Route path="/contratados/disparos" element={<ContratadosDisparos />} />
+              <Route path="/contratados/relatorios" element={<ContratadosRelatorios />} />
+              <Route path="/inteligencia-eleitoral" element={<InteligenciaEleitoral />} />
+              <Route path="/calendario-politico" element={<CalendarioPolitico />} />
+              <Route path="/midia" element={<Midia />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/status-whatsapp" element={<StatusWhatsApp />} />
+            </Route>
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
 
 export default App;
-
