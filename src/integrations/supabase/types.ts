@@ -204,6 +204,30 @@ export type Database = {
           },
         ]
       }
+      api_cache: {
+        Row: {
+          endpoint_key: string
+          expires_at: string
+          fetched_at: string
+          payload: Json
+          source: string
+        }
+        Insert: {
+          endpoint_key: string
+          expires_at: string
+          fetched_at?: string
+          payload: Json
+          source: string
+        }
+        Update: {
+          endpoint_key?: string
+          expires_at?: string
+          fetched_at?: string
+          payload?: Json
+          source?: string
+        }
+        Relationships: []
+      }
       campaign_frames: {
         Row: {
           client_id: string
@@ -867,6 +891,7 @@ export type Database = {
           client_id: string
           contrato_aceito: boolean
           contrato_aceito_em: string | null
+          cpf: string | null
           created_at: string
           email: string | null
           endereco: string | null
@@ -897,6 +922,7 @@ export type Database = {
           client_id: string
           contrato_aceito?: boolean
           contrato_aceito_em?: string | null
+          cpf?: string | null
           created_at?: string
           email?: string | null
           endereco?: string | null
@@ -927,6 +953,7 @@ export type Database = {
           client_id?: string
           contrato_aceito?: boolean
           contrato_aceito_em?: string | null
+          cpf?: string | null
           created_at?: string
           email?: string | null
           endereco?: string | null
@@ -1112,6 +1139,103 @@ export type Database = {
             columns: ["supporter_id"]
             isOneToOne: false
             referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_autoresolve_config: {
+        Row: {
+          client_id: string
+          created_at: string
+          enabled: boolean
+          frequency: string
+          hour_utc: number
+          id: string
+          last_run_at: string | null
+          last_run_message: string | null
+          last_run_status: string | null
+          relink_orphans: boolean
+          resolve_invalid_ids: boolean
+          updated_at: string
+          weekday: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          enabled?: boolean
+          frequency?: string
+          hour_utc?: number
+          id?: string
+          last_run_at?: string | null
+          last_run_message?: string | null
+          last_run_status?: string | null
+          relink_orphans?: boolean
+          resolve_invalid_ids?: boolean
+          updated_at?: string
+          weekday?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          enabled?: boolean
+          frequency?: string
+          hour_utc?: number
+          id?: string
+          last_run_at?: string | null
+          last_run_message?: string | null
+          last_run_status?: string | null
+          relink_orphans?: boolean
+          resolve_invalid_ids?: boolean
+          updated_at?: string
+          weekday?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_autoresolve_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_autoresolve_runs: {
+        Row: {
+          client_id: string
+          id: string
+          linked_count: number
+          message: string | null
+          ran_at: string
+          resolved_count: number
+          status: string
+          triggered_by: string
+        }
+        Insert: {
+          client_id: string
+          id?: string
+          linked_count?: number
+          message?: string | null
+          ran_at?: string
+          resolved_count?: number
+          status: string
+          triggered_by?: string
+        }
+        Update: {
+          client_id?: string
+          id?: string
+          linked_count?: number
+          message?: string | null
+          ran_at?: string
+          resolved_count?: number
+          status?: string
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_autoresolve_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -1311,6 +1435,7 @@ export type Database = {
           bairro: string | null
           cidade: string | null
           client_id: string
+          cpf: string | null
           created_at: string
           email: string | null
           endereco: string | null
@@ -1331,6 +1456,7 @@ export type Database = {
           bairro?: string | null
           cidade?: string | null
           client_id: string
+          cpf?: string | null
           created_at?: string
           email?: string | null
           endereco?: string | null
@@ -1351,6 +1477,7 @@ export type Database = {
           bairro?: string | null
           cidade?: string | null
           client_id?: string
+          cpf?: string | null
           created_at?: string
           email?: string | null
           endereco?: string | null
@@ -1739,6 +1866,7 @@ export type Database = {
           classificacao_politica: string
           client_id: string
           contratado_id: string | null
+          cpf: string | null
           created_at: string
           data_nascimento: string | null
           email: string | null
@@ -1767,6 +1895,7 @@ export type Database = {
           classificacao_politica?: string
           client_id: string
           contratado_id?: string | null
+          cpf?: string | null
           created_at?: string
           data_nascimento?: string | null
           email?: string | null
@@ -1795,6 +1924,7 @@ export type Database = {
           classificacao_politica?: string
           client_id?: string
           contratado_id?: string | null
+          cpf?: string | null
           created_at?: string
           data_nascimento?: string | null
           email?: string | null
@@ -2376,15 +2506,19 @@ export type Database = {
       }
       supporter_accounts: {
         Row: {
+          birth_date: string | null
           city: string | null
           client_id: string
+          cpf: string | null
           created_at: string
           email: string
+          endereco: string | null
           facebook_username: string | null
           id: string
           instagram_username: string | null
           name: string
           neighborhood: string | null
+          phone: string | null
           presenca_obrigatoria: boolean
           referred_by: string | null
           state: string | null
@@ -2394,15 +2528,19 @@ export type Database = {
           whatsapp_confirmado: boolean
         }
         Insert: {
+          birth_date?: string | null
           city?: string | null
           client_id: string
+          cpf?: string | null
           created_at?: string
           email: string
+          endereco?: string | null
           facebook_username?: string | null
           id?: string
           instagram_username?: string | null
           name: string
           neighborhood?: string | null
+          phone?: string | null
           presenca_obrigatoria?: boolean
           referred_by?: string | null
           state?: string | null
@@ -2412,15 +2550,19 @@ export type Database = {
           whatsapp_confirmado?: boolean
         }
         Update: {
+          birth_date?: string | null
           city?: string | null
           client_id?: string
+          cpf?: string | null
           created_at?: string
           email?: string
+          endereco?: string | null
           facebook_username?: string | null
           id?: string
           instagram_username?: string | null
           name?: string
           neighborhood?: string | null
+          phone?: string | null
           presenca_obrigatoria?: boolean
           referred_by?: string | null
           state?: string | null
@@ -2532,11 +2674,16 @@ export type Database = {
       }
       supporters: {
         Row: {
+          bairro: string | null
+          birth_date: string | null
+          cidade: string | null
           classification:
             | Database["public"]["Enums"]["supporter_classification"]
             | null
           client_id: string
+          cpf: string | null
           created_at: string | null
+          endereco: string | null
           engagement_score: number | null
           first_contact_date: string | null
           id: string
@@ -2544,14 +2691,20 @@ export type Database = {
           name: string
           notes: string | null
           referral_count: number
+          telefone: string | null
           updated_at: string | null
         }
         Insert: {
+          bairro?: string | null
+          birth_date?: string | null
+          cidade?: string | null
           classification?:
             | Database["public"]["Enums"]["supporter_classification"]
             | null
           client_id: string
+          cpf?: string | null
           created_at?: string | null
+          endereco?: string | null
           engagement_score?: number | null
           first_contact_date?: string | null
           id?: string
@@ -2559,14 +2712,20 @@ export type Database = {
           name: string
           notes?: string | null
           referral_count?: number
+          telefone?: string | null
           updated_at?: string | null
         }
         Update: {
+          bairro?: string | null
+          birth_date?: string | null
+          cidade?: string | null
           classification?:
             | Database["public"]["Enums"]["supporter_classification"]
             | null
           client_id?: string
+          cpf?: string | null
           created_at?: string | null
+          endereco?: string | null
           engagement_score?: number | null
           first_contact_date?: string | null
           id?: string
@@ -2574,6 +2733,7 @@ export type Database = {
           name?: string
           notes?: string | null
           referral_count?: number
+          telefone?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3222,6 +3382,7 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      is_valid_cpf: { Args: { cpf: string }; Returns: boolean }
       link_orphan_engagement_actions: {
         Args: { p_client_id: string }
         Returns: number
@@ -3236,42 +3397,31 @@ export type Database = {
         }
         Returns: undefined
       }
+      normalize_br_phone: { Args: { p_raw: string }; Returns: string }
+      normalize_locality: { Args: { p_input: string }; Returns: string }
+      normalize_person_name: { Args: { p_name: string }; Returns: string }
+      only_digits: { Args: { input: string }; Returns: string }
       pick_healthy_whatsapp_instance: {
         Args: { p_client_id: string }
         Returns: string
       }
-      register_pessoa_public:
-        | {
-            Args: {
-              p_bairro?: string
-              p_cidade?: string
-              p_client_id: string
-              p_email?: string
-              p_endereco?: string
-              p_nome: string
-              p_notas?: string
-              p_socials?: Json
-              p_telefone: string
-              p_tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_bairro?: string
-              p_cidade?: string
-              p_client_id: string
-              p_data_nascimento?: string
-              p_email?: string
-              p_endereco?: string
-              p_nome: string
-              p_notas?: string
-              p_socials?: Json
-              p_telefone: string
-              p_tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
-            }
-            Returns: string
-          }
+      register_pessoa_public: {
+        Args: {
+          p_bairro?: string
+          p_cidade?: string
+          p_client_id: string
+          p_cpf?: string
+          p_data_nascimento?: string
+          p_email?: string
+          p_endereco?: string
+          p_nome: string
+          p_notas?: string
+          p_socials?: Json
+          p_telefone: string
+          p_tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+        }
+        Returns: string
+      }
       snapshot_monthly_scores: {
         Args: { p_client_id: string }
         Returns: number
@@ -3285,6 +3435,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      unaccent: { Args: { "": string }; Returns: string }
       whatsapp_phone_variants: { Args: { p_phone: string }; Returns: string[] }
     }
     Enums: {
