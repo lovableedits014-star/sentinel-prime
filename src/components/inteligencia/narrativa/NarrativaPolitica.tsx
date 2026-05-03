@@ -977,7 +977,7 @@ const NarrativaPolitica = () => {
 
         {/* Perfil candidato + Candidato de referência TSE */}
         <PerfilCard
-          perfil={perfil}
+          perfil={perfil ?? null}
           onSave={(p) => savePerfil.mutate(p)}
           ufAtual={uf}
           municipioAtual={municipio}

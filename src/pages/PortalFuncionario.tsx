@@ -243,8 +243,8 @@ export default function PortalFuncionario() {
         p_client_id: clientId!,
         p_nome: acaoCadNome.trim(),
         p_telefone: acaoCadTelefone.trim(),
-        p_cidade: acaoCadCidade.trim() || null,
-        p_bairro: acaoCadBairro.trim() || null,
+        p_cidade: acaoCadCidade.trim() || undefined,
+        p_bairro: acaoCadBairro.trim() || undefined,
         p_tipo_pessoa: "cidadao",
         p_notas: `Coletado na ação: ${acao.titulo}`,
       });
