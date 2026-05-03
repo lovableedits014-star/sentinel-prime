@@ -58,16 +58,23 @@ Deno.serve(async (req) => {
     const body = RequestSchema.parse(await req.json());
     const { clientId, currentReplies } = body;
 
-    // Verify client ownership (owner OR team member)
-    const { data: client } = await supabase
-      .from('clients')
-      .select('id, name, cargo')
-      .eq('id', clientId)
-      .maybeSingle();
+    // Verify client ownership/membership (owner OR team member)
+    const [{ data: client }, { data: owned }, { data: tm }] = await Promise.all([
+      supabase.from('clients').select('id, name, cargo').eq('id', clientId).maybeSingle(),
+      supabase.from('clients').select('id').eq('id', clientId).eq('user_id', user.id).maybeSingle(),
+      supabase.from('team_members').select('id').eq('client_id', clientId).eq('user_id', user.id).maybeSingle(),
+    ]);
 
     if (!client) {
       return new Response(JSON.stringify({ success: false, error: 'Cliente não encontrado' }), {
         status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!owned && !tm) {
+      return new Response(JSON.stringify({ success: false, error: 'forbidden' }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
