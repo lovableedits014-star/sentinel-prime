@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Briefcase, Search, Users, QrCode, Loader2, FileText,
   CheckCircle2, AlertCircle, PhoneCall, Crown, Copy, RefreshCw,
-  ChevronLeft, ChevronRight, Inbox, UserX,
+  ChevronLeft, ChevronRight, Inbox, UserX, Circle, ClipboardCopy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,14 +18,68 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import ContratadosSubNav from "@/components/contratados/ContratadosSubNav";
 import KpiCard from "@/components/contratados/KpiCard";
 import TeamTree from "@/components/contratados/TeamTree";
-import { useContratadosData } from "@/components/contratados/useContratadosData";
+import { useContratadosData, type DiagStep } from "@/components/contratados/useContratadosData";
 import ContractTemplatesManager from "@/components/contratados/ContractTemplatesManager";
 import TelemarketingResultsPanel from "@/components/contratados/TelemarketingResultsPanel";
+
+function DiagnosticsPanel({ steps, loadError, retryAttempt }: { steps: DiagStep[]; loadError: string | null; retryAttempt: number }) {
+  if (!steps || steps.length === 0) return null;
+  const copy = async () => {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      retryAttempt,
+      loadError,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      steps,
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      toast.success("Diagnóstico copiado");
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
+  };
+  const Icon = ({ s }: { s: DiagStep }) => {
+    if (s.status === "ok") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />;
+    if (s.status === "error") return <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />;
+    if (s.status === "pending") return <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />;
+    return <Circle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />;
+  };
+  return (
+    <details className="mt-3 rounded-md border border-border/60 bg-background/60 text-xs">
+      <summary className="cursor-pointer select-none px-3 py-2 font-medium text-foreground/80 hover:text-foreground">
+        Ver diagnóstico detalhado ({steps.length} etapas)
+      </summary>
+      <div className="border-t border-border/60 p-3 space-y-1.5">
+        {steps.map((s) => (
+          <div key={s.key} className="flex items-start gap-2">
+            <Icon s={s} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-foreground/90">{s.label}</span>
+                {typeof s.durationMs === "number" && (
+                  <span className="text-[10px] text-muted-foreground tabular-nums">{s.durationMs}ms</span>
+                )}
+              </div>
+              {s.detail && <div className="mt-0.5 break-all font-mono text-[10px] text-muted-foreground">{s.detail}</div>}
+            </div>
+          </div>
+        ))}
+        <div className="pt-2 flex justify-end">
+          <Button size="sm" variant="ghost" onClick={copy} className="h-7 gap-1.5 text-xs">
+            <ClipboardCopy className="h-3 w-3" />
+            Copiar diagnóstico
+          </Button>
+        </div>
+      </div>
+    </details>
+  );
+}
 
 export default function Contratados() {
   const {
     clientId, clientName, contratados, setContratados,
-    indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, reload,
+    indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, diagnostics, reload,
   } = useContratadosData();
 
   const [search, setSearch] = useState("");
