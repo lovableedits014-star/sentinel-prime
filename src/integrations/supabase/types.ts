@@ -5343,6 +5343,7 @@ export type Database = {
         Args: { p_client_id: string; p_phone: string }
         Returns: Json
       }
+      consume_lider_invite_token: { Args: { _token: string }; Returns: boolean }
       count_pessoas_by_bairro: {
         Args: {
           p_bairro: string
@@ -5404,6 +5405,18 @@ export type Database = {
           ufs: string
           votos_2022: number
           votos_2024: number
+        }[]
+      }
+      get_client_public: {
+        Args: { _client_id: string }
+        Returns: {
+          id: string
+          logo_url: string
+          name: string
+          whatsapp_oficial: string
+          whatsapp_window_enabled: boolean
+          whatsapp_window_end: string
+          whatsapp_window_start: string
         }[]
       }
       get_migracoes_partidarias: {
@@ -5603,6 +5616,24 @@ export type Database = {
         Returns: undefined
       }
       unaccent: { Args: { "": string }; Returns: string }
+      validate_lider_invite_token: {
+        Args: { _token: string }
+        Returns: {
+          client_id: string
+          expires_at: string
+          note: string
+          reason: string
+          used_at: string
+          valid: boolean
+        }[]
+      }
+      verify_telemarketing_operador: {
+        Args: { _client_id: string; _nome: string; _senha: string }
+        Returns: {
+          id: string
+          nome: string
+        }[]
+      }
       whatsapp_phone_variants: { Args: { p_phone: string }; Returns: string[] }
     }
     Enums: {
