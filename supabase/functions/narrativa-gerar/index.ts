@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { callLLMRaw, getClientLLMConfig } from "../_shared/llm-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,22 +8,11 @@ const corsHeaders = {
 
 /**
  * narrativa-gerar
- * A partir do dossiê (dados_brutos + analise) e do perfil do candidato,
- * usa Lovable AI para gerar:
- *  - 3 versões de discurso (popular / técnico / emocional)
- *  - 3 ataques 3-camadas (Tema -> Falha do gestor -> Solução do candidato)
- *  - 3 manchetes para reels/cards
- *  - 1 roteiro de visita estratégica (foco emocional + bairro sugerido) — legado
- *  - roteiro_estrategico: 4–6 paradas reais (local, objetivo, emoção, fala, imagem)
- *
- * Body: { dossie_id }
+ * Usa o provedor de IA central (Settings → Provedor de IA) para gerar pacotes de narrativa.
  */
 
 const SUPA_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPA_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash";
 
 export function normBairro(s: string): string {
   return String(s || "")
