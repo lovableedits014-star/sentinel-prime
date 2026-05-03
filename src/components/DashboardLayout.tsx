@@ -81,6 +81,8 @@ const DashboardLayout = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
+  const [timeoutError, setTimeoutError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [user, setUser] = useState<any>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accessProfile, setAccessProfile] = useState<AccessProfile | null>(null);
@@ -161,34 +163,16 @@ const DashboardLayout = () => {
 
         setLoading(false);
         refreshAllData();
-      } catch (error) {
+      } catch (error: any) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
-        // Não desloga em timeout. Verifica token persistido em localStorage.
-        // Se existe um token, mantém a UI carregada (modo otimista) e tenta novamente em background.
-        let hasStoredSession = false;
-        try {
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
-              const raw = localStorage.getItem(k);
-              if (raw && raw.length > 20) { hasStoredSession = true; break; }
-            }
-          }
-        } catch {}
-
-        if (hasStoredSession) {
-          toast.error("Conexão lenta ao verificar permissões. Liberando acesso...");
-          setIsClientOwner(true);
-          setAccessProfile(null);
-          setLoading(false);
-          return;
-        }
-        toast.error("Sessão expirada. Entre novamente.");
+        const message = error?.message || "Não foi possível verificar sua sessão.";
+        setTimeoutError(message);
         setLoading(false);
-        navigate("/auth", { replace: true });
       }
     };
+    setTimeoutError(null);
+    setLoading(true);
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -200,7 +184,7 @@ const DashboardLayout = () => {
       }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
-  }, [navigate, refreshAllData]);
+  }, [navigate, refreshAllData, retryCount]);
 
   // Close mobile sidebar on route change
   useEffect(() => {
@@ -222,6 +206,42 @@ const DashboardLayout = () => {
     toast.success("Logout realizado com sucesso");
     navigate("/auth");
   };
+
+  if (timeoutError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-sm w-full text-center space-y-4 rounded-lg border bg-card p-6 shadow-sm">
+          <div className="mx-auto h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+            <X className="h-5 w-5 text-destructive" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">Não conseguimos verificar sua sessão</h2>
+            <p className="text-sm text-muted-foreground">{timeoutError}</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={() => {
+                setTimeoutError(null);
+                setLoading(true);
+                setRetryCount((c) => c + 1);
+              }}
+            >
+              Tentar novamente
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                await supabase.auth.signOut().catch(() => {});
+                navigate("/auth", { replace: true });
+              }}
+            >
+              Voltar ao login
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
