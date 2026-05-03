@@ -48,7 +48,9 @@ export function useContratadosData() {
 
   const load = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Usa getSession (cache local) em vez de getUser (rede) para evitar travas
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) { setLoading(false); return; }
       const { data: client } = await supabase
         .from("clients").select("id, name").eq("user_id", user.id).maybeSingle();
