@@ -220,14 +220,23 @@ const DashboardLayout = () => {
     setLoading(true);
     checkUser();
 
+    let lastUserId: string | null = null;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session) {
+      // Só reage a eventos explícitos — ignora INITIAL_SESSION/TOKEN_REFRESHED
+      // sem sessão (transientes, causam redirect indevido para /auth).
+      if (event === "SIGNED_OUT") {
+        lastUserId = null;
         navigate("/auth", { replace: true });
-      } else {
-        setUser(session.user);
-        // Só invalida cache em SIGNED_IN explícito; TOKEN_REFRESHED não deve forçar refetch geral.
-        if (event === "SIGNED_IN") refreshAllData();
+        return;
       }
+      if (!session) return; // ignora outros eventos sem sessão
+      setUser(session.user);
+      // Só invalida cache quando o usuário REALMENTE muda (login de outra conta),
+      // não em refresh de token nem em re-emissão de INITIAL_SESSION.
+      if (event === "SIGNED_IN" && lastUserId && lastUserId !== session.user.id) {
+        refreshAllData();
+      }
+      lastUserId = session.user.id;
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, [navigate, refreshAllData, retryCount]);
