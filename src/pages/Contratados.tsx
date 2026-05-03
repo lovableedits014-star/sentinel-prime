@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Briefcase, Search, Users, QrCode, Loader2, FileText,
-  CheckCircle2, AlertCircle, PhoneCall, Crown, Copy,
+  CheckCircle2, AlertCircle, PhoneCall, Crown, Copy, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,7 @@ import TelemarketingResultsPanel from "@/components/contratados/TelemarketingRes
 export default function Contratados() {
   const {
     clientId, clientName, contratados, setContratados,
-    indicados, setIndicados, checkinStats, loading,
+    indicados, setIndicados, checkinStats, loading, loadError, reload,
   } = useContratadosData();
 
   const [search, setSearch] = useState("");
@@ -71,6 +71,19 @@ export default function Contratados() {
   return (
     <div className="p-4 md:p-6">
       <ContratadosSubNav />
+
+      {loadError && (
+        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-2 text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{loadError}</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={reload} className="gap-1.5 self-start md:self-auto">
+            <RefreshCw className="h-3.5 w-3.5" />
+            Tentar novamente
+          </Button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
