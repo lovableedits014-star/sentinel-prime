@@ -5323,7 +5323,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      __lovable_migrate_exec: { Args: { sql: string }; Returns: undefined }
       calculate_engagement_score: {
         Args: { p_days?: number; p_supporter_id: string }
         Returns: number
