@@ -5327,6 +5327,7 @@ export type Database = {
         Args: { p_days?: number; p_supporter_id: string }
         Returns: number
       }
+      claim_invite_token: { Args: { _token: string }; Returns: string }
       compute_militant_badge: {
         Args: {
           p_30d_neg: number
