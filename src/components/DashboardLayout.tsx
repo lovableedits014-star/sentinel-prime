@@ -164,23 +164,27 @@ const DashboardLayout = () => {
       } catch (error) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
-        // Verifica se ainda há sessão válida antes de deslogar.
-        // Timeouts de rede/RPC não devem expulsar o usuário logado.
+        // Não desloga em timeout. Verifica token persistido em localStorage.
+        // Se existe um token, mantém a UI carregada (modo otimista) e tenta novamente em background.
+        let hasStoredSession = false;
         try {
-          const { data: { session: stillSession } } = await supabase.auth.getSession();
-          if (stillSession) {
-            // Mantém logado, libera UI como super admin tentativa de recuperação
-            toast.error("Conexão lenta ao verificar permissões. Tentando novamente...");
-            setIsClientOwner(true);
-            setAccessProfile(null);
-            setUser(stillSession.user);
-            setLoading(false);
-            return;
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+              const raw = localStorage.getItem(k);
+              if (raw && raw.length > 20) { hasStoredSession = true; break; }
+            }
           }
-        } catch {
-          // Ignore — segue para logout
+        } catch {}
+
+        if (hasStoredSession) {
+          toast.error("Conexão lenta ao verificar permissões. Liberando acesso...");
+          setIsClientOwner(true);
+          setAccessProfile(null);
+          setLoading(false);
+          return;
         }
-        toast.error("Não foi possível carregar o painel. Entre novamente.");
+        toast.error("Sessão expirada. Entre novamente.");
         setLoading(false);
         navigate("/auth", { replace: true });
       }
