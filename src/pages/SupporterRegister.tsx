@@ -216,6 +216,7 @@ export default function SupporterRegister() {
         const igResolved = resolved.find((p) => p.platform === "instagram")?.username || null;
 
         // Create auth account
+        let authCreated = false;
         try {
           const { data: authData, error: signUpError } = await supabase.auth.signUp({
             email: email.trim(),
@@ -224,7 +225,18 @@ export default function SupporterRegister() {
           });
           if (signUpError) {
             console.error("Auth signup error:", signUpError);
-          } else if (authData?.user && data.supporter_id) {
+            const msg = signUpError.message || "";
+            if (/invalid/i.test(msg) && /email/i.test(msg)) {
+              setError("E-mail inválido ou não aceito pelo provedor. Use um e-mail real (gmail, outlook, etc.).");
+            } else if (/registered|exists/i.test(msg)) {
+              setError("Este e-mail já está cadastrado. Faça login no Portal.");
+            } else {
+              setError(`Erro ao criar conta de acesso: ${msg}`);
+            }
+            return;
+          }
+          if (authData?.user && data.supporter_id) {
+            authCreated = true;
             // Create supporter_account and link referral using service-side data
             const { data: newAccount } = await supabase
               .from("supporter_accounts")
@@ -255,14 +267,12 @@ export default function SupporterRegister() {
                 referred_account_id: newAccount.id,
               } as any);
 
-              // Increment referral_count on the referrer's supporter
-              // Find supporter linked to referrer account
               const { data: refAccount } = await supabase
                 .from("supporter_accounts")
                 .select("supporter_id")
                 .eq("id", data.referrer_account_id)
                 .maybeSingle();
-              
+
               if (refAccount?.supporter_id) {
                 await supabase.rpc("calculate_engagement_score" as any, {
                   p_supporter_id: refAccount.supporter_id,
@@ -271,12 +281,20 @@ export default function SupporterRegister() {
               }
             }
           }
-        } catch (authErr) {
+        } catch (authErr: any) {
           console.error("Auth error:", authErr);
+          setError(`Erro ao criar conta: ${authErr?.message || "tente novamente"}`);
+          return;
+        }
+
+        if (!authCreated) {
+          setError("Não foi possível criar sua conta de acesso. Verifique o e-mail e tente novamente.");
+          return;
         }
 
         setSuccess(true);
         setSuccessMessage(data.message);
+
       } else {
         setError(data?.error || "Erro ao cadastrar. Tente novamente.");
       }
