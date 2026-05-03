@@ -5507,6 +5507,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_client_member: { Args: { _client_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       is_valid_cpf: { Args: { cpf: string }; Returns: boolean }
       link_orphan_engagement_actions: {
