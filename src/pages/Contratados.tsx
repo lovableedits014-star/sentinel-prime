@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Briefcase, Search, Users, QrCode, Loader2, FileText,
   CheckCircle2, AlertCircle, PhoneCall, Crown, Copy, RefreshCw,
+  ChevronLeft, ChevronRight, Inbox, UserX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,30 @@ export default function Contratados() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [showLinks, setShowLinks] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+
+  // Indicados: busca, filtro de status e paginação client-side
+  const PAGE_SIZE = 20;
+  const [indSearch, setIndSearch] = useState("");
+  const [indStatusFilter, setIndStatusFilter] = useState<string>("all");
+  const [indPage, setIndPage] = useState(1);
+  useEffect(() => { setIndPage(1); }, [indSearch, indStatusFilter]);
+
+  const filteredIndicados = useMemo(() => {
+    const q = indSearch.trim().toLowerCase();
+    return (indicados || []).filter(i => {
+      if (indStatusFilter !== "all" && i.status !== indStatusFilter) return false;
+      if (!q) return true;
+      return (
+        i.nome.toLowerCase().includes(q) ||
+        (i.telefone || "").toLowerCase().includes(q) ||
+        (i.cidade || "").toLowerCase().includes(q)
+      );
+    });
+  }, [indicados, indSearch, indStatusFilter]);
+
+  const totalIndPages = Math.max(1, Math.ceil(filteredIndicados.length / PAGE_SIZE));
+  const safePage = Math.min(indPage, totalIndPages);
+  const pagedIndicados = filteredIndicados.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const liderMap = useMemo(() => {
     const m: Record<string, string> = {};
@@ -67,6 +92,38 @@ export default function Contratados() {
   const portalUrl = clientId ? `${window.location.origin}/portal-contratado/${clientId}` : "";
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  // Sem cliente vinculado → estado vazio dedicado
+  if (!clientId) {
+    return (
+      <div className="p-4 md:p-6">
+        <ContratadosSubNav />
+        {loadError && (
+          <div className="mb-4 flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-2 text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{loadError}</span>
+            </div>
+          </div>
+        )}
+        <Card className="py-16 text-center text-muted-foreground border-dashed mt-6">
+          <CardContent className="flex flex-col items-center gap-3">
+            <UserX className="w-12 h-12 opacity-30" />
+            <p className="font-medium text-foreground">Nenhum cliente vinculado</p>
+            <p className="text-sm max-w-md">
+              Sua conta ainda não está associada a um cliente, ou a sessão não foi restaurada. Tente recarregar.
+            </p>
+            <Button size="sm" variant="outline" onClick={reload} className="gap-1.5 mt-2">
+              <RefreshCw className="h-3.5 w-3.5" />
+              Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const hasContratados = contratados.length > 0;
 
   return (
     <div className="p-4 md:p-6">
@@ -151,45 +208,45 @@ export default function Contratados() {
 
         {/* Equipe */}
         <TabsContent value="equipe" className="mt-4 space-y-4">
-          {/* Filtros */}
-          <div className="flex flex-col md:flex-row gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome, telefone, cidade ou zona..." className="pl-9" />
+          {/* Filtros (somente quando há contratados) */}
+          {hasContratados && (
+            <div className="flex flex-col md:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome, telefone, cidade ou zona..." className="pl-9" />
+              </div>
+              <Select value={filterLider} onValueChange={setFilterLider}>
+                <SelectTrigger className="w-full md:w-[200px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os líderes</SelectItem>
+                  {Object.entries(liderMap).map(([id, nome]) => (
+                    <SelectItem key={id} value={id}><span className="flex items-center gap-1"><Crown className="w-3 h-3" />{nome}</span></SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full md:w-[140px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos status</SelectItem>
+                  <SelectItem value="ativo">Ativos</SelectItem>
+                  <SelectItem value="inativo">Inativos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={filterLider} onValueChange={setFilterLider}>
-              <SelectTrigger className="w-full md:w-[200px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os líderes</SelectItem>
-                {Object.entries(liderMap).map(([id, nome]) => (
-                  <SelectItem key={id} value={id}><span className="flex items-center gap-1"><Crown className="w-3 h-3" />{nome}</span></SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full md:w-[140px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos status</SelectItem>
-                <SelectItem value="ativo">Ativos</SelectItem>
-                <SelectItem value="inativo">Inativos</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {clientId && (
-            <TeamTree
-              clientId={clientId}
-              clientName={clientName}
-              contratados={contratados}
-              setContratados={setContratados}
-              indicados={indicados}
-              setIndicados={setIndicados}
-              checkinStats={checkinStats}
-              search={search}
-              filterLider={filterLider}
-              filterStatus={filterStatus}
-            />
           )}
+
+          <TeamTree
+            clientId={clientId}
+            clientName={clientName}
+            contratados={contratados}
+            setContratados={setContratados}
+            indicados={indicados}
+            setIndicados={setIndicados}
+            checkinStats={checkinStats}
+            search={search}
+            filterLider={filterLider}
+            filterStatus={filterStatus}
+          />
         </TabsContent>
 
         {/* Indicados */}
@@ -199,45 +256,92 @@ export default function Contratados() {
               <CardTitle className="text-base">Indicados aguardando verificação</CardTitle>
               <p className="text-xs text-muted-foreground">Pessoas indicadas pelos contratados que precisam ser confirmadas por telemarketing.</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              {/* Filtros (somente quando há indicados) */}
+              {indicados.length > 0 && (
+                <div className="flex flex-col md:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input value={indSearch} onChange={e => setIndSearch(e.target.value)} placeholder="Buscar indicado por nome, telefone ou cidade..." className="pl-9" />
+                  </div>
+                  <Select value={indStatusFilter} onValueChange={setIndStatusFilter}>
+                    <SelectTrigger className="w-full md:w-[160px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos status</SelectItem>
+                      <SelectItem value="pendente">⏳ Pendente</SelectItem>
+                      <SelectItem value="confirmado">✅ Confirmado</SelectItem>
+                      <SelectItem value="falso">❌ Falso</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {indicados.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
-                  <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <Inbox className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">Nenhum indicado ainda.</p>
+                  <p className="text-xs mt-1">Indicados aparecem aqui quando seus contratados cadastram pessoas.</p>
+                </div>
+              ) : filteredIndicados.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">Nenhum indicado encontrado com os filtros aplicados.</p>
+                  <Button variant="ghost" size="sm" className="mt-2" onClick={() => { setIndSearch(""); setIndStatusFilter("all"); }}>
+                    Limpar filtros
+                  </Button>
                 </div>
               ) : (
-                <div className="divide-y">
-                  {indicados.map(ind => {
-                    const cNome = contratados.find(c => c.id === ind.contratado_id)?.nome || "—";
-                    return (
-                      <div key={ind.id} className="flex items-center justify-between gap-3 py-3">
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{ind.nome}</p>
-                          <p className="text-xs text-muted-foreground truncate">📞 {ind.telefone}{ind.cidade ? ` • ${ind.cidade}` : ""}</p>
-                          <p className="text-xs text-muted-foreground">Indicado por: <span className="font-medium">{cNome}</span></p>
+                <>
+                  <div className="divide-y">
+                    {pagedIndicados.map(ind => {
+                      const cNome = contratados.find(c => c.id === ind.contratado_id)?.nome || "—";
+                      return (
+                        <div key={ind.id} className="flex items-center justify-between gap-3 py-3">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{ind.nome}</p>
+                            <p className="text-xs text-muted-foreground truncate">📞 {ind.telefone}{ind.cidade ? ` • ${ind.cidade}` : ""}</p>
+                            <p className="text-xs text-muted-foreground">Indicado por: <span className="font-medium">{cNome}</span></p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant={
+                              ind.status === "confirmado" ? "default" :
+                              ind.status === "falso" ? "destructive" : "secondary"
+                            } className="text-[10px]">{ind.status}</Badge>
+                            <Select defaultValue={ind.status} onValueChange={async (v) => {
+                              await supabase.from("contratado_indicados").update({ status: v, verified_at: new Date().toISOString() } as any).eq("id", ind.id);
+                              setIndicados(prev => prev.map(i => i.id === ind.id ? { ...i, status: v } : i));
+                              toast.success("Status atualizado!");
+                            }}>
+                              <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pendente">⏳ Pendente</SelectItem>
+                                <SelectItem value="confirmado">✅ Confirmado</SelectItem>
+                                <SelectItem value="falso">❌ Falso</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant={
-                            ind.status === "confirmado" ? "default" :
-                            ind.status === "falso" ? "destructive" : "secondary"
-                          } className="text-[10px]">{ind.status}</Badge>
-                          <Select defaultValue={ind.status} onValueChange={async (v) => {
-                            await supabase.from("contratado_indicados").update({ status: v, verified_at: new Date().toISOString() } as any).eq("id", ind.id);
-                            setIndicados(prev => prev.map(i => i.id === ind.id ? { ...i, status: v } : i));
-                            toast.success("Status atualizado!");
-                          }}>
-                            <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pendente">⏳ Pendente</SelectItem>
-                              <SelectItem value="confirmado">✅ Confirmado</SelectItem>
-                              <SelectItem value="falso">❌ Falso</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {totalIndPages > 1 && (
+                    <div className="flex items-center justify-between gap-3 pt-2 text-xs text-muted-foreground">
+                      <span>
+                        Mostrando {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredIndicados.length)} de {filteredIndicados.length}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" className="h-7 gap-1" disabled={safePage <= 1} onClick={() => setIndPage(p => Math.max(1, p - 1))}>
+                          <ChevronLeft className="w-3.5 h-3.5" />Anterior
+                        </Button>
+                        <span className="tabular-nums">Página {safePage} de {totalIndPages}</span>
+                        <Button variant="outline" size="sm" className="h-7 gap-1" disabled={safePage >= totalIndPages} onClick={() => setIndPage(p => Math.min(totalIndPages, p + 1))}>
+                          Próximo<ChevronRight className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
