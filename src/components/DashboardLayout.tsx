@@ -114,8 +114,7 @@ const DashboardLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accessProfile, setAccessProfile] = useState<AccessProfile | null>(null);
   const [isClientOwner, setIsClientOwner] = useState(false);
-  // Server-side check via is_super_admin() RPC.
-  const { isSuperAdmin } = useIsSuperAdmin();
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const refreshAllData = useCallback(() => {
     queryClient.invalidateQueries();
