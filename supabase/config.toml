@@ -1,1 +1,46 @@
 project_id = "xvlvlhwlatclucjzwhld"
+
+[functions.register-supporter]
+verify_jwt = false
+
+[functions.calculate-ied]
+verify_jwt = false
+
+[functions.register-contratado]
+verify_jwt = false
+
+[functions.register-funcionario]
+verify_jwt = false
+
+[functions.manage-whatsapp-instance]
+verify_jwt = false
+
+[functions.send-whatsapp-dispatch]
+verify_jwt = false
+
+[functions.send-birthday-messages]
+verify_jwt = false
+
+[functions.check-presence-absences]
+verify_jwt = false
+
+[functions.whatsapp-inbound-webhook]
+verify_jwt = false
+
+[functions.holidays-fetch]
+verify_jwt = false
+
+[functions.check-cpf-exists]
+verify_jwt = false
+
+[functions.preview-social-profile]
+verify_jwt = false
+
+[functions.resolve-social-link]
+verify_jwt = false
+
+[functions.resolve-whatsapp-link]
+verify_jwt = false
+
+[functions.ibge-municipio-fetch]
+verify_jwt = false
