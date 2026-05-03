@@ -149,9 +149,11 @@ const DashboardLayout = () => {
         if (!mounted) return;
 
         if (isSuperAdmin === true) {
+          setIsSuperAdmin(true);
           setIsClientOwner(true);
           setAccessProfile(null); // full access
         } else {
+          setIsSuperAdmin(false);
           // Check if user is a client owner
           const { data: clientData, error: clientError } = await withTimeout(
             supabase
@@ -196,7 +198,6 @@ const DashboardLayout = () => {
         }
 
         setLoading(false);
-        refreshAllData();
       } catch (error: any) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
