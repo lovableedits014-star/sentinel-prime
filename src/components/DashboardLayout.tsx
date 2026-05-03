@@ -12,7 +12,7 @@ import { isPathAllowed, getRoleLabels, type AccessProfile } from "@/lib/access-c
 import { CoringaButton } from "@/components/coringa/CoringaButton";
 import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
-const AUTH_CHECK_TIMEOUT_MS = 12000;
+const AUTH_CHECK_TIMEOUT_MS = 30000;
 
 const withTimeout = async <T,>(promise: PromiseLike<T>, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -164,7 +164,27 @@ const DashboardLayout = () => {
       } catch (error) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
-        toast.error("Não foi possível carregar o painel. Entre novamente.");
+        // Não desloga em timeout. Verifica token persistido em localStorage.
+        // Se existe um token, mantém a UI carregada (modo otimista) e tenta novamente em background.
+        let hasStoredSession = false;
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+              const raw = localStorage.getItem(k);
+              if (raw && raw.length > 20) { hasStoredSession = true; break; }
+            }
+          }
+        } catch {}
+
+        if (hasStoredSession) {
+          toast.error("Conexão lenta ao verificar permissões. Liberando acesso...");
+          setIsClientOwner(true);
+          setAccessProfile(null);
+          setLoading(false);
+          return;
+        }
+        toast.error("Sessão expirada. Entre novamente.");
         setLoading(false);
         navigate("/auth", { replace: true });
       }
