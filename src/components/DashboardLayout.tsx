@@ -247,6 +247,14 @@ const DashboardLayout = () => {
     }
   }, [location.pathname, accessProfile, isClientOwner, loading, navigate]);
 
+  // Filter menu items based on access profile (memoized — antes dos returns condicionais para manter ordem de hooks)
+  const filteredSections = useMemo(() => MENU_SECTIONS.map(section => ({
+    ...section,
+    items: section.items.filter(item =>
+      isClientOwner || !accessProfile || isPathAllowed(accessProfile, item.path)
+    ),
+  })).filter(section => section.items.length > 0), [isClientOwner, accessProfile]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Logout realizado com sucesso");
@@ -297,13 +305,7 @@ const DashboardLayout = () => {
     );
   }
 
-  // Filter menu items based on access profile (memoized — evita recriar a cada render)
-  const filteredSections = useMemo(() => MENU_SECTIONS.map(section => ({
-    ...section,
-    items: section.items.filter(item =>
-      isClientOwner || !accessProfile || isPathAllowed(accessProfile, item.path)
-    ),
-  })).filter(section => section.items.length > 0), [isClientOwner, accessProfile]);
+  // (filteredSections está calculado acima — antes dos returns condicionais — para manter ordem de hooks)
 
   const NavItem = ({ item, mobile = false }: { item: { icon: any; label: string; path: string }; mobile?: boolean }) => {
     const Icon = item.icon;
