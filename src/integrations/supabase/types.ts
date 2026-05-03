@@ -5615,6 +5615,38 @@ export type Database = {
         }
         Returns: undefined
       }
+      tele_list_contatos: {
+        Args: { _client_id: string; _nome: string; _senha: string }
+        Returns: {
+          bairro: string
+          candidato_alternativo: string
+          cidade: string
+          id: string
+          ligacao_em: string
+          ligacao_status: string
+          nome: string
+          operador_nome: string
+          tabela: string
+          telefone: string
+          tipo: string
+          vota_candidato: string
+        }[]
+      }
+      tele_registrar_ligacao: {
+        Args: {
+          _bairro: string
+          _candidato_alternativo?: string
+          _cidade: string
+          _client_id: string
+          _id: string
+          _ligacao_status: string
+          _nome: string
+          _senha: string
+          _tabela: string
+          _vota_candidato?: string
+        }
+        Returns: Json
+      }
       unaccent: { Args: { "": string }; Returns: string }
       validate_lider_invite_token: {
         Args: { _token: string }

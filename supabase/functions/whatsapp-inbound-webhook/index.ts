@@ -116,30 +116,44 @@ Deno.serve(async (req) => {
     const eventName = String(payload?.event || payload?.type || "").toLowerCase();
     const instanceId = payload?.instance_id || payload?.instanceId || payload?.data?.instance_id;
 
-    if (instanceId && (eventName === "disconnected" || eventName.includes("logout") || eventName.includes("banned"))) {
+    // Verify instance belongs to the client_id in the URL before any status mutation
+    let instanceOwnedByClient = false;
+    if (instanceId) {
+      const { data: inst } = await admin
+        .from("whatsapp_instances")
+        .select("id, client_id")
+        .eq("id", instanceId)
+        .maybeSingle();
+      instanceOwnedByClient = !!inst && (inst as any).client_id === clientId;
+      if (!instanceOwnedByClient) {
+        console.warn("[whatsapp-inbound-webhook] instance/client mismatch", { instanceId, clientId, found: inst });
+      }
+    }
+
+    if (instanceId && instanceOwnedByClient && (eventName === "disconnected" || eventName.includes("logout") || eventName.includes("banned"))) {
       const { error: upErr } = await admin.from("whatsapp_instances").update({
         status: "disconnected",
         connected_since: null,
         last_disconnected_at: new Date().toISOString(),
-      }).eq("id", instanceId);
+      }).eq("id", instanceId).eq("client_id", clientId);
       if (upErr) console.error("[whatsapp-inbound-webhook] failed to mark disconnected:", upErr);
       else console.log("[whatsapp-inbound-webhook] instance marked disconnected:", instanceId, "reason=", payload?.data?.reason);
       return json({ ok: true, handled: "disconnected", instance_id: instanceId });
     }
 
-    if (instanceId && (eventName === "connected" || eventName === "ready" || eventName === "open")) {
+    if (instanceId && instanceOwnedByClient && (eventName === "connected" || eventName === "ready" || eventName === "open")) {
       await admin.from("whatsapp_instances").update({
         status: "connected",
         connected_since: new Date().toISOString(),
         last_health_check_at: new Date().toISOString(),
-      }).eq("id", instanceId);
+      }).eq("id", instanceId).eq("client_id", clientId);
       return json({ ok: true, handled: "connected", instance_id: instanceId });
     }
 
-    if (instanceId && eventName === "health_check") {
+    if (instanceId && instanceOwnedByClient && eventName === "health_check") {
       await admin.from("whatsapp_instances").update({
         last_health_check_at: new Date().toISOString(),
-      }).eq("id", instanceId);
+      }).eq("id", instanceId).eq("client_id", clientId);
       // não retorna — health_check pode coexistir com payload de mensagem
     }
 

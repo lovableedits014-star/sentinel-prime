@@ -5,13 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Phone, Plus, Trash2, Eye, EyeOff, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Phone, Plus, Trash2, KeyRound, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Operador {
   id: string;
   nome: string;
-  senha: string;
   ativo: boolean;
   created_at: string;
 }
@@ -22,7 +21,8 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
   const [nome, setNome] = useState("");
   const [senha, setSenha] = useState("");
   const [adding, setAdding] = useState(false);
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [resetTarget, setResetTarget] = useState<Operador | null>(null);
+  const [resetSenha, setResetSenha] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
 
   const teleUrl = `${window.location.origin}/telemarketing/${clientId}`;
@@ -30,7 +30,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
   const fetchOps = async () => {
     const { data } = await supabase
       .from("telemarketing_operadores")
-      .select("*")
+      .select("id, nome, ativo, created_at")
       .eq("client_id", clientId)
       .order("created_at", { ascending: true });
     setOperadores((data as any[]) || []);
@@ -142,18 +142,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div>
                       <p className="text-sm font-medium">{op.nome}</p>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <span>Senha:</span>
-                        <code className="bg-muted px-1 rounded">
-                          {showPasswords[op.id] ? op.senha : "••••••"}
-                        </code>
-                        <button
-                          onClick={() => setShowPasswords((p) => ({ ...p, [op.id]: !p[op.id] }))}
-                          className="hover:text-foreground"
-                        >
-                          {showPasswords[op.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        </button>
-                      </div>
+                      <p className="text-xs text-muted-foreground">Senha protegida (hash)</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -161,6 +150,15 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
                       {op.ativo ? "Ativo" : "Inativo"}
                     </Badge>
                     <Switch checked={op.ativo} onCheckedChange={() => toggleAtivo(op)} />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      title="Redefinir senha"
+                      onClick={() => { setResetTarget(op); setResetSenha(""); }}
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                    </Button>
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDelete(op.id)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -170,6 +168,37 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
             </div>
           )}
         </div>
+
+        {resetTarget && (
+          <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
+            <p className="text-sm font-medium">Redefinir senha de {resetTarget.nome}</p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nova senha"
+                value={resetSenha}
+                onChange={(e) => setResetSenha(e.target.value)}
+                className="h-9 text-sm flex-1"
+              />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  if (!resetSenha.trim()) { toast.error("Informe a nova senha"); return; }
+                  const { error } = await supabase
+                    .from("telemarketing_operadores")
+                    .update({ senha: resetSenha.trim() } as any)
+                    .eq("id", resetTarget.id);
+                  if (error) { toast.error("Erro: " + error.message); return; }
+                  toast.success("Senha atualizada");
+                  setResetTarget(null);
+                  setResetSenha("");
+                }}
+              >
+                Salvar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setResetTarget(null)}>Cancelar</Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

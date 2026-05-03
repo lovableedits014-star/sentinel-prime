@@ -80,50 +80,31 @@ export default function Telemarketing() {
       return;
     }
 
-    // Fetch contratados (líderes + liderados)
-    const { data: contratadosData } = await supabase
-      .from("contratados")
-      .select("id, nome, telefone, cidade, bairro, is_lider, ligacao_status, vota_candidato, candidato_alternativo, operador_nome, ligacao_em")
-      .eq("client_id", clientId!)
-      .order("created_at", { ascending: true });
-
-    // Fetch indicados
-    const { data: indicadosData } = await supabase
-      .from("contratado_indicados")
-      .select("id, nome, telefone, cidade, bairro, ligacao_status, vota_candidato, candidato_alternativo, operador_nome, ligacao_em")
-      .eq("client_id", clientId!)
-      .order("created_at", { ascending: true });
-
-    const allContatos: ContatoTele[] = [
-      ...(contratadosData || []).map((c: any) => ({
-        id: c.id,
-        nome: c.nome,
-        telefone: c.telefone,
-        cidade: c.cidade,
-        bairro: c.bairro,
-        ligacao_status: c.ligacao_status,
-        vota_candidato: c.vota_candidato,
-        candidato_alternativo: c.candidato_alternativo,
-        operador_nome: c.operador_nome,
-        ligacao_em: c.ligacao_em,
-        tipo: c.is_lider ? "lider" as const : "liderado" as const,
-        tabela: "contratados" as const,
-      })),
-      ...(indicadosData || []).map((i: any) => ({
-        id: i.id,
-        nome: i.nome,
-        telefone: i.telefone,
-        cidade: i.cidade,
-        bairro: i.bairro,
-        ligacao_status: i.ligacao_status,
-        vota_candidato: i.vota_candidato,
-        candidato_alternativo: i.candidato_alternativo,
-        operador_nome: i.operador_nome,
-        ligacao_em: i.ligacao_em,
-        tipo: "indicado" as const,
-        tabela: "contratado_indicados" as const,
-      })),
-    ];
+    // Fetch all contacts via secure RPC (operator-authenticated, no direct table read)
+    const { data: rpcRows, error: rpcErr } = await supabase.rpc("tele_list_contatos" as any, {
+      _client_id: clientId!,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+    });
+    if (rpcErr) {
+      toast.error("Erro ao carregar contatos: " + rpcErr.message);
+      setLoading(false);
+      return;
+    }
+    const allContatos: ContatoTele[] = ((rpcRows as any[]) || []).map((r) => ({
+      id: r.id,
+      nome: r.nome,
+      telefone: r.telefone,
+      cidade: r.cidade,
+      bairro: r.bairro,
+      ligacao_status: r.ligacao_status,
+      vota_candidato: r.vota_candidato,
+      candidato_alternativo: r.candidato_alternativo,
+      operador_nome: r.operador_nome,
+      ligacao_em: r.ligacao_em,
+      tipo: r.tipo as "lider" | "liderado" | "indicado",
+      tabela: r.tabela as "contratados" | "contratado_indicados",
+    }));
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
     const lista = allContatos.filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
@@ -176,42 +157,40 @@ export default function Telemarketing() {
     if (!current) return;
 
     setSaving(true);
-    const updateData: Record<string, any> = {
-      ligacao_status: ligacaoStatus,
-      operador_nome: operadorNome.trim(),
-      ligacao_em: new Date().toISOString(),
-      cidade: cidade.trim() || null,
-      bairro: bairro.trim() || null,
-    };
-
-    if (ligacaoStatus === "atendeu") {
-      updateData.vota_candidato = votaCandidato || null;
-      updateData.candidato_alternativo = candidatoAlt.trim() || null;
-      if (current.tabela === "contratado_indicados") {
-        if (votaCandidato === "sim") updateData.status = "confirmado";
-        else if (votaCandidato === "nao") updateData.status = "rejeitado";
-      }
-    }
-
-    const { data: updatedRows, error } = await supabase
-      .from(current.tabela)
-      .update(updateData as any)
-      .eq("id", current.id)
-      .select();
+    const { data: rpcResult, error } = await supabase.rpc("tele_registrar_ligacao" as any, {
+      _client_id: clientId!,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _tabela: current.tabela,
+      _id: current.id,
+      _ligacao_status: ligacaoStatus,
+      _cidade: cidade.trim() || "",
+      _bairro: bairro.trim() || "",
+      _vota_candidato: ligacaoStatus === "atendeu" ? (votaCandidato || null) : null,
+      _candidato_alternativo: ligacaoStatus === "atendeu" ? (candidatoAlt.trim() || null) : null,
+    });
 
     if (error) {
       toast.error("Erro ao salvar: " + error.message);
       setSaving(false);
       return;
     }
-
-    if (!updatedRows || updatedRows.length === 0) {
-      toast.error("Falha ao salvar no banco — nenhuma linha foi atualizada. Tente recarregar a página.");
+    if (!rpcResult || (rpcResult as any).updated === 0) {
+      toast.error("Falha ao salvar no banco. Tente recarregar a página.");
       setSaving(false);
       return;
     }
 
-    // Update local state
+    const updateData: Record<string, any> = {
+      ligacao_status: ligacaoStatus,
+      operador_nome: operadorNome.trim(),
+      ligacao_em: new Date().toISOString(),
+      cidade: cidade.trim() || null,
+      bairro: bairro.trim() || null,
+      vota_candidato: ligacaoStatus === "atendeu" ? (votaCandidato || null) : null,
+      candidato_alternativo: ligacaoStatus === "atendeu" ? (candidatoAlt.trim() || null) : null,
+    };
+
     setContatos((prev) =>
       prev.map((i) =>
         i.id === current.id ? { ...i, ...updateData } : i

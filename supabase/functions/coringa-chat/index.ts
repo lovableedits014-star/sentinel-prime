@@ -224,6 +224,27 @@ Deno.serve(async (req) => {
 
   try {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
+
+    // Require authenticated user
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Autenticação obrigatória" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data: userData, error: userErr } = await admin.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = userData.user.id;
+
     const { clientId, conversationId, message, history } = await req.json();
     if (!clientId || !message) {
       return new Response(JSON.stringify({ error: "clientId e message são obrigatórios" }), {
@@ -232,7 +253,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    // Verify the authenticated user owns or is a team member of the client
+    const [{ data: ownedClient }, { data: teamMember }] = await Promise.all([
+      admin.from("clients").select("id").eq("id", clientId).eq("user_id", userId).maybeSingle(),
+      admin.from("team_members").select("id").eq("client_id", clientId).eq("user_id", userId).maybeSingle(),
+    ]);
+    if (!ownedClient && !teamMember) {
+      return new Response(JSON.stringify({ error: "Acesso negado a este cliente" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Carrega contexto leve do cliente p/ system prompt
     const { data: client } = await admin
