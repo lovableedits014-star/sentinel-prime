@@ -33,6 +33,15 @@ export function CoringaButton() {
 
   if (!clientId) return null;
 
+  // Limpa o histórico sempre que o bot for fechado
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setMessages([]);
+      setInput("");
+    }
+  };
+
   const send = async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
@@ -44,11 +53,26 @@ export function CoringaButton() {
       const { data, error } = await supabase.functions.invoke("coringa-chat", {
         body: { clientId, message: text, history: messages },
       });
-      if (error) throw error;
+      // Erros HTTP do edge: o supabase-js coloca o status no contexto
+      if (error) {
+        const ctx: any = (error as any).context;
+        const status = ctx?.status;
+        let msg = error.message || "Erro ao falar com o Sentinelle Bot";
+        try {
+          const body = ctx?.body ? JSON.parse(ctx.body) : null;
+          if (body?.error) msg = body.error;
+        } catch {}
+        if (status === 402) {
+          msg = "💳 Créditos de IA esgotados no workspace. Adicione créditos em Settings → Workspace → Usage para continuar.";
+        } else if (status === 429) {
+          msg = "⏳ Muitas requisições. Aguarde alguns segundos e tente de novo.";
+        }
+        throw new Error(msg);
+      }
       if (data?.error) throw new Error(data.error);
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "(sem resposta)", tools: data.tools_used }]);
     } catch (e: any) {
-      toast.error(e.message || "Erro ao falar com o Coringa");
+      toast.error(e.message || "Erro ao falar com o Sentinelle Bot");
       setMessages((prev) => [...prev, { role: "assistant", content: "❌ " + (e.message || "Erro inesperado") }]);
     } finally {
       setLoading(false);
