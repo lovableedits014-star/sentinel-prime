@@ -12,13 +12,10 @@ RUN npm install --no-audit --no-fund --legacy-peer-deps
 
 COPY . .
 
-# Vite substitui VITE_* em tempo de build. Passe via --build-arg no Easypanel.
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_PUBLISHABLE_KEY
-ARG VITE_SUPABASE_PROJECT_ID
-ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
-ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
-ENV VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID
+# Variáveis públicas do Supabase embutidas no bundle pelo Vite
+ENV VITE_SUPABASE_URL=https://xvlvlhwlatclucjzwhld.supabase.co
+ENV VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2bHZsaHdsYXRjbHVjanp3aGxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MTMyNDUsImV4cCI6MjA5Mjk4OTI0NX0.GjRoK-I0jR_VJBTEgclbRltZpVBbZexIKIoM9K_EchA
+ENV VITE_SUPABASE_PROJECT_ID=xvlvlhwlatclucjzwhld
 
 RUN npm run build
 
