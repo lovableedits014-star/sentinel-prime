@@ -81,6 +81,8 @@ const DashboardLayout = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
+  const [timeoutError, setTimeoutError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [user, setUser] = useState<any>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accessProfile, setAccessProfile] = useState<AccessProfile | null>(null);
