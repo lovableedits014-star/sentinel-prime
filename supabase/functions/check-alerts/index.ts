@@ -24,12 +24,47 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Authenticate caller: either a CRON_SECRET (for scheduled jobs) or a valid user JWT scoped to the client
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    const cronHeader = req.headers.get("x-cron-token");
+    const authHeader = req.headers.get("authorization") ?? "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "");
+    const isCron = !!cronSecret && (cronHeader === cronSecret || bearer === cronSecret);
+
     const { client_id } = await req.json();
     if (!client_id) {
       return new Response(JSON.stringify({ error: "client_id required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (!isCron) {
+      // Verify the JWT and that the user has access to this client
+      if (!bearer) {
+        return new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+        global: { headers: { Authorization: `Bearer ${bearer}` } },
+      });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData?.user) {
+        return new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const uid = userData.user.id;
+      const [{ data: ownClient }, { data: tm }] = await Promise.all([
+        supabase.from("clients").select("id").eq("id", client_id).eq("user_id", uid).maybeSingle(),
+        supabase.from("team_members").select("id").eq("client_id", client_id).eq("user_id", uid).maybeSingle(),
+      ]);
+      if (!ownClient && !tm) {
+        return new Response(JSON.stringify({ error: "forbidden" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const alerts: AlertPayload[] = [];
@@ -202,6 +237,7 @@ Deno.serve(async (req) => {
         analyzed: true,
         alerts_generated: newAlerts.length,
         alerts_skipped: alerts.length - newAlerts.length,
+        // Note: do not echo `samples`/`tasks` payloads — sensitive data stays in the alertas row only
         types: newAlerts.map(a => a.tipo),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

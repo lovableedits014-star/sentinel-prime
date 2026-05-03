@@ -51,6 +51,43 @@ Deno.serve(async (req) => {
     const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(url, key);
 
+    // Basic per-IP rate limiting via api_cache (max 20 lookups / 10 min)
+    const ip = (req.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim();
+    const rlKey = `cpf_check:${ip}`;
+    try {
+      const { data: rl } = await admin
+        .from("api_cache")
+        .select("payload, expires_at")
+        .eq("source", "rate_limit")
+        .eq("endpoint_key", rlKey)
+        .maybeSingle();
+      const now = Date.now();
+      let count = 0;
+      let expiresAt = new Date(now + 10 * 60_000).toISOString();
+      if (rl && new Date(rl.expires_at).getTime() > now) {
+        count = Number((rl.payload as any)?.count ?? 0);
+        expiresAt = rl.expires_at as string;
+      }
+      if (count >= 20) {
+        await new Promise((r) => setTimeout(r, 1500));
+        return new Response(JSON.stringify({ exists: false, valid: false, error: "rate_limited" }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      await admin.from("api_cache").upsert({
+        source: "rate_limit",
+        endpoint_key: rlKey,
+        payload: { count: count + 1 },
+        expires_at: expiresAt,
+        fetched_at: new Date().toISOString(),
+      }, { onConflict: "source,endpoint_key" });
+    } catch (_e) {
+      // Rate limit table might not allow upsert; fail open but add a small delay
+    }
+
+    // Deliberate small delay to slow down enumeration
+    await new Promise((r) => setTimeout(r, 250));
+
     const [pessoas, funcionarios, contratados, supporters, accounts] = await Promise.all([
       admin.from("pessoas").select("id").eq("client_id", client_id).eq("cpf", cpfClean).limit(1).maybeSingle(),
       admin.from("funcionarios").select("id").eq("client_id", client_id).eq("cpf", cpfClean).limit(1).maybeSingle(),

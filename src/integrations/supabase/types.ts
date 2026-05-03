@@ -5674,6 +5674,7 @@ export type Database = {
         Args: { _client_id: string; _code: string }
         Returns: {
           referrer_name: string
+          valid: boolean
         }[]
       }
       verify_telemarketing_operador: {
