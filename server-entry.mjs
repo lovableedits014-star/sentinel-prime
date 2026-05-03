@@ -1,5 +1,5 @@
 // Wrapper Node.js para servir o build do TanStack Start em VPS.
-// O dist/server/server.js exporta um handler (fetch-style ou default).
+// O dist/server/server.js exporta um server entry com método fetch.
 // Aqui criamos um servidor HTTP nativo que adapta Request/Response.
 
 import { createServer } from "node:http";
@@ -36,8 +36,9 @@ const MIME = {
 
 // Importa o handler do build SSR
 const serverModule = await import("./dist/server/server.js");
+const serverEntry = serverModule.default;
 const handler =
-  serverModule.default ||
+  (serverEntry && typeof serverEntry.fetch === "function" && serverEntry.fetch.bind(serverEntry)) ||
   serverModule.handler ||
   serverModule.fetch ||
   serverModule.GET;
@@ -45,6 +46,9 @@ const handler =
 if (typeof handler !== "function") {
   console.error("[server-entry] Não encontrei handler exportado em dist/server/server.js");
   console.error("Exports:", Object.keys(serverModule));
+  if (serverEntry && typeof serverEntry === "object") {
+    console.error("Default export keys:", Object.keys(serverEntry));
+  }
   process.exit(1);
 }
 
