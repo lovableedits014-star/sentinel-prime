@@ -5,13 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Phone, Plus, Trash2, Eye, EyeOff, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Phone, Plus, Trash2, Copy, ExternalLink, CheckCircle2, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 interface Operador {
   id: string;
   nome: string;
-  senha: string;
   ativo: boolean;
   created_at: string;
 }
