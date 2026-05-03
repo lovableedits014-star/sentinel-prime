@@ -342,10 +342,35 @@ REGRAS:
             status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (status === 400 && /tool calling/i.test(e?.message || "")) {
-          return new Response(JSON.stringify({ error: e.message }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+        // tool_use_failed (Groq) ou similar: o modelo é fraco para tools.
+        // Faz fallback: refaz a chamada SEM tools para obter ao menos uma resposta textual.
+        const body = e?.providerBody || e?.message || "";
+        if (status === 400 && /tool_use_failed|failed to call a function|tool calling/i.test(body)) {
+          try {
+            const fallback = await callLLMRaw(llmConfig, {
+              messages: [
+                ...messages,
+                {
+                  role: "system",
+                  content:
+                    "Importante: o provedor de IA atual não conseguiu chamar funções. Responda com base no contexto já disponível, em português, e oriente o usuário a reformular a pergunta de forma mais simples — ou recomende trocar o modelo nas Configurações para um mais robusto (ex.: llama-3.3-70b, gpt-4o-mini ou Lovable AI).",
+                },
+              ],
+              temperature: 0.3,
+            });
+            finalText =
+              fallback?.choices?.[0]?.message?.content ||
+              "O modelo de IA configurado não suporta bem chamadas de ferramentas. Troque para um modelo mais robusto em Configurações → Provedor de IA (ex.: llama-3.3-70b-versatile, gpt-4o-mini ou Lovable AI).";
+            break;
+          } catch (_) {
+            return new Response(
+              JSON.stringify({
+                error:
+                  "O modelo configurado não suporta tool calling de forma confiável. Troque o modelo em Configurações → Provedor de IA (recomendado: llama-3.3-70b-versatile, gpt-4o-mini ou Lovable AI).",
+              }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
         }
         console.error("LLM error:", e?.message);
         throw e;
