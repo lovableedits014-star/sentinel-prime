@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Briefcase, Search, Users, QrCode, Loader2, FileText,
   CheckCircle2, AlertCircle, PhoneCall, Crown, Copy, RefreshCw,
+  ChevronLeft, ChevronRight, Inbox, UserX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

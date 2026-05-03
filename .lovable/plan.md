@@ -1,66 +1,41 @@
-## Migração SENTINELLE → Sentinelle 2.0
+## Objetivo
 
-Vou clonar o projeto SENTINELLE original para esta base e migrar tudo que for tecnicamente possível para o Supabase já conectado a este projeto.
+Garantir que a aba **Contratados** sempre mostre uma mensagem clara quando não houver dados (em vez de espaço em branco ou spinner) e adicionar paginação client-side aos indicados, evitando travar a UI quando a lista crescer. Aplicar tudo de forma defensiva (sem assumir que `clientId`/listas existem).
 
-### Escopo do projeto original (verificado)
+## Mudanças
 
-- **41 páginas** (Dashboard, Comments, Engagement, Disparos, Inteligência Eleitoral/Conteúdo, Militância, Territorial, WhatsApp, SuperAdmin, Portais, etc.)
-- **~25 pastas de componentes** + UI shadcn completa
-- **156 migrations SQL** (schema + RLS + triggers + funções)
-- **60+ Edge Functions** (Meta, WhatsApp, IA, TSE, IBGE, GDELT, cron jobs, etc.)
-- **Storage buckets**: `client-logos`, `birthday-images`
-- **Integrações**: Meta (Facebook/Instagram), WhatsApp (UAZAPI), provedores de LLM, push VAPID, pg_cron
+### 1. `src/pages/Contratados.tsx`
 
-### ⚠️ Diferenças importantes que afetam a migração
+- **Empty state global** (após `loading`): se `clientId` for `null` (usuário sem cliente vinculado) → card central com ícone, título "Nenhum cliente vinculado" e botão "Tentar novamente" (chama `reload`). Não tentar renderizar Tabs/KPIs nesse caso.
+- **Empty state de equipe**: quando `contratados.length === 0`, renderizar apenas o card "Nenhum contratado ainda" (já existe em `TeamTree`) e ocultar filtros (Search/Líder/Status) para reduzir ruído.
+- **Paginação na aba Indicados**:
+  - Adicionar `useState` para `indPage` (default 1) e constante `PAGE_SIZE = 20`.
+  - Adicionar busca local `indSearch` (filtra por nome/telefone/cidade).
+  - Filtro por status (`pendente`/`confirmado`/`falso`/`all`).
+  - Slice da lista filtrada por página; controles "Anterior / Próximo" + indicador `página X de Y`.
+  - Reset de `indPage` quando filtros mudam (`useEffect`).
+  - Empty state diferenciado: "Nenhum indicado encontrado" (quando há filtro) vs "Nenhum indicado ainda" (lista vazia).
+- **KPI defensivo**: garantir que `Object.keys(liderMap).length` e divisões por `totalContratados` não quebrem (já tratado, manter).
 
-1. **Framework difere**: o original é **Vite + React Router DOM**; este projeto é **TanStack Start** (file-based routing, server functions). Isso exige reescrever cada rota — não dá para copiar `src/pages/*.tsx` cru.
-2. **Dados das tabelas não podem ser copiados pelo agente.** Eu só posso recriar o **schema** (estrutura, RLS, funções, triggers) via migrations. Para mover os **registros existentes** (usuários, comentários, contatos, etc.) você precisa rodar `pg_dump`/`psql` manualmente conforme o `MIGRATION.md` do projeto original — não tenho acesso ao banco do Lovable Cloud de lá.
-3. **Edge Functions Supabase**: posso recriar todas as 60+ functions neste projeto, e o deploy é automático.
-4. **Storage**: posso criar os buckets, mas os arquivos em si precisam ser copiados por script (você executando) — não consigo ler binários do storage do projeto original.
-5. **Secrets** (Meta tokens, WhatsApp bridge, VAPID, LLM keys): você precisa fornecer; vou pedir conforme cada integração for sendo ativada.
+### 2. `src/components/contratados/TeamTree.tsx`
 
-### Estratégia recomendada — em fases
+- Manter o empty state existente; adicionar mensagem específica quando `visibleLiderIds.length === 0 && noLeaderList.length === 0 && contratados.length > 0` (filtro elimina tudo) — já existe, mas simplificar a condição para evitar falsos negativos.
+- Defensivo: envolver `indicadosOf` e `checkinStats[c.id]` em fallback (`|| []` / `|| { total:0, last:null }`) — já parcialmente feito.
 
-Tentar fazer tudo de uma vez vai falhar (volume gigantesco + framework diferente). Proposta dividida:
+### 3. Sem mudanças em `useContratadosData.ts`
 
-#### Fase 1 — Fundação (esta etapa)
-- Substituir o template em branco por:
-  - Estrutura de rotas TanStack equivalente (`/`, `/auth`, `/dashboard`, `/comments`, `/engagement`, etc. — esqueletos navegáveis)
-  - Layout principal (`DashboardLayout`) e tema/branding do Sentinelle
-  - Cliente Supabase já apontando para o Supabase deste projeto
-- Aplicar **todas as 156 migrations** consolidadas no Supabase atual (schema + RLS + funções + triggers)
-- Criar buckets de storage (`client-logos`, `birthday-images`)
+A camada de dados já lida com sessão/timeout/erros. Apenas confirmar que `contratados`, `indicados`, `checkinStats` sempre são arrays/objetos (já são, inicializados como `[]`/`{}`).
 
-#### Fase 2 — Edge Functions
-- Copiar as 60+ edge functions para `supabase/functions/`
-- Cadastrar segredos conforme você for me fornecendo (Meta, WhatsApp, LLM, VAPID)
-- Deploy automático
+## Detalhes técnicos
 
-#### Fase 3 — Telas (em lotes)
-Migrar páginas em grupos temáticos, convertendo de React Router DOM → TanStack Router:
-1. Auth + Dashboard + Settings
-2. Comments + Engagement + Disparos
-3. Inteligência Eleitoral + Conteúdo + Militância
-4. Territorial + Calendário + Mídia
-5. Portais (Funcionário, Contratado, Apoiador) + SuperAdmin
-6. Telas restantes (Recrutamento, Telemarketing, etc.)
+- Paginação puramente client-side (sem nova query) — o volume esperado é baixo e evita complexidade de RLS/cursors.
+- Reset de página via `useEffect([indSearch, indStatusFilter])`.
+- Nenhum acesso direto a `window`/`localStorage` novo.
+- Sem alterações de schema, RLS ou rotas.
 
-#### Fase 4 — Dados e integrações externas
-- Você executa o `pg_dump` do Lovable Cloud do projeto original e importa no Supabase deste projeto (vou te dar os comandos exatos com a connection string nova)
-- Reapontar webhooks Meta/WhatsApp para as URLs deste projeto
-- Validação ponta-a-ponta
+## Critério de aceitação
 
-### Detalhes técnicos
-
-- Roteamento: cada `src/pages/X.tsx` vira `src/routes/x.tsx` com `createFileRoute`. Hooks `useNavigate`/`Link` migram de `react-router-dom` para `@tanstack/react-router`.
-- Componentes (`src/components/**`) podem ser copiados quase 1:1 — só ajusto imports de roteamento.
-- Cliente Supabase: uso o `@/integrations/supabase/client` já gerado (anon key deste projeto).
-- Migrations SQL: aplico em ordem cronológica via tool de migration. Algumas podem precisar de pequenos ajustes (ex.: extensões já instaladas).
-
-### O que preciso de você antes de começar
-
-1. **Confirmação para iniciar pela Fase 1** (fundação + schema completo + buckets).
-2. Saber se quer que eu **mantenha o nome interno "Sentinelle"** nas telas ou troque para "Sentinelle 2.0".
-3. Confirmar que tudo bem o **Supabase deste projeto receber 156 migrations** de uma vez (vou consolidar em poucos arquivos grandes).
-
-Após aprovar este plano, começo pela Fase 1 imediatamente.
+1. Usuário sem `client` vinculado vê card "Nenhum cliente vinculado" + botão de retry, sem Tabs vazios.
+2. Cliente sem contratados vê card "Nenhum contratado ainda" e filtros ocultos.
+3. Aba Indicados com 0 itens mostra empty state; com >20 mostra paginação funcional; busca/status filtram e resetam página.
+4. Nenhum crash quando `liderMap`, `indicados` ou `checkinStats` estão vazios.
