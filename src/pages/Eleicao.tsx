@@ -420,7 +420,7 @@ export default function Eleicao() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar cadastro" : "Novo cadastro"}</DialogTitle>
           </DialogHeader>
@@ -492,6 +492,31 @@ export default function Eleicao() {
                 <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" />
               </div>
             </div>
+            {form.tipo === "coordenador" && (
+              <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>E-mail de acesso</Label>
+                    <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="coordenador@email.com" />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Senha</Label>
+                      <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setForm(f => ({ ...f, password: genLocalPassword() }))}>
+                        Gerar
+                      </Button>
+                    </div>
+                    <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder={editing ? "Nova senha opcional" : "Mínimo 6 caracteres"} />
+                  </div>
+                </div>
+                {!editing && (
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Checkbox checked={form.send_access} onCheckedChange={(checked) => setForm(f => ({ ...f, send_access: !!checked }))} />
+                    Enviar acesso no WhatsApp ao cadastrar
+                  </label>
+                )}
+              </div>
+            )}
             <div>
               <Label>Endereço *</Label>
               <Input value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rua, número, bairro" />
