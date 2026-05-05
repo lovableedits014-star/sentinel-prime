@@ -3,6 +3,9 @@ project_id = "xvlvlhwlatclucjzwhld"
 [functions.register-supporter]
 verify_jwt = false
 
+[functions.legacy-supporter-set-password]
+verify_jwt = false
+
 [functions.calculate-ied]
 verify_jwt = false
 
