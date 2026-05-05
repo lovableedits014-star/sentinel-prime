@@ -134,7 +134,8 @@ export default function PortalUnificado() {
       if (r.isFuncionario) navigate(`/portal-funcionario/${clientId}`, { replace: true });
       else if (r.isCoordenador) navigate(`/portal-coordenador/${clientId}`, { replace: true });
       else if (r.isContratado) navigate(`/portal-contratado/${clientId}`, { replace: true });
-      else navigate(`/portal-apoiador/${clientId}`, { replace: true });
+      else if (r.isApoiador) navigate(`/portal-apoiador/${clientId}`, { replace: true });
+      // Sem papel mapeado: mantém na tela com a opção de trocar de conta (renderizada abaixo).
     } finally {
       setDetecting(false);
     }
