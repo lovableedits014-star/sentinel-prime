@@ -134,7 +134,8 @@ export default function PortalUnificado() {
       if (r.isFuncionario) navigate(`/portal-funcionario/${clientId}`, { replace: true });
       else if (r.isCoordenador) navigate(`/portal-coordenador/${clientId}`, { replace: true });
       else if (r.isContratado) navigate(`/portal-contratado/${clientId}`, { replace: true });
-      else navigate(`/portal-apoiador/${clientId}`, { replace: true });
+      else if (r.isApoiador) navigate(`/portal-apoiador/${clientId}`, { replace: true });
+      // Sem papel mapeado: mantém na tela com a opção de trocar de conta (renderizada abaixo).
     } finally {
       setDetecting(false);
     }
@@ -263,11 +264,44 @@ export default function PortalUnificado() {
   }
 
   // ─── DETECTING ROLES ──────────────────────────────────────────────────
-  // Always redirecting after detection — show loader
+  if (detecting || !roles) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Abrindo seu portal...</p>
+      </div>
+    );
+  }
+
+  // Sessão logada mas sem papel neste cliente — provavelmente entrou com outra conta.
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-3">
-      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      <p className="text-sm text-muted-foreground">Abrindo seu portal...</p>
+    <div className="min-h-screen bg-gradient-to-b from-primary/10 via-background to-background flex flex-col items-center justify-center p-4">
+      <Card className="w-full max-w-sm shadow-xl">
+        <CardContent className="pt-6 space-y-4 text-center">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+            <Shield className="w-7 h-7" />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg">Conta sem acesso a este portal</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Você entrou como <strong>{session.user.email}</strong>, mas essa conta não está vinculada como coordenador, funcionário ou apoiador deste cliente.
+            </p>
+          </div>
+          <Button
+            className="w-full"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              setSession(null);
+              setRoles(null);
+              setEmail("");
+              setPassword("");
+              setMode("login");
+            }}
+          >
+            Sair e entrar com outra conta
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
