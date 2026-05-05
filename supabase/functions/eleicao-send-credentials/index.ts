@@ -44,7 +44,12 @@ Deno.serve(async (req) => {
       .eq("id", pessoa_id).maybeSingle();
     if (!pessoa) return new Response(JSON.stringify({ error: "Pessoa não encontrada" }), { status: 404, headers: { ...cors, "Content-Type": "application/json" } });
 
-    const { data: canAccess } = await admin.rpc("user_can_access_client", { _client_id: pessoa.client_id });
+    const { data: isSuper } = await userClient.rpc("is_super_admin");
+    let canAccess = !!isSuper;
+    if (!canAccess) {
+      const { data: ca } = await userClient.rpc("user_can_access_client", { _client_id: pessoa.client_id });
+      canAccess = !!ca;
+    }
     if (!canAccess) return new Response(JSON.stringify({ error: "Sem permissão" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
 
     // Gera senha temporária e cria/atualiza conta
