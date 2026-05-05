@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.eleicao-create-account]
 verify_jwt = true
+
+[functions.eleicao-send-credentials]
+verify_jwt = true
