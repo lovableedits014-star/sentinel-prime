@@ -285,6 +285,7 @@ export default function Eleicao() {
                 onAdd={() => openNew({ escopo: "campo_grande", regiao: r.value })}
                 onEdit={openEdit}
                 onDelete={remove}
+                onCredentials={openCred}
               />
             ))
           }
@@ -306,6 +307,7 @@ export default function Eleicao() {
                 onAdd={() => openNew({ escopo: "interior", cidade })}
                 onEdit={openEdit}
                 onDelete={remove}
+                onCredentials={openCred}
                 interior
               />
             ))
@@ -407,12 +409,13 @@ export default function Eleicao() {
 }
 
 function RegionBlock({
-  title, pessoas, onAdd, onEdit, onDelete, interior,
+  title, pessoas, onAdd, onEdit, onDelete, onCredentials, interior,
 }: {
   title: string;
   pessoas: Pessoa[];
   onAdd: () => void;
   onEdit: (p: Pessoa) => void;
+  onCredentials: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   interior?: boolean;
 }) {
@@ -443,18 +446,18 @@ function RegionBlock({
             <div className="py-8 text-center text-sm text-muted-foreground">Nenhum cadastro nesta {interior ? "cidade" : "região"}</div>
           )}
           {coords.map(c => (
-            <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} interior={interior} />
+            <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} interior={interior} />
           ))}
           {lideresOrfaos.length > 0 && (
             <div className="p-3">
               <p className="text-xs font-semibold text-muted-foreground mb-2">Líderes sem coordenador</p>
-              {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} />)}
+              {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
             </div>
           )}
           {cabosOrfaos.length > 0 && (
             <div className="p-3">
               <p className="text-xs font-semibold text-muted-foreground mb-2">Cabos sem líder</p>
-              {cabosOrfaos.map(c => <PessoaRow key={c.id} p={c} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} />)}
+              {cabosOrfaos.map(c => <PessoaRow key={c.id} p={c} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
             </div>
           )}
         </div>
@@ -463,28 +466,28 @@ function RegionBlock({
   );
 }
 
-function CoordBlock({ coord, all, onEdit, onDelete, interior }: {
-  coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; interior?: boolean;
+function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
+  coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void; interior?: boolean;
 }) {
   const lideres = all.filter(p => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
 
   return (
     <div className="p-3">
-      <PessoaRow p={coord} all={all} depth={0} onEdit={onEdit} onDelete={onDelete} />
+      <PessoaRow p={coord} all={all} depth={0} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />
       <div className="ml-6 mt-1 space-y-1">
         {lideres.map(l => {
           const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === l.id);
           return (
             <div key={l.id}>
-              <PessoaRow p={l} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} />
+              <PessoaRow p={l} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />
               <div className="ml-6 space-y-1">
-                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={2} onEdit={onEdit} onDelete={onDelete} />)}
+                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={2} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
               </div>
             </div>
           );
         })}
-        {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} />)}
+        {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
       </div>
     </div>
   );
