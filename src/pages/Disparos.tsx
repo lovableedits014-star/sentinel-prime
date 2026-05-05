@@ -384,6 +384,7 @@ export default function Disparos() {
                   <SelectItem value="apoiadores">🙋 Apoiadores</SelectItem>
                   <SelectItem value="funcionarios">👷 Funcionários</SelectItem>
                   <SelectItem value="contratados">📝 Contratados</SelectItem>
+                  <SelectItem value="eleicao">🗳️ Eleição (Coord/Líder/Cabo)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
