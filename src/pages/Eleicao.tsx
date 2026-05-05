@@ -404,6 +404,22 @@ export default function Eleicao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog credenciais */}
+      <Dialog open={credOpen} onOpenChange={setCredOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Acesso ao portal — {credPessoa?.nome}</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Defina email e senha. O coordenador entrará em <code>/portal/{clientId}</code> e verá apenas a equipe dele.</p>
+          <div className="space-y-3 mt-2">
+            <div><Label>E-mail *</Label><Input type="email" value={credEmail} onChange={e => setCredEmail(e.target.value)} placeholder="coordenador@email.com" /></div>
+            <div><Label>Senha *</Label><Input type="password" value={credPassword} onChange={e => setCredPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCredOpen(false)}>Cancelar</Button>
+            <Button onClick={saveCred} disabled={credLoading}>{credLoading ? "Salvando…" : "Salvar acesso"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
