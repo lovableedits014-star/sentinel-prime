@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Heart, Briefcase, ArrowLeft } from "lucide-react";
@@ -11,18 +11,28 @@ type Papel = "apoiador" | "funcionario" | "campo" | null;
 
 export default function CadastroUnificado() {
   const { clientId } = useParams<{ clientId: string }>();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Permite pré-seleção via querystring (?papel=funcionario) — usado pelos redirects das rotas antigas
+  // Permite pré-seleção via querystring (?papel=funcionario) — usado pelos redirects das rotas antigas.
+  // O antigo ?papel=apoiador não deve abrir cadastro quando usado como link de acesso: portal é login.
   const initialPapel = (searchParams.get("papel") as Papel) || null;
   const initialModo = searchParams.get("modo");
+  const shouldRedirectOldAccessLink = initialPapel === "apoiador" && !searchParams.get("complete") && !searchParams.get("ref") && !searchParams.get("ref_func");
+
+  useEffect(() => {
+    if (clientId && shouldRedirectOldAccessLink) {
+      navigate(`/portal/${clientId}`, { replace: true });
+    }
+  }, [clientId, navigate, shouldRedirectOldAccessLink]);
 
   const [papel, setPapel] = useState<Papel>(
     initialPapel === "funcionario" ? "funcionario"
     : initialModo === "detalhado" ? "campo"
-    : initialPapel === "apoiador" ? "apoiador"
     : null
   );
+
+  if (shouldRedirectOldAccessLink) return null;
 
   // Após escolher, renderiza a página correta (que já é completa e auto-contida)
   if (papel === "apoiador") {
