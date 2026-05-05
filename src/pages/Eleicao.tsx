@@ -603,16 +603,19 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, indent = 0, teamCount, expanded, onToggle }: {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   onCredentials: (p: Pessoa) => void;
+  onSend?: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
+  sendingId?: string | null;
   indent?: number;
   teamCount?: number;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
+  const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
   return (
