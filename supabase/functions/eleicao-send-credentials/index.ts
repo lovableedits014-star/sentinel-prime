@@ -17,14 +17,53 @@ function genPassword(len = 10) {
 function normalizePhone(p: string) {
   const digits = (p || "").replace(/\D/g, "");
   if (!digits) return "";
-  if (digits.startsWith("55")) return digits;
-  return "55" + digits;
+  if (digits.length === 13 && digits.startsWith("55")) {
+    const ddd = digits.slice(2, 4);
+    const local = digits.slice(4);
+    return local.length === 9 && local.startsWith("9") ? `55${ddd}${local.slice(1)}` : digits;
+  }
+  if (digits.length === 11) {
+    const ddd = digits.slice(0, 2);
+    const local = digits.slice(2);
+    return local.length === 9 && local.startsWith("9") ? `55${ddd}${local.slice(1)}` : `55${digits}`;
+  }
+  return digits.startsWith("55") ? digits : "55" + digits;
+}
+
+function validEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+}
+
+async function bridgeSend(bridgeUrl: string, bridgeKey: string, phone: string, message: string) {
+  const res = await fetch(bridgeUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
+    body: JSON.stringify({ action: "send", phone, message }),
+  });
+  const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+  return { res, data };
+}
+
+function sendFailure(res: Response, data: any) {
+  if (!res.ok) return data?.error || `Erro na ponte WhatsApp (status ${res.status})`;
+  if (data?.success === false) return data?.error || "Ponte recusou o envio";
+  if (data?.delivered === false) return data?.error || "Mensagem não entregue pelo WhatsApp";
+  const confirmed = data?.delivered === true || Boolean(data?.messageId || data?.message_id || data?.id || data?.key?.id);
+  return confirmed ? null : (data?.error || "Ponte não confirmou o envio da mensagem");
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
-    const { pessoa_id, channel, app_url } = await req.json(); // channel: "whatsapp" | "link_only"
+    const { pessoa_id, channel, app_url, email, password: providedPassword } = await req.json(); // channel: "whatsapp" | "link_only"
+    const emailInput = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const passwordInput = typeof providedPassword === "string" ? providedPassword : "";
+    if (emailInput && !validEmail(emailInput)) {
+      return new Response(JSON.stringify({ error: "E-mail inválido" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
+    }
+    if (passwordInput && passwordInput.length < 6) {
+      return new Response(JSON.stringify({ error: "Senha deve ter no mínimo 6 caracteres" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
+    }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -53,8 +92,8 @@ Deno.serve(async (req) => {
     if (!canAccess) return new Response(JSON.stringify({ error: "Sem permissão" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
 
     // Gera senha temporária e cria/atualiza conta
-    const password = genPassword(10);
-    const emailNorm = (pessoa.email || `coord-${pessoa.id.slice(0,8)}@portal.local`).toLowerCase();
+    const password = passwordInput || genPassword(10);
+    const emailNorm = (emailInput || pessoa.email || `coord-${pessoa.id.slice(0,8)}@portal.local`).toLowerCase();
 
     let userId = pessoa.user_id as string | null;
     if (!userId) {
@@ -63,7 +102,7 @@ Deno.serve(async (req) => {
       userId = found?.id || null;
     }
     if (userId) {
-      await admin.auth.admin.updateUserById(userId, { password, email_confirm: true });
+      await admin.auth.admin.updateUserById(userId, { email: emailNorm, password, email_confirm: true });
     } else {
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email: emailNorm, password, email_confirm: true,
@@ -93,21 +132,41 @@ Deno.serve(async (req) => {
     const phone = normalizePhone(pessoa.telefone);
     if (!phone) throw new Error("Telefone inválido");
 
-    // Prioriza whatsapp_instances ativa (primária); cai para legacy do client
+    // Usa a mesma seleção do sistema de disparos: instância conectada saudável, depois pool ativo, depois legado.
     let bridgeUrl: string | null = null;
     let bridgeKey: string | null = null;
+    let instanceId: string | null = null;
 
-    const { data: insts } = await admin.from("whatsapp_instances")
-      .select("bridge_url, bridge_api_key, is_primary, status, is_active")
-      .eq("client_id", pessoa.client_id)
-      .eq("is_active", true)
-      .not("bridge_url", "is", null)
-      .not("bridge_api_key", "is", null);
-    const primary = insts?.find((i: any) => i.is_primary) || insts?.[0];
-    if (primary) {
-      bridgeUrl = primary.bridge_url;
-      bridgeKey = primary.bridge_api_key;
+    const { data: pickedId } = await admin.rpc("pick_healthy_whatsapp_instance", { p_client_id: pessoa.client_id });
+    if (pickedId) {
+      const { data: inst } = await admin.from("whatsapp_instances")
+        .select("id, bridge_url, bridge_api_key")
+        .eq("id", pickedId).maybeSingle();
+      if (inst?.bridge_url && inst?.bridge_api_key) {
+        bridgeUrl = inst.bridge_url;
+        bridgeKey = inst.bridge_api_key;
+        instanceId = inst.id;
+      }
     }
+
+    if (!bridgeUrl || !bridgeKey) {
+      const { data: inst } = await admin.from("whatsapp_instances")
+        .select("id, bridge_url, bridge_api_key, is_primary, status")
+        .eq("client_id", pessoa.client_id)
+        .eq("is_active", true)
+        .not("bridge_url", "is", null)
+        .not("bridge_api_key", "is", null)
+        .order("is_primary", { ascending: false })
+        .order("status", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (inst?.bridge_url && inst?.bridge_api_key) {
+        bridgeUrl = inst.bridge_url;
+        bridgeKey = inst.bridge_api_key;
+        instanceId = inst.id;
+      }
+    }
+
     if (!bridgeUrl || !bridgeKey) {
       const { data: client } = await admin.from("clients")
         .select("whatsapp_bridge_url, whatsapp_bridge_api_key")
@@ -122,17 +181,28 @@ Deno.serve(async (req) => {
       }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
-    const res = await fetch(bridgeUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
-      body: JSON.stringify({ action: "send", phone, message }),
-    });
-    const sendData = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    const { res, data: sendData } = await bridgeSend(bridgeUrl, bridgeKey, phone, message);
+    const failure = sendFailure(res, sendData);
+    if (failure) {
+      if (instanceId) {
+        await admin.rpc("log_whatsapp_send", {
+          p_instance_id: instanceId, p_client_id: pessoa.client_id, p_dispatch_id: null,
+          p_success: false, p_error_message: String(failure).slice(0, 200),
+          p_preflight_status: "skipped", p_preflight_reconnected: false,
+        });
+      }
       return new Response(JSON.stringify({
         success: true, sent: false, portal_url: portalUrl, email: emailNorm, password, message,
-        warning: `Falha no envio (${res.status}): ${sendData?.error || "erro desconhecido"}`,
+        warning: `Falha no envio: ${failure}`,
       }), { headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
+    if (instanceId) {
+      await admin.rpc("log_whatsapp_send", {
+        p_instance_id: instanceId, p_client_id: pessoa.client_id, p_dispatch_id: null,
+        p_success: true, p_error_message: null,
+        p_preflight_status: "skipped", p_preflight_reconnected: false,
+      });
     }
 
     return new Response(JSON.stringify({

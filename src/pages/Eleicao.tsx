@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -53,6 +54,13 @@ const TIPO_META: Record<Tipo, { label: string; color: string; icon: any }> = {
   cabo: { label: "Cabo Eleitoral", color: "bg-green-500/10 text-green-600 border-green-500/30", icon: UserCheck },
 };
 
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+function genLocalPassword(len = 10) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
 export default function Eleicao() {
   const { data: clientId } = useCurrentClientId();
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
@@ -74,6 +82,9 @@ export default function Eleicao() {
     endereco: "",
     parent_id: "" as string,
     observacoes: "",
+    email: "",
+    password: "",
+    send_access: true,
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
@@ -95,6 +106,7 @@ export default function Eleicao() {
     setForm({
       tipo: "coordenador", escopo, regiao: "centro", cidade: "",
       nome: "", telefone: "", endereco: "", parent_id: "", observacoes: "",
+      email: "", password: genLocalPassword(), send_access: true,
       ...presets,
     });
     setDialogOpen(true);
@@ -109,6 +121,9 @@ export default function Eleicao() {
       nome: p.nome, telefone: p.telefone, endereco: p.endereco,
       parent_id: p.parent_id || "",
       observacoes: p.observacoes || "",
+      email: p.email || "",
+      password: "",
+      send_access: false,
     });
     setDialogOpen(true);
   }
@@ -119,6 +134,12 @@ export default function Eleicao() {
     }
     if (form.escopo === "interior" && !form.cidade.trim()) {
       toast.error("Cidade é obrigatória para Interior"); return;
+    }
+    if (form.tipo === "coordenador" && form.email.trim() && !isValidEmail(form.email)) {
+      toast.error("Informe um e-mail válido para o coordenador"); return;
+    }
+    if (form.tipo === "coordenador" && !editing && form.send_access && (!form.email.trim() || form.password.length < 6)) {
+      toast.error("Para enviar acesso, informe e-mail e senha com no mínimo 6 caracteres"); return;
     }
     const payload: any = {
       client_id: clientId,
@@ -131,12 +152,21 @@ export default function Eleicao() {
       endereco: form.endereco.trim(),
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
+      email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
     };
     const q = editing
-      ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id)
-      : supabase.from("eleicao_pessoas" as any).insert(payload);
-    const { error } = await q;
+      ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
+      : supabase.from("eleicao_pessoas" as any).insert(payload).select().single();
+    const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
+    if (!editing && form.tipo === "coordenador" && form.send_access) {
+      await sendCredentials(savedPessoa as unknown as Pessoa, "whatsapp", {
+        email: form.email.trim(),
+        password: form.password,
+        closeRegisterDialog: true,
+      });
+      return;
+    }
     toast.success(editing ? "Atualizado!" : "Cadastrado!");
     setDialogOpen(false);
     load();
@@ -160,29 +190,19 @@ export default function Eleicao() {
   function openCred(p: Pessoa) {
     setCredPessoa(p);
     setCredEmail(p.email || "");
-    setCredPassword("");
+    setCredPassword(genLocalPassword());
     setCredOpen(true);
   }
 
   async function saveCred() {
     if (!credPessoa) return;
-    if (!credEmail.trim() || credPassword.length < 6) {
+    if (!credEmail.trim() || !isValidEmail(credEmail) || credPassword.length < 6) {
       toast.error("Email e senha (mín. 6) obrigatórios"); return;
     }
     setCredLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("eleicao-create-account", {
-        body: { pessoa_id: credPessoa.id, email: credEmail.trim(), password: credPassword },
-      });
-      if (error) {
-        let msg = error.message;
-        try { const b = await (error as any).context?.json?.(); if (b?.error) msg = b.error; } catch {}
-        throw new Error(msg);
-      }
-      if (!data?.success) throw new Error(data?.error || "Falha");
-      toast.success("Acesso criado! O coordenador pode entrar no portal.");
-      setCredOpen(false);
-      load();
+      const ok = await sendCredentials(credPessoa, "whatsapp", { email: credEmail.trim(), password: credPassword });
+      if (ok) setCredOpen(false);
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -193,11 +213,26 @@ export default function Eleicao() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [credResult, setCredResult] = useState<{ pessoa: Pessoa; portal_url: string; email: string; password: string; message: string; sent: boolean; warning?: string } | null>(null);
 
-  async function sendCredentials(p: Pessoa, channel: "whatsapp" | "link_only") {
+  async function sendCredentials(
+    p: Pessoa,
+    channel: "whatsapp" | "link_only",
+    options?: { email?: string; password?: string; closeRegisterDialog?: boolean }
+  ) {
+    if (!options?.email && !p.email) {
+      openCred(p);
+      toast.warning("Informe o e-mail e a senha do coordenador antes de enviar o acesso.");
+      return false;
+    }
     setSendingId(p.id);
     try {
       const { data, error } = await supabase.functions.invoke("eleicao-send-credentials", {
-        body: { pessoa_id: p.id, channel, app_url: window.location.origin },
+        body: {
+          pessoa_id: p.id,
+          channel,
+          app_url: window.location.origin,
+          email: options?.email,
+          password: options?.password,
+        },
       });
       if (error) {
         let msg = error.message;
@@ -209,9 +244,12 @@ export default function Eleicao() {
       if (data.sent) toast.success("Credenciais enviadas por WhatsApp!");
       else if (data.warning) toast.warning(data.warning);
       else toast.success("Credenciais geradas! Copie abaixo.");
+      if (options?.closeRegisterDialog) setDialogOpen(false);
       load();
+      return true;
     } catch (e: any) {
       toast.error(e.message);
+      return false;
     } finally {
       setSendingId(null);
     }
@@ -387,7 +425,7 @@ export default function Eleicao() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Editar cadastro" : "Novo cadastro"}</DialogTitle>
           </DialogHeader>
@@ -459,6 +497,31 @@ export default function Eleicao() {
                 <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" />
               </div>
             </div>
+            {form.tipo === "coordenador" && (
+              <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>E-mail de acesso</Label>
+                    <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="coordenador@email.com" />
+                  </div>
+                  {!editing && <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Senha</Label>
+                      <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setForm(f => ({ ...f, password: genLocalPassword() }))}>
+                        Gerar
+                      </Button>
+                    </div>
+                    <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
+                  </div>}
+                </div>
+                {!editing && (
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <Checkbox checked={form.send_access} onCheckedChange={(checked) => setForm(f => ({ ...f, send_access: !!checked }))} />
+                    Enviar acesso no WhatsApp ao cadastrar
+                  </label>
+                )}
+              </div>
+            )}
             <div>
               <Label>Endereço *</Label>
               <Input value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rua, número, bairro" />
@@ -479,14 +542,14 @@ export default function Eleicao() {
       <Dialog open={credOpen} onOpenChange={setCredOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Acesso ao portal — {credPessoa?.nome}</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Defina email e senha. O coordenador entrará em <code>/portal/{clientId}</code> e verá apenas a equipe dele.</p>
+          <p className="text-xs text-muted-foreground">Defina email e senha para salvar o acesso e enviar pelo WhatsApp conectado.</p>
           <div className="space-y-3 mt-2">
             <div><Label>E-mail *</Label><Input type="email" value={credEmail} onChange={e => setCredEmail(e.target.value)} placeholder="coordenador@email.com" /></div>
-            <div><Label>Senha *</Label><Input type="password" value={credPassword} onChange={e => setCredPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
+            <div><Label>Senha *</Label><Input value={credPassword} onChange={e => setCredPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCredOpen(false)}>Cancelar</Button>
-            <Button onClick={saveCred} disabled={credLoading}>{credLoading ? "Salvando…" : "Salvar acesso"}</Button>
+            <Button onClick={saveCred} disabled={credLoading}>{credLoading ? "Enviando…" : "Salvar e enviar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -536,7 +599,7 @@ export default function Eleicao() {
                   </Button>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground">A senha foi gerada automaticamente. Salve-a — não conseguirá vê-la novamente.</p>
+              <p className="text-[11px] text-muted-foreground">Salve esta senha — ela só aparece aqui neste momento.</p>
             </div>
           )}
           <DialogFooter>
@@ -725,7 +788,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
                 <Copy className="w-3.5 h-3.5 mr-2" />Gerar link e copiar
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onCredentials(p)}>
-                <KeyRound className="w-3.5 h-3.5 mr-2" />Definir senha manual
+                <KeyRound className="w-3.5 h-3.5 mr-2" />Definir e enviar acesso
               </DropdownMenuItem>
             </>
           )}
