@@ -464,7 +464,7 @@ export default function Eleicao() {
 }
 
 function RegionBlock({
-  title, pessoas, onAdd, onEdit, onDelete, onCredentials, interior,
+  title, pessoas, onAdd, onEdit, onDelete, onCredentials, interior, defaultOpen,
 }: {
   title: string;
   pessoas: Pessoa[];
@@ -473,46 +473,54 @@ function RegionBlock({
   onCredentials: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   interior?: boolean;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
   const coords = pessoas.filter(p => p.tipo === "coordenador");
-  const lideresOrfaos = pessoas.filter(p => p.tipo === "lider" && !p.parent_id);
-  const cabosOrfaos = pessoas.filter(p => p.tipo === "cabo" && !p.parent_id);
+  const lideres = pessoas.filter(p => p.tipo === "lider");
+  const cabos = pessoas.filter(p => p.tipo === "cabo");
+  const lideresOrfaos = lideres.filter(p => !p.parent_id);
+  const cabosOrfaos = cabos.filter(p => !p.parent_id);
+  const hasContent = pessoas.length > 0;
+  const [open, setOpen] = useState(defaultOpen ?? hasContent);
 
   return (
-    <Card className="overflow-hidden">
-      <button type="button" onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-3 p-4 hover:bg-muted/40 text-left">
-        <ChevronRight className={cn("w-4 h-4 transition-transform", open && "rotate-90")} />
-        <MapPin className="w-5 h-5 text-primary shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold">{title}</p>
-          <p className="text-xs text-muted-foreground">
-            {pessoas.length} cadastrados · {coords.length} coord · {pessoas.filter(p => p.tipo === "lider").length} líderes · {pessoas.filter(p => p.tipo === "cabo").length} cabos
-          </p>
+    <Card className="overflow-hidden border-border/60">
+      <div
+        onClick={() => hasContent && setOpen(o => !o)}
+        className={cn(
+          "flex items-center gap-2 px-3 py-2 group",
+          hasContent && "cursor-pointer hover:bg-muted/40"
+        )}
+      >
+        <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90", !hasContent && "opacity-30")} />
+        <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+        <p className="font-medium text-sm flex-1 truncate">{title}</p>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          {coords.length > 0 && <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 font-medium">{coords.length}c</span>}
+          {lideres.length > 0 && <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium">{lideres.length}l</span>}
+          {cabos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 font-medium">{cabos.length}cb</span>}
+          {!hasContent && <span className="italic">vazio</span>}
         </div>
-        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onAdd(); }}>
-          <Plus className="w-3.5 h-3.5 mr-1" />Adicionar
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); onAdd(); }}>
+          <Plus className="w-3.5 h-3.5" />
         </Button>
-      </button>
+      </div>
 
-      {open && (
-        <div className="border-t bg-muted/10 divide-y">
-          {pessoas.length === 0 && (
-            <div className="py-8 text-center text-sm text-muted-foreground">Nenhum cadastro nesta {interior ? "cidade" : "região"}</div>
-          )}
+      {open && hasContent && (
+        <div className="border-t bg-muted/20">
           {coords.map(c => (
             <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} interior={interior} />
           ))}
           {lideresOrfaos.length > 0 && (
-            <div className="p-3">
-              <p className="text-xs font-semibold text-muted-foreground mb-2">Líderes sem coordenador</p>
-              {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
+            <div className="px-3 py-2 border-t border-dashed">
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">Líderes sem coordenador</p>
+              {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
             </div>
           )}
           {cabosOrfaos.length > 0 && (
-            <div className="p-3">
-              <p className="text-xs font-semibold text-muted-foreground mb-2">Cabos sem líder</p>
-              {cabosOrfaos.map(c => <PessoaRow key={c.id} p={c} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
+            <div className="px-3 py-2 border-t border-dashed">
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">Cabos sem líder</p>
+              {cabosOrfaos.map(c => <PessoaRow key={c.id} p={c} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
             </div>
           )}
         </div>
@@ -526,58 +534,104 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
 }) {
   const lideres = all.filter(p => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
+  const totalEquipe = lideres.length + cabosDir.length + lideres.reduce((acc, l) => acc + all.filter(p => p.tipo === "cabo" && p.parent_id === l.id).length, 0);
+  const [expanded, setExpanded] = useState(false);
+  const hasTeam = totalEquipe > 0;
 
   return (
-    <div className="p-3">
-      <PessoaRow p={coord} all={all} depth={0} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />
-      <div className="ml-6 mt-1 space-y-1">
-        {lideres.map(l => {
-          const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === l.id);
-          return (
-            <div key={l.id}>
-              <PessoaRow p={l} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />
-              <div className="ml-6 space-y-1">
-                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={2} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
+    <div className="border-b last:border-b-0">
+      <PessoaRow
+        p={coord}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onCredentials={onCredentials}
+        teamCount={hasTeam ? totalEquipe : undefined}
+        expanded={expanded}
+        onToggle={hasTeam ? () => setExpanded(e => !e) : undefined}
+      />
+      {expanded && hasTeam && (
+        <div className="bg-background/50 pb-1">
+          {lideres.map(l => {
+            const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === l.id);
+            return (
+              <div key={l.id}>
+                <PessoaRow p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={1} />
+                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={2} />)}
               </div>
-            </div>
-          );
-        })}
-        {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
-      </div>
+            );
+          })}
+          {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={1} />)}
+        </div>
+      )}
     </div>
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials }: { p: Pessoa; all: Pessoa[]; depth: number; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void }) {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, indent = 0, teamCount, expanded, onToggle }: {
+  p: Pessoa;
+  onEdit: (p: Pessoa) => void;
+  onDelete: (id: string) => void;
+  onCredentials: (p: Pessoa) => void;
+  indent?: number;
+  teamCount?: number;
+  expanded?: boolean;
+  onToggle?: () => void;
+}) {
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
   return (
-    <div className="group flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/40">
-      <div className={cn("w-7 h-7 rounded-full flex items-center justify-center shrink-0 border", meta.color)}>
-        <Icon className="w-3.5 h-3.5" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate flex items-center gap-1">
-          {p.nome}
-          {p.tipo === "coordenador" && p.user_id && <CheckCircle2 className="w-3 h-3 text-emerald-600" aria-label="Acesso configurado" />}
-        </p>
-        <p className="text-xs text-muted-foreground truncate flex items-center gap-2">
-          <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{p.telefone}</span>
-          <span className="truncate">· {p.endereco}</span>
-        </p>
-      </div>
-      <Badge variant="outline" className={cn("text-[10px]", meta.color)}>{meta.label}</Badge>
-      {p.tipo === "coordenador" && (
-        <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100" title="Definir acesso ao portal" onClick={() => onCredentials(p)}>
-          <KeyRound className="w-3.5 h-3.5" />
-        </Button>
+    <div
+      className={cn(
+        "group flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 transition-colors",
+        onToggle && "cursor-pointer"
       )}
-      <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => onEdit(p)}>
-        <Edit2 className="w-3.5 h-3.5" />
-      </Button>
-      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100" onClick={() => onDelete(p.id)}>
-        <Trash2 className="w-3.5 h-3.5" />
-      </Button>
+      style={{ paddingLeft: `${12 + indent * 20}px` }}
+      onClick={onToggle}
+    >
+      {onToggle ? (
+        <ChevronRight className={cn("w-3 h-3 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-90")} />
+      ) : indent > 0 ? (
+        <div className="w-3 shrink-0 text-muted-foreground/40 text-xs">└</div>
+      ) : (
+        <div className="w-3 shrink-0" />
+      )}
+      <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0", meta.color)}>
+        <Icon className="w-3 h-3" />
+      </div>
+      <div className="flex-1 min-w-0 flex items-center gap-2">
+        <span className="text-sm font-medium truncate">{p.nome}</span>
+        {p.tipo === "coordenador" && p.user_id && (
+          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
+        )}
+        <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {p.telefone}</span>
+        <span className="text-xs text-muted-foreground truncate hidden md:inline">· {p.endereco}</span>
+      </div>
+      {teamCount !== undefined && (
+        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
+          <Users className="w-2.5 h-2.5 mr-0.5" />{teamCount}
+        </Badge>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+          <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 focus:opacity-100">
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem onClick={() => onEdit(p)}>
+            <Edit2 className="w-3.5 h-3.5 mr-2" />Editar
+          </DropdownMenuItem>
+          {p.tipo === "coordenador" && (
+            <DropdownMenuItem onClick={() => onCredentials(p)}>
+              <KeyRound className="w-3.5 h-3.5 mr-2" />Definir acesso
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onDelete(p.id)} className="text-destructive focus:text-destructive">
+            <Trash2 className="w-3.5 h-3.5 mr-2" />Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
