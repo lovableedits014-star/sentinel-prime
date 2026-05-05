@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
-type Regiao = "centro" | "segredo" | "prosa" | "bandeira" | "anhanduizinho" | "lagoa" | "moreninha";
+type Regiao = "centro" | "segredo" | "prosa" | "bandeira" | "anhanduizinho" | "lagoa" | "moreninha" | "imbirussu";
 
 interface Pessoa {
   id: string;
@@ -40,6 +40,7 @@ const REGIOES: { value: Regiao; label: string }[] = [
   { value: "bandeira", label: "Bandeira" },
   { value: "anhanduizinho", label: "Anhanduizinho" },
   { value: "lagoa", label: "Lagoa" },
+  { value: "imbirussu", label: "Imbirussu" },
   { value: "moreninha", label: "Moreninha" },
 ];
 
