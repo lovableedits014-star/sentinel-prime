@@ -357,6 +357,9 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
       }
       ({ client_id, titulo, mensagem, tipo, tag_filtro, batch_size, delay_min, delay_max, batch_pause } = payload);
+      var eleicao_tipo = payload.eleicao_tipo || null;
+      var eleicao_escopo = payload.eleicao_escopo || null;
+      var eleicao_regiao = payload.eleicao_regiao || null;
 
       // Verify ownership
       const { data: ownerCheck } = await adminClient
@@ -421,6 +424,16 @@ Deno.serve(async (req) => {
       recipients = (pendingItems || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
       dispatch = { id: existingDispatchId };
       console.log(`[resume] dispatch=${existingDispatchId} pending=${recipients.length}`);
+    } else if (tipo === "eleicao") {
+      let q = adminClient.from("eleicao_pessoas")
+        .select("telefone, nome")
+        .eq("client_id", client_id)
+        .not("telefone", "is", null);
+      if (eleicao_tipo) q = q.eq("tipo", eleicao_tipo);
+      if (eleicao_escopo) q = q.eq("escopo", eleicao_escopo);
+      if (eleicao_regiao) q = q.eq("regiao", eleicao_regiao);
+      const { data } = await q;
+      recipients = (data || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
     } else if (tipo === "funcionarios") {
       const { data } = await adminClient
         .from("funcionarios")

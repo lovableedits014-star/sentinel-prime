@@ -1592,6 +1592,7 @@ export type Database = {
           client_id: string
           created_at: string
           created_by: string | null
+          email: string | null
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
           id: string
@@ -1609,6 +1610,7 @@ export type Database = {
           client_id: string
           created_at?: string
           created_by?: string | null
+          email?: string | null
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
           id?: string
@@ -1626,6 +1628,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           created_by?: string | null
+          email?: string | null
           endereco?: string
           escopo?: Database["public"]["Enums"]["eleicao_escopo"]
           id?: string
@@ -5451,6 +5454,10 @@ export type Database = {
           p_only_whatsapp?: boolean
         }
         Returns: number
+      }
+      eleicao_pessoa_in_user_tree: {
+        Args: { _pessoa_id: string; _user_id: string }
+        Returns: boolean
       }
       enqueue_whatsapp_retry: {
         Args: {

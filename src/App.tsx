@@ -41,6 +41,7 @@ const ContratadosRelatorios = lazy(() => import("./pages/ContratadosRelatorios")
 const RegistroContratado = lazy(() => import("./pages/RegistroContratado"));
 const PortalContratado = lazy(() => import("./pages/PortalContratado"));
 const PortalFuncionario = lazy(() => import("./pages/PortalFuncionario"));
+const PortalCoordenador = lazy(() => import("./pages/PortalCoordenador"));
 const Telemarketing = lazy(() => import("./pages/Telemarketing"));
 const CadastroUnificado = lazy(() => import("./pages/CadastroUnificado"));
 const CadastroLiderConvite = lazy(() => import("./pages/CadastroLiderConvite"));
@@ -104,6 +105,7 @@ const AppRouter = () => {
             <Route path="/funcionario/:clientId" element={<RedirectToCadastro extraQuery="papel=funcionario" />} />
             {/* Portais antigos seguem ativos até a Entrega 2 (Portal Unificado) */}
             <Route path="/portal-funcionario/:clientId" element={<PortalFuncionario />} />
+            <Route path="/portal-coordenador/:clientId" element={<PortalCoordenador />} />
             <Route path="/portal-contratado/:clientId" element={<PortalContratado />} />
             <Route path="/contratado/:clientId" element={<RegistroContratado />} />
             <Route path="/contratado/:clientId/:liderId" element={<RegistroContratado />} />

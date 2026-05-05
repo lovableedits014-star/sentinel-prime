@@ -178,6 +178,9 @@ export default function Disparos() {
   const [mensagem, setMensagem] = useState("");
   const [tipoDisparo, setTipoDisparo] = useState("manual");
   const [tagFiltro, setTagFiltro] = useState("_all");
+  const [eleicaoTipo, setEleicaoTipo] = useState<"all" | "coordenador" | "lider" | "cabo">("all");
+  const [eleicaoEscopo, setEleicaoEscopo] = useState<"all" | "campo_grande" | "interior">("all");
+  const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
   const handleUseMissions = () => {
@@ -194,56 +197,49 @@ export default function Disparos() {
 
   // Count recipients based on filter
   const { data: recipientCount = 0 } = useQuery<number>({
-    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo],
+    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao],
     queryFn: async () => {
-      if (tipoDisparo === "funcionarios") {
-        const { count } = await supabase
-          .from("funcionarios")
+      if (tipoDisparo === "eleicao") {
+        let q = supabase.from("eleicao_pessoas" as any)
           .select("*", { count: "exact", head: true })
           .eq("client_id", clientId!)
-          .eq("status", "ativo")
           .not("telefone", "is", null);
+        if (eleicaoTipo !== "all") q = q.eq("tipo", eleicaoTipo);
+        if (eleicaoEscopo !== "all") q = q.eq("escopo", eleicaoEscopo);
+        if (eleicaoRegiao !== "all") q = q.eq("regiao", eleicaoRegiao);
+        const { count } = await q;
+        return count || 0;
+      }
+      if (tipoDisparo === "funcionarios") {
+        const { count } = await supabase
+          .from("funcionarios").select("*", { count: "exact", head: true })
+          .eq("client_id", clientId!).eq("status", "ativo").not("telefone", "is", null);
         return count || 0;
       }
       if (tipoDisparo === "contratados") {
         const { count } = await supabase
-          .from("contratados")
-          .select("*", { count: "exact", head: true })
-          .eq("client_id", clientId!)
-          .eq("status", "ativo")
-          .not("telefone", "is", null);
+          .from("contratados").select("*", { count: "exact", head: true })
+          .eq("client_id", clientId!).eq("status", "ativo").not("telefone", "is", null);
         return count || 0;
       }
       if (tipoDisparo === "apoiadores") {
         const { count } = await supabase
-          .from("pessoas")
-          .select("*", { count: "exact", head: true })
-          .eq("client_id", clientId!)
-          .eq("tipo_pessoa", "apoiador")
-          .not("telefone", "is", null);
+          .from("pessoas").select("*", { count: "exact", head: true })
+          .eq("client_id", clientId!).eq("tipo_pessoa", "apoiador").not("telefone", "is", null);
         return count || 0;
       }
-      // Manual / pessoas
       if (tagFiltro && tagFiltro !== "_all") {
-        // Count pessoas with this tag
         const { data: tagData } = await supabase
-          .from("tags" as any)
-          .select("id")
-          .eq("client_id", clientId)
-          .eq("nome", tagFiltro)
-          .maybeSingle();
+          .from("tags" as any).select("id").eq("client_id", clientId).eq("nome", tagFiltro).maybeSingle();
         if (!tagData) return 0;
         const { count } = await supabase
-          .from("pessoas_tags" as any)
-          .select("*", { count: "exact", head: true })
+          .from("pessoas_tags" as any).select("*", { count: "exact", head: true })
           .eq("tag_id", (tagData as any).id);
         return count || 0;
       }
       const { count } = await supabase
-        .from("pessoas")
-        .select("*", { count: "exact", head: true })
-        .eq("client_id", clientId!)
-        .not("telefone", "is", null);
+        .from("pessoas").select("*", { count: "exact", head: true })
+        .eq("client_id", clientId!).not("telefone", "is", null);
       return count || 0;
     },
     enabled: !!clientId,
@@ -273,6 +269,9 @@ export default function Disparos() {
           mensagem: mensagem.trim(),
           tipo: tipoDisparo,
           tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
+          eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
+          eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
+          eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
           batch_size: pol.batch_size,
           delay_min: pol.delay_min,
           delay_max: pol.delay_max,
@@ -385,6 +384,7 @@ export default function Disparos() {
                   <SelectItem value="apoiadores">🙋 Apoiadores</SelectItem>
                   <SelectItem value="funcionarios">👷 Funcionários</SelectItem>
                   <SelectItem value="contratados">📝 Contratados</SelectItem>
+                  <SelectItem value="eleicao">🗳️ Eleição (Coord/Líder/Cabo)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -408,6 +408,53 @@ export default function Disparos() {
                   </SelectContent>
                 </Select>
               </div>
+            )}
+
+            {tipoDisparo === "eleicao" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={eleicaoTipo} onValueChange={(v) => setEleicaoTipo(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="coordenador">🔴 Coordenadores</SelectItem>
+                      <SelectItem value="lider">🔵 Líderes</SelectItem>
+                      <SelectItem value="cabo">🟢 Cabos eleitorais</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Escopo</Label>
+                  <Select value={eleicaoEscopo} onValueChange={(v) => { setEleicaoEscopo(v as any); setEleicaoRegiao("all"); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">CG + Interior</SelectItem>
+                      <SelectItem value="campo_grande">Campo Grande</SelectItem>
+                      <SelectItem value="interior">Interior</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {eleicaoEscopo === "campo_grande" && (
+                  <div className="space-y-2">
+                    <Label>Região</Label>
+                    <Select value={eleicaoRegiao} onValueChange={setEleicaoRegiao}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="centro">Centro</SelectItem>
+                        <SelectItem value="segredo">Segredo</SelectItem>
+                        <SelectItem value="prosa">Prosa</SelectItem>
+                        <SelectItem value="bandeira">Bandeira</SelectItem>
+                        <SelectItem value="anhanduizinho">Anhanduizinho</SelectItem>
+                        <SelectItem value="lagoa">Lagoa</SelectItem>
+                        <SelectItem value="imbirussu">Imbirussu</SelectItem>
+                        <SelectItem value="moreninha">Moreninha</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

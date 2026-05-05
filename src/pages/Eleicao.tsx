@@ -9,8 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,8 @@ interface Pessoa {
   endereco: string;
   parent_id: string | null;
   observacoes: string | null;
+  email: string | null;
+  user_id: string | null;
   created_at: string;
 }
 
@@ -147,6 +149,45 @@ export default function Eleicao() {
     load();
   }
 
+  // ─── Credenciais de Coordenador ────────────────────────────────
+  const [credOpen, setCredOpen] = useState(false);
+  const [credPessoa, setCredPessoa] = useState<Pessoa | null>(null);
+  const [credEmail, setCredEmail] = useState("");
+  const [credPassword, setCredPassword] = useState("");
+  const [credLoading, setCredLoading] = useState(false);
+
+  function openCred(p: Pessoa) {
+    setCredPessoa(p);
+    setCredEmail(p.email || "");
+    setCredPassword("");
+    setCredOpen(true);
+  }
+
+  async function saveCred() {
+    if (!credPessoa) return;
+    if (!credEmail.trim() || credPassword.length < 6) {
+      toast.error("Email e senha (mín. 6) obrigatórios"); return;
+    }
+    setCredLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("eleicao-create-account", {
+        body: { pessoa_id: credPessoa.id, email: credEmail.trim(), password: credPassword },
+      });
+      if (error) {
+        let msg = error.message;
+        try { const b = await (error as any).context?.json?.(); if (b?.error) msg = b.error; } catch {}
+        throw new Error(msg);
+      }
+      if (!data?.success) throw new Error(data?.error || "Falha");
+      toast.success("Acesso criado! O coordenador pode entrar no portal.");
+      setCredOpen(false);
+      load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setCredLoading(false);
+    }
+  }
   // computed
   const matchesSearch = (p: Pessoa) => {
     if (!search) return true;
@@ -244,6 +285,7 @@ export default function Eleicao() {
                 onAdd={() => openNew({ escopo: "campo_grande", regiao: r.value })}
                 onEdit={openEdit}
                 onDelete={remove}
+                onCredentials={openCred}
               />
             ))
           }
@@ -265,6 +307,7 @@ export default function Eleicao() {
                 onAdd={() => openNew({ escopo: "interior", cidade })}
                 onEdit={openEdit}
                 onDelete={remove}
+                onCredentials={openCred}
                 interior
               />
             ))
@@ -361,17 +404,34 @@ export default function Eleicao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog credenciais */}
+      <Dialog open={credOpen} onOpenChange={setCredOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Acesso ao portal — {credPessoa?.nome}</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Defina email e senha. O coordenador entrará em <code>/portal/{clientId}</code> e verá apenas a equipe dele.</p>
+          <div className="space-y-3 mt-2">
+            <div><Label>E-mail *</Label><Input type="email" value={credEmail} onChange={e => setCredEmail(e.target.value)} placeholder="coordenador@email.com" /></div>
+            <div><Label>Senha *</Label><Input type="password" value={credPassword} onChange={e => setCredPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCredOpen(false)}>Cancelar</Button>
+            <Button onClick={saveCred} disabled={credLoading}>{credLoading ? "Salvando…" : "Salvar acesso"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function RegionBlock({
-  title, pessoas, onAdd, onEdit, onDelete, interior,
+  title, pessoas, onAdd, onEdit, onDelete, onCredentials, interior,
 }: {
   title: string;
   pessoas: Pessoa[];
   onAdd: () => void;
   onEdit: (p: Pessoa) => void;
+  onCredentials: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   interior?: boolean;
 }) {
@@ -402,18 +462,18 @@ function RegionBlock({
             <div className="py-8 text-center text-sm text-muted-foreground">Nenhum cadastro nesta {interior ? "cidade" : "região"}</div>
           )}
           {coords.map(c => (
-            <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} interior={interior} />
+            <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} interior={interior} />
           ))}
           {lideresOrfaos.length > 0 && (
             <div className="p-3">
               <p className="text-xs font-semibold text-muted-foreground mb-2">Líderes sem coordenador</p>
-              {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} />)}
+              {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
             </div>
           )}
           {cabosOrfaos.length > 0 && (
             <div className="p-3">
               <p className="text-xs font-semibold text-muted-foreground mb-2">Cabos sem líder</p>
-              {cabosOrfaos.map(c => <PessoaRow key={c.id} p={c} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} />)}
+              {cabosOrfaos.map(c => <PessoaRow key={c.id} p={c} all={pessoas} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
             </div>
           )}
         </div>
@@ -422,34 +482,34 @@ function RegionBlock({
   );
 }
 
-function CoordBlock({ coord, all, onEdit, onDelete, interior }: {
-  coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; interior?: boolean;
+function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
+  coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void; interior?: boolean;
 }) {
   const lideres = all.filter(p => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
 
   return (
     <div className="p-3">
-      <PessoaRow p={coord} all={all} depth={0} onEdit={onEdit} onDelete={onDelete} />
+      <PessoaRow p={coord} all={all} depth={0} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />
       <div className="ml-6 mt-1 space-y-1">
         {lideres.map(l => {
           const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === l.id);
           return (
             <div key={l.id}>
-              <PessoaRow p={l} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} />
+              <PessoaRow p={l} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />
               <div className="ml-6 space-y-1">
-                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={2} onEdit={onEdit} onDelete={onDelete} />)}
+                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={2} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
               </div>
             </div>
           );
         })}
-        {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} />)}
+        {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} all={all} depth={1} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
       </div>
     </div>
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete }: { p: Pessoa; all: Pessoa[]; depth: number; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void }) {
+function PessoaRow({ p, onEdit, onDelete, onCredentials }: { p: Pessoa; all: Pessoa[]; depth: number; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void }) {
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
   return (
@@ -458,13 +518,21 @@ function PessoaRow({ p, onEdit, onDelete }: { p: Pessoa; all: Pessoa[]; depth: n
         <Icon className="w-3.5 h-3.5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{p.nome}</p>
+        <p className="text-sm font-medium truncate flex items-center gap-1">
+          {p.nome}
+          {p.tipo === "coordenador" && p.user_id && <CheckCircle2 className="w-3 h-3 text-emerald-600" aria-label="Acesso configurado" />}
+        </p>
         <p className="text-xs text-muted-foreground truncate flex items-center gap-2">
           <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{p.telefone}</span>
           <span className="truncate">· {p.endereco}</span>
         </p>
       </div>
       <Badge variant="outline" className={cn("text-[10px]", meta.color)}>{meta.label}</Badge>
+      {p.tipo === "coordenador" && (
+        <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100" title="Definir acesso ao portal" onClick={() => onCredentials(p)}>
+          <KeyRound className="w-3.5 h-3.5" />
+        </Button>
+      )}
       <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => onEdit(p)}>
         <Edit2 className="w-3.5 h-3.5" />
       </Button>
