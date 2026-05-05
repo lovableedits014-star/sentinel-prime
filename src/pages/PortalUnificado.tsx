@@ -29,6 +29,25 @@ export default function PortalUnificado() {
   const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleResetPassword = async () => {
+    if (!email.trim()) { toast.error("Digite seu e-mail no campo acima primeiro"); return; }
+    setResetLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setResetSent(true);
+      toast.success("Enviamos um link para o seu e-mail!");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao enviar link");
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const [clientName, setClientName] = useState("");
   const [clientLogo, setClientLogo] = useState<string | null>(null);
