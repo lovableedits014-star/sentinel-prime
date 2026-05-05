@@ -783,7 +783,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
                 <Copy className="w-3.5 h-3.5 mr-2" />Gerar link e copiar
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onCredentials(p)}>
-                <KeyRound className="w-3.5 h-3.5 mr-2" />Definir senha manual
+                <KeyRound className="w-3.5 h-3.5 mr-2" />Definir e enviar acesso
               </DropdownMenuItem>
             </>
           )}
