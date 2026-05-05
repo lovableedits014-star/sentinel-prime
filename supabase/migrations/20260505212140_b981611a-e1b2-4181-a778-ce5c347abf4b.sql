@@ -1,0 +1,1 @@
+ALTER TYPE public.eleicao_regiao ADD VALUE IF NOT EXISTS 'imbirussu';

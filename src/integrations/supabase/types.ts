@@ -5799,6 +5799,7 @@ export type Database = {
         | "anhanduizinho"
         | "lagoa"
         | "moreninha"
+        | "imbirussu"
       eleicao_tipo: "coordenador" | "lider" | "cabo"
       llm_provider:
         | "groq"
@@ -5981,6 +5982,7 @@ export const Constants = {
         "anhanduizinho",
         "lagoa",
         "moreninha",
+        "imbirussu",
       ],
       eleicao_tipo: ["coordenador", "lider", "cabo"],
       llm_provider: [
