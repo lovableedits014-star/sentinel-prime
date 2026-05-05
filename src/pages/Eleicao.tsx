@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal } from "lucide-react";
+import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -189,7 +189,34 @@ export default function Eleicao() {
       setCredLoading(false);
     }
   }
-  // computed
+  // ─── Enviar credenciais (gera senha e envia/copia) ──────────────
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [credResult, setCredResult] = useState<{ pessoa: Pessoa; portal_url: string; email: string; password: string; message: string; sent: boolean; warning?: string } | null>(null);
+
+  async function sendCredentials(p: Pessoa, channel: "whatsapp" | "link_only") {
+    setSendingId(p.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("eleicao-send-credentials", {
+        body: { pessoa_id: p.id, channel },
+      });
+      if (error) {
+        let msg = error.message;
+        try { const b = await (error as any).context?.json?.(); if (b?.error) msg = b.error; } catch {}
+        throw new Error(msg);
+      }
+      if (!data?.success) throw new Error(data?.error || "Falha");
+      setCredResult({ pessoa: p, ...data });
+      if (data.sent) toast.success("Credenciais enviadas por WhatsApp!");
+      else if (data.warning) toast.warning(data.warning);
+      else toast.success("Credenciais geradas! Copie abaixo.");
+      load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   const matchesSearch = (p: Pessoa) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -313,6 +340,8 @@ export default function Eleicao() {
                   onEdit={openEdit}
                   onDelete={remove}
                   onCredentials={openCred}
+                  onSend={sendCredentials}
+                  sendingId={sendingId}
                 />
               );
             })
@@ -347,6 +376,8 @@ export default function Eleicao() {
                 onEdit={openEdit}
                 onDelete={remove}
                 onCredentials={openCred}
+                onSend={sendCredentials}
+                sendingId={sendingId}
                 interior
               />
             ))
@@ -459,18 +490,67 @@ export default function Eleicao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog resultado de credenciais geradas */}
+      <Dialog open={!!credResult} onOpenChange={(o) => !o && setCredResult(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {credResult?.sent ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5 text-primary" />}
+              {credResult?.sent ? "Acesso enviado!" : "Acesso gerado"}
+            </DialogTitle>
+          </DialogHeader>
+          {credResult && (
+            <div className="space-y-3">
+              {credResult.warning && (
+                <div className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 p-2 rounded border border-amber-500/30">
+                  ⚠️ {credResult.warning}
+                </div>
+              )}
+              {credResult.sent && (
+                <div className="text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 p-2 rounded border border-emerald-500/30">
+                  ✓ Mensagem enviada para <strong>{credResult.pessoa.telefone}</strong>
+                </div>
+              )}
+              <div className="space-y-2 text-sm bg-muted/40 p-3 rounded font-mono">
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground">Portal:</span><span className="truncate">{credResult.portal_url}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground">E-mail:</span><span className="truncate">{credResult.email}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground">Senha:</span><span className="font-bold">{credResult.password}</span></div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { navigator.clipboard.writeText(credResult.message); toast.success("Mensagem copiada"); }}>
+                  <Copy className="w-4 h-4 mr-2" />Copiar mensagem
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => {
+                  const phone = credResult.pessoa.telefone.replace(/\D/g, "");
+                  const p = phone.startsWith("55") ? phone : "55" + phone;
+                  window.open(`https://wa.me/${p}?text=${encodeURIComponent(credResult.message)}`, "_blank");
+                }}>
+                  <Send className="w-4 h-4 mr-2" />Abrir WhatsApp
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">A senha foi gerada automaticamente. Salve-a — não conseguirá vê-la novamente.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setCredResult(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function RegionBlock({
-  title, pessoas, onAdd, onEdit, onDelete, onCredentials, interior, defaultOpen,
+  title, pessoas, onAdd, onEdit, onDelete, onCredentials, onSend, sendingId, interior, defaultOpen,
 }: {
   title: string;
   pessoas: Pessoa[];
   onAdd: () => void;
   onEdit: (p: Pessoa) => void;
   onCredentials: (p: Pessoa) => void;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
+  sendingId: string | null;
   onDelete: (id: string) => void;
   interior?: boolean;
   defaultOpen?: boolean;
@@ -509,18 +589,18 @@ function RegionBlock({
       {open && hasContent && (
         <div className="border-t bg-muted/20">
           {coords.map(c => (
-            <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} interior={interior} />
+            <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} interior={interior} />
           ))}
           {lideresOrfaos.length > 0 && (
             <div className="px-3 py-2 border-t border-dashed">
               <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">Líderes sem coordenador</p>
-              {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
+              {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} />)}
             </div>
           )}
           {cabosOrfaos.length > 0 && (
             <div className="px-3 py-2 border-t border-dashed">
               <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">Cabos sem líder</p>
-              {cabosOrfaos.map(c => <PessoaRow key={c.id} p={c} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} />)}
+              {cabosOrfaos.map(c => <PessoaRow key={c.id} p={c} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} />)}
             </div>
           )}
         </div>
@@ -529,8 +609,9 @@ function RegionBlock({
   );
 }
 
-function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
-  coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void; interior?: boolean;
+function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendingId, interior }: {
+  coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null; interior?: boolean;
 }) {
   const lideres = all.filter(p => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
@@ -545,6 +626,8 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
         onEdit={onEdit}
         onDelete={onDelete}
         onCredentials={onCredentials}
+        onSend={onSend}
+        sendingId={sendingId}
         teamCount={hasTeam ? totalEquipe : undefined}
         expanded={expanded}
         onToggle={hasTeam ? () => setExpanded(e => !e) : undefined}
@@ -555,28 +638,31 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
             const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === l.id);
             return (
               <div key={l.id}>
-                <PessoaRow p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={1} />
-                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={2} />)}
+                <PessoaRow p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />
+                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={2} />)}
               </div>
             );
           })}
-          {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={1} />)}
+          {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />)}
         </div>
       )}
     </div>
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, indent = 0, teamCount, expanded, onToggle }: {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   onCredentials: (p: Pessoa) => void;
+  onSend?: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
+  sendingId?: string | null;
   indent?: number;
   teamCount?: number;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
+  const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
   return (
@@ -621,10 +707,20 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, indent = 0, teamCount, 
           <DropdownMenuItem onClick={() => onEdit(p)}>
             <Edit2 className="w-3.5 h-3.5 mr-2" />Editar
           </DropdownMenuItem>
-          {p.tipo === "coordenador" && (
-            <DropdownMenuItem onClick={() => onCredentials(p)}>
-              <KeyRound className="w-3.5 h-3.5 mr-2" />Definir acesso
-            </DropdownMenuItem>
+          {p.tipo === "coordenador" && onSend && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onSend(p, "whatsapp")} disabled={isSending}>
+                {isSending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-2" />}
+                Enviar acesso por WhatsApp
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onSend(p, "link_only")} disabled={isSending}>
+                <Copy className="w-3.5 h-3.5 mr-2" />Gerar link e copiar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onCredentials(p)}>
+                <KeyRound className="w-3.5 h-3.5 mr-2" />Definir senha manual
+              </DropdownMenuItem>
+            </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => onDelete(p.id)} className="text-destructive focus:text-destructive">
