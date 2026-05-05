@@ -24,7 +24,7 @@ function normalizePhone(p: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
-    const { pessoa_id, channel } = await req.json(); // channel: "whatsapp" | "link_only"
+    const { pessoa_id, channel, app_url } = await req.json(); // channel: "whatsapp" | "link_only"
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
