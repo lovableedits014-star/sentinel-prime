@@ -190,29 +190,19 @@ export default function Eleicao() {
   function openCred(p: Pessoa) {
     setCredPessoa(p);
     setCredEmail(p.email || "");
-    setCredPassword("");
+    setCredPassword(genLocalPassword());
     setCredOpen(true);
   }
 
   async function saveCred() {
     if (!credPessoa) return;
-    if (!credEmail.trim() || credPassword.length < 6) {
+    if (!credEmail.trim() || !isValidEmail(credEmail) || credPassword.length < 6) {
       toast.error("Email e senha (mín. 6) obrigatórios"); return;
     }
     setCredLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("eleicao-create-account", {
-        body: { pessoa_id: credPessoa.id, email: credEmail.trim(), password: credPassword },
-      });
-      if (error) {
-        let msg = error.message;
-        try { const b = await (error as any).context?.json?.(); if (b?.error) msg = b.error; } catch {}
-        throw new Error(msg);
-      }
-      if (!data?.success) throw new Error(data?.error || "Falha");
-      toast.success("Acesso criado! O coordenador pode entrar no portal.");
-      setCredOpen(false);
-      load();
+      const ok = await sendCredentials(credPessoa, "whatsapp", { email: credEmail.trim(), password: credPassword });
+      if (ok) setCredOpen(false);
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -251,8 +241,10 @@ export default function Eleicao() {
       else toast.success("Credenciais geradas! Copie abaixo.");
       if (options?.closeRegisterDialog) setDialogOpen(false);
       load();
+      return true;
     } catch (e: any) {
       toast.error(e.message);
+      return false;
     } finally {
       setSendingId(null);
     }
