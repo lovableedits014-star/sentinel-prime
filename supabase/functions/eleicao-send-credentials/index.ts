@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
       userId = found?.id || null;
     }
     if (userId) {
-      await admin.auth.admin.updateUserById(userId, { password, email_confirm: true });
+      await admin.auth.admin.updateUserById(userId, { email: emailNorm, password, email_confirm: true });
     } else {
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email: emailNorm, password, email_confirm: true,
