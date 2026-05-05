@@ -160,7 +160,7 @@ export default function Eleicao() {
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
     if (!editing && form.tipo === "coordenador" && form.send_access) {
-      await sendCredentials(savedPessoa as Pessoa, "whatsapp", {
+      await sendCredentials(savedPessoa as unknown as Pessoa, "whatsapp", {
         email: form.email.trim(),
         password: form.password,
         closeRegisterDialog: true,
@@ -223,11 +223,21 @@ export default function Eleicao() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [credResult, setCredResult] = useState<{ pessoa: Pessoa; portal_url: string; email: string; password: string; message: string; sent: boolean; warning?: string } | null>(null);
 
-  async function sendCredentials(p: Pessoa, channel: "whatsapp" | "link_only") {
+  async function sendCredentials(
+    p: Pessoa,
+    channel: "whatsapp" | "link_only",
+    options?: { email?: string; password?: string; closeRegisterDialog?: boolean }
+  ) {
     setSendingId(p.id);
     try {
       const { data, error } = await supabase.functions.invoke("eleicao-send-credentials", {
-        body: { pessoa_id: p.id, channel, app_url: window.location.origin },
+        body: {
+          pessoa_id: p.id,
+          channel,
+          app_url: window.location.origin,
+          email: options?.email,
+          password: options?.password,
+        },
       });
       if (error) {
         let msg = error.message;
@@ -239,6 +249,7 @@ export default function Eleicao() {
       if (data.sent) toast.success("Credenciais enviadas por WhatsApp!");
       else if (data.warning) toast.warning(data.warning);
       else toast.success("Credenciais geradas! Copie abaixo.");
+      if (options?.closeRegisterDialog) setDialogOpen(false);
       load();
     } catch (e: any) {
       toast.error(e.message);
