@@ -172,6 +172,7 @@ export default function PortalUnificado() {
                     ? "Use o e-mail e senha que você definiu no cadastro."
                     : "Ao se cadastrar você entra como apoiador ativo."}
                 </p>
+              </form>
             </CardContent>
           </Card>
         </div>
