@@ -660,10 +660,20 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <DropdownMenuItem onClick={() => onEdit(p)}>
             <Edit2 className="w-3.5 h-3.5 mr-2" />Editar
           </DropdownMenuItem>
-          {p.tipo === "coordenador" && (
-            <DropdownMenuItem onClick={() => onCredentials(p)}>
-              <KeyRound className="w-3.5 h-3.5 mr-2" />Definir acesso
-            </DropdownMenuItem>
+          {p.tipo === "coordenador" && onSend && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onSend(p, "whatsapp")} disabled={isSending}>
+                {isSending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-2" />}
+                Enviar acesso por WhatsApp
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onSend(p, "link_only")} disabled={isSending}>
+                <Copy className="w-3.5 h-3.5 mr-2" />Gerar link e copiar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onCredentials(p)}>
+                <KeyRound className="w-3.5 h-3.5 mr-2" />Definir senha manual
+              </DropdownMenuItem>
+            </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => onDelete(p.id)} className="text-destructive focus:text-destructive">
