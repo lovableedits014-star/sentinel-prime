@@ -513,21 +513,28 @@ export default function Eleicao() {
                 </div>
               )}
               <div className="space-y-2 text-sm bg-muted/40 p-3 rounded font-mono">
-                <div className="flex justify-between gap-2"><span className="text-muted-foreground">Portal:</span><span className="truncate">{credResult.portal_url}</span></div>
-                <div className="flex justify-between gap-2"><span className="text-muted-foreground">E-mail:</span><span className="truncate">{credResult.email}</span></div>
-                <div className="flex justify-between gap-2"><span className="text-muted-foreground">Senha:</span><span className="font-bold">{credResult.password}</span></div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-muted-foreground text-xs">Portal:</span>
+                  <span className="break-all text-xs">{credResult.portal_url}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-muted-foreground text-xs">E-mail:</span>
+                  <span className="break-all text-xs">{credResult.email}</span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-muted-foreground text-xs">Senha:</span>
+                  <span className="font-bold break-all">{credResult.password}</span>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => { navigator.clipboard.writeText(credResult.message); toast.success("Mensagem copiada"); }}>
-                  <Copy className="w-4 h-4 mr-2" />Copiar mensagem
+                  <Copy className="w-4 h-4 mr-2" />Copiar
                 </Button>
-                <Button variant="outline" className="flex-1" onClick={() => {
-                  const phone = credResult.pessoa.telefone.replace(/\D/g, "");
-                  const p = phone.startsWith("55") ? phone : "55" + phone;
-                  window.open(`https://wa.me/${p}?text=${encodeURIComponent(credResult.message)}`, "_blank");
-                }}>
-                  <Send className="w-4 h-4 mr-2" />Abrir WhatsApp
-                </Button>
+                {!credResult.sent && (
+                  <Button className="flex-1" disabled={sendingId === credResult.pessoa.id} onClick={() => sendCredentials(credResult.pessoa, "whatsapp")}>
+                    <Send className="w-4 h-4 mr-2" />{sendingId === credResult.pessoa.id ? "Enviando..." : "Enviar via WhatsApp"}
+                  </Button>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground">A senha foi gerada automaticamente. Salve-a — não conseguirá vê-la novamente.</p>
             </div>
