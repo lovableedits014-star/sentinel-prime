@@ -88,7 +88,7 @@ const MENU_SECTIONS: MenuSection[] = [
     label: "Operacional",
     items: [
       { icon: Send, label: "Disparos WhatsApp", path: "/disparos" },
-      { icon: Briefcase, label: "Contratados", path: "/contratados" },
+      { icon: Vote, label: "Eleição", path: "/eleicao" },
       { icon: MapPin, label: "Territorial", path: "/territorial" },
       { icon: Vote, label: "Inteligência Eleitoral", path: "/inteligencia-eleitoral" },
       { icon: Newspaper, label: "Mídia", path: "/midia" },
