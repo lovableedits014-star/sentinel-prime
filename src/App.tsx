@@ -126,7 +126,8 @@ const AppRouter = () => {
               <Route path="/missoes-ia" element={<MissoesIA />} />
               <Route path="/funcionarios" element={<Funcionarios />} />
               <Route path="/presenca" element={<ControlePresenca />} />
-              <Route path="/contratados" element={<Contratados />} />
+              <Route path="/contratados" element={<Navigate to="/eleicao" replace />} />
+              <Route path="/eleicao" element={<Eleicao />} />
               <Route path="/contratados/disparos" element={<ContratadosDisparos />} />
               <Route path="/contratados/relatorios" element={<ContratadosRelatorios />} />
               <Route path="/inteligencia-eleitoral" element={<InteligenciaEleitoral />} />
