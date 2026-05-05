@@ -245,59 +245,96 @@ export default function Eleicao() {
           <TabsTrigger value="interior">Coord. Interior</TabsTrigger>
         </TabsList>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        {/* KPIs compactos */}
+        <div className="flex flex-wrap gap-2 mb-3">
           {([
-            { k: "total", label: "Total", color: "text-foreground" },
-            { k: "coord", label: "Coordenadores", color: "text-red-600" },
-            { k: "lider", label: "Líderes", color: "text-blue-600" },
-            { k: "cabo", label: "Cabos eleitorais", color: "text-green-600" },
+            { k: "total", label: "Total", color: "bg-foreground/5 text-foreground" },
+            { k: "coord", label: "Coord.", color: "bg-red-500/10 text-red-600" },
+            { k: "lider", label: "Líderes", color: "bg-blue-500/10 text-blue-600" },
+            { k: "cabo", label: "Cabos", color: "bg-green-500/10 text-green-600" },
           ] as const).map(s => (
-            <Card key={s.k} className="p-4">
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-              <p className={cn("text-2xl font-bold tabular-nums", s.color)}>{(stats as any)[s.k]}</p>
-            </Card>
+            <div key={s.k} className={cn("px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5", s.color)}>
+              <span className="opacity-70">{s.label}</span>
+              <span className="font-bold tabular-nums">{(stats as any)[s.k]}</span>
+            </div>
           ))}
         </div>
 
-        <Card className="p-3 mb-4 flex flex-wrap gap-2 items-center">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-8" placeholder="Buscar por nome, telefone ou endereço..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          {escopo === "campo_grande" && (
-            <Select value={regiaoFilter} onValueChange={(v) => setRegiaoFilter(v as any)}>
-              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as regiões</SelectItem>
-                {REGIOES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-        </Card>
+        {/* Busca */}
+        <div className="relative mb-3">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pl-9 h-9" placeholder="Buscar nome, telefone ou endereço…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
 
-        <TabsContent value="campo_grande" className="space-y-4">
+        {/* Chips de região (CG) */}
+        {escopo === "campo_grande" && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            <button
+              onClick={() => setRegiaoFilter("all")}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
+                regiaoFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border"
+              )}
+            >
+              Todas <span className="opacity-70 ml-1">{escopoList.length}</span>
+            </button>
+            {REGIOES.map(r => {
+              const count = escopoList.filter(p => p.regiao === r.value).length;
+              const active = regiaoFilter === r.value;
+              return (
+                <button
+                  key={r.value}
+                  onClick={() => setRegiaoFilter(active ? "all" : r.value)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
+                    active ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border",
+                    count === 0 && !active && "opacity-50"
+                  )}
+                >
+                  {r.label} <span className="opacity-70 ml-1">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <TabsContent value="campo_grande" className="space-y-2 mt-0">
           {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> :
-            cgRegioes.map(r => (
-              <RegionBlock
-                key={r.value}
-                title={r.label}
-                pessoas={escopoList.filter(p => p.regiao === r.value)}
-                onAdd={() => openNew({ escopo: "campo_grande", regiao: r.value })}
-                onEdit={openEdit}
-                onDelete={remove}
-                onCredentials={openCred}
-              />
-            ))
+            cgRegioes.map(r => {
+              const list = escopoList.filter(p => p.regiao === r.value);
+              if (list.length === 0 && regiaoFilter === "all") return null;
+              return (
+                <RegionBlock
+                  key={r.value}
+                  title={r.label}
+                  pessoas={list}
+                  defaultOpen={regiaoFilter !== "all" || !!search}
+                  onAdd={() => openNew({ escopo: "campo_grande", regiao: r.value })}
+                  onEdit={openEdit}
+                  onDelete={remove}
+                  onCredentials={openCred}
+                />
+              );
+            })
           }
+          {!loading && escopoList.length === 0 && (
+            <Card className="py-12 text-center text-muted-foreground border-dashed">
+              <Crown className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Nenhum cadastro em Campo Grande ainda</p>
+              <Button variant="link" onClick={() => openNew({ escopo: "campo_grande" })}>Cadastrar primeiro</Button>
+            </Card>
+          )}
+          {!loading && regiaoFilter === "all" && escopoList.length > 0 && cgRegioes.every(r => escopoList.filter(p => p.regiao === r.value).length === 0) && (
+            <p className="text-center text-sm text-muted-foreground py-6">Nenhum resultado</p>
+          )}
         </TabsContent>
 
-        <TabsContent value="interior" className="space-y-4">
+        <TabsContent value="interior" className="space-y-2 mt-0">
           {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> :
             interiorCidades.length === 0 ? (
               <Card className="py-12 text-center text-muted-foreground border-dashed">
                 <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p>Nenhuma cidade cadastrada ainda</p>
+                <p className="text-sm">Nenhuma cidade cadastrada ainda</p>
                 <Button variant="link" onClick={() => openNew({ escopo: "interior" })}>Cadastrar primeiro coordenador</Button>
               </Card>
             ) : interiorCidades.map(cidade => (
@@ -305,6 +342,7 @@ export default function Eleicao() {
                 key={cidade}
                 title={cidade}
                 pessoas={escopoList.filter(p => p.cidade === cidade)}
+                defaultOpen={!!search}
                 onAdd={() => openNew({ escopo: "interior", cidade })}
                 onEdit={openEdit}
                 onDelete={remove}
