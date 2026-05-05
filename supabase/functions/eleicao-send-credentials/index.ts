@@ -74,7 +74,8 @@ Deno.serve(async (req) => {
     }
     await admin.from("eleicao_pessoas").update({ email: emailNorm, user_id: userId }).eq("id", pessoa_id);
 
-    const portalUrl = `${Deno.env.get("PUBLIC_APP_URL") || "https://app.lovable.dev"}/portal/${pessoa.client_id}`;
+    const baseUrl = (app_url || req.headers.get("origin") || Deno.env.get("PUBLIC_APP_URL") || "").replace(/\/$/, "");
+    const portalUrl = `${baseUrl}/portal/${pessoa.client_id}`;
     const message =
       `🗳️ *Acesso ao Portal da Campanha*\n\n` +
       `Olá ${pessoa.nome}! Seu acesso de coordenador foi liberado.\n\n` +
