@@ -537,14 +537,14 @@ export default function Eleicao() {
       <Dialog open={credOpen} onOpenChange={setCredOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Acesso ao portal — {credPessoa?.nome}</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Defina email e senha. O coordenador entrará em <code>/portal/{clientId}</code> e verá apenas a equipe dele.</p>
+          <p className="text-xs text-muted-foreground">Defina email e senha para salvar o acesso e enviar pelo WhatsApp conectado.</p>
           <div className="space-y-3 mt-2">
             <div><Label>E-mail *</Label><Input type="email" value={credEmail} onChange={e => setCredEmail(e.target.value)} placeholder="coordenador@email.com" /></div>
-            <div><Label>Senha *</Label><Input type="password" value={credPassword} onChange={e => setCredPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
+            <div><Label>Senha *</Label><Input value={credPassword} onChange={e => setCredPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCredOpen(false)}>Cancelar</Button>
-            <Button onClick={saveCred} disabled={credLoading}>{credLoading ? "Salvando…" : "Salvar acesso"}</Button>
+            <Button onClick={saveCred} disabled={credLoading}>{credLoading ? "Enviando…" : "Salvar e enviar"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -594,7 +594,7 @@ export default function Eleicao() {
                   </Button>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground">A senha foi gerada automaticamente. Salve-a — não conseguirá vê-la novamente.</p>
+              <p className="text-[11px] text-muted-foreground">Salve esta senha — ela só aparece aqui neste momento.</p>
             </div>
           )}
           <DialogFooter>
