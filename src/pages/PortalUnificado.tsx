@@ -28,26 +28,50 @@ export default function PortalUnificado() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [mode, setMode] = useState<"login" | "register">("login");
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
+  const [mode, setMode] = useState<"login" | "register" | "recover">("login");
 
-  const handleResetPassword = async () => {
-    if (!email.trim()) { toast.error("Digite seu e-mail no campo acima primeiro"); return; }
-    setResetLoading(true);
+  // Recuperação para apoiadores migrados (sem e-mail configurado)
+  const [recoverEmail, setRecoverEmail] = useState("");
+  const [recoverPassword, setRecoverPassword] = useState("");
+  const [recoverConfirm, setRecoverConfirm] = useState("");
+  const [recoverLoading, setRecoverLoading] = useState(false);
+
+  const handleLegacyRecover = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recoverEmail.trim()) { toast.error("Informe seu e-mail"); return; }
+    if (recoverPassword.length < 6) { toast.error("A senha deve ter pelo menos 6 caracteres"); return; }
+    if (recoverPassword !== recoverConfirm) { toast.error("As senhas não coincidem"); return; }
+
+    setRecoverLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const { data, error } = await supabase.functions.invoke("legacy-supporter-set-password", {
+        body: {
+          email: recoverEmail.trim().toLowerCase(),
+          new_password: recoverPassword,
+          client_id: clientId,
+        },
       });
       if (error) throw error;
-      setResetSent(true);
-      toast.success("Enviamos um link para o seu e-mail!");
+      if (!data?.success) throw new Error(data?.error || "Não foi possível definir a senha");
+
+      toast.success("Senha definida! Entrando...");
+      // Login automático após definir a senha
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: recoverEmail.trim().toLowerCase(),
+        password: recoverPassword,
+      });
+      if (signInErr) {
+        setMode("login");
+        setEmail(recoverEmail.trim().toLowerCase());
+        toast.info("Agora faça login com sua nova senha.");
+      }
     } catch (err: any) {
-      toast.error(err.message || "Erro ao enviar link");
+      toast.error(err?.message || "Erro ao definir senha");
     } finally {
-      setResetLoading(false);
+      setRecoverLoading(false);
     }
   };
+
 
   const [clientName, setClientName] = useState("");
   const [clientLogo, setClientLogo] = useState<string | null>(null);
@@ -143,36 +167,73 @@ export default function PortalUnificado() {
                 <Button variant={mode === "login" ? "default" : "ghost"} size="sm" onClick={() => setMode("login")}>Entrar</Button>
                 <Button variant={mode === "register" ? "default" : "ghost"} size="sm" onClick={() => setMode("register")}>Cadastrar</Button>
               </div>
-              <form onSubmit={mode === "login" ? handleLogin : handleRegister} className="space-y-4">
-                {mode === "register" && (
+
+              {mode === "recover" ? (
+                <form onSubmit={handleLegacyRecover} className="space-y-4">
+                  <div className="rounded-md bg-primary/5 border border-primary/20 p-3 text-xs text-muted-foreground">
+                    Se você já era apoiador no sistema antigo, informe o e-mail cadastrado e defina uma nova senha para acessar.
+                  </div>
                   <div className="space-y-2">
-                    <Label htmlFor="name">Nome completo</Label>
-                    <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="João da Silva" required />
+                    <Label htmlFor="recover-email">E-mail cadastrado</Label>
+                    <Input id="recover-email" type="email" value={recoverEmail} onChange={e => setRecoverEmail(e.target.value)} placeholder="seu@email.com" required />
                   </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Senha</Label>
-                  <div className="relative">
-                    <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" minLength={6} required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <div className="space-y-2">
+                    <Label htmlFor="recover-password">Nova senha</Label>
+                    <Input id="recover-password" type="password" value={recoverPassword} onChange={e => setRecoverPassword(e.target.value)} placeholder="Mínimo 6 caracteres" minLength={6} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="recover-confirm">Confirmar nova senha</Label>
+                    <Input id="recover-confirm" type="password" value={recoverConfirm} onChange={e => setRecoverConfirm(e.target.value)} placeholder="Repita a senha" minLength={6} required />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={recoverLoading}>
+                    {recoverLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    Definir senha e entrar
+                  </Button>
+                  <button type="button" onClick={() => setMode("login")} className="block w-full text-center text-xs text-muted-foreground hover:text-foreground underline">
+                    Voltar ao login
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={mode === "login" ? handleLogin : handleRegister} className="space-y-4">
+                  {mode === "register" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nome completo</Label>
+                      <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="João da Silva" required />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Senha</Label>
+                    <div className="relative">
+                      <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" minLength={6} required />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={authLoading}>
+                    {authLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    {mode === "login" ? "Entrar" : "Criar conta"}
+                  </Button>
+                  {mode === "login" && (
+                    <button
+                      type="button"
+                      onClick={() => { setMode("recover"); setRecoverEmail(email); }}
+                      className="block w-full text-center text-xs text-primary hover:underline font-medium"
+                    >
+                      Já era apoiador? Definir/redefinir minha senha
                     </button>
-                  </div>
-                </div>
-                <Button type="submit" className="w-full" disabled={authLoading}>
-                  {authLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  {mode === "login" ? "Entrar" : "Criar conta"}
-                </Button>
-                <p className="text-xs text-center text-muted-foreground">
-                  {mode === "login"
-                    ? "Use o e-mail e senha que você definiu no cadastro."
-                    : "Ao se cadastrar você entra como apoiador ativo."}
-                </p>
-              </form>
+                  )}
+                  <p className="text-xs text-center text-muted-foreground">
+                    {mode === "login"
+                      ? "Use o e-mail e senha que você definiu no cadastro."
+                      : "Ao se cadastrar você entra como apoiador ativo."}
+                  </p>
+                </form>
+              )}
             </CardContent>
           </Card>
         </div>

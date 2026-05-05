@@ -4312,6 +4312,7 @@ export type Database = {
           facebook_username: string | null
           id: string
           instagram_username: string | null
+          legacy_password_recovery_allowed: boolean
           name: string
           neighborhood: string | null
           phone: string | null
@@ -4334,6 +4335,7 @@ export type Database = {
           facebook_username?: string | null
           id?: string
           instagram_username?: string | null
+          legacy_password_recovery_allowed?: boolean
           name: string
           neighborhood?: string | null
           phone?: string | null
@@ -4356,6 +4358,7 @@ export type Database = {
           facebook_username?: string | null
           id?: string
           instagram_username?: string | null
+          legacy_password_recovery_allowed?: boolean
           name?: string
           neighborhood?: string | null
           phone?: string | null
