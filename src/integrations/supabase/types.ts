@@ -2240,6 +2240,33 @@ export type Database = {
         }
         Relationships: []
       }
+      legacy_password_recovery_allowlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          source: string | null
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          source?: string | null
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          source?: string | null
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       lider_invite_tokens: {
         Row: {
           client_id: string

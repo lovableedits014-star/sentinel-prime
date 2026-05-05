@@ -27,42 +27,62 @@ Deno.serve(async (req) => {
 
     const normalizedEmail = String(email).trim().toLowerCase();
 
-    // Procura conta de apoiador autorizada para recuperação manual.
-    let query = admin
-      .from("supporter_accounts")
-      .select("id, user_id, name, email, client_id, legacy_password_recovery_allowed")
+    // 1) Tenta na allowlist global (todos os usuários migrados)
+    const { data: allow, error: allowErr } = await admin
+      .from("legacy_password_recovery_allowlist")
+      .select("id, user_id, email, used_at")
       .ilike("email", normalizedEmail)
-      .eq("legacy_password_recovery_allowed", true);
+      .is("used_at", null)
+      .limit(1);
+    if (allowErr) throw allowErr;
 
-    if (client_id) query = query.eq("client_id", client_id);
+    let userId: string | null = allow && allow.length > 0 ? allow[0].user_id : null;
+    let allowId: string | null = allow && allow.length > 0 ? allow[0].id : null;
+    let supporterAccountId: string | null = null;
 
-    const { data: accounts, error: accErr } = await query.limit(1);
-    if (accErr) throw accErr;
+    // 2) Fallback: conta de apoiador legada
+    if (!userId) {
+      let query = admin
+        .from("supporter_accounts")
+        .select("id, user_id, email, client_id, legacy_password_recovery_allowed")
+        .ilike("email", normalizedEmail)
+        .eq("legacy_password_recovery_allowed", true);
+      if (client_id) query = query.eq("client_id", client_id);
+      const { data: accounts, error: accErr } = await query.limit(1);
+      if (accErr) throw accErr;
+      if (accounts && accounts.length > 0 && accounts[0].user_id) {
+        userId = accounts[0].user_id;
+        supporterAccountId = accounts[0].id;
+      }
+    }
 
-    if (!accounts || accounts.length === 0) {
+    if (!userId) {
       return json({
         success: false,
-        error: "E-mail não encontrado entre os apoiadores cadastrados ou já utilizado.",
+        error: "E-mail não encontrado entre os usuários cadastrados ou redefinição já utilizada.",
       }, 404);
     }
 
-    const account = accounts[0];
-    if (!account.user_id) {
-      return json({ success: false, error: "Conta sem usuário vinculado. Contate o administrador." }, 409);
-    }
-
     // Atualiza a senha via Admin API
-    const { error: updErr } = await admin.auth.admin.updateUserById(account.user_id, {
+    const { error: updErr } = await admin.auth.admin.updateUserById(userId, {
       password: String(new_password),
       email_confirm: true,
     });
     if (updErr) throw updErr;
 
-    // Consome o privilégio para que o fluxo só funcione uma vez por apoiador
-    await admin
-      .from("supporter_accounts")
-      .update({ legacy_password_recovery_allowed: false })
-      .eq("id", account.id);
+    // Consome o privilégio (uso único)
+    if (allowId) {
+      await admin
+        .from("legacy_password_recovery_allowlist")
+        .update({ used_at: new Date().toISOString() })
+        .eq("id", allowId);
+    }
+    if (supporterAccountId) {
+      await admin
+        .from("supporter_accounts")
+        .update({ legacy_password_recovery_allowed: false })
+        .eq("id", supporterAccountId);
+    }
 
     return json({ success: true, message: "Senha definida com sucesso. Você já pode entrar." });
   } catch (err: any) {
