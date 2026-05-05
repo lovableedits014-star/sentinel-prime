@@ -178,6 +178,9 @@ export default function Disparos() {
   const [mensagem, setMensagem] = useState("");
   const [tipoDisparo, setTipoDisparo] = useState("manual");
   const [tagFiltro, setTagFiltro] = useState("_all");
+  const [eleicaoTipo, setEleicaoTipo] = useState<"all" | "coordenador" | "lider" | "cabo">("all");
+  const [eleicaoEscopo, setEleicaoEscopo] = useState<"all" | "campo_grande" | "interior">("all");
+  const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
   const handleUseMissions = () => {
