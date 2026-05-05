@@ -499,15 +499,15 @@ export default function Eleicao() {
                     <Label>E-mail de acesso</Label>
                     <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="coordenador@email.com" />
                   </div>
-                  <div>
+                  {!editing && <div>
                     <div className="flex items-center justify-between gap-2">
                       <Label>Senha</Label>
                       <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setForm(f => ({ ...f, password: genLocalPassword() }))}>
                         Gerar
                       </Button>
                     </div>
-                    <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder={editing ? "Nova senha opcional" : "Mínimo 6 caracteres"} />
-                  </div>
+                    <Input value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
+                  </div>}
                 </div>
                 {!editing && (
                   <label className="flex items-center gap-2 text-sm font-medium">
