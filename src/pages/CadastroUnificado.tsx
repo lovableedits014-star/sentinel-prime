@@ -18,7 +18,7 @@ export default function CadastroUnificado() {
   // O antigo ?papel=apoiador não deve abrir cadastro quando usado como link de acesso: portal é login.
   const initialPapel = (searchParams.get("papel") as Papel) || null;
   const initialModo = searchParams.get("modo");
-  const shouldRedirectOldAccessLink = initialPapel === "apoiador" && !searchParams.get("ref") && !searchParams.get("ref_func");
+  const shouldRedirectOldAccessLink = initialPapel === "apoiador" && !searchParams.get("complete") && !searchParams.get("ref") && !searchParams.get("ref_func");
 
   useEffect(() => {
     if (clientId && shouldRedirectOldAccessLink) {
