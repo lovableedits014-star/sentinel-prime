@@ -36,6 +36,23 @@ export default function PortalUnificado() {
   const [recoverConfirm, setRecoverConfirm] = useState("");
   const [recoverLoading, setRecoverLoading] = useState(false);
 
+  const getLegacyRecoverErrorMessage = async (error: any) => {
+    if (error?.context?.json) {
+      try {
+        const body = await error.context.json();
+        if (body?.error) return body.error;
+      } catch {
+        // Mantém fallback abaixo caso o corpo não seja JSON.
+      }
+    }
+
+    if (error?.message === "Edge Function returned a non-2xx status code") {
+      return "E-mail não encontrado entre os 30 apoiadores migrados ou redefinição já utilizada.";
+    }
+
+    return error?.message || "Erro ao definir senha";
+  };
+
   const handleLegacyRecover = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!recoverEmail.trim()) { toast.error("Informe seu e-mail"); return; }
@@ -66,7 +83,7 @@ export default function PortalUnificado() {
         toast.info("Agora faça login com sua nova senha.");
       }
     } catch (err: any) {
-      toast.error(err?.message || "Erro ao definir senha");
+      toast.error(await getLegacyRecoverErrorMessage(err));
     } finally {
       setRecoverLoading(false);
     }
