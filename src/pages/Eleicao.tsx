@@ -106,6 +106,7 @@ export default function Eleicao() {
     setForm({
       tipo: "coordenador", escopo, regiao: "centro", cidade: "",
       nome: "", telefone: "", endereco: "", parent_id: "", observacoes: "",
+      email: "", password: genLocalPassword(), send_access: true,
       ...presets,
     });
     setDialogOpen(true);
@@ -120,6 +121,9 @@ export default function Eleicao() {
       nome: p.nome, telefone: p.telefone, endereco: p.endereco,
       parent_id: p.parent_id || "",
       observacoes: p.observacoes || "",
+      email: p.email || "",
+      password: "",
+      send_access: false,
     });
     setDialogOpen(true);
   }
@@ -130,6 +134,12 @@ export default function Eleicao() {
     }
     if (form.escopo === "interior" && !form.cidade.trim()) {
       toast.error("Cidade é obrigatória para Interior"); return;
+    }
+    if (form.tipo === "coordenador" && form.email.trim() && !isValidEmail(form.email)) {
+      toast.error("Informe um e-mail válido para o coordenador"); return;
+    }
+    if (form.tipo === "coordenador" && !editing && form.send_access && (!form.email.trim() || form.password.length < 6)) {
+      toast.error("Para enviar acesso, informe e-mail e senha com no mínimo 6 caracteres"); return;
     }
     const payload: any = {
       client_id: clientId,
@@ -142,12 +152,21 @@ export default function Eleicao() {
       endereco: form.endereco.trim(),
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
+      email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
     };
     const q = editing
-      ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id)
-      : supabase.from("eleicao_pessoas" as any).insert(payload);
-    const { error } = await q;
+      ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
+      : supabase.from("eleicao_pessoas" as any).insert(payload).select().single();
+    const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
+    if (!editing && form.tipo === "coordenador" && form.send_access) {
+      await sendCredentials(savedPessoa as Pessoa, "whatsapp", {
+        email: form.email.trim(),
+        password: form.password,
+        closeRegisterDialog: true,
+      });
+      return;
+    }
     toast.success(editing ? "Atualizado!" : "Cadastrado!");
     setDialogOpen(false);
     load();
