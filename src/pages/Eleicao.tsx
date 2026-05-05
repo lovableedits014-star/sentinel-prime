@@ -562,8 +562,9 @@ function RegionBlock({
   );
 }
 
-function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
-  coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void; interior?: boolean;
+function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendingId, interior }: {
+  coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null; interior?: boolean;
 }) {
   const lideres = all.filter(p => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
@@ -578,6 +579,8 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
         onEdit={onEdit}
         onDelete={onDelete}
         onCredentials={onCredentials}
+        onSend={onSend}
+        sendingId={sendingId}
         teamCount={hasTeam ? totalEquipe : undefined}
         expanded={expanded}
         onToggle={hasTeam ? () => setExpanded(e => !e) : undefined}
@@ -588,12 +591,12 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
             const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === l.id);
             return (
               <div key={l.id}>
-                <PessoaRow p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={1} />
-                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={2} />)}
+                <PessoaRow p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />
+                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={2} />)}
               </div>
             );
           })}
-          {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} indent={1} />)}
+          {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />)}
         </div>
       )}
     </div>
