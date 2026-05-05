@@ -168,7 +168,7 @@ export default function SupporterPortal() {
       // formulário de cadastro completo, que valida todos os campos
       // obrigatórios (telefone, CPF, cidade, bairro, endereço, nascimento).
       toast.info("Complete seu cadastro para acessar o portal.");
-      navigate(`/cadastro/${clientId}?papel=apoiador`);
+      navigate(`/cadastro/${clientId}?papel=apoiador&complete=1`);
       return;
     }
 
