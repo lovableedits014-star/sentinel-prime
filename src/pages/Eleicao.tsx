@@ -340,6 +340,8 @@ export default function Eleicao() {
                   onEdit={openEdit}
                   onDelete={remove}
                   onCredentials={openCred}
+                  onSend={sendCredentials}
+                  sendingId={sendingId}
                 />
               );
             })
@@ -374,6 +376,8 @@ export default function Eleicao() {
                 onEdit={openEdit}
                 onDelete={remove}
                 onCredentials={openCred}
+                onSend={sendCredentials}
+                sendingId={sendingId}
                 interior
               />
             ))
