@@ -14,6 +14,7 @@ interface Roles {
   isFuncionario: boolean;
   isContratado: boolean;
   isApoiador: boolean;
+  isCoordenador: boolean;
 }
 
 export default function PortalUnificado() {
