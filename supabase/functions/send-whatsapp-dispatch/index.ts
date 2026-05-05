@@ -357,6 +357,9 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
       }
       ({ client_id, titulo, mensagem, tipo, tag_filtro, batch_size, delay_min, delay_max, batch_pause } = payload);
+      var eleicao_tipo = payload.eleicao_tipo || null;
+      var eleicao_escopo = payload.eleicao_escopo || null;
+      var eleicao_regiao = payload.eleicao_regiao || null;
 
       // Verify ownership
       const { data: ownerCheck } = await adminClient
