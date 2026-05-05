@@ -197,56 +197,49 @@ export default function Disparos() {
 
   // Count recipients based on filter
   const { data: recipientCount = 0 } = useQuery<number>({
-    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo],
+    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao],
     queryFn: async () => {
-      if (tipoDisparo === "funcionarios") {
-        const { count } = await supabase
-          .from("funcionarios")
+      if (tipoDisparo === "eleicao") {
+        let q = supabase.from("eleicao_pessoas" as any)
           .select("*", { count: "exact", head: true })
           .eq("client_id", clientId!)
-          .eq("status", "ativo")
           .not("telefone", "is", null);
+        if (eleicaoTipo !== "all") q = q.eq("tipo", eleicaoTipo);
+        if (eleicaoEscopo !== "all") q = q.eq("escopo", eleicaoEscopo);
+        if (eleicaoRegiao !== "all") q = q.eq("regiao", eleicaoRegiao);
+        const { count } = await q;
+        return count || 0;
+      }
+      if (tipoDisparo === "funcionarios") {
+        const { count } = await supabase
+          .from("funcionarios").select("*", { count: "exact", head: true })
+          .eq("client_id", clientId!).eq("status", "ativo").not("telefone", "is", null);
         return count || 0;
       }
       if (tipoDisparo === "contratados") {
         const { count } = await supabase
-          .from("contratados")
-          .select("*", { count: "exact", head: true })
-          .eq("client_id", clientId!)
-          .eq("status", "ativo")
-          .not("telefone", "is", null);
+          .from("contratados").select("*", { count: "exact", head: true })
+          .eq("client_id", clientId!).eq("status", "ativo").not("telefone", "is", null);
         return count || 0;
       }
       if (tipoDisparo === "apoiadores") {
         const { count } = await supabase
-          .from("pessoas")
-          .select("*", { count: "exact", head: true })
-          .eq("client_id", clientId!)
-          .eq("tipo_pessoa", "apoiador")
-          .not("telefone", "is", null);
+          .from("pessoas").select("*", { count: "exact", head: true })
+          .eq("client_id", clientId!).eq("tipo_pessoa", "apoiador").not("telefone", "is", null);
         return count || 0;
       }
-      // Manual / pessoas
       if (tagFiltro && tagFiltro !== "_all") {
-        // Count pessoas with this tag
         const { data: tagData } = await supabase
-          .from("tags" as any)
-          .select("id")
-          .eq("client_id", clientId)
-          .eq("nome", tagFiltro)
-          .maybeSingle();
+          .from("tags" as any).select("id").eq("client_id", clientId).eq("nome", tagFiltro).maybeSingle();
         if (!tagData) return 0;
         const { count } = await supabase
-          .from("pessoas_tags" as any)
-          .select("*", { count: "exact", head: true })
+          .from("pessoas_tags" as any).select("*", { count: "exact", head: true })
           .eq("tag_id", (tagData as any).id);
         return count || 0;
       }
       const { count } = await supabase
-        .from("pessoas")
-        .select("*", { count: "exact", head: true })
-        .eq("client_id", clientId!)
-        .not("telefone", "is", null);
+        .from("pessoas").select("*", { count: "exact", head: true })
+        .eq("client_id", clientId!).not("telefone", "is", null);
       return count || 0;
     },
     enabled: !!clientId,
