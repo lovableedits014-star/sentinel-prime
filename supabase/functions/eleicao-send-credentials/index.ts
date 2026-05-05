@@ -93,18 +93,27 @@ Deno.serve(async (req) => {
     const phone = normalizePhone(pessoa.telefone);
     if (!phone) throw new Error("Telefone inválido");
 
-    const { data: client } = await admin.from("clients")
-      .select("whatsapp_bridge_url, whatsapp_bridge_api_key")
-      .eq("id", pessoa.client_id).maybeSingle();
+    // Prioriza whatsapp_instances ativa (primária); cai para legacy do client
+    let bridgeUrl: string | null = null;
+    let bridgeKey: string | null = null;
 
-    let bridgeUrl = client?.whatsapp_bridge_url;
-    let bridgeKey = client?.whatsapp_bridge_api_key;
+    const { data: insts } = await admin.from("whatsapp_instances")
+      .select("bridge_url, bridge_api_key, is_primary, status, is_active")
+      .eq("client_id", pessoa.client_id)
+      .eq("is_active", true)
+      .not("bridge_url", "is", null)
+      .not("bridge_api_key", "is", null);
+    const primary = insts?.find((i: any) => i.is_primary) || insts?.[0];
+    if (primary) {
+      bridgeUrl = primary.bridge_url;
+      bridgeKey = primary.bridge_api_key;
+    }
     if (!bridgeUrl || !bridgeKey) {
-      const { data: inst } = await admin.from("whatsapp_instances")
-        .select("bridge_url, bridge_api_key")
-        .eq("client_id", pessoa.client_id).eq("active", true).limit(1).maybeSingle();
-      bridgeUrl = inst?.bridge_url || bridgeUrl;
-      bridgeKey = inst?.bridge_api_key || bridgeKey;
+      const { data: client } = await admin.from("clients")
+        .select("whatsapp_bridge_url, whatsapp_bridge_api_key")
+        .eq("id", pessoa.client_id).maybeSingle();
+      bridgeUrl = bridgeUrl || client?.whatsapp_bridge_url || null;
+      bridgeKey = bridgeKey || client?.whatsapp_bridge_api_key || null;
     }
     if (!bridgeUrl || !bridgeKey) {
       return new Response(JSON.stringify({
