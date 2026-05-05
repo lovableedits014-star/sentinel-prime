@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, Briefcase, ArrowLeft } from "lucide-react";
+import { Heart, Briefcase, ArrowLeft, Crown } from "lucide-react";
 import SupporterRegister from "./SupporterRegister";
 import RegistroFuncionario from "./RegistroFuncionario";
 import RegistroPessoa from "./RegistroPessoa";
 
-type Papel = "apoiador" | "funcionario" | "campo" | null;
+type Papel = "apoiador" | "funcionario" | "campo" | "coordenador" | null;
 
 export default function CadastroUnificado() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -18,7 +18,7 @@ export default function CadastroUnificado() {
   // O antigo ?papel=apoiador não deve abrir cadastro quando usado como link de acesso: portal é login.
   const initialPapel = (searchParams.get("papel") as Papel) || null;
   const initialModo = searchParams.get("modo");
-  const shouldRedirectOldAccessLink = initialPapel === "apoiador" && !searchParams.get("complete") && !searchParams.get("ref") && !searchParams.get("ref_func");
+  const shouldRedirectOldAccessLink = (initialPapel === "apoiador" || initialPapel === "coordenador") && !searchParams.get("complete") && !searchParams.get("ref") && !searchParams.get("ref_func");
 
   useEffect(() => {
     if (clientId && shouldRedirectOldAccessLink) {
@@ -85,7 +85,7 @@ export default function CadastroUnificado() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-3 gap-4">
             <button
               type="button"
               onClick={() => setPapel("apoiador")}
@@ -111,6 +111,20 @@ export default function CadastroUnificado() {
               <h3 className="font-semibold text-lg mb-1">Funcionário</h3>
               <p className="text-sm text-muted-foreground">
                 Equipe oficial — check-in diário, missões e link para indicar apoiadores.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate(`/portal/${clientId}`)}
+              className="group text-left p-6 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all"
+            >
+              <div className="w-12 h-12 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <Crown className="w-6 h-6" />
+              </div>
+              <h3 className="font-semibold text-lg mb-1">Coordenador</h3>
+              <p className="text-sm text-muted-foreground">
+                Entre com o e-mail e senha enviados pelo administrador.
               </p>
             </button>
           </div>

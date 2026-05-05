@@ -96,17 +96,25 @@ Deno.serve(async (req) => {
     const emailNorm = (emailInput || pessoa.email || `coord-${pessoa.id.slice(0,8)}@portal.local`).toLowerCase();
 
     let userId = pessoa.user_id as string | null;
-    if (!userId) {
-      const { data: list } = await admin.auth.admin.listUsers();
-      const found = list?.users?.find((u: any) => (u.email || "").toLowerCase() === emailNorm);
-      userId = found?.id || null;
-    }
+    const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const foundByEmail = list?.users?.find((u: any) => (u.email || "").toLowerCase() === emailNorm) || null;
+
+    // Se o e-mail informado já existir em outra conta, vincula o coordenador a essa conta.
+    // Isso evita o erro atual: a pessoa fica com email correto, mas user_id preso em coord-xxxx@portal.local.
+    if (foundByEmail?.id) userId = foundByEmail.id;
+
     if (userId) {
-      await admin.auth.admin.updateUserById(userId, { email: emailNorm, password, email_confirm: true });
+      const { error: uErr } = await admin.auth.admin.updateUserById(userId, {
+        email: emailNorm,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: pessoa.nome, role: "coordenador" },
+      });
+      if (uErr) throw uErr;
     } else {
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email: emailNorm, password, email_confirm: true,
-        user_metadata: { full_name: pessoa.nome },
+        user_metadata: { full_name: pessoa.nome, role: "coordenador" },
       });
       if (cErr) throw cErr;
       userId = created.user!.id;
