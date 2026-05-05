@@ -41,6 +41,7 @@ const ContratadosRelatorios = lazy(() => import("./pages/ContratadosRelatorios")
 const RegistroContratado = lazy(() => import("./pages/RegistroContratado"));
 const PortalContratado = lazy(() => import("./pages/PortalContratado"));
 const PortalFuncionario = lazy(() => import("./pages/PortalFuncionario"));
+const PortalCoordenador = lazy(() => import("./pages/PortalCoordenador"));
 const Telemarketing = lazy(() => import("./pages/Telemarketing"));
 const CadastroUnificado = lazy(() => import("./pages/CadastroUnificado"));
 const CadastroLiderConvite = lazy(() => import("./pages/CadastroLiderConvite"));
