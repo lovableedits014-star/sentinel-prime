@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.ibge-municipio-fetch]
 verify_jwt = false
+
+[functions.eleicao-create-account]
+verify_jwt = true
