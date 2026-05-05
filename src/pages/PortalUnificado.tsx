@@ -116,20 +116,23 @@ export default function PortalUnificado() {
     if (!session || !clientId) return;
     setDetecting(true);
     try {
-      const [funcRes, contRes, accRes] = await Promise.all([
+      const [funcRes, contRes, accRes, coordRes] = await Promise.all([
         supabase.from("funcionarios").select("id").eq("client_id", clientId).eq("user_id", session.user.id).maybeSingle(),
         supabase.from("contratados").select("id").eq("client_id", clientId).eq("user_id", session.user.id).maybeSingle(),
         supabase.from("supporter_accounts").select("id").eq("client_id", clientId).eq("user_id", session.user.id).maybeSingle(),
+        supabase.from("eleicao_pessoas" as any).select("id").eq("client_id", clientId).eq("user_id", session.user.id).eq("tipo", "coordenador").maybeSingle(),
       ]);
       const r: Roles = {
         isFuncionario: !!funcRes.data,
         isContratado: !!contRes.data,
         isApoiador: !!accRes.data,
+        isCoordenador: !!coordRes.data,
       };
       setRoles(r);
 
-      // Hierarquia: Funcionário > Líder > Apoiador. Cargo maior predomina.
+      // Hierarquia: Funcionário > Coordenador > Líder > Apoiador.
       if (r.isFuncionario) navigate(`/portal-funcionario/${clientId}`, { replace: true });
+      else if (r.isCoordenador) navigate(`/portal-coordenador/${clientId}`, { replace: true });
       else if (r.isContratado) navigate(`/portal-contratado/${clientId}`, { replace: true });
       else navigate(`/portal-apoiador/${clientId}`, { replace: true });
     } finally {
