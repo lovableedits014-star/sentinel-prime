@@ -40,6 +40,7 @@ const REGIOES: { value: Regiao; label: string }[] = [
   { value: "bandeira", label: "Bandeira" },
   { value: "anhanduizinho", label: "Anhanduizinho" },
   { value: "lagoa", label: "Lagoa" },
+  { value: "imbirussu", label: "Imbirussu" },
   { value: "moreninha", label: "Moreninha" },
 ];
 
