@@ -493,7 +493,7 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, interior }: {
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete }: { p: Pessoa; all: Pessoa[]; depth: number; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void }) {
+function PessoaRow({ p, onEdit, onDelete, onCredentials }: { p: Pessoa; all: Pessoa[]; depth: number; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void }) {
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
   return (
@@ -502,13 +502,21 @@ function PessoaRow({ p, onEdit, onDelete }: { p: Pessoa; all: Pessoa[]; depth: n
         <Icon className="w-3.5 h-3.5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{p.nome}</p>
+        <p className="text-sm font-medium truncate flex items-center gap-1">
+          {p.nome}
+          {p.tipo === "coordenador" && p.user_id && <CheckCircle2 className="w-3 h-3 text-emerald-600" aria-label="Acesso configurado" />}
+        </p>
         <p className="text-xs text-muted-foreground truncate flex items-center gap-2">
           <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{p.telefone}</span>
           <span className="truncate">· {p.endereco}</span>
         </p>
       </div>
       <Badge variant="outline" className={cn("text-[10px]", meta.color)}>{meta.label}</Badge>
+      {p.tipo === "coordenador" && (
+        <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100" title="Definir acesso ao portal" onClick={() => onCredentials(p)}>
+          <KeyRound className="w-3.5 h-3.5" />
+        </Button>
+      )}
       <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => onEdit(p)}>
         <Edit2 className="w-3.5 h-3.5" />
       </Button>
