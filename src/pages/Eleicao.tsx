@@ -218,6 +218,11 @@ export default function Eleicao() {
     channel: "whatsapp" | "link_only",
     options?: { email?: string; password?: string; closeRegisterDialog?: boolean }
   ) {
+    if (!options?.email && !p.email) {
+      openCred(p);
+      toast.warning("Informe o e-mail e a senha do coordenador antes de enviar o acesso.");
+      return false;
+    }
     setSendingId(p.id);
     try {
       const { data, error } = await supabase.functions.invoke("eleicao-send-credentials", {
