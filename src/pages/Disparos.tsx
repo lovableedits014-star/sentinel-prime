@@ -409,6 +409,53 @@ export default function Disparos() {
                 </Select>
               </div>
             )}
+
+            {tipoDisparo === "eleicao" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={eleicaoTipo} onValueChange={(v) => setEleicaoTipo(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="coordenador">🔴 Coordenadores</SelectItem>
+                      <SelectItem value="lider">🔵 Líderes</SelectItem>
+                      <SelectItem value="cabo">🟢 Cabos eleitorais</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Escopo</Label>
+                  <Select value={eleicaoEscopo} onValueChange={(v) => { setEleicaoEscopo(v as any); setEleicaoRegiao("all"); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">CG + Interior</SelectItem>
+                      <SelectItem value="campo_grande">Campo Grande</SelectItem>
+                      <SelectItem value="interior">Interior</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {eleicaoEscopo === "campo_grande" && (
+                  <div className="space-y-2">
+                    <Label>Região</Label>
+                    <Select value={eleicaoRegiao} onValueChange={setEleicaoRegiao}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="centro">Centro</SelectItem>
+                        <SelectItem value="segredo">Segredo</SelectItem>
+                        <SelectItem value="prosa">Prosa</SelectItem>
+                        <SelectItem value="bandeira">Bandeira</SelectItem>
+                        <SelectItem value="anhanduizinho">Anhanduizinho</SelectItem>
+                        <SelectItem value="lagoa">Lagoa</SelectItem>
+                        <SelectItem value="imbirussu">Imbirussu</SelectItem>
+                        <SelectItem value="moreninha">Moreninha</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Mission quick-fill button */}
