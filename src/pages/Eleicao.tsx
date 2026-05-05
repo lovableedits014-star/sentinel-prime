@@ -495,13 +495,15 @@ export default function Eleicao() {
 }
 
 function RegionBlock({
-  title, pessoas, onAdd, onEdit, onDelete, onCredentials, interior, defaultOpen,
+  title, pessoas, onAdd, onEdit, onDelete, onCredentials, onSend, sendingId, interior, defaultOpen,
 }: {
   title: string;
   pessoas: Pessoa[];
   onAdd: () => void;
   onEdit: (p: Pessoa) => void;
   onCredentials: (p: Pessoa) => void;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
+  sendingId: string | null;
   onDelete: (id: string) => void;
   interior?: boolean;
   defaultOpen?: boolean;
