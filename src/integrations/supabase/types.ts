@@ -1586,6 +1586,75 @@ export type Database = {
           },
         ]
       }
+      eleicao_pessoas: {
+        Row: {
+          cidade: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          endereco: string
+          escopo: Database["public"]["Enums"]["eleicao_escopo"]
+          id: string
+          nome: string
+          observacoes: string | null
+          parent_id: string | null
+          regiao: Database["public"]["Enums"]["eleicao_regiao"] | null
+          telefone: string
+          tipo: Database["public"]["Enums"]["eleicao_tipo"]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          cidade?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          endereco: string
+          escopo: Database["public"]["Enums"]["eleicao_escopo"]
+          id?: string
+          nome: string
+          observacoes?: string | null
+          parent_id?: string | null
+          regiao?: Database["public"]["Enums"]["eleicao_regiao"] | null
+          telefone: string
+          tipo: Database["public"]["Enums"]["eleicao_tipo"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          cidade?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          endereco?: string
+          escopo?: Database["public"]["Enums"]["eleicao_escopo"]
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          parent_id?: string | null
+          regiao?: Database["public"]["Enums"]["eleicao_regiao"] | null
+          telefone?: string
+          tipo?: Database["public"]["Enums"]["eleicao_tipo"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_pessoas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_pessoas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engagement_actions: {
         Row: {
           action_date: string
@@ -5690,6 +5759,7 @@ export type Database = {
         Returns: Json
       }
       unaccent: { Args: { "": string }; Returns: string }
+      user_can_access_client: { Args: { _client_id: string }; Returns: boolean }
       validate_lider_invite_token: {
         Args: { _token: string }
         Returns: {
@@ -5720,6 +5790,16 @@ export type Database = {
     Enums: {
       app_role: "admin" | "client" | "funcionario"
       comment_status: "pending" | "responded" | "ignored"
+      eleicao_escopo: "campo_grande" | "interior"
+      eleicao_regiao:
+        | "centro"
+        | "segredo"
+        | "prosa"
+        | "bandeira"
+        | "anhanduizinho"
+        | "lagoa"
+        | "moreninha"
+      eleicao_tipo: "coordenador" | "lider" | "cabo"
       llm_provider:
         | "groq"
         | "openai"
@@ -5892,6 +5972,17 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "client", "funcionario"],
       comment_status: ["pending", "responded", "ignored"],
+      eleicao_escopo: ["campo_grande", "interior"],
+      eleicao_regiao: [
+        "centro",
+        "segredo",
+        "prosa",
+        "bandeira",
+        "anhanduizinho",
+        "lagoa",
+        "moreninha",
+      ],
+      eleicao_tipo: ["coordenador", "lider", "cabo"],
       llm_provider: [
         "groq",
         "openai",

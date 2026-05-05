@@ -35,6 +35,7 @@ const MissoesIA = lazy(() => import("./pages/MissoesIA"));
 const Funcionarios = lazy(() => import("./pages/Funcionarios"));
 const ControlePresenca = lazy(() => import("./pages/ControlePresenca"));
 const Contratados = lazy(() => import("./pages/Contratados"));
+const Eleicao = lazy(() => import("./pages/Eleicao"));
 const ContratadosDisparos = lazy(() => import("./pages/ContratadosDisparos"));
 const ContratadosRelatorios = lazy(() => import("./pages/ContratadosRelatorios"));
 const RegistroContratado = lazy(() => import("./pages/RegistroContratado"));
@@ -125,7 +126,8 @@ const AppRouter = () => {
               <Route path="/missoes-ia" element={<MissoesIA />} />
               <Route path="/funcionarios" element={<Funcionarios />} />
               <Route path="/presenca" element={<ControlePresenca />} />
-              <Route path="/contratados" element={<Contratados />} />
+              <Route path="/contratados" element={<Navigate to="/eleicao" replace />} />
+              <Route path="/eleicao" element={<Eleicao />} />
               <Route path="/contratados/disparos" element={<ContratadosDisparos />} />
               <Route path="/contratados/relatorios" element={<ContratadosRelatorios />} />
               <Route path="/inteligencia-eleitoral" element={<InteligenciaEleitoral />} />
