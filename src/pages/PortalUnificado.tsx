@@ -172,27 +172,6 @@ export default function PortalUnificado() {
                     ? "Use o e-mail e senha que você definiu no cadastro."
                     : "Ao se cadastrar você entra como apoiador ativo."}
                 </p>
-                {mode === "login" && (
-                  <div className="pt-2 border-t border-border/40">
-                    {resetSent ? (
-                      <p className="text-xs text-center text-emerald-600 dark:text-emerald-400 font-medium">
-                        ✓ Link enviado! Verifique seu e-mail (e a caixa de spam) para definir sua senha.
-                      </p>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleResetPassword}
-                        disabled={resetLoading}
-                        className="w-full text-xs text-primary hover:underline font-medium disabled:opacity-50"
-                      >
-                        {resetLoading ? "Enviando..." : "Esqueci minha senha / Primeiro acesso"}
-                      </button>
-                    )}
-                    <p className="text-[10px] text-center text-muted-foreground mt-1.5 leading-relaxed">
-                      Se você já era cadastrado e nunca fez login aqui, clique acima para definir sua senha.
-                    </p>
-                  </div>
-                )}
               </form>
             </CardContent>
           </Card>
