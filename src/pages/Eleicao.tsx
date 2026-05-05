@@ -30,6 +30,8 @@ interface Pessoa {
   endereco: string;
   parent_id: string | null;
   observacoes: string | null;
+  email: string | null;
+  user_id: string | null;
   created_at: string;
 }
 
