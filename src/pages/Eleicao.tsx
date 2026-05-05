@@ -197,7 +197,7 @@ export default function Eleicao() {
     setSendingId(p.id);
     try {
       const { data, error } = await supabase.functions.invoke("eleicao-send-credentials", {
-        body: { pessoa_id: p.id, channel },
+        body: { pessoa_id: p.id, channel, app_url: window.location.origin },
       });
       if (error) {
         let msg = error.message;
