@@ -189,7 +189,34 @@ export default function Eleicao() {
       setCredLoading(false);
     }
   }
-  // computed
+  // ─── Enviar credenciais (gera senha e envia/copia) ──────────────
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [credResult, setCredResult] = useState<{ pessoa: Pessoa; portal_url: string; email: string; password: string; message: string; sent: boolean; warning?: string } | null>(null);
+
+  async function sendCredentials(p: Pessoa, channel: "whatsapp" | "link_only") {
+    setSendingId(p.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("eleicao-send-credentials", {
+        body: { pessoa_id: p.id, channel },
+      });
+      if (error) {
+        let msg = error.message;
+        try { const b = await (error as any).context?.json?.(); if (b?.error) msg = b.error; } catch {}
+        throw new Error(msg);
+      }
+      if (!data?.success) throw new Error(data?.error || "Falha");
+      setCredResult({ pessoa: p, ...data });
+      if (data.sent) toast.success("Credenciais enviadas por WhatsApp!");
+      else if (data.warning) toast.warning(data.warning);
+      else toast.success("Credenciais geradas! Copie abaixo.");
+      load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   const matchesSearch = (p: Pessoa) => {
     if (!search) return true;
     const q = search.toLowerCase();
