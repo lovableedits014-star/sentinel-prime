@@ -424,6 +424,16 @@ Deno.serve(async (req) => {
       recipients = (pendingItems || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
       dispatch = { id: existingDispatchId };
       console.log(`[resume] dispatch=${existingDispatchId} pending=${recipients.length}`);
+    } else if (tipo === "eleicao") {
+      let q = adminClient.from("eleicao_pessoas")
+        .select("telefone, nome")
+        .eq("client_id", client_id)
+        .not("telefone", "is", null);
+      if (eleicao_tipo) q = q.eq("tipo", eleicao_tipo);
+      if (eleicao_escopo) q = q.eq("escopo", eleicao_escopo);
+      if (eleicao_regiao) q = q.eq("regiao", eleicao_regiao);
+      const { data } = await q;
+      recipients = (data || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
     } else if (tipo === "funcionarios") {
       const { data } = await adminClient
         .from("funcionarios")
