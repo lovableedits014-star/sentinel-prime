@@ -35,6 +35,7 @@ const MissoesIA = lazy(() => import("./pages/MissoesIA"));
 const Funcionarios = lazy(() => import("./pages/Funcionarios"));
 const ControlePresenca = lazy(() => import("./pages/ControlePresenca"));
 const Contratados = lazy(() => import("./pages/Contratados"));
+const Eleicao = lazy(() => import("./pages/Eleicao"));
 const ContratadosDisparos = lazy(() => import("./pages/ContratadosDisparos"));
 const ContratadosRelatorios = lazy(() => import("./pages/ContratadosRelatorios"));
 const RegistroContratado = lazy(() => import("./pages/RegistroContratado"));
