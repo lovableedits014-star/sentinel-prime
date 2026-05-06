@@ -31,7 +31,7 @@ const TIPO_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export function MemoriaPanel({ clientId }: { clientId: string | null | undefined }) {
-  const [view, setView] = useState<"documentos" | "fatos">("documentos");
+  const [view, setView] = useState<"documentos" | "timeline" | "fatos">("documentos");
   if (!clientId) {
     return <Card><CardContent className="p-6 text-sm text-muted-foreground">Selecione um cliente.</CardContent></Card>;
   }
