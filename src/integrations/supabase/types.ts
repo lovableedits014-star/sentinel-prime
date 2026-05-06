@@ -547,6 +547,7 @@ export type Database = {
           confidence: number | null
           contexto: string | null
           created_at: string
+          document_id: string | null
           entidades: Json | null
           extraction_run_id: string | null
           id: string
@@ -567,6 +568,7 @@ export type Database = {
           confidence?: number | null
           contexto?: string | null
           created_at?: string
+          document_id?: string | null
           entidades?: Json | null
           extraction_run_id?: string | null
           id?: string
@@ -587,6 +589,7 @@ export type Database = {
           confidence?: number | null
           contexto?: string | null
           created_at?: string
+          document_id?: string | null
           entidades?: Json | null
           extraction_run_id?: string | null
           id?: string
@@ -601,7 +604,15 @@ export type Database = {
           tipo?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "candidate_knowledge_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "ic_knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       clients: {
         Row: {
@@ -2095,6 +2106,117 @@ export type Database = {
             columns: ["supporter_id"]
             isOneToOne: false
             referencedRelation: "supporters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ic_knowledge_documents: {
+        Row: {
+          adversarios_citados: Json
+          audio_url: string | null
+          bairros_citados: Json
+          bandeiras: Json
+          bordoes: Json
+          client_id: string
+          created_at: string
+          created_by: string | null
+          data_evento: string | null
+          duracao_sec: number | null
+          extraction_run_id: string | null
+          id: string
+          local: string | null
+          model: string | null
+          numeros_e_dados: Json
+          pessoas_citadas: Json
+          pontos_principais: Json
+          promessas: Json
+          propostas: Json
+          provider: string | null
+          resumo_executivo: string | null
+          status: string
+          tags: string[]
+          texto_integral: string
+          tipo_documento: string
+          titulo: string
+          tom_emocional: string | null
+          transcription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          adversarios_citados?: Json
+          audio_url?: string | null
+          bairros_citados?: Json
+          bandeiras?: Json
+          bordoes?: Json
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          data_evento?: string | null
+          duracao_sec?: number | null
+          extraction_run_id?: string | null
+          id?: string
+          local?: string | null
+          model?: string | null
+          numeros_e_dados?: Json
+          pessoas_citadas?: Json
+          pontos_principais?: Json
+          promessas?: Json
+          propostas?: Json
+          provider?: string | null
+          resumo_executivo?: string | null
+          status?: string
+          tags?: string[]
+          texto_integral: string
+          tipo_documento?: string
+          titulo: string
+          tom_emocional?: string | null
+          transcription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          adversarios_citados?: Json
+          audio_url?: string | null
+          bairros_citados?: Json
+          bandeiras?: Json
+          bordoes?: Json
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_evento?: string | null
+          duracao_sec?: number | null
+          extraction_run_id?: string | null
+          id?: string
+          local?: string | null
+          model?: string | null
+          numeros_e_dados?: Json
+          pessoas_citadas?: Json
+          pontos_principais?: Json
+          promessas?: Json
+          propostas?: Json
+          provider?: string | null
+          resumo_executivo?: string | null
+          status?: string
+          tags?: string[]
+          texto_integral?: string
+          tipo_documento?: string
+          titulo?: string
+          tom_emocional?: string | null
+          transcription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ic_knowledge_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ic_knowledge_documents_transcription_id_fkey"
+            columns: ["transcription_id"]
+            isOneToOne: false
+            referencedRelation: "ic_transcriptions"
             referencedColumns: ["id"]
           },
         ]
