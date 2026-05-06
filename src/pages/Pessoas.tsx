@@ -332,7 +332,7 @@ export default function Pessoas() {
                 </TableRow>
               ) : (
                 paged.map((r) => (
-                  <TableRow key={r.key} className={r.pessoa_id ? "cursor-pointer hover:bg-muted/50" : ""} onClick={() => openProfile(r)}>
+                  <TableRow key={r.key} className="cursor-pointer hover:bg-muted/50" onClick={() => openProfile(r)}>
                     <TableCell className="font-medium">{r.nome}</TableCell>
                     <TableCell className="text-sm">
                       <div className="flex items-center gap-1.5">
