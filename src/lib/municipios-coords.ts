@@ -2,7 +2,7 @@
 // Fonte: kelvins/municipios-brasileiros (IBGE).
 import coords from "@/assets/geo/municipios-coords.json";
 
-const MAP = coords as Record<string, [number, number]>;
+const MAP = coords as unknown as Record<string, [number, number]>;
 
 function norm(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
