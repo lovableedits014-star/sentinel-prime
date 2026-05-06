@@ -1,95 +1,103 @@
-# Reformular a Memória da Inteligência de Conteúdo
+## Objetivo
 
-## Diagnóstico
+1. Coordenadores **não cadastram mais valores** de líderes nem cabos eleitorais (e nem o próprio valor pode ser definido por eles).
+2. ADM tem uma nova aba em **Eleição → Pendentes de valor** onde vê todos os cadastros sem `valor_contratacao` (ou com valor 0), pode atribuir valor **individual ou em massa** (selecionando vários).
+3. Para cada pessoa com valor já definido, ADM consegue **gerar contrato em Word (.docx)** individual ou em lote, com 3 modelos distintos: **Coordenador**, **Líder**, **Cabo Eleitoral**.
 
-Hoje cada transcrição é fatiada em chunks (12k chars) e a IA extrai dezenas de "fatos" isolados (`candidate_knowledge`). Esses fatos viram cards soltos em **Memória**, sem o contexto da fala original. Resultado: parece descolado, repetitivo e sem narrativa. Nenhum outro fluxo (DNA, matérias, disparos, coringa) consegue voltar à fala completa para citar com fidelidade.
+---
 
-## Visão nova
+## Mudanças no Portal do Coordenador (bloqueio)
 
-A memória passa a ter **dois níveis**:
+`src/pages/PortalCoordenador.tsx`
 
-1. **Documento (transcrição inteira)** — unidade principal. Cada áudio vira 1 registro com texto integral + um **resumo estruturado** rico (gerado por IA em uma única passada, vendo o texto inteiro).
-2. **Fatos** (mantidos) — viram índice navegável, sempre apontando de volta para o documento de origem (com timestamp do segmento).
+- Remover qualquer input/exibição de `valor_contratacao` no formulário de novo líder/cabo (hoje o portal já não envia valor — confirmar removendo do payload se aparecer e nunca exibir o campo).
+- Garantir que o `insert` em `eleicao_pessoas` feito pelo portal **não envie** `valor_contratacao` (deixa default `0` / null para sinalizar pendência).
+- Adicionar aviso na tela: "O valor do contrato será definido pela administração da campanha."
 
-Tudo isso fica disponível para os outros módulos como "banco de conhecimento do candidato".
+## Mudanças na página ADM `src/pages/Eleicao.tsx`
 
-## O que muda (alto nível)
+### Nova aba principal "Pendentes de valor"
 
-### 1. Nova tabela `ic_knowledge_documents`
-Um registro por transcrição (e no futuro: por post longo, discurso colado manualmente, entrevista em PDF). Campos principais:
-- `titulo` (auto: "Live 06/05 — Saúde no Centro")
-- `tipo_documento` (transcricao | discurso | entrevista | post_longo | manual)
-- `data_evento`, `local`, `duracao_sec`
-- `texto_integral` (a transcrição completa)
-- `resumo_executivo` (3–5 linhas)
-- `pontos_principais` (jsonb: lista ordenada de bullets)
-- `propostas` (jsonb estruturado: título, descrição, bairro, prazo)
-- `promessas`, `bandeiras`, `bordoes` (jsonb)
-- `pessoas_citadas`, `bairros_citados`, `adversarios_citados` (jsonb)
-- `numeros_e_dados` (jsonb)
-- `tom_emocional` (esperançoso, indignado, etc.) e `tags`
-- `transcription_id` (link para `ic_transcriptions`)
-- `embedding` (vector, opcional, para busca semântica)
-- `client_id`, `created_at`
+Hoje há `Tabs view = cadastros | custos`. Adicionar uma 3ª aba: **"Pendentes de valor"**.
 
-### 2. `candidate_knowledge` ganha `document_id`
-Os fatos continuam existindo (servem para busca rápida e agregações por bairro/tema), mas cada fato fica vinculado ao documento pai. Na UI, abrir um fato leva ao documento.
+Conteúdo da aba (novo componente `src/components/eleicao/PendentesValorPanel.tsx`):
 
-### 3. Pipeline de extração reformado (`ic-extract-knowledge`)
-- Para `sourceType=transcription`, **uma única chamada LLM** vê o texto inteiro (até ~30k tokens nos modelos atuais — Gemini 1.5/2.0, Claude, GPT-4o suportam) e devolve **um JSON único e estruturado** = o resumo do documento.
-- Se o texto exceder o limite do provedor escolhido, fazemos um **map-reduce explícito**: extrai por chunk → faz uma 2ª chamada de "consolidação" que recebe os resumos parciais e produz o documento final coeso (sem duplicatas, com narrativa). Não joga fatos soltos no banco.
-- Os fatos extraídos são derivados desse resumo consolidado (não dos chunks crus), garantindo coerência.
+- Lista todas as `eleicao_pessoas` do client onde `valor_contratacao IS NULL OR valor_contratacao = 0`.
+- Filtros: por tipo (Coordenador/Líder/Cabo), escopo (CG/Interior), região/cidade, busca por nome.
+- Cada linha tem checkbox + nome + tipo + região/cidade + líder vinculado + telefone + botão "Definir valor".
+- Topo da lista:
+  - Botão **"Selecionar todos"**.
+  - Quando há ≥1 selecionado: barra de ações fixa com:
+    - Input "Valor (R$)" + botão **"Aplicar a N selecionados"** (UPDATE em massa em `eleicao_pessoas.valor_contratacao` filtrando por `id IN (...)`).
+    - Botão **"Gerar contratos (.docx)"** (ver seção contratos).
+  - Sugestão automática de valor por tipo (presets editáveis) já preenchendo o input quando todos selecionados são do mesmo tipo:
+    - Coordenador: R$ 5.000
+    - Líder: R$ 2.500
+    - Cabo: R$ 1.000
+  - Os presets ficam guardados em `localStorage` por client (sem nova tabela).
+- Ação individual: o botão "Definir valor" abre um pequeno popover com input + salvar (UPDATE de uma única linha).
 
-### 4. Nova aba **Memória** redesenhada
-Substitui a grade de cards solta por:
-- **Lista de Documentos** (cards grandes, tipo "feed de conteúdo do candidato"): título, data, resumo executivo, badges com nº de propostas/bandeiras/bairros.
-- Clicar abre **Drawer/Página do documento**:
-  - Resumo executivo
-  - Seções: Propostas | Promessas | Bandeiras | Bordões | Bairros | Pessoas | Números
-  - Texto integral (com player do áudio se houver, e busca dentro do texto)
-  - Botão "Reextrair com outro modelo"
-  - Botão "Usar como base" → abre Estúdio/Matérias já com o contexto carregado
-- Aba secundária **Fatos** (busca livre cross-documento) para quem quiser o modo antigo.
+Após salvar, recarrega a lista — a pessoa some da aba "Pendentes" automaticamente.
 
-### 5. Integrações com outros fluxos
-- **DNA**: passa a ler `pontos_principais` + `bordoes` agregados de todos os documentos (muito mais coeso que fatos avulsos).
-- **Matérias** (`ic-write-materia`): recebe `document_id(s)` selecionados → o prompt é montado com o resumo estruturado + trechos do texto integral. Citações ficam fiéis.
-- **Sugestões de disparo** (`ic-suggest-dispatches`): cruza `bairros_citados` com a base de pessoas por bairro.
-- **Coringa-chat**: ganha ferramenta "buscar na memória" (RAG simples por documento + embedding opcional).
-- **Radar/Ideias**: pode sugerir "retomar promessa feita em [documento X de 12/04]".
+### Cadastros existentes (aba "Cadastros")
 
-### 6. Migração dos dados existentes
-- Script (edge function `ic-migrate-knowledge-to-documents`) que:
-  - Para cada `ic_transcriptions` existente, cria 1 `ic_knowledge_documents` chamando o novo pipeline.
-  - Re-vincula os `candidate_knowledge` antigos ao documento criado (por `source_id = transcription.id`).
-- Roda sob demanda (botão "Migrar memória antiga" em SuperAdmin/Configurações).
+- Manter o campo de valor **somente para o ADM** (já é o comportamento atual). Adicionar pequeno badge amarelo "Valor pendente" nas linhas onde `valor_contratacao` é nulo/zero, com link para a nova aba.
 
-## Ideias extras de melhoria (para lapidar a ferramenta)
+## Geração de contrato Word (.docx)
 
-1. **Linha do tempo do candidato**: timeline visual com todos os documentos por data → vira ativo de campanha.
-2. **Detecção de contradições**: ao salvar novo documento, IA checa se há promessa anterior conflitante e alerta.
-3. **Mapa de propostas por bairro**: alimenta o mapa territorial que já existe.
-4. **Busca semântica** (embeddings com `pgvector`) — permite "o candidato já falou sobre creches no Bairro X?".
-5. **Tags manuais + favoritos** por documento (ex: "discurso de palanque", "live íntima").
-6. **Exportar livro de campanha**: gerar PDF com todas as propostas/promessas agrupadas por tema.
-7. **Alerta de promessa repetida demais** (vira bordão) ou **abandonada** (não é citada há 30 dias).
-8. **Áudio-âncora**: salvar URL do áudio original junto do documento + permitir tocar trecho de uma proposta específica (usando timestamps dos segments).
-9. **Aprovação humana**: cada documento tem status (rascunho → revisado → publicado na memória), evitando "lixo" do LLM.
-10. **Versionamento**: reextrair gera nova versão sem perder a anterior.
+### Templates por tipo
 
-## Detalhes técnicos
+Reaproveitar a tabela existente `contract_templates` (colunas: `id, client_id, tipo, titulo, conteudo`). Hoje só está sendo usada com `tipo` = lider/liderado pelo módulo de Contratados.
 
-- Migration: criar `ic_knowledge_documents` com RLS por `client_id` (mesmo padrão de `candidate_knowledge`).
-- Adicionar coluna `document_id uuid references ic_knowledge_documents(id) on delete cascade` em `candidate_knowledge`.
-- Refatorar `ic-extract-knowledge`: separar em `extractDocumentSummary()` (modo transcrição, single-shot ou map-reduce-consolidate) e manter `extractFacts()` derivando do resumo.
-- Novo componente `DocumentoDetalhe.tsx` (drawer com seções).
-- Refatorar `MemoriaPanel.tsx` em duas abas internas: **Documentos** (novo) e **Fatos** (atual).
-- Atualizar `ic-write-materia` e `coringa-chat` para preferirem `ic_knowledge_documents` quando disponíveis.
-- Embeddings ficam opcionais (etapa 2) — não bloquear o release principal.
+Estender o `ContractTemplatesManager` (ou criar um novo gerenciador específico em `src/components/eleicao/EleicaoContractTemplates.tsx`) para suportar três tipos:
+- `eleicao_coordenador`
+- `eleicao_lider`
+- `eleicao_cabo`
 
-## Entrega em fases
+Ao instalar a feature, criar via migração 3 templates default (um por tipo) para cada client que ainda não tem, com placeholders:
+`{nome} {tipo} {telefone} {endereco} {cidade} {regiao} {lider} {coordenador} {valor} {valor_extenso} {data} {contratante}`.
 
-**Fase 1 (essencial):** tabela + pipeline single-shot/consolidação + nova UI de Memória (Documentos) + migração + matéria/coringa lendo documentos.
-**Fase 2:** embeddings + busca semântica + detecção de contradições + timeline visual + exportar livro de campanha.
+Adicionar uma sub-seção na página Eleição → Configurações (botão no topo "Modelos de contrato") para o ADM editar esses 3 modelos.
 
-Posso começar pela Fase 1. Confirma?
+### Geração efetiva (.docx)
+
+Novo helper `src/lib/eleicao-contrato-docx.ts` usando a lib **`docx`** (já no skill set, instalar com `bun add docx`):
+
+- Função `gerarContratoDocx(pessoa, template, contexto)` retorna um `Blob`.
+- Substitui placeholders pelos dados da pessoa + lider/coordenador (via lookup em `parent_id`) + nome do client (contratante) + valor formatado em R$ e por extenso.
+- Estrutura simples: título em negrito, parágrafos preservando quebras de linha do template, espaço para assinaturas.
+
+Função `gerarContratosLoteZip(pessoas, templates, contexto)`:
+- Para cada pessoa escolhe o template do tipo correto.
+- Empacota tudo num `.zip` (lib `jszip` — `bun add jszip`) com nomes `Contrato - {nome}.docx`.
+- Faz download único.
+
+### Onde aparece
+
+Na aba **Pendentes de valor**:
+- Se uma linha já tem valor e foi atribuído agora, fica highlight verde com botão "Baixar contrato".
+- Botão de lote gera zip com todos os selecionados que já têm valor.
+
+Na aba **Cadastros** existente: adicionar botão "Contrato (.docx)" por linha que faz download individual usando o template do tipo da pessoa. Se não houver valor definido, botão fica desabilitado com tooltip "Defina o valor do contrato primeiro".
+
+## Banco
+
+Migração necessária:
+1. Inserir 3 templates default (`eleicao_coordenador`, `eleicao_lider`, `eleicao_cabo`) em `contract_templates` para cada `client_id` existente que ainda não os tenha (idempotente com `WHERE NOT EXISTS`).
+2. Confirmar/relaxar o CHECK do campo `tipo` em `contract_templates` se houver constraint impedindo os novos valores.
+3. (Opcional) Política RLS: garantir que `UPDATE` em `eleicao_pessoas.valor_contratacao` exige role do owner/team admin do client — não permitir que portais (coordenador) consigam alterar esse campo. Implementar com policy de UPDATE filtrando por `user_can_access_client` e papel.
+
+## Resumo de arquivos
+
+Novos:
+- `src/components/eleicao/PendentesValorPanel.tsx`
+- `src/components/eleicao/EleicaoContractTemplates.tsx`
+- `src/lib/eleicao-contrato-docx.ts`
+- migration: defaults de templates + (opcional) policy de update do valor
+
+Editados:
+- `src/pages/Eleicao.tsx` — adiciona aba "Pendentes de valor", botão "Modelos de contrato", botão de download por linha.
+- `src/pages/PortalCoordenador.tsx` — remove qualquer input de valor + aviso.
+- `src/components/contratados/ContractTemplatesManager.tsx` — opcional, suportar os 3 novos `tipo`.
+
+Deps novas: `docx`, `jszip`.
