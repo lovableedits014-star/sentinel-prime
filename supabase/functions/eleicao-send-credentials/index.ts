@@ -36,6 +36,10 @@ function validEmail(email: string) {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
+const BRIDGE_TIMEOUT_MS = 15000;
+const PREFLIGHT_CACHE_TTL_MS = 30000;
+// Cache em memória por isolate (Deno). Evita revalidar a mesma instância em rajadas.
+const preflightCache = new Map<string, { ts: number; status: string; reconnected: boolean; detail: string }>();
 
 function isConnectedStatus(status: unknown) {
   const s = String(status || "").toLowerCase();
@@ -53,17 +57,31 @@ function bridgeStatus(data: any) {
 
 async function bridgeAction(bridgeUrl: string, bridgeKey: string, body: Record<string, unknown>, retries = 0) {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(bridgeUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
-    if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < retries) {
-      await sleep(1000 * (attempt + 1));
-      continue;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), BRIDGE_TIMEOUT_MS);
+    try {
+      const res = await fetch(bridgeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+      if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < retries) {
+        clearTimeout(tid);
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      clearTimeout(tid);
+      return { res, data };
+    } catch (err) {
+      clearTimeout(tid);
+      const aborted = (err as Error)?.name === "AbortError";
+      if (attempt < retries) { await sleep(1000 * (attempt + 1)); continue; }
+      // Sintetiza um Response-like de falha para o caller tratar uniformemente.
+      const fakeRes = new Response(null, { status: aborted ? 504 : 502 });
+      return { res: fakeRes, data: { error: aborted ? `Timeout após ${BRIDGE_TIMEOUT_MS}ms na ponte WhatsApp` : `Falha de rede: ${(err as Error).message}` } };
     }
-    return { res, data };
   }
   throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
 }
@@ -110,12 +128,19 @@ async function tryReconnectInstance(admin: any, inst: any) {
 
 async function preflightInstance(admin: any, inst: any) {
   if (!inst?.bridge_url || !inst?.bridge_api_key) return { status: "disconnected", reconnected: false, detail: "sem credenciais" };
+  // Cache: se a instância foi validada como connected há menos de 30s, reusa.
+  const cached = preflightCache.get(inst.id);
+  if (cached && Date.now() - cached.ts < PREFLIGHT_CACHE_TTL_MS && cached.status === "connected") {
+    return { status: cached.status, reconnected: false, detail: cached.detail + " (cached)" };
+  }
   try {
     const { res, data } = await bridgeAction(inst.bridge_url, inst.bridge_api_key, { action: "instance_status" }, 1);
     const raw = bridgeStatus(data);
     if (isConnectedStatus(raw)) {
       await updateInstanceStatus(admin, inst, "connected");
-      return { status: "connected", reconnected: false, detail: raw };
+      const result = { status: "connected", reconnected: false, detail: raw };
+      preflightCache.set(inst.id, { ts: Date.now(), ...result });
+      return result;
     }
     if (isExplicitOfflineStatus(raw) || res.status === 401) {
       await updateInstanceStatus(admin, inst, "disconnected");
@@ -123,7 +148,12 @@ async function preflightInstance(admin: any, inst: any) {
   } catch (err) {
     console.warn("[eleicao-send-credentials] preflight status falhou:", (err as Error).message);
   }
-  return await tryReconnectInstance(admin, inst);
+  preflightCache.delete(inst.id);
+  const reconnect = await tryReconnectInstance(admin, inst);
+  if (reconnect.status === "connected") {
+    preflightCache.set(inst.id, { ts: Date.now(), status: "connected", reconnected: true, detail: reconnect.detail });
+  }
+  return reconnect;
 }
 
 Deno.serve(async (req) => {
