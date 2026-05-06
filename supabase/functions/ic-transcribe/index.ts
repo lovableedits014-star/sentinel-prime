@@ -103,16 +103,49 @@ Deno.serve(async (req) => {
     if (language) groqForm.append("language", language);
     if (prompt) groqForm.append("prompt", prompt);
 
-    const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${groqKey}` },
-      body: groqForm,
-    });
+    // Retry com backoff para erros transitórios do Groq (502/503/504/429)
+    let groqRes: Response | null = null;
+    let lastErrText = "";
+    const maxAttempts = 4;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${groqKey}` },
+          body: groqForm,
+        });
+        if (groqRes.ok) break;
+        // status retentável?
+        if ([429, 500, 502, 503, 504].includes(groqRes.status) && attempt < maxAttempts) {
+          lastErrText = await groqRes.text().catch(() => "");
+          console.warn(`[ic-transcribe] Groq ${groqRes.status} (tentativa ${attempt}/${maxAttempts}), retry...`);
+          await new Promise((r) => setTimeout(r, 1500 * attempt));
+          continue;
+        }
+        break;
+      } catch (e) {
+        lastErrText = e instanceof Error ? e.message : String(e);
+        console.warn(`[ic-transcribe] fetch falhou (tentativa ${attempt}/${maxAttempts}):`, lastErrText);
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1500 * attempt));
+          continue;
+        }
+      }
+    }
 
-    if (!groqRes.ok) {
-      const txt = await groqRes.text();
-      console.error("Groq error", groqRes.status, txt);
-      return json({ error: `Groq (${groqRes.status}): ${txt.slice(0, 300)}` }, 502);
+    if (!groqRes || !groqRes.ok) {
+      const status = groqRes?.status ?? 0;
+      const txt = groqRes ? await groqRes.text().catch(() => lastErrText) : lastErrText;
+      console.error("Groq error final", status, txt);
+      const friendly =
+        status === 502 || status === 503 || status === 504
+          ? "Os servidores do Groq estão instáveis no momento (502/503). Tente novamente em alguns minutos."
+          : status === 429
+          ? "Limite de uso do Groq atingido. Aguarde um instante e tente novamente."
+          : status === 413 || /too large/i.test(txt)
+          ? "Arquivo grande demais para o Groq. Reduza para MP3 mono 16kHz ou divida o áudio."
+          : `Groq (${status}): ${String(txt).slice(0, 300)}`;
+      return json({ error: friendly }, 502);
     }
 
     const result = await groqRes.json();
