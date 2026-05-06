@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Merge } from "lucide-react";
 import { resolveUF, ufName, ufRegion, UF_LIST } from "@/lib/brazil-geo";
+import { getCityCoords } from "@/lib/municipios-coords";
 import { toast } from "sonner";
 
 interface LocationGroup {
