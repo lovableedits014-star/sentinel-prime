@@ -1,45 +1,34 @@
-## Objetivo
+## O que vamos entregar
 
-Adicionar diagnóstico passo-a-passo (sessão → cliente → contratados → indicados → check-ins) com logs no console e um banner expansível na aba Contratados, para identificar exatamente qual etapa trava ou falha.
+Hoje a função "Gerar minha foto" (moldura/frame da campanha) já existe e está plugada no portal do Apoiador, do Funcionário e do Contratado, via componente `CampaignFrameGenerator`. Ela carrega as molduras ativas do cliente por uma RPC pública (`get_active_campaign_frames`) e gera a foto no próprio navegador. **Não existe hoje uma página pública dedicada** — o gerador só aparece dentro de portais logados.
 
-## Mudanças
+Vamos:
 
-### 1. `src/components/contratados/useContratadosData.ts`
-
-- Exportar tipos `DiagStatus = "pending" | "ok" | "error" | "skipped"` e `DiagStep { key, label, status, durationMs?, detail? }`.
-- Novo estado `diagnostics: DiagStep[]` exposto pelo hook.
-- Helpers internos `startStep(key, label)` e `finishStep(step, status, detail)` que:
-  - Atualizam o array `steps` e chamam `setDiagnostics([...steps])` (somente se `seq` ainda é o atual).
-  - Marcam `durationMs` relativo a `t0 = performance.now()`.
-- Instrumentar cada etapa do `load()`:
-  1. **Sessão** — registrar fonte (`localStorage(token+user)` / `localStorage(user)` / `supabase.auth.getSession`) e `userId` truncado.
-  2. **Cliente** — registrar se veio via `supabase-js` ou via `REST fallback`; detalhar quando não há vínculo.
-  3. **Contratados / Indicados / Check-ins** — uma `DiagStep` para cada query, status `ok` com contagem de linhas ou `error` com `result.reason.message` / `result.value.error.message`.
-- Adicionar `console.info` / `console.warn` / `console.error` prefixados com `[Contratados]` em cada transição (início, sucesso, falha, fim com tempo total).
-- Erros agora incluem o `detail` na `loadError` (ex.: `"Não foi possível carregar contratados: timeout..."`).
-- Em caso de erro fatal no `catch`, adicionar uma `DiagStep "fatal"`.
-
-### 2. `src/pages/Contratados.tsx`
-
-- Consumir `diagnostics` do hook.
-- Componente local `DiagnosticsPanel` (collapsible com `<details>`) renderizado dentro do banner de erro existente:
-  - Cabeçalho: "Ver diagnóstico detalhado".
-  - Lista vertical de steps: ícone por status (`CheckCircle2` verde, `AlertCircle` vermelho, `Loader2` girando, `Circle` cinza), label, tempo decorrido, e `detail` em texto pequeno mono.
-  - Botão "Copiar diagnóstico" que serializa `diagnostics` + `loadError` + `retryAttempt` + `userAgent` em JSON e chama `navigator.clipboard.writeText`, com `toast.success("Diagnóstico copiado")`.
-- O painel também é mostrado no estado vazio "Nenhum cliente vinculado" e no banner do fluxo principal.
-
-### 3. Sem mudanças em outros arquivos.
+1. **Criar uma página pública** `/foto/:clientId` (sem login) que mostra o gerador de foto da campanha daquele candidato. Esse vira o "link do template da foto do WhatsApp" que o coordenador pode mandar pra qualquer pessoa.
+2. **Adicionar o gerador no Portal do Coordenador** (mesma experiência dos outros portais).
+3. **Botão "Copiar link da foto"** no topo do portal do coordenador (copia `https://.../foto/{clientId}` pro clipboard).
+4. **Botão "Enviar foto" em cada linha de líder e cabo** — abre o WhatsApp (`wa.me/<telefone>`) já com mensagem pronta convidando a pessoa a gerar a foto naquele link.
 
 ## Detalhes técnicos
 
-- `diagnostics` é resetado a cada `load(attempt)` (novo array começa vazio).
-- `flush()` só atualiza estado quando `seq === loadSeq.current` para evitar overwrite por chamadas antigas.
-- O painel é colapsado por padrão para não poluir a UI; abre sob demanda.
-- Logs no console usam ▶ / ✓ / ✗ / ◼ para facilitar leitura.
+- **Nova rota pública** `src/pages/FotoPublica.tsx` registrada em `src/App.tsx` (sem guarda de auth, igual aos cadastros públicos). Layout enxuto: header com logo do candidato, `<CampaignFrameGenerator clientId={clientId} variant="showcase" />`, rodapé curto. Trata `clientId` inválido com mensagem amigável.
+- **`CampaignFrameGenerator`** já usa `supabase.rpc("get_active_campaign_frames", ...)`. Vou verificar/garantir que essa RPC seja `SECURITY DEFINER` e acessível para `anon` (caso ainda não esteja, criamos migration ajustando o `GRANT EXECUTE ... TO anon`). O componente em si não exige sessão.
+- **Portal do Coordenador (`src/pages/PortalCoordenador.tsx`)**:
+  - Importar `CampaignFrameGenerator` e renderizar no topo (`variant="showcase"`).
+  - Botão **"Copiar link da foto"** ao lado dos botões existentes; usa `navigator.clipboard.writeText` + toast.
+  - Em `PessoaRow` (líderes e cabos), adicionar botão "Enviar foto" que abre `https://wa.me/<digitos do telefone>?text=<mensagem url-encoded>` em nova aba. Mensagem padrão:
+    `"Oi {nome}! Gere sua foto de perfil oficial da campanha aqui: {link}"`.
+  - Normalizar telefone removendo não-dígitos e prefixando `55` quando faltar.
+- **Sem mudanças no banco** além do possível `GRANT EXECUTE` na RPC se ela ainda não permitir `anon` — confirmamos antes de criar migration.
 
-## Critério de aceitação
+## Fluxo final pro coordenador
 
-1. Console mostra cada etapa com status e tempo total.
-2. Banner de erro tem um "Ver diagnóstico detalhado" que lista todas as etapas com ícone, duração e mensagem.
-3. Botão "Copiar diagnóstico" copia um JSON pronto para colar.
-4. Erro de uma query específica (ex.: indicados) aparece com a mensagem real do PostgREST/Supabase, não mais como genérico.
+```text
+Portal do Coordenador
+ ├── [Mostra gerador da foto] (mesma experiência do apoiador)
+ ├── [Botão "Copiar link da foto"]  →  https://app/foto/{clientId}
+ └── Lista de Líderes / Cabos
+      └── cada linha: [Senha] [Excluir] [Enviar foto] → abre WhatsApp
+```
+
+Qualquer pessoa que receber o link `/foto/{clientId}` consegue gerar a foto sem precisar logar.

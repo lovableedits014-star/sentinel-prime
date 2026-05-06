@@ -52,6 +52,7 @@ const Midia = lazy(() => import("./pages/Midia"));
 const StatusWhatsApp = lazy(() => import("./pages/StatusWhatsApp"));
 const Militancia = lazy(() => import("./pages/Militancia"));
 const InteligenciaConteudo = lazy(() => import("./pages/InteligenciaConteudo"));
+const FotoPublica = lazy(() => import("./pages/FotoPublica"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
@@ -114,6 +115,7 @@ const AppRouter = () => {
             <Route path="/portal/:clientId" element={<PortalUnificado />} />
             <Route path="/portal-apoiador/:clientId" element={<SupporterPortal />} />
             <Route path="/pwa-start" element={<PwaStart />} />
+            <Route path="/foto/:clientId" element={<FotoPublica />} />
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/comments" element={<Comments />} />
