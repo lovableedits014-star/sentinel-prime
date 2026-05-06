@@ -52,6 +52,7 @@ const Midia = lazy(() => import("./pages/Midia"));
 const StatusWhatsApp = lazy(() => import("./pages/StatusWhatsApp"));
 const Militancia = lazy(() => import("./pages/Militancia"));
 const InteligenciaConteudo = lazy(() => import("./pages/InteligenciaConteudo"));
+const FotoPublica = lazy(() => import("./pages/FotoPublica"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
