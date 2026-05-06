@@ -15,6 +15,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
+import { findBestSegment, formatTime, type AudioSegment } from "./audioMatch";
+import { useRef, useEffect, createContext, useContext } from "react";
+import { Play } from "lucide-react";
 
 const TIPO_LABEL: Record<string, { label: string; color: string }> = {
   promessa: { label: "Promessa", color: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
