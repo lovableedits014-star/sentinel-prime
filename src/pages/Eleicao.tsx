@@ -110,6 +110,7 @@ export default function Eleicao() {
       tipo: "coordenador", escopo, regiao: "centro", cidade: "",
       nome: "", telefone: "", endereco: "", parent_id: "", observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
+      valor_contratacao: "",
       ...presets,
     });
     setDialogOpen(true);
