@@ -107,6 +107,7 @@ export default function Pessoas() {
           row.roles.forEach(r => pushRole(existing, r));
           // prefer richer fields
           if (!existing.cidade && row.cidade) existing.cidade = row.cidade;
+          if (!existing.bairro && row.bairro) existing.bairro = row.bairro;
           if (!existing.pessoa_id && row.pessoa_id) existing.pessoa_id = row.pessoa_id;
           if (row.whatsapp_confirmado) existing.whatsapp_confirmado = true;
           // prefer the most complete name (more words / longer)
