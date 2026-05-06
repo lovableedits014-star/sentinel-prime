@@ -31,23 +31,45 @@ const TIPO_LABEL: Record<string, { label: string; color: string }> = {
   outro: { label: "Outro", color: "bg-muted text-muted-foreground" },
 };
 
-export function MemoriaPanel({ clientId }: { clientId: string | null | undefined }) {
+export function MemoriaPanel({ clientId, clientName }: { clientId: string | null | undefined; clientName?: string }) {
   const [view, setView] = useState<"documentos" | "timeline" | "fatos">("documentos");
+  const [exporting, setExporting] = useState(false);
   if (!clientId) {
     return <Card><CardContent className="p-6 text-sm text-muted-foreground">Selecione um cliente.</CardContent></Card>;
   }
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await exportLivroDeCampanha(clientId!, clientName);
+      toast.success("Livro de campanha gerado!");
+    } catch (e: any) {
+      toast.error(e.message || "Falha ao gerar PDF");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Brain className="w-4 h-4 text-primary" />
-            Memória viva do candidato
-          </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            Cada transcrição vira um <strong>documento estruturado</strong> com resumo, propostas, promessas, bordões,
-            bairros e pessoas citadas. É a fonte de verdade para o DNA, redator de matérias, sugestões de disparo e o coringa.
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Brain className="w-4 h-4 text-primary" />
+                Memória viva do candidato
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cada transcrição vira um <strong>documento estruturado</strong> com resumo, propostas, promessas, bordões,
+                bairros e pessoas citadas. É a fonte de verdade para o DNA, redator de matérias, sugestões de disparo e o coringa.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleExport} disabled={exporting} className="flex-shrink-0">
+              {exporting ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <BookOpen className="w-4 h-4 mr-1.5" />}
+              Livro de campanha
+            </Button>
+          </div>
         </CardHeader>
       </Card>
 
