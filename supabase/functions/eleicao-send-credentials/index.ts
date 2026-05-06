@@ -240,8 +240,8 @@ Deno.serve(async (req) => {
         .eq("is_active", true)
         .not("bridge_url", "is", null)
         .not("bridge_api_key", "is", null)
-        .in("status", ["connected", "open"])
         .order("is_primary", { ascending: false })
+        .order("status", { ascending: true })
         .order("last_send_at", { ascending: true, nullsFirst: true })
         .limit(1)
         .maybeSingle();
