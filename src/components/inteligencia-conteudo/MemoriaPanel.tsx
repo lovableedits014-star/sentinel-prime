@@ -11,9 +11,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Brain, Trash2, ExternalLink, Loader2, Search, Sparkles, FileText,
-  MapPin, Users, Megaphone, Quote, Hash, Flag, Calendar, FileAudio,
+  MapPin, Users, Megaphone, Quote, Hash, Flag, Calendar, FileAudio, BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { exportLivroDeCampanha } from "./exportLivroCampanha";
 
 const TIPO_LABEL: Record<string, { label: string; color: string }> = {
   promessa: { label: "Promessa", color: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
