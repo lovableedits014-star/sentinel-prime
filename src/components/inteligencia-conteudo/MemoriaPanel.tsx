@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Brain, Trash2, ExternalLink, Loader2, Search, Sparkles, FileText,
   MapPin, Users, Megaphone, Quote, Hash, Flag, Calendar, FileAudio, BookOpen,
+  AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
