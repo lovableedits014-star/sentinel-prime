@@ -108,6 +108,14 @@ export default function Pessoas() {
           if (!existing.cidade && row.cidade) existing.cidade = row.cidade;
           if (!existing.pessoa_id && row.pessoa_id) existing.pessoa_id = row.pessoa_id;
           if (row.whatsapp_confirmado) existing.whatsapp_confirmado = true;
+          // prefer the most complete name (more words / longer)
+          const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+          if (
+            wordCount(row.nome) > wordCount(existing.nome) ||
+            (wordCount(row.nome) === wordCount(existing.nome) && row.nome.length > existing.nome.length)
+          ) {
+            existing.nome = row.nome;
+          }
           return;
         }
         byPhone.set(key, row);
