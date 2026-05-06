@@ -15,6 +15,7 @@ import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Sea
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
@@ -34,6 +35,7 @@ interface Pessoa {
   observacoes: string | null;
   email: string | null;
   user_id: string | null;
+  valor_contratacao: number | null;
   created_at: string;
 }
 
@@ -85,6 +87,7 @@ export default function Eleicao() {
     email: "",
     password: "",
     send_access: true,
+    valor_contratacao: "" as string,
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
@@ -107,6 +110,7 @@ export default function Eleicao() {
       tipo: "coordenador", escopo, regiao: "centro", cidade: "",
       nome: "", telefone: "", endereco: "", parent_id: "", observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
+      valor_contratacao: "",
       ...presets,
     });
     setDialogOpen(true);
@@ -124,6 +128,7 @@ export default function Eleicao() {
       email: p.email || "",
       password: "",
       send_access: false,
+      valor_contratacao: p.valor_contratacao != null ? String(p.valor_contratacao) : "",
     });
     setDialogOpen(true);
   }
@@ -153,6 +158,7 @@ export default function Eleicao() {
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
+      valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
     };
     const q = editing
       ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
@@ -294,6 +300,8 @@ export default function Eleicao() {
     );
   }, [pessoas, form.tipo, form.escopo, form.regiao, form.cidade]);
 
+  const [view, setView] = useState<"cadastros" | "custos">("cadastros");
+
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
@@ -301,9 +309,21 @@ export default function Eleicao() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Eleição</h1>
           <p className="text-sm text-muted-foreground mt-1">Coordenadores, líderes e cabos eleitorais da campanha</p>
         </div>
-        <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
+        {view === "cadastros" && (
+          <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
+        )}
       </div>
 
+      <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
+          <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {view === "custos" ? (
+        <PrevisaoCustos pessoas={pessoas as any} />
+      ) : (
       <Tabs value={escopo} onValueChange={(v) => { setEscopo(v as Escopo); setRegiaoFilter("all"); }}>
         <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
           <TabsTrigger value="campo_grande">Coord. Campo Grande</TabsTrigger>
@@ -422,6 +442,7 @@ export default function Eleicao() {
           }
         </TabsContent>
       </Tabs>
+      )}
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -495,6 +516,15 @@ export default function Eleicao() {
               <div>
                 <Label>Telefone *</Label>
                 <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" />
+              </div>
+              <div>
+                <Label>Valor de contratação (R$)</Label>
+                <Input
+                  inputMode="decimal"
+                  value={form.valor_contratacao}
+                  onChange={e => setForm(f => ({ ...f, valor_contratacao: e.target.value.replace(/[^0-9.,]/g, "") }))}
+                  placeholder="0,00 (deixe em branco se não recebe)"
+                />
               </div>
             </div>
             {form.tipo === "coordenador" && (

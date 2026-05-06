@@ -1,0 +1,1 @@
+ALTER TABLE public.eleicao_pessoas ADD COLUMN IF NOT EXISTS valor_contratacao numeric(12,2) NOT NULL DEFAULT 0;

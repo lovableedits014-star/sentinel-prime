@@ -1605,6 +1605,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at: string
           user_id: string | null
+          valor_contratacao: number
         }
         Insert: {
           cidade?: string | null
@@ -1624,6 +1625,7 @@ export type Database = {
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at?: string
           user_id?: string | null
+          valor_contratacao?: number
         }
         Update: {
           cidade?: string | null
@@ -1643,6 +1645,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at?: string
           user_id?: string | null
+          valor_contratacao?: number
         }
         Relationships: [
           {
