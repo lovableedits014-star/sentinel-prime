@@ -5690,6 +5690,7 @@ export type Database = {
       normalize_br_phone: { Args: { p_raw: string }; Returns: string }
       normalize_locality: { Args: { p_input: string }; Returns: string }
       normalize_person_name: { Args: { p_name: string }; Returns: string }
+      normalize_phone: { Args: { p: string }; Returns: string }
       only_digits: { Args: { input: string }; Returns: string }
       pick_healthy_whatsapp_instance: {
         Args: { p_client_id: string }
