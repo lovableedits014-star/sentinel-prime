@@ -115,6 +115,7 @@ const AppRouter = () => {
             <Route path="/portal/:clientId" element={<PortalUnificado />} />
             <Route path="/portal-apoiador/:clientId" element={<SupporterPortal />} />
             <Route path="/pwa-start" element={<PwaStart />} />
+            <Route path="/foto/:clientId" element={<FotoPublica />} />
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/comments" element={<Comments />} />
