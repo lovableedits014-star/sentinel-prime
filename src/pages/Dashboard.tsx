@@ -149,11 +149,6 @@ const Dashboard = () => {
   // Manual sync only
   const handleManualSync = async () => {
     if (!clientId || syncing) return;
-    const remaining = syncCooldownRemaining(clientId);
-    if (remaining > 0) {
-      toast.info(`Aguarde ${formatCooldown(remaining)} antes de sincronizar novamente (limite anti-custo).`);
-      return;
-    }
     setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke('fetch-meta-comments', {
