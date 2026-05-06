@@ -78,14 +78,14 @@ export default function Pessoas() {
 
     const [pRes, fRes, eRes] = await Promise.all([
       supabase.from("pessoas")
-        .select("id, nome, telefone, cidade, whatsapp_confirmado, tipo_pessoa")
+        .select("id, nome, telefone, cidade, bairro, whatsapp_confirmado, tipo_pessoa")
         .eq("client_id", clientId)
         .eq("tipo_pessoa", "apoiador" as any),
       supabase.from("funcionarios")
-        .select("id, nome, telefone, cidade, whatsapp_confirmado")
+        .select("id, nome, telefone, cidade, bairro, whatsapp_confirmado")
         .eq("client_id", clientId),
       supabase.from("eleicao_pessoas" as any)
-        .select("id, nome, telefone, cidade, tipo, funcionario_id")
+        .select("id, nome, telefone, cidade, endereco, tipo, funcionario_id")
         .eq("client_id", clientId)
         .in("tipo", ["coordenador", "lider", "cabo"]),
     ]);
