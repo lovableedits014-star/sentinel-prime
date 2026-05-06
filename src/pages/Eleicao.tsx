@@ -300,6 +300,8 @@ export default function Eleicao() {
     );
   }, [pessoas, form.tipo, form.escopo, form.regiao, form.cidade]);
 
+  const [view, setView] = useState<"cadastros" | "custos">("cadastros");
+
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
@@ -307,9 +309,21 @@ export default function Eleicao() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Eleição</h1>
           <p className="text-sm text-muted-foreground mt-1">Coordenadores, líderes e cabos eleitorais da campanha</p>
         </div>
-        <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
+        {view === "cadastros" && (
+          <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
+        )}
       </div>
 
+      <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
+        <TabsList className="grid grid-cols-2 w-full max-w-md">
+          <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
+          <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {view === "custos" ? (
+        <PrevisaoCustos pessoas={pessoas as any} />
+      ) : (
       <Tabs value={escopo} onValueChange={(v) => { setEscopo(v as Escopo); setRegiaoFilter("all"); }}>
         <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
           <TabsTrigger value="campo_grande">Coord. Campo Grande</TabsTrigger>
