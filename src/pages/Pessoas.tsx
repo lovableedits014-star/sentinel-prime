@@ -41,6 +41,7 @@ type UnifiedRow = {
   nome: string;
   telefone: string | null;
   cidade: string | null;
+  bairro: string | null;
   whatsapp_confirmado: boolean;
   roles: string[];      // ["apoiador","funcionario",...]
 };
