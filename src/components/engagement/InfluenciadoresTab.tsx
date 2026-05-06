@@ -462,7 +462,7 @@ export default function InfluenciadoresTab({ clientId }: { clientId: string }) {
       if (data && data.length > 0) {
         // filtra apenas os vinculados a entidades cadastradas
         const filtered = data.filter((c) =>
-          profileKeyToSupporter.has(`${c.platform || "facebook"}:${c.platform_user_id}`)
+          profileKeyToSupporter.has(`${c.platform || "facebook"}:${cleanHandle(c.platform_user_id)}`)
         );
         allComments = allComments.concat(filtered);
         from += pageSize;
