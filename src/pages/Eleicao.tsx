@@ -87,6 +87,7 @@ export default function Eleicao() {
     email: "",
     password: "",
     send_access: true,
+    valor_contratacao: "" as string,
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
