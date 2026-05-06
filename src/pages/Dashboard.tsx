@@ -149,11 +149,6 @@ const Dashboard = () => {
   // Manual sync only
   const handleManualSync = async () => {
     if (!clientId || syncing) return;
-    const remaining = syncCooldownRemaining(clientId);
-    if (remaining > 0) {
-      toast.info(`Aguarde ${formatCooldown(remaining)} antes de sincronizar novamente (limite anti-custo).`);
-      return;
-    }
     setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke('fetch-meta-comments', {
@@ -168,6 +163,10 @@ const Dashboard = () => {
           for (const w of data.warnings) toast.warning(w, { duration: 8000 });
         }
         reloadData();
+        // Também invalida caches da página de Comentários (mesma sync)
+        queryClient.invalidateQueries({ queryKey: ["comments-data"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-comments-independent"] });
+        queryClient.invalidateQueries({ queryKey: ["ai-review-queue"] });
       } else {
         const errMsg = data?.error || "Erro na sincronização";
         if (errMsg.includes('expirado') || errMsg.includes('expired')) {

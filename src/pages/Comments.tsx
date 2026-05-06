@@ -321,11 +321,7 @@ const Comments = () => {
       toast.error("Cliente não encontrado");
       return;
     }
-    const remaining = syncCooldownRemaining(cid);
-    if (remaining > 0) {
-      toast.info(`Aguarde ${formatCooldown(remaining)} antes de sincronizar novamente (limite anti-custo).`);
-      return;
-    }
+
 
     setSyncing(true);
     try {
