@@ -34,14 +34,42 @@ function validEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
+
+function isConnectedStatus(status: unknown) {
+  const s = String(status || "").toLowerCase();
+  return s === "connected" || s === "open";
+}
+
+function isExplicitOfflineStatus(status: unknown) {
+  const s = String(status || "").toLowerCase();
+  return ["disconnected", "offline", "closed", "logged_out", "logout", "banned"].includes(s);
+}
+
+function bridgeStatus(data: any) {
+  return String(data?.status || data?.instance?.status || "").toLowerCase();
+}
+
+async function bridgeAction(bridgeUrl: string, bridgeKey: string, body: Record<string, unknown>, retries = 0) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(bridgeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+    if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < retries) {
+      await sleep(1000 * (attempt + 1));
+      continue;
+    }
+    return { res, data };
+  }
+  throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
+}
+
 async function bridgeSend(bridgeUrl: string, bridgeKey: string, phone: string, message: string) {
-  const res = await fetch(bridgeUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
-    body: JSON.stringify({ action: "send", phone, message }),
-  });
-  const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
-  return { res, data };
+  return await bridgeAction(bridgeUrl, bridgeKey, { action: "send", phone, message }, 2);
 }
 
 function sendFailure(res: Response, data: any) {
@@ -50,6 +78,52 @@ function sendFailure(res: Response, data: any) {
   if (data?.delivered === false) return data?.error || "Mensagem não entregue pelo WhatsApp";
   const confirmed = data?.delivered === true || Boolean(data?.messageId || data?.message_id || data?.id || data?.key?.id);
   return confirmed ? null : (data?.error || "Ponte não confirmou o envio da mensagem");
+}
+
+function isInstanceDisconnectedFailure(res: Response, data: any, failure: string) {
+  if (res.status === 401) return true;
+  const msg = String(data?.error || data?.message || failure || "").toLowerCase();
+  return msg.includes("instance") && (msg.includes("disconnect") || msg.includes("not connected") || msg.includes("offline"));
+}
+
+async function updateInstanceStatus(admin: any, inst: any, status: "connected" | "connecting" | "disconnected") {
+  if (!inst?.id) return;
+  const updates: any = { status, last_health_check_at: new Date().toISOString() };
+  if (status === "connected") {
+    updates.connected_since = inst.connected_since || new Date().toISOString();
+  }
+  if (status === "disconnected") {
+    updates.connected_since = null;
+    updates.last_disconnected_at = new Date().toISOString();
+  }
+  await admin.from("whatsapp_instances").update(updates).eq("id", inst.id);
+}
+
+async function tryReconnectInstance(admin: any, inst: any) {
+  if (!inst?.bridge_url || !inst?.bridge_api_key) return { status: "disconnected", reconnected: false, detail: "sem credenciais" };
+  const { res, data } = await bridgeAction(inst.bridge_url, inst.bridge_api_key, { action: "reconnect" }, 1);
+  const raw = bridgeStatus(data);
+  const status = isConnectedStatus(raw) ? "connected" : isExplicitOfflineStatus(raw) || res.status === 401 ? "disconnected" : "connecting";
+  await updateInstanceStatus(admin, inst, status as any);
+  return { status, reconnected: status === "connected", detail: raw || data?.error || data?.message || "sem status" };
+}
+
+async function preflightInstance(admin: any, inst: any) {
+  if (!inst?.bridge_url || !inst?.bridge_api_key) return { status: "disconnected", reconnected: false, detail: "sem credenciais" };
+  try {
+    const { res, data } = await bridgeAction(inst.bridge_url, inst.bridge_api_key, { action: "instance_status" }, 1);
+    const raw = bridgeStatus(data);
+    if (isConnectedStatus(raw)) {
+      await updateInstanceStatus(admin, inst, "connected");
+      return { status: "connected", reconnected: false, detail: raw };
+    }
+    if (isExplicitOfflineStatus(raw) || res.status === 401) {
+      await updateInstanceStatus(admin, inst, "disconnected");
+    }
+  } catch (err) {
+    console.warn("[eleicao-send-credentials] preflight status falhou:", (err as Error).message);
+  }
+  return await tryReconnectInstance(admin, inst);
 }
 
 Deno.serve(async (req) => {
@@ -144,34 +218,38 @@ Deno.serve(async (req) => {
     let bridgeUrl: string | null = null;
     let bridgeKey: string | null = null;
     let instanceId: string | null = null;
+    let selectedInstance: any = null;
 
     const { data: pickedId } = await admin.rpc("pick_healthy_whatsapp_instance", { p_client_id: pessoa.client_id });
     if (pickedId) {
       const { data: inst } = await admin.from("whatsapp_instances")
-        .select("id, bridge_url, bridge_api_key")
+        .select("id, bridge_url, bridge_api_key, status, connected_since")
         .eq("id", pickedId).maybeSingle();
       if (inst?.bridge_url && inst?.bridge_api_key) {
         bridgeUrl = inst.bridge_url;
         bridgeKey = inst.bridge_api_key;
         instanceId = inst.id;
+        selectedInstance = inst;
       }
     }
 
     if (!bridgeUrl || !bridgeKey) {
       const { data: inst } = await admin.from("whatsapp_instances")
-        .select("id, bridge_url, bridge_api_key, is_primary, status")
+        .select("id, bridge_url, bridge_api_key, is_primary, status, connected_since")
         .eq("client_id", pessoa.client_id)
         .eq("is_active", true)
         .not("bridge_url", "is", null)
         .not("bridge_api_key", "is", null)
         .order("is_primary", { ascending: false })
         .order("status", { ascending: true })
+        .order("last_send_at", { ascending: true, nullsFirst: true })
         .limit(1)
         .maybeSingle();
       if (inst?.bridge_url && inst?.bridge_api_key) {
         bridgeUrl = inst.bridge_url;
         bridgeKey = inst.bridge_api_key;
         instanceId = inst.id;
+        selectedInstance = inst;
       }
     }
 
@@ -189,14 +267,50 @@ Deno.serve(async (req) => {
       }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
+    if (selectedInstance) {
+      const preflight = await preflightInstance(admin, selectedInstance);
+      if (preflight.status !== "connected") {
+        await admin.rpc("log_whatsapp_send", {
+          p_instance_id: selectedInstance.id, p_client_id: pessoa.client_id, p_dispatch_id: null,
+          p_success: false, p_error_message: `Preflight: instância offline (${preflight.detail || "sem status"})`.slice(0, 200),
+          p_preflight_status: preflight.status, p_preflight_reconnected: preflight.reconnected,
+        });
+        return new Response(JSON.stringify({
+          success: true, sent: false, portal_url: portalUrl, email: emailNorm, password, message,
+          warning: "Instância WhatsApp desconectada. Reconecte o chip ou copie e envie manualmente.",
+        }), { headers: { ...cors, "Content-Type": "application/json" } });
+      }
+      if (preflight.reconnected) await sleep(1500);
+    }
+
     const { res, data: sendData } = await bridgeSend(bridgeUrl, bridgeKey, phone, message);
     const failure = sendFailure(res, sendData);
     if (failure) {
+      if (selectedInstance && isInstanceDisconnectedFailure(res, sendData, String(failure))) {
+        const reconnect = await tryReconnectInstance(admin, selectedInstance);
+        if (reconnect.status === "connected") {
+          await sleep(1500);
+          const retry = await bridgeSend(bridgeUrl, bridgeKey, phone, message);
+          const retryFailure = sendFailure(retry.res, retry.data);
+          if (!retryFailure) {
+            await admin.rpc("log_whatsapp_send", {
+              p_instance_id: instanceId, p_client_id: pessoa.client_id, p_dispatch_id: null,
+              p_success: true, p_error_message: null,
+              p_preflight_status: "reconnected", p_preflight_reconnected: true,
+            });
+            return new Response(JSON.stringify({
+              success: true, sent: true, portal_url: portalUrl, email: emailNorm, password, message,
+            }), { headers: { ...cors, "Content-Type": "application/json" } });
+          }
+        } else {
+          await updateInstanceStatus(admin, selectedInstance, "disconnected");
+        }
+      }
       if (instanceId) {
         await admin.rpc("log_whatsapp_send", {
           p_instance_id: instanceId, p_client_id: pessoa.client_id, p_dispatch_id: null,
           p_success: false, p_error_message: String(failure).slice(0, 200),
-          p_preflight_status: "skipped", p_preflight_reconnected: false,
+          p_preflight_status: selectedInstance ? "connected" : "skipped", p_preflight_reconnected: false,
         });
       }
       return new Response(JSON.stringify({
