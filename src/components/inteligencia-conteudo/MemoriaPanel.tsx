@@ -31,7 +31,7 @@ const TIPO_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export function MemoriaPanel({ clientId }: { clientId: string | null | undefined }) {
-  const [view, setView] = useState<"documentos" | "fatos">("documentos");
+  const [view, setView] = useState<"documentos" | "timeline" | "fatos">("documentos");
   if (!clientId) {
     return <Card><CardContent className="p-6 text-sm text-muted-foreground">Selecione um cliente.</CardContent></Card>;
   }
@@ -53,10 +53,14 @@ export function MemoriaPanel({ clientId }: { clientId: string | null | undefined
       <Tabs value={view} onValueChange={(v) => setView(v as any)}>
         <TabsList>
           <TabsTrigger value="documentos"><FileText className="w-4 h-4 mr-1.5" />Documentos</TabsTrigger>
+          <TabsTrigger value="timeline"><Calendar className="w-4 h-4 mr-1.5" />Timeline</TabsTrigger>
           <TabsTrigger value="fatos"><Sparkles className="w-4 h-4 mr-1.5" />Fatos avulsos</TabsTrigger>
         </TabsList>
         <TabsContent value="documentos" className="mt-4">
           <DocumentsList clientId={clientId} />
+        </TabsContent>
+        <TabsContent value="timeline" className="mt-4">
+          <DocumentsTimeline clientId={clientId} />
         </TabsContent>
         <TabsContent value="fatos" className="mt-4">
           <FactsList clientId={clientId} />
@@ -614,6 +618,165 @@ function FactsList({ clientId }: { clientId: string }) {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/* =========================================================================
+ * TIMELINE
+ * ========================================================================= */
+
+function DocumentsTimeline({ clientId }: { clientId: string }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"todas" | "propostas" | "promessas" | "bandeiras" | "bordoes">("todas");
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["ic-knowledge-documents-timeline", clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ic_knowledge_documents" as any)
+        .select("id, titulo, resumo_executivo, data_evento, created_at, propostas, promessas, bandeiras, bordoes, bairros_citados, pessoas_citadas, tom_emocional, local")
+        .eq("client_id", clientId)
+        .order("data_evento", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    staleTime: 30_000,
+  });
+
+  // Agrupa por mês/ano
+  const grouped = useMemo(() => {
+    const list = data ?? [];
+    const filtered = list.filter((d) => {
+      if (filter === "todas") return true;
+      const arr = (d as any)[filter];
+      return Array.isArray(arr) && arr.length > 0;
+    });
+    const groups = new Map<string, any[]>();
+    for (const d of filtered) {
+      const dt = new Date(d.data_evento || d.created_at);
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(d);
+    }
+    return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [data, filter]);
+
+  const monthLabel = (key: string) => {
+    const [y, m] = key.split("-");
+    const date = new Date(Number(y), Number(m) - 1, 1);
+    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
+
+  const filterChips: Array<{ id: typeof filter; label: string; icon: React.ReactNode }> = [
+    { id: "todas", label: "Todas", icon: <FileText className="w-3 h-3" /> },
+    { id: "propostas", label: "Propostas", icon: <Megaphone className="w-3 h-3" /> },
+    { id: "promessas", label: "Promessas", icon: <Flag className="w-3 h-3" /> },
+    { id: "bandeiras", label: "Bandeiras", icon: <Hash className="w-3 h-3" /> },
+    { id: "bordoes", label: "Bordões", icon: <Quote className="w-3 h-3" /> },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground p-6">
+        <Loader2 className="w-4 h-4 animate-spin" /> Carregando timeline...
+      </div>
+    );
+  }
+
+  if (!data?.length) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-sm text-muted-foreground space-y-2">
+          <Calendar className="w-8 h-8 mx-auto text-muted-foreground/50" />
+          <p>Sem documentos ainda — a timeline aparece quando a memória tiver conteúdo.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-1.5">
+        {filterChips.map((c) => (
+          <Button
+            key={c.id}
+            size="sm"
+            variant={filter === c.id ? "default" : "outline"}
+            onClick={() => setFilter(c.id)}
+            className="h-7 gap-1.5 text-xs"
+          >
+            {c.icon} {c.label}
+          </Button>
+        ))}
+      </div>
+
+      <div className="relative pl-6">
+        {/* Linha vertical */}
+        <div className="absolute left-2 top-2 bottom-2 w-px bg-border" />
+
+        {grouped.map(([monthKey, docs]) => (
+          <div key={monthKey} className="mb-6">
+            <div className="sticky top-0 z-10 -ml-6 mb-3 flex items-center gap-2 bg-background/95 backdrop-blur py-1.5">
+              <div className="w-4 h-4 rounded-full bg-primary border-2 border-background shadow-sm" />
+              <h3 className="text-sm font-semibold capitalize">{monthLabel(monthKey)}</h3>
+              <Badge variant="secondary" className="text-[10px]">{docs.length}</Badge>
+            </div>
+
+            <div className="space-y-3">
+              {docs.map((d) => {
+                const dt = new Date(d.data_evento || d.created_at);
+                const day = dt.getDate();
+                return (
+                  <div key={d.id} className="relative flex gap-4">
+                    {/* Bolinha do dia */}
+                    <div className="absolute -left-[18px] top-3 w-2.5 h-2.5 rounded-full bg-primary/60 border-2 border-background" />
+                    <div className="w-12 flex-shrink-0 text-right">
+                      <div className="text-xl font-bold leading-none">{day}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">
+                        {dt.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
+                      </div>
+                    </div>
+                    <Card
+                      className="flex-1 cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => setOpenId(d.id)}
+                    >
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <h4 className="font-medium text-sm leading-snug flex-1">{d.titulo}</h4>
+                          {d.tom_emocional && (
+                            <Badge variant="outline" className="text-[10px] flex-shrink-0">{d.tom_emocional}</Badge>
+                          )}
+                        </div>
+                        {d.local && (
+                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <MapPin className="w-3 h-3" /> {d.local}
+                          </div>
+                        )}
+                        {d.resumo_executivo && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">{d.resumo_executivo}</p>
+                        )}
+                        <div className="flex flex-wrap gap-1">
+                          <CountBadge icon={<Megaphone className="w-3 h-3" />} n={d.propostas?.length} label="prop." />
+                          <CountBadge icon={<Flag className="w-3 h-3" />} n={d.promessas?.length} label="prom." />
+                          <CountBadge icon={<Hash className="w-3 h-3" />} n={d.bandeiras?.length} label="band." />
+                          <CountBadge icon={<Quote className="w-3 h-3" />} n={d.bordoes?.length} label="bord." />
+                          <CountBadge icon={<MapPin className="w-3 h-3" />} n={d.bairros_citados?.length} label="bairros" />
+                          <CountBadge icon={<Users className="w-3 h-3" />} n={d.pessoas_citadas?.length} label="pessoas" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <DocumentDrawer openId={openId} onClose={() => setOpenId(null)} />
     </div>
   );
 }
