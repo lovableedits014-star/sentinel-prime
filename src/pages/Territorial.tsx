@@ -624,7 +624,22 @@ export default function Territorial() {
       .sort((a, b) => b.count - a.count);
   }, [allGeoEntries, selectedUF]);
 
-  // Neighborhoods of selected city (drill-down level 3)
+  // Marcadores de cidade pro mapa: usa cityGroups + lookup de coordenadas IBGE.
+  // Quando há UF selecionada, usa essa UF; senão deduz do grupo.
+  const mapCityMarkers = useMemo(() => {
+    const out: { city: string; count: number; coords: [number, number] }[] = [];
+    for (const g of cityGroups) {
+      const uf = selectedUF || (() => {
+        // tenta inferir UF a partir das pessoas dessa cidade
+        const sample = allGeoEntries.find(e => (e.city || "").toLowerCase().includes(g.city.toLowerCase()));
+        return sample ? inferUF(sample) : null;
+      })();
+      if (!uf) continue;
+      const coords = getCityCoords(g.city, uf);
+      if (coords) out.push({ city: g.city, count: g.count, coords });
+    }
+    return out;
+  }, [cityGroups, selectedUF, allGeoEntries]);
   const neighborhoodGroups = useMemo(() => {
     if (!selectedCity) return [];
     const canon = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
