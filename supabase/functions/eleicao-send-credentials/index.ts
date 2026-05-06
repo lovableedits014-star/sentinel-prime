@@ -36,6 +36,10 @@ function validEmail(email: string) {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
+const BRIDGE_TIMEOUT_MS = 15000;
+const PREFLIGHT_CACHE_TTL_MS = 30000;
+// Cache em memória por isolate (Deno). Evita revalidar a mesma instância em rajadas.
+const preflightCache = new Map<string, { ts: number; status: string; reconnected: boolean; detail: string }>();
 
 function isConnectedStatus(status: unknown) {
   const s = String(status || "").toLowerCase();
