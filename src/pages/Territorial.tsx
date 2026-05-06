@@ -963,7 +963,13 @@ export default function Territorial() {
                   <p className="text-xs mt-1">Cadastre apoiadores no portal com o campo <strong>estado</strong> preenchido para ver o mapa colorido.</p>
                 </div>
               ) : (
-                <BrazilMap data={ufCounts} selectedUF={selectedUF} onSelectUF={(uf) => { setSelectedUF(uf); setSelectedCity(null); }} />
+                <BrazilMap
+                  data={ufCounts}
+                  selectedUF={selectedUF}
+                  onSelectUF={(uf) => { setSelectedUF(uf); setSelectedCity(null); }}
+                  cities={mapCityMarkers}
+                  onSelectCity={(city) => { setDetailLevel("city"); setSelectedCity(city); }}
+                />
               )}
             </CardContent>
           </Card>
