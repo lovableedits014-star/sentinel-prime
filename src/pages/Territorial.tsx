@@ -437,6 +437,31 @@ export default function Territorial() {
     enabled: !!client?.id,
   });
 
+  // ── Eleição: pessoas cadastradas no fluxo de coordenadores/contratados ──
+  const { data: eleicaoRows } = useQuery({
+    queryKey: ["territorial-eleicao", client?.id],
+    queryFn: async () => {
+      if (!client?.id) return [];
+      const PAGE = 1000;
+      const result: Array<{ id: string; nome: string; telefone: string | null; cidade: string | null; endereco: string | null; email: string | null; created_at: string }> = [];
+      let from = 0;
+      while (true) {
+        const { data } = await supabase
+          .from("eleicao_pessoas")
+          .select("id, nome, telefone, cidade, endereco, email, created_at")
+          .eq("client_id", client.id)
+          .order("created_at", { ascending: false })
+          .range(from, from + PAGE - 1);
+        if (!data || data.length === 0) break;
+        result.push(...(data as any[]));
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return result;
+    },
+    enabled: !!client?.id,
+  });
+
   const { data: indicadoRows } = useQuery({
     queryKey: ["recruitment-indicados", client?.id],
     queryFn: async () => {
