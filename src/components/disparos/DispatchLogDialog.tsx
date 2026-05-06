@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
+import { FileText, CheckCircle, XCircle, Clock, Loader2, RefreshCw } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 type LogItem = {
   id: string;
