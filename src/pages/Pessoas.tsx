@@ -41,6 +41,7 @@ type UnifiedRow = {
   nome: string;
   telefone: string | null;
   cidade: string | null;
+  bairro: string | null;
   whatsapp_confirmado: boolean;
   roles: string[];      // ["apoiador","funcionario",...]
 };
@@ -77,14 +78,14 @@ export default function Pessoas() {
 
     const [pRes, fRes, eRes] = await Promise.all([
       supabase.from("pessoas")
-        .select("id, nome, telefone, cidade, whatsapp_confirmado, tipo_pessoa")
+        .select("id, nome, telefone, cidade, bairro, whatsapp_confirmado, tipo_pessoa")
         .eq("client_id", clientId)
         .eq("tipo_pessoa", "apoiador" as any),
       supabase.from("funcionarios")
-        .select("id, nome, telefone, cidade, whatsapp_confirmado")
+        .select("id, nome, telefone, cidade, bairro, whatsapp_confirmado")
         .eq("client_id", clientId),
       supabase.from("eleicao_pessoas" as any)
-        .select("id, nome, telefone, cidade, tipo, funcionario_id")
+        .select("id, nome, telefone, cidade, endereco, tipo, funcionario_id")
         .eq("client_id", clientId)
         .in("tipo", ["coordenador", "lider", "cabo"]),
     ]);
@@ -106,6 +107,7 @@ export default function Pessoas() {
           row.roles.forEach(r => pushRole(existing, r));
           // prefer richer fields
           if (!existing.cidade && row.cidade) existing.cidade = row.cidade;
+          if (!existing.bairro && row.bairro) existing.bairro = row.bairro;
           if (!existing.pessoa_id && row.pessoa_id) existing.pessoa_id = row.pessoa_id;
           if (row.whatsapp_confirmado) existing.whatsapp_confirmado = true;
           // prefer the most complete name (more words / longer)
@@ -124,6 +126,16 @@ export default function Pessoas() {
       }
     }
 
+    function bairroFromEndereco(endereco: string | null): string | null {
+      if (!endereco) return null;
+      // Padrão: "Rua X, 123 - Bairro, Cidade/UF" ou "Rua X, 123, Bairro, Cidade"
+      const m = endereco.match(/-\s*([^,]+?)\s*,/);
+      if (m) return m[1].trim();
+      const parts = endereco.split(",").map(s => s.trim()).filter(Boolean);
+      if (parts.length >= 3) return parts[parts.length - 2] || null;
+      return null;
+    }
+
     (pRes.data || []).forEach((p: any) => add({
       key: `p:${p.id}`,
       source: "pessoas",
@@ -132,6 +144,7 @@ export default function Pessoas() {
       nome: p.nome,
       telefone: p.telefone,
       cidade: p.cidade,
+      bairro: p.bairro || null,
       whatsapp_confirmado: !!p.whatsapp_confirmado,
       roles: ["apoiador"],
     }));
@@ -143,6 +156,7 @@ export default function Pessoas() {
       nome: f.nome,
       telefone: f.telefone,
       cidade: f.cidade,
+      bairro: f.bairro || null,
       whatsapp_confirmado: !!f.whatsapp_confirmado,
       roles: ["funcionario"],
     }));
@@ -154,6 +168,7 @@ export default function Pessoas() {
       nome: e.nome,
       telefone: e.telefone,
       cidade: e.cidade,
+      bairro: bairroFromEndereco(e.endereco),
       whatsapp_confirmado: false,
       roles: [e.tipo],
     }));
@@ -320,6 +335,7 @@ export default function Pessoas() {
                 <TableHead>Nome</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Cidade</TableHead>
+                <TableHead>Bairro</TableHead>
                 <TableHead>Papéis</TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
@@ -332,11 +348,11 @@ export default function Pessoas() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">Carregando...</TableCell>
+                  <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Carregando...</TableCell>
                 </TableRow>
               ) : paged.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">Nenhuma pessoa encontrada</TableCell>
+                  <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Nenhuma pessoa encontrada</TableCell>
                 </TableRow>
               ) : (
                 paged.map((r) => (
@@ -363,6 +379,7 @@ export default function Pessoas() {
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{r.cidade || "—"}</TableCell>
+                    <TableCell className="text-sm">{r.bairro || "—"}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {r.roles.map(role => (
