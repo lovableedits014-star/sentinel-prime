@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, Check, Link2, UserPlus, LogIn, Phone, QrCode, Printer, Download, Star, Plus, Trash2, Loader2 } from "lucide-react";
+import { Copy, Check, Link2, UserPlus, LogIn, Phone, QrCode, Printer, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { QRCodeCanvas } from "qrcode.react";
@@ -36,12 +36,6 @@ interface InviteToken {
 export default function PublicLinksCard({ clientId }: PublicLinksCardProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [qrLink, setQrLink] = useState<LinkEntry | null>(null);
-  const [invites, setInvites] = useState<InviteToken[]>([]);
-  const [loadingInvites, setLoadingInvites] = useState(true);
-  const [creatingInvite, setCreatingInvite] = useState(false);
-  const [inviteNote, setInviteNote] = useState("");
-  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
-
   const baseUrl = window.location.origin;
 
   const links: LinkEntry[] = [
@@ -70,65 +64,6 @@ export default function PublicLinksCard({ clientId }: PublicLinksCardProps) {
       color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
     },
   ];
-
-  // ─── Convites de Líder ──────────────────────────────────────────────────
-  const loadInvites = async () => {
-    setLoadingInvites(true);
-    const { data, error } = await supabase
-      .from("lider_invite_tokens" as any)
-      .select("id, token, created_at, expires_at, used_at, note")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-    if (!error && data) setInvites(data as any);
-    setLoadingInvites(false);
-  };
-
-  useEffect(() => {
-    loadInvites();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
-
-  const handleCreateInvite = async () => {
-    setCreatingInvite(true);
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) {
-      toast.error("Faça login para gerar convites");
-      setCreatingInvite(false);
-      return;
-    }
-    const { error } = await supabase.from("lider_invite_tokens" as any).insert({
-      client_id: clientId,
-      created_by: userData.user.id,
-      note: inviteNote.trim() || null,
-    });
-    if (error) {
-      toast.error("Erro ao gerar convite");
-      console.error(error);
-    } else {
-      toast.success("Convite criado!");
-      setInviteNote("");
-      await loadInvites();
-    }
-    setCreatingInvite(false);
-  };
-
-  const handleDeleteInvite = async (id: string) => {
-    const { error } = await supabase.from("lider_invite_tokens" as any).delete().eq("id", id);
-    if (error) {
-      toast.error("Erro ao remover convite");
-      return;
-    }
-    toast.success("Convite removido");
-    setInvites((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  const handleCopyInvite = (token: string, id: string) => {
-    const url = `${baseUrl}/cadastro-lider/${token}`;
-    navigator.clipboard.writeText(url);
-    setCopiedInviteId(id);
-    toast.success("Link de convite copiado!");
-    setTimeout(() => setCopiedInviteId(null), 2000);
-  };
 
   const handleCopy = (url: string, index: number) => {
     navigator.clipboard.writeText(url);
