@@ -15,6 +15,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
+import { findBestSegment, formatTime, type AudioSegment } from "./audioMatch";
+import { useRef, useEffect, createContext, useContext } from "react";
+import { Play } from "lucide-react";
 
 const TIPO_LABEL: Record<string, { label: string; color: string }> = {
   promessa: { label: "Promessa", color: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
@@ -363,7 +366,35 @@ function CountBadge({ icon, n, label }: { icon: React.ReactNode; n?: number; lab
 
 /* ---------- Drawer de detalhe ---------- */
 
+/* Player de áudio + contexto para clicar em trechos */
+const AudioCtx = createContext<{
+  segments: AudioSegment[];
+  hasAudio: boolean;
+  playAt: (sec: number) => void;
+} | null>(null);
+
+function useAudioCtx() { return useContext(AudioCtx); }
+
+function PlaySegmentButton({ text }: { text: string }) {
+  const ctx = useAudioCtx();
+  if (!ctx?.hasAudio || !ctx.segments.length) return null;
+  const seg = findBestSegment(text, ctx.segments);
+  if (!seg) return null;
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); ctx.playAt(seg.start); }}
+      className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-primary hover:underline"
+      title={`Tocar trecho: ${seg.text.slice(0, 80)}...`}
+    >
+      <Play className="w-3 h-3 fill-current" /> {formatTime(seg.start)}
+    </button>
+  );
+}
+
 function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: () => void }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const { data: doc, isLoading } = useQuery({
     queryKey: ["ic-knowledge-document", openId],
     queryFn: async () => {
@@ -379,6 +410,33 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
     enabled: !!openId,
   });
 
+  // Carrega segmentos da transcrição associada
+  const { data: segments = [] } = useQuery({
+    queryKey: ["ic-transcription-segments", doc?.transcription_id],
+    queryFn: async () => {
+      if (!doc?.transcription_id) return [];
+      const { data, error } = await supabase
+        .from("ic_transcriptions" as any)
+        .select("segments")
+        .eq("id", doc.transcription_id)
+        .maybeSingle();
+      if (error) return [];
+      return (((data as any)?.segments) ?? []) as AudioSegment[];
+    },
+    enabled: !!doc?.transcription_id,
+  });
+
+  const hasAudio = !!doc?.audio_url;
+  const playAt = (sec: number) => {
+    const a = audioRef.current;
+    if (!a) return;
+    a.currentTime = Math.max(0, sec);
+    a.play().catch(() => { /* ignore */ });
+  };
+
+  // Reset audio quando muda doc
+  useEffect(() => { if (audioRef.current) audioRef.current.pause(); }, [openId]);
+
   return (
     <Sheet open={!!openId} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-2xl overflow-hidden flex flex-col p-0">
@@ -391,6 +449,15 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
               {doc.provider && <> • {doc.provider}/{doc.model}</>}
             </p>
           )}
+          {hasAudio && (
+            <audio
+              ref={audioRef}
+              src={doc.audio_url}
+              controls
+              preload="metadata"
+              className="w-full mt-2 h-9"
+            />
+          )}
         </SheetHeader>
         <ScrollArea className="flex-1 px-6 py-4">
           {isLoading || !doc ? (
@@ -398,7 +465,20 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
               <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
             </div>
           ) : (
+            <AudioCtx.Provider value={{ segments, hasAudio: hasAudio && segments.length > 0, playAt }}>
             <div className="space-y-5 pb-10">
+              {hasAudio && segments.length > 0 && (
+                <div className="text-[11px] text-muted-foreground -mt-1 flex items-center gap-1.5">
+                  <Play className="w-3 h-3 text-primary" />
+                  Clique no horário ao lado de cada item para ouvir o trecho no áudio.
+                </div>
+              )}
+              {hasAudio && segments.length === 0 && (
+                <div className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Áudio disponível, mas sem segmentação por timestamp para esta transcrição.
+                </div>
+              )}
+
               {doc.resumo_executivo && (
                 <Section title="Resumo executivo">
                   <p className="text-sm leading-relaxed">{doc.resumo_executivo}</p>
@@ -407,8 +487,16 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
 
               {Array.isArray(doc.pontos_principais) && doc.pontos_principais.length > 0 && (
                 <Section title="Pontos principais">
-                  <ul className="list-disc pl-5 space-y-1 text-sm">
-                    {doc.pontos_principais.map((p: string, i: number) => <li key={i}>{p}</li>)}
+                  <ul className="space-y-1.5 text-sm">
+                    {doc.pontos_principais.map((p: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-primary">•</span>
+                        <div className="flex-1">
+                          <span>{p}</span>
+                          <PlaySegmentButton text={p} />
+                        </div>
+                      </li>
+                    ))}
                   </ul>
                 </Section>
               )}
@@ -422,6 +510,7 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
                     {p.bairro && <Badge variant="secondary" className="text-[10px]">📍 {p.bairro}</Badge>}
                     {p.prazo && <Badge variant="outline" className="text-[10px]">⏱ {p.prazo}</Badge>}
                   </div>
+                  <PlaySegmentButton text={`${p.titulo || ""} ${p.descricao || ""}`} />
                 </>
               )} />
 
@@ -429,6 +518,7 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
                 <>
                   <p className="text-sm">{p.texto}</p>
                   {p.tema && <Badge variant="outline" className="text-[10px] mt-1">{p.tema}</Badge>}
+                  <PlaySegmentButton text={p.texto || ""} />
                 </>
               )} />
 
@@ -436,17 +526,22 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
                 <>
                   <p className="text-sm font-medium">{b.tema}</p>
                   {b.posicao && <p className="text-xs text-muted-foreground mt-0.5">{b.posicao}</p>}
+                  <PlaySegmentButton text={`${b.tema || ""} ${b.posicao || ""}`} />
                 </>
               )} />
 
               <ListSection title="Bordões" items={doc.bordoes} render={(b) => (
-                <p className="text-sm italic">"{b.frase}"</p>
+                <>
+                  <p className="text-sm italic">"{b.frase}"</p>
+                  <PlaySegmentButton text={b.frase || ""} />
+                </>
               )} />
 
               <ListSection title="Bairros citados" items={doc.bairros_citados} render={(b) => (
                 <>
                   <p className="text-sm font-medium">📍 {b.nome}</p>
                   {b.contexto && <p className="text-xs text-muted-foreground mt-0.5">{b.contexto}</p>}
+                  <PlaySegmentButton text={`${b.nome || ""} ${b.contexto || ""}`} />
                 </>
               )} />
 
@@ -454,6 +549,7 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
                 <>
                   <p className="text-sm font-medium">👤 {p.nome} {p.papel && <span className="text-xs text-muted-foreground">— {p.papel}</span>}</p>
                   {p.contexto && <p className="text-xs text-muted-foreground mt-0.5">{p.contexto}</p>}
+                  <PlaySegmentButton text={`${p.nome || ""} ${p.contexto || ""}`} />
                 </>
               )} />
 
@@ -461,6 +557,7 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
                 <>
                   <p className="text-sm font-medium">{a.nome_ou_referencia} {a.tipo && <span className="text-xs text-muted-foreground">— {a.tipo}</span>}</p>
                   {a.trecho && <p className="text-xs text-muted-foreground italic mt-0.5">"{a.trecho}"</p>}
+                  <PlaySegmentButton text={`${a.nome_ou_referencia || ""} ${a.trecho || ""}`} />
                 </>
               )} />
 
@@ -468,6 +565,7 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
                 <>
                   <p className="text-sm font-medium">{n.valor}</p>
                   {n.contexto && <p className="text-xs text-muted-foreground mt-0.5">{n.contexto}</p>}
+                  <PlaySegmentButton text={`${n.valor || ""} ${n.contexto || ""}`} />
                 </>
               )} />
 
@@ -477,13 +575,30 @@ function DocumentDrawer({ openId, onClose }: { openId: string | null; onClose: (
                     <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground mb-2">
                       Ver texto completo ({doc.texto_integral.length.toLocaleString("pt-BR")} caracteres)
                     </summary>
-                    <p className="whitespace-pre-wrap text-xs leading-relaxed bg-muted/50 p-3 rounded">
-                      {doc.texto_integral}
-                    </p>
+                    {hasAudio && segments.length > 0 ? (
+                      <div className="text-xs leading-relaxed bg-muted/50 p-3 rounded space-y-1 max-h-96 overflow-auto">
+                        {segments.map((s, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => playAt(s.start)}
+                            className="block w-full text-left hover:bg-primary/10 rounded px-1.5 py-0.5 transition-colors"
+                          >
+                            <span className="text-primary font-mono text-[10px] mr-2">{formatTime(s.start)}</span>
+                            <span>{s.text}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed bg-muted/50 p-3 rounded">
+                        {doc.texto_integral}
+                      </p>
+                    )}
                   </details>
                 </Section>
               )}
             </div>
+            </AudioCtx.Provider>
           )}
         </ScrollArea>
       </SheetContent>
