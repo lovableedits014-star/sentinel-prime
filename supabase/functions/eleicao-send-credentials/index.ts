@@ -57,17 +57,31 @@ function bridgeStatus(data: any) {
 
 async function bridgeAction(bridgeUrl: string, bridgeKey: string, body: Record<string, unknown>, retries = 0) {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(bridgeUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
-    if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < retries) {
-      await sleep(1000 * (attempt + 1));
-      continue;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), BRIDGE_TIMEOUT_MS);
+    try {
+      const res = await fetch(bridgeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+      if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < retries) {
+        clearTimeout(tid);
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      clearTimeout(tid);
+      return { res, data };
+    } catch (err) {
+      clearTimeout(tid);
+      const aborted = (err as Error)?.name === "AbortError";
+      if (attempt < retries) { await sleep(1000 * (attempt + 1)); continue; }
+      // Sintetiza um Response-like de falha para o caller tratar uniformemente.
+      const fakeRes = new Response(null, { status: aborted ? 504 : 502 });
+      return { res: fakeRes, data: { error: aborted ? `Timeout após ${BRIDGE_TIMEOUT_MS}ms na ponte WhatsApp` : `Falha de rede: ${(err as Error).message}` } };
     }
-    return { res, data };
   }
   throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
 }
