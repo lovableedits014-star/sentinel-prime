@@ -75,6 +75,10 @@ function DocumentsList({ clientId }: { clientId: string }) {
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [migrating, setMigrating] = useState(false);
+  const [semanticMode, setSemanticMode] = useState(false);
+  const [semanticResults, setSemanticResults] = useState<any[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
 
   async function migrateOld() {
     if (!confirm("Reprocessar até 20 transcrições antigas para gerar documentos? Pode levar alguns minutos.")) return;
@@ -100,12 +104,61 @@ function DocumentsList({ clientId }: { clientId: string }) {
     }
   }
 
+  async function runSemanticSearch() {
+    if (!search.trim()) {
+      setSemanticResults(null);
+      return;
+    }
+    setSearching(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ic-search-documents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ clientId, query: search, threshold: 0.25, limit: 30 }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Falha na busca");
+      setSemanticResults(j.results ?? []);
+      if ((j.results ?? []).length === 0) toast.info("Nenhum documento similar encontrado");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function backfillEmbeddings() {
+    setBackfilling(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ic-backfill-embeddings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ clientId, limit: 25 }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Falha");
+      toast.success(`Embeddings: ${j.processed} OK, ${j.failed} falhas${j.remaining ? " — clique novamente para continuar" : ""}`);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBackfilling(false);
+    }
+  }
+
   const { data, isLoading } = useQuery({
     queryKey: ["ic-knowledge-documents", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ic_knowledge_documents" as any)
-        .select("id, titulo, resumo_executivo, data_evento, created_at, tipo_documento, propostas, promessas, bandeiras, bordoes, bairros_citados, pessoas_citadas, tags, tom_emocional")
+        .select("id, titulo, resumo_executivo, data_evento, created_at, tipo_documento, propostas, promessas, bandeiras, bordoes, bairros_citados, pessoas_citadas, tags, tom_emocional, embedding")
         .eq("client_id", clientId)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -115,8 +168,19 @@ function DocumentsList({ clientId }: { clientId: string }) {
     staleTime: 30_000,
   });
 
+  const withoutEmbedding = (data ?? []).filter((d: any) => !d.embedding).length;
+
   const filtered = useMemo(() => {
     const list = data ?? [];
+    if (semanticMode && semanticResults) {
+      // Mantém ordem de similaridade vinda do RPC, e enriquece com dados da listagem
+      const byId = new Map(list.map((d: any) => [d.id, d]));
+      return semanticResults.map((r: any) => ({
+        ...(byId.get(r.id) || {}),
+        ...r,
+        _similarity: r.similarity,
+      }));
+    }
     if (!search.trim()) return list;
     const s = search.toLowerCase();
     return list.filter((d) =>
@@ -124,7 +188,7 @@ function DocumentsList({ clientId }: { clientId: string }) {
       d.resumo_executivo?.toLowerCase().includes(s) ||
       JSON.stringify(d.tags || []).toLowerCase().includes(s),
     );
-  }, [data, search]);
+  }, [data, search, semanticMode, semanticResults]);
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -140,21 +204,55 @@ function DocumentsList({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[220px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por título, resumo ou tag..."
+            placeholder={semanticMode ? "Ex: o que ele disse sobre saúde nas periferias..." : "Buscar por título, resumo ou tag..."}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              if (semanticMode) setSemanticResults(null);
+            }}
+            onKeyDown={(e) => { if (semanticMode && e.key === "Enter") runSemanticSearch(); }}
             className="pl-9"
           />
         </div>
+        <Button
+          variant={semanticMode ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setSemanticMode((v) => !v);
+            setSemanticResults(null);
+          }}
+          title="Busca por significado (embeddings)"
+        >
+          <Sparkles className="w-4 h-4 mr-1.5" />
+          {semanticMode ? "Semântica" : "Literal"}
+        </Button>
+        {semanticMode && (
+          <Button size="sm" onClick={runSemanticSearch} disabled={searching || !search.trim()}>
+            {searching ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Search className="w-4 h-4 mr-1.5" />}
+            Buscar
+          </Button>
+        )}
         <Button variant="outline" size="sm" onClick={migrateOld} disabled={migrating}>
           {migrating ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1.5" />}
           Migrar antigas
         </Button>
       </div>
+
+      {semanticMode && withoutEmbedding > 0 && (
+        <div className="flex items-center justify-between gap-3 text-xs bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+          <span className="text-amber-700 dark:text-amber-300">
+            {withoutEmbedding} documento(s) ainda sem índice semântico — não aparecerão na busca por significado.
+          </span>
+          <Button size="sm" variant="outline" onClick={backfillEmbeddings} disabled={backfilling}>
+            {backfilling ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1" />}
+            Indexar
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground p-6">
@@ -164,7 +262,7 @@ function DocumentsList({ clientId }: { clientId: string }) {
         <Card>
           <CardContent className="p-8 text-center text-sm text-muted-foreground space-y-2">
             <FileAudio className="w-8 h-8 mx-auto text-muted-foreground/50" />
-            <p>Nenhum documento ainda.</p>
+            <p>{semanticMode && search ? "Nenhum documento similar encontrado." : "Nenhum documento ainda."}</p>
             <p className="text-xs">
               Suba uma transcrição na aba <strong>Transcrição</strong> — a IA cria automaticamente
               um documento estruturado com tudo o que o candidato disse.
@@ -187,6 +285,11 @@ function DocumentsList({ clientId }: { clientId: string }) {
                       <Calendar className="w-3 h-3" />
                       {new Date(d.data_evento || d.created_at).toLocaleDateString("pt-BR")}
                       {d.tom_emocional && <span>• tom: {d.tom_emocional}</span>}
+                      {typeof d._similarity === "number" && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {(d._similarity * 100).toFixed(0)}% similar
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <Button

@@ -2122,6 +2122,9 @@ export type Database = {
           created_by: string | null
           data_evento: string | null
           duracao_sec: number | null
+          embedded_at: string | null
+          embedding: string | null
+          embedding_model: string | null
           extraction_run_id: string | null
           id: string
           local: string | null
@@ -2153,6 +2156,9 @@ export type Database = {
           created_by?: string | null
           data_evento?: string | null
           duracao_sec?: number | null
+          embedded_at?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
           extraction_run_id?: string | null
           id?: string
           local?: string | null
@@ -2184,6 +2190,9 @@ export type Database = {
           created_by?: string | null
           data_evento?: string | null
           duracao_sec?: number | null
+          embedded_at?: string | null
+          embedding?: string | null
+          embedding_model?: string | null
           extraction_run_id?: string | null
           id?: string
           local?: string | null
@@ -5777,6 +5786,25 @@ export type Database = {
           p_success: boolean
         }
         Returns: undefined
+      }
+      match_ic_documents: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          p_client_id: string
+          query_embedding: string
+        }
+        Returns: {
+          created_at: string
+          data_evento: string
+          id: string
+          local: string
+          resumo_executivo: string
+          similarity: number
+          tags: string[]
+          tipo_documento: string
+          titulo: string
+        }[]
       }
       municipio_ranking: {
         Args: { p_codigo_ibge: number }
