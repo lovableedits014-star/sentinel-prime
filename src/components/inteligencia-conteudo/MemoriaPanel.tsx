@@ -74,6 +74,31 @@ function DocumentsList({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [migrating, setMigrating] = useState(false);
+
+  async function migrateOld() {
+    if (!confirm("Reprocessar até 20 transcrições antigas para gerar documentos? Pode levar alguns minutos.")) return;
+    setMigrating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ic-migrate-knowledge-to-documents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ clientId, limit: 20 }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Falha");
+      toast.success(`Migração concluída: ${j.processed_now} processadas`);
+      qc.invalidateQueries({ queryKey: ["ic-knowledge-documents", clientId] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setMigrating(false);
+    }
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ["ic-knowledge-documents", clientId],
