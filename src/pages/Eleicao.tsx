@@ -442,6 +442,7 @@ export default function Eleicao() {
           }
         </TabsContent>
       </Tabs>
+      )}
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
