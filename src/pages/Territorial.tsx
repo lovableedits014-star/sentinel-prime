@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Merge } from "lucide-react";
 import { resolveUF, ufName, ufRegion, UF_LIST } from "@/lib/brazil-geo";
+import { getCityCoords } from "@/lib/municipios-coords";
 import { toast } from "sonner";
 
 interface LocationGroup {
@@ -624,7 +625,22 @@ export default function Territorial() {
       .sort((a, b) => b.count - a.count);
   }, [allGeoEntries, selectedUF]);
 
-  // Neighborhoods of selected city (drill-down level 3)
+  // Marcadores de cidade pro mapa: usa cityGroups + lookup de coordenadas IBGE.
+  // Quando há UF selecionada, usa essa UF; senão deduz do grupo.
+  const mapCityMarkers = useMemo(() => {
+    const out: { city: string; count: number; coords: [number, number] }[] = [];
+    for (const g of cityGroups) {
+      const uf = selectedUF || (() => {
+        // tenta inferir UF a partir das pessoas dessa cidade
+        const sample = allGeoEntries.find(e => (e.city || "").toLowerCase().includes(g.city.toLowerCase()));
+        return sample ? inferUF(sample) : null;
+      })();
+      if (!uf) continue;
+      const coords = getCityCoords(g.city, uf);
+      if (coords) out.push({ city: g.city, count: g.count, coords });
+    }
+    return out;
+  }, [cityGroups, selectedUF, allGeoEntries]);
   const neighborhoodGroups = useMemo(() => {
     if (!selectedCity) return [];
     const canon = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -963,7 +979,13 @@ export default function Territorial() {
                   <p className="text-xs mt-1">Cadastre apoiadores no portal com o campo <strong>estado</strong> preenchido para ver o mapa colorido.</p>
                 </div>
               ) : (
-                <BrazilMap data={ufCounts} selectedUF={selectedUF} onSelectUF={(uf) => { setSelectedUF(uf); setSelectedCity(null); }} />
+                <BrazilMap
+                  data={ufCounts}
+                  selectedUF={selectedUF}
+                  onSelectUF={(uf) => { setSelectedUF(uf); setSelectedCity(null); }}
+                  cities={mapCityMarkers}
+                  onSelectCity={(city) => { setDetailLevel("city"); setSelectedCity(city); }}
+                />
               )}
             </CardContent>
           </Card>
