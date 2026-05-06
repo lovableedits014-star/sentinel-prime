@@ -8,9 +8,30 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Crown, Users, UserCheck, LogOut, Plus, Trash2, Phone, MapPin, Loader2, KeyRound, ChevronDown, ChevronRight } from "lucide-react";
+import { Crown, Users, UserCheck, LogOut, Plus, Trash2, Phone, MapPin, Loader2, KeyRound, ChevronDown, ChevronRight, Camera, Copy, Send } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
+
+function buildFotoLink(clientId: string) {
+  const base = (typeof window !== "undefined" ? window.location.origin : "").replace(/\/$/, "");
+  return `${base}/foto/${clientId}`;
+}
+function waPhone(p: string) {
+  const d = (p || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.startsWith("55")) return d;
+  return d.length <= 11 ? "55" + d : d;
+}
+function sendFotoWhats(pessoa: { nome: string; telefone: string }, clientId: string) {
+  const phone = waPhone(pessoa.telefone);
+  const link = buildFotoLink(clientId);
+  const msg = `Oi ${pessoa.nome}! Gere sua foto de perfil oficial da campanha aqui: ${link}`;
+  const url = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url, "_blank");
+}
 
 type Tipo = "coordenador" | "lider" | "cabo";
 interface Pessoa {
