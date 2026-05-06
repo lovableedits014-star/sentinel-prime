@@ -200,8 +200,54 @@ export default function Pessoas() {
     setDeleteTarget(null);
   }
 
-  function openProfile(r: UnifiedRow) {
-    if (r.pessoa_id) navigate(`/pessoas/${r.pessoa_id}`);
+  async function openProfile(r: UnifiedRow) {
+    if (r.pessoa_id) {
+      navigate(`/pessoas/${r.pessoa_id}`);
+      return;
+    }
+    if (!clientId) return;
+    try {
+      // Try to find existing pessoa by normalized phone
+      const ph = normPhone(r.telefone || "");
+      if (ph.length >= 10) {
+        const { data: existing } = await supabase
+          .from("pessoas")
+          .select("id, telefone")
+          .eq("client_id", clientId)
+          .ilike("telefone", `%${ph.slice(-9)}%`)
+          .limit(20);
+        const match = (existing || []).find((p: any) => normPhone(p.telefone || "").slice(-10) === ph.slice(-10));
+        if (match) {
+          navigate(`/pessoas/${match.id}`);
+          return;
+        }
+      }
+      // Create a pessoas record so user can edit/add notes/socials
+      const tipo = r.roles.includes("funcionario")
+        ? "voluntario"
+        : r.roles.includes("coordenador") || r.roles.includes("lider") || r.roles.includes("cabo")
+          ? "lideranca"
+          : "apoiador";
+      const { data: created, error } = await supabase
+        .from("pessoas")
+        .insert({
+          client_id: clientId,
+          nome: r.nome,
+          telefone: r.telefone,
+          cidade: r.cidade,
+          tipo_pessoa: tipo as any,
+        })
+        .select("id")
+        .single();
+      if (error || !created) {
+        toast.error("Não foi possível abrir o perfil: " + (error?.message || "erro"));
+        return;
+      }
+      toast.success("Perfil criado para edição");
+      navigate(`/pessoas/${created.id}`);
+    } catch (e: any) {
+      toast.error("Erro ao abrir perfil: " + e.message);
+    }
   }
 
   return (
