@@ -81,6 +81,7 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
         <TabsList>
           <TabsTrigger value="documentos"><FileText className="w-4 h-4 mr-1.5" />Documentos</TabsTrigger>
           <TabsTrigger value="timeline"><Calendar className="w-4 h-4 mr-1.5" />Timeline</TabsTrigger>
+          <TabsTrigger value="contradicoes"><AlertTriangle className="w-4 h-4 mr-1.5" />Contradições</TabsTrigger>
           <TabsTrigger value="fatos"><Sparkles className="w-4 h-4 mr-1.5" />Fatos avulsos</TabsTrigger>
         </TabsList>
         <TabsContent value="documentos" className="mt-4">
@@ -88,6 +89,9 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
         </TabsContent>
         <TabsContent value="timeline" className="mt-4">
           <DocumentsTimeline clientId={clientId} />
+        </TabsContent>
+        <TabsContent value="contradicoes" className="mt-4">
+          <ContradictionsList clientId={clientId} />
         </TabsContent>
         <TabsContent value="fatos" className="mt-4">
           <FactsList clientId={clientId} />
