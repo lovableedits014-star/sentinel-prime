@@ -2110,6 +2110,69 @@ export type Database = {
           },
         ]
       }
+      ic_document_contradictions: {
+        Row: {
+          client_id: string
+          created_at: string
+          detected_at: string
+          document_a_id: string
+          document_b_id: string
+          explicacao: string
+          id: string
+          severidade: string
+          status: string
+          tema: string | null
+          tipo: string | null
+          trecho_a: string | null
+          trecho_b: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          detected_at?: string
+          document_a_id: string
+          document_b_id: string
+          explicacao: string
+          id?: string
+          severidade?: string
+          status?: string
+          tema?: string | null
+          tipo?: string | null
+          trecho_a?: string | null
+          trecho_b?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          detected_at?: string
+          document_a_id?: string
+          document_b_id?: string
+          explicacao?: string
+          id?: string
+          severidade?: string
+          status?: string
+          tema?: string | null
+          tipo?: string | null
+          trecho_a?: string | null
+          trecho_b?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ic_document_contradictions_document_a_id_fkey"
+            columns: ["document_a_id"]
+            isOneToOne: false
+            referencedRelation: "ic_knowledge_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ic_document_contradictions_document_b_id_fkey"
+            columns: ["document_b_id"]
+            isOneToOne: false
+            referencedRelation: "ic_knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ic_knowledge_documents: {
         Row: {
           adversarios_citados: Json
