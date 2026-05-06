@@ -1,0 +1,1 @@
+DELETE FROM public.eleicao_pessoas WHERE id = '337fd74a-b8b8-4942-bb34-e75bea82aa56';
