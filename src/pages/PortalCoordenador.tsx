@@ -415,7 +415,7 @@ export default function PortalCoordenador() {
   );
 }
 
-function PessoaRow({ p, onDelete, small }: { p: Pessoa; onDelete: (id: string) => void; small?: boolean }) {
+function PessoaRow({ p, onDelete, clientId, small }: { p: Pessoa; onDelete: (id: string) => void; clientId: string; small?: boolean }) {
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
   return (
@@ -430,6 +430,15 @@ function PessoaRow({ p, onDelete, small }: { p: Pessoa; onDelete: (id: string) =
         </p>
       </div>
       <Badge variant="outline" className={cn("text-[10px]", meta.color)}>{meta.label}</Badge>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7 text-emerald-600 opacity-70 hover:opacity-100"
+        title="Enviar link da foto via WhatsApp"
+        onClick={() => sendFotoWhats(p, clientId)}
+      >
+        <Send className="w-3.5 h-3.5" />
+      </Button>
       <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive opacity-60 hover:opacity-100" onClick={() => onDelete(p.id)}>
         <Trash2 className="w-3.5 h-3.5" />
       </Button>
