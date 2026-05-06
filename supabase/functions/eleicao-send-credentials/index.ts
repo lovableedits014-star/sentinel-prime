@@ -218,34 +218,38 @@ Deno.serve(async (req) => {
     let bridgeUrl: string | null = null;
     let bridgeKey: string | null = null;
     let instanceId: string | null = null;
+    let selectedInstance: any = null;
 
     const { data: pickedId } = await admin.rpc("pick_healthy_whatsapp_instance", { p_client_id: pessoa.client_id });
     if (pickedId) {
       const { data: inst } = await admin.from("whatsapp_instances")
-        .select("id, bridge_url, bridge_api_key")
+        .select("id, bridge_url, bridge_api_key, status, connected_since")
         .eq("id", pickedId).maybeSingle();
       if (inst?.bridge_url && inst?.bridge_api_key) {
         bridgeUrl = inst.bridge_url;
         bridgeKey = inst.bridge_api_key;
         instanceId = inst.id;
+        selectedInstance = inst;
       }
     }
 
     if (!bridgeUrl || !bridgeKey) {
       const { data: inst } = await admin.from("whatsapp_instances")
-        .select("id, bridge_url, bridge_api_key, is_primary, status")
+        .select("id, bridge_url, bridge_api_key, is_primary, status, connected_since")
         .eq("client_id", pessoa.client_id)
         .eq("is_active", true)
         .not("bridge_url", "is", null)
         .not("bridge_api_key", "is", null)
+        .in("status", ["connected", "open"])
         .order("is_primary", { ascending: false })
-        .order("status", { ascending: true })
+        .order("last_send_at", { ascending: true, nullsFirst: true })
         .limit(1)
         .maybeSingle();
       if (inst?.bridge_url && inst?.bridge_api_key) {
         bridgeUrl = inst.bridge_url;
         bridgeKey = inst.bridge_api_key;
         instanceId = inst.id;
+        selectedInstance = inst;
       }
     }
 
@@ -263,14 +267,50 @@ Deno.serve(async (req) => {
       }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
+    if (selectedInstance) {
+      const preflight = await preflightInstance(admin, selectedInstance);
+      if (preflight.status !== "connected") {
+        await admin.rpc("log_whatsapp_send", {
+          p_instance_id: selectedInstance.id, p_client_id: pessoa.client_id, p_dispatch_id: null,
+          p_success: false, p_error_message: `Preflight: instância offline (${preflight.detail || "sem status"})`.slice(0, 200),
+          p_preflight_status: preflight.status, p_preflight_reconnected: preflight.reconnected,
+        });
+        return new Response(JSON.stringify({
+          success: true, sent: false, portal_url: portalUrl, email: emailNorm, password, message,
+          warning: "Instância WhatsApp desconectada. Reconecte o chip ou copie e envie manualmente.",
+        }), { headers: { ...cors, "Content-Type": "application/json" } });
+      }
+      if (preflight.reconnected) await sleep(1500);
+    }
+
     const { res, data: sendData } = await bridgeSend(bridgeUrl, bridgeKey, phone, message);
     const failure = sendFailure(res, sendData);
     if (failure) {
+      if (selectedInstance && isInstanceDisconnectedFailure(res, sendData, String(failure))) {
+        const reconnect = await tryReconnectInstance(admin, selectedInstance);
+        if (reconnect.status === "connected") {
+          await sleep(1500);
+          const retry = await bridgeSend(bridgeUrl, bridgeKey, phone, message);
+          const retryFailure = sendFailure(retry.res, retry.data);
+          if (!retryFailure) {
+            await admin.rpc("log_whatsapp_send", {
+              p_instance_id: instanceId, p_client_id: pessoa.client_id, p_dispatch_id: null,
+              p_success: true, p_error_message: null,
+              p_preflight_status: "reconnected", p_preflight_reconnected: true,
+            });
+            return new Response(JSON.stringify({
+              success: true, sent: true, portal_url: portalUrl, email: emailNorm, password, message,
+            }), { headers: { ...cors, "Content-Type": "application/json" } });
+          }
+        } else {
+          await updateInstanceStatus(admin, selectedInstance, "disconnected");
+        }
+      }
       if (instanceId) {
         await admin.rpc("log_whatsapp_send", {
           p_instance_id: instanceId, p_client_id: pessoa.client_id, p_dispatch_id: null,
           p_success: false, p_error_message: String(failure).slice(0, 200),
-          p_preflight_status: "skipped", p_preflight_reconnected: false,
+          p_preflight_status: selectedInstance ? "connected" : "skipped", p_preflight_reconnected: false,
         });
       }
       return new Response(JSON.stringify({
