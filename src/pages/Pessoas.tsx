@@ -335,6 +335,7 @@ export default function Pessoas() {
                 <TableHead>Nome</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Cidade</TableHead>
+                <TableHead>Bairro</TableHead>
                 <TableHead>Papéis</TableHead>
                 <TableHead>
                   <div className="flex items-center gap-1">
