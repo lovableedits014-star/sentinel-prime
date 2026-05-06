@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
+import { FileText, CheckCircle, XCircle, Clock, Loader2, RefreshCw } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 type LogItem = {
   id: string;
@@ -24,6 +25,8 @@ const itemStatusMap: Record<string, { label: string; icon: typeof Clock; classNa
 
 export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: string; titulo: string }) {
   const [open, setOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: items = [], isLoading } = useQuery<LogItem[]>({
     queryKey: ["dispatch-log", dispatchId],
@@ -44,6 +47,31 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
   const failed = items.filter(i => i.status === "falha").length;
   const pending = items.filter(i => i.status === "pendente").length;
 
+  const handleRetryFailed = async () => {
+    if (failed === 0) return;
+    setRetrying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+        body: { retry_failed_dispatch_id: dispatchId },
+      });
+      if (error) throw error;
+      toast({
+        title: "Reenvio iniciado",
+        description: `${data?.retried ?? failed} número(s) com falha foram reenfileirados.`,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["dispatch-log", dispatchId] });
+      await queryClient.invalidateQueries({ queryKey: ["dispatches"] });
+    } catch (err: any) {
+      toast({
+        title: "Falha ao reenviar",
+        description: err?.message || "Não foi possível reenviar os números com falha.",
+        variant: "destructive",
+      });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -57,10 +85,22 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
           <DialogTitle className="text-base">Log de Envio — {titulo}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex gap-3 text-xs mb-3">
+        <div className="flex items-center gap-3 text-xs mb-3 flex-wrap">
           <Badge variant="outline" className="gap-1">✅ {sent} enviados</Badge>
           <Badge variant="outline" className="gap-1">❌ {failed} falhas</Badge>
           <Badge variant="outline" className="gap-1">⏳ {pending} pendentes</Badge>
+          {failed > 0 && pending === 0 && (
+            <Button
+              size="sm"
+              variant="default"
+              className="h-7 ml-auto gap-1"
+              onClick={handleRetryFailed}
+              disabled={retrying}
+            >
+              {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Reenviar falhas ({failed})
+            </Button>
+          )}
         </div>
 
         {isLoading ? (

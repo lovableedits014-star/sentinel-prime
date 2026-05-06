@@ -178,6 +178,51 @@ Deno.serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey);
 
     const payload = await req.json();
+    // Modo "retry só falhas": reseta itens com status='falha' para 'pendente' e segue como resume.
+    if (payload.retry_failed_dispatch_id) {
+      const dispatchId = payload.retry_failed_dispatch_id as string;
+      // Verifica ownership via auth
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      }
+      const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      }
+      const { data: disp } = await adminClient
+        .from("whatsapp_dispatches").select("id, client_id").eq("id", dispatchId).maybeSingle();
+      if (!disp) {
+        return new Response(JSON.stringify({ error: "Dispatch not found" }), { status: 404, headers: corsHeaders });
+      }
+      const { data: ownerCheck } = await adminClient
+        .from("clients").select("id").eq("id", disp.client_id).eq("user_id", user.id).maybeSingle();
+      if (!ownerCheck) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
+      }
+      const { data: resetItems, error: resetErr } = await adminClient
+        .from("whatsapp_dispatch_items")
+        .update({ status: "pendente", erro: null, enviado_em: null })
+        .eq("dispatch_id", dispatchId)
+        .eq("status", "falha")
+        .select("id");
+      if (resetErr) {
+        return new Response(JSON.stringify({ error: `Falha ao resetar itens: ${resetErr.message}` }), { status: 500, headers: corsHeaders });
+      }
+      const resetCount = resetItems?.length || 0;
+      if (resetCount === 0) {
+        return new Response(JSON.stringify({ retried: 0, message: "Nenhum item com status 'falha' para reenviar." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Recoloca dispatch como em_andamento e reaproveita fluxo resume
+      await adminClient.from("whatsapp_dispatches")
+        .update({ status: "em_andamento" }).eq("id", dispatchId);
+      payload.resume_dispatch_id = dispatchId;
+      payload.retry_failed_dispatch_id = undefined;
+      console.log(`[retry-failed] dispatch=${dispatchId} reset=${resetCount}`);
+    }
     const isResume = !!payload.resume_dispatch_id;
     const isRetryQueue = !!payload.retry_queue_id;
 
