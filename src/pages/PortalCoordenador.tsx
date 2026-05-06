@@ -135,6 +135,19 @@ export default function PortalCoordenador() {
     ].filter(Boolean).join(" - ");
 
     const parent = form.parent_id || me.id;
+
+    // Verificar se telefone já é de um funcionário deste client → propor vínculo
+    const { findFuncionarioByPhone } = await import("@/lib/funcionario-link");
+    const func = await findFuncionarioByPhone(me.client_id, form.telefone.trim());
+    let funcionarioId: string | null = null;
+    if (func) {
+      const ok = window.confirm(
+        `Esse telefone já é do funcionário "${func.nome}". Deseja vincular esse novo papel ao mesmo funcionário (sem duplicar o cadastro)?`,
+      );
+      if (!ok) return;
+      funcionarioId = func.id;
+    }
+
     const payload: any = {
       client_id: me.client_id,
       tipo: form.tipo,
@@ -145,6 +158,7 @@ export default function PortalCoordenador() {
       telefone: form.telefone.trim(),
       endereco: enderecoFmt,
       parent_id: parent,
+      funcionario_id: funcionarioId,
     };
     setSaving(true);
     const { error } = await supabase.from("eleicao_pessoas" as any).insert(payload);

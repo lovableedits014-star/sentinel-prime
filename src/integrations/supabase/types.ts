@@ -1595,6 +1595,7 @@ export type Database = {
           email: string | null
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
+          funcionario_id: string | null
           id: string
           nome: string
           observacoes: string | null
@@ -1613,6 +1614,7 @@ export type Database = {
           email?: string | null
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
+          funcionario_id?: string | null
           id?: string
           nome: string
           observacoes?: string | null
@@ -1631,6 +1633,7 @@ export type Database = {
           email?: string | null
           endereco?: string
           escopo?: Database["public"]["Enums"]["eleicao_escopo"]
+          funcionario_id?: string | null
           id?: string
           nome?: string
           observacoes?: string | null
@@ -1647,6 +1650,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_pessoas_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
           {
