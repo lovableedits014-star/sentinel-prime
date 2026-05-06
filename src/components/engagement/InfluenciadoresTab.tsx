@@ -366,6 +366,19 @@ export default function InfluenciadoresTab({ clientId }: { clientId: string }) {
     // 2) Busca perfis sociais (platform + platform_user_id) desses supporters
     const profileKeyToSupporter = new Map<string, string>();
     const supporterProfileUrls = new Map<string, Record<string, string>>();
+    const cleanHandle = (s: string | null | undefined) =>
+      (s || "").toLowerCase().trim().replace(/^@/, "").replace(/\/$/, "");
+    const addProfile = (supporterId: string | null | undefined, platform: string, handle: string | null | undefined, url?: string | null) => {
+      if (!supporterId || !platform || !handle) return;
+      const h = cleanHandle(handle);
+      if (!h) return;
+      profileKeyToSupporter.set(`${platform}:${h}`, supporterId);
+      if (url) {
+        const existing = supporterProfileUrls.get(supporterId) || {};
+        if (!existing[platform]) existing[platform] = url;
+        supporterProfileUrls.set(supporterId, existing);
+      }
+    };
     {
       let pFrom = 0;
       const pSize = 1000;
@@ -377,16 +390,54 @@ export default function InfluenciadoresTab({ clientId }: { clientId: string }) {
           .range(pFrom, pFrom + pSize - 1);
         if (!data || data.length === 0) break;
         for (const sp of data) {
-          profileKeyToSupporter.set(`${sp.platform}:${sp.platform_user_id}`, sp.supporter_id);
           const url = buildProfileUrl(sp.platform, (sp as any).platform_username, sp.platform_user_id);
-          if (url) {
-            const existing = supporterProfileUrls.get(sp.supporter_id) || {};
-            existing[sp.platform] = url;
-            supporterProfileUrls.set(sp.supporter_id, existing);
-          }
+          addProfile(sp.supporter_id, sp.platform, sp.platform_user_id, url);
+          addProfile(sp.supporter_id, sp.platform, (sp as any).platform_username, url);
         }
         pFrom += pSize;
         if (data.length < pSize) break;
+      }
+    }
+
+    // Também usa handles cadastrados em supporter_accounts (instagram_username, facebook_username)
+    for (const r of (accountsRes.data || []) as any[]) {
+      if (!r.supporter_id) continue;
+      if (r.instagram_username) {
+        const h = cleanHandle(r.instagram_username);
+        addProfile(r.supporter_id, "instagram", h, h ? `https://instagram.com/${h}` : null);
+      }
+      if (r.facebook_username) {
+        const h = cleanHandle(r.facebook_username);
+        addProfile(r.supporter_id, "facebook", h, h ? `https://facebook.com/${h}` : null);
+      }
+    }
+
+    // E redes cadastradas em pessoa_social (cruza pessoa→supporter)
+    {
+      const pessoaIdToSupporter = new Map<string, string>();
+      for (const r of (pessoasRes.data || []) as any[]) {
+        if (r.supporter_id && r.id) pessoaIdToSupporter.set(r.id, r.supporter_id);
+      }
+      // pessoasRes não trazia o id — refaz query mínima:
+      const { data: pessoasIds } = await supabase
+        .from("pessoas")
+        .select("id, supporter_id")
+        .eq("client_id", clientId)
+        .not("supporter_id", "is", null);
+      for (const r of pessoasIds || []) {
+        if (r.supporter_id) pessoaIdToSupporter.set(r.id, r.supporter_id);
+      }
+      const pessoaIds = Array.from(pessoaIdToSupporter.keys());
+      if (pessoaIds.length > 0) {
+        const { data: socials } = await supabase
+          .from("pessoa_social")
+          .select("pessoa_id, plataforma, usuario, url_perfil")
+          .in("pessoa_id", pessoaIds);
+        for (const s of socials || []) {
+          const sid = pessoaIdToSupporter.get(s.pessoa_id);
+          if (!sid) continue;
+          addProfile(sid, s.plataforma, s.usuario, s.url_perfil);
+        }
       }
     }
 
