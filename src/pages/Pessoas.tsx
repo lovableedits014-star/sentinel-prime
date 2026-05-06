@@ -379,6 +379,7 @@ export default function Pessoas() {
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">{r.cidade || "—"}</TableCell>
+                    <TableCell className="text-sm">{r.bairro || "—"}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {r.roles.map(role => (
