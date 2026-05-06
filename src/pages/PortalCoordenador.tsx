@@ -269,28 +269,39 @@ export default function PortalCoordenador() {
                 const isCollapsed = collapsed[l.id] ?? true;
                 return (
                   <div key={l.id} className="border rounded-lg overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setCollapsed(c => ({ ...c, [l.id]: !isCollapsed }))}
-                      className="w-full flex items-center gap-2 p-2 hover:bg-muted/40 text-left"
-                    >
-                      {isCollapsed ? <ChevronRight className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                      <div className={cn("rounded-full flex items-center justify-center shrink-0 border w-8 h-8", TIPO_META.lider.color)}>
-                        <Users className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{l.nome}</p>
-                        <p className="text-xs text-muted-foreground truncate flex items-center gap-2">
-                          <Phone className="w-3 h-3" />{l.telefone}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="text-[10px]">{cabosDoLider.length} cabos</Badge>
-                    </button>
+                    <div className="flex items-center gap-2 p-2 hover:bg-muted/40">
+                      <button
+                        type="button"
+                        onClick={() => setCollapsed(c => ({ ...c, [l.id]: !isCollapsed }))}
+                        className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                      >
+                        {isCollapsed ? <ChevronRight className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                        <div className={cn("rounded-full flex items-center justify-center shrink-0 border w-8 h-8", TIPO_META.lider.color)}>
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{l.nome}</p>
+                          <p className="text-xs text-muted-foreground truncate flex items-center gap-2">
+                            <Phone className="w-3 h-3" />{l.telefone}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-[10px]">{cabosDoLider.length} cabos</Badge>
+                      </button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-emerald-600"
+                        title="Enviar link da foto via WhatsApp"
+                        onClick={() => sendFotoWhats(l, clientId!)}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
                     {!isCollapsed && (
                       <div className="px-3 pb-3 pt-1 border-t bg-muted/20">
                         <div className="ml-2 space-y-1">
                           {cabosDoLider.length === 0 && <p className="text-xs text-muted-foreground py-1">Sem cabos vinculados.</p>}
-                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} small />)}
+                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small />)}
                         </div>
                         <div className="flex gap-2 mt-2">
                           <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)}>
