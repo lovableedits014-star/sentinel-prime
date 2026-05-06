@@ -520,7 +520,7 @@ export default function InfluenciadoresTab({ clientId }: { clientId: string }) {
     for (const c of allComments) {
       if (!c.platform_user_id) continue;
       const platform = c.platform || "facebook";
-      const key = `${platform}:${c.platform_user_id}`;
+      const key = `${platform}:${cleanHandle(c.platform_user_id)}`;
       const supporterId = profileKeyToSupporter.get(key);
       if (!supporterId) continue;
       const meta = supporterMeta.get(supporterId);
