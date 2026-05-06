@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
-  Users, MessageSquare, Wifi, WifiOff, Filter, Zap, Target, Settings2, Cake,
+  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SugestoesPanel } from "@/components/disparos/SugestoesPanel";
