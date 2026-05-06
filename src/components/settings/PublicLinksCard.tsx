@@ -1,15 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Copy, Check, Link2, UserPlus, LogIn, Phone, QrCode, Printer, Download, Star, Plus, Trash2, Loader2 } from "lucide-react";
+import { Copy, Check, Link2, UserPlus, LogIn, Phone, QrCode, Printer, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { QRCodeCanvas } from "qrcode.react";
-import { supabase } from "@/integrations/supabase/client-selfhosted";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 interface PublicLinksCardProps {
   clientId: string;
@@ -24,24 +20,9 @@ interface LinkEntry {
   color: string;
 }
 
-interface InviteToken {
-  id: string;
-  token: string;
-  created_at: string;
-  expires_at: string;
-  used_at: string | null;
-  note: string | null;
-}
-
 export default function PublicLinksCard({ clientId }: PublicLinksCardProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [qrLink, setQrLink] = useState<LinkEntry | null>(null);
-  const [invites, setInvites] = useState<InviteToken[]>([]);
-  const [loadingInvites, setLoadingInvites] = useState(true);
-  const [creatingInvite, setCreatingInvite] = useState(false);
-  const [inviteNote, setInviteNote] = useState("");
-  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
-
   const baseUrl = window.location.origin;
 
   const links: LinkEntry[] = [
@@ -70,65 +51,6 @@ export default function PublicLinksCard({ clientId }: PublicLinksCardProps) {
       color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
     },
   ];
-
-  // ─── Convites de Líder ──────────────────────────────────────────────────
-  const loadInvites = async () => {
-    setLoadingInvites(true);
-    const { data, error } = await supabase
-      .from("lider_invite_tokens" as any)
-      .select("id, token, created_at, expires_at, used_at, note")
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
-    if (!error && data) setInvites(data as any);
-    setLoadingInvites(false);
-  };
-
-  useEffect(() => {
-    loadInvites();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
-
-  const handleCreateInvite = async () => {
-    setCreatingInvite(true);
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) {
-      toast.error("Faça login para gerar convites");
-      setCreatingInvite(false);
-      return;
-    }
-    const { error } = await supabase.from("lider_invite_tokens" as any).insert({
-      client_id: clientId,
-      created_by: userData.user.id,
-      note: inviteNote.trim() || null,
-    });
-    if (error) {
-      toast.error("Erro ao gerar convite");
-      console.error(error);
-    } else {
-      toast.success("Convite criado!");
-      setInviteNote("");
-      await loadInvites();
-    }
-    setCreatingInvite(false);
-  };
-
-  const handleDeleteInvite = async (id: string) => {
-    const { error } = await supabase.from("lider_invite_tokens" as any).delete().eq("id", id);
-    if (error) {
-      toast.error("Erro ao remover convite");
-      return;
-    }
-    toast.success("Convite removido");
-    setInvites((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  const handleCopyInvite = (token: string, id: string) => {
-    const url = `${baseUrl}/cadastro-lider/${token}`;
-    navigator.clipboard.writeText(url);
-    setCopiedInviteId(id);
-    toast.success("Link de convite copiado!");
-    setTimeout(() => setCopiedInviteId(null), 2000);
-  };
 
   const handleCopy = (url: string, index: number) => {
     navigator.clipboard.writeText(url);
@@ -282,110 +204,6 @@ export default function PublicLinksCard({ clientId }: PublicLinksCardProps) {
       </Dialog>
     </Card>
 
-    {/* ───────── Convites de Líder Contratado ───────── */}
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Star className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1">
-            <CardTitle>Convites de Líder Contratado</CardTitle>
-            <CardDescription>
-              Gere links únicos para convidar líderes contratados. Cada link só pode ser usado uma vez e expira em 30 dias.
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-          <Textarea
-            value={inviteNote}
-            onChange={(e) => setInviteNote(e.target.value)}
-            placeholder="Observação (opcional) — ex: nome do líder, região, etc."
-            rows={2}
-            className="bg-background text-sm"
-          />
-          <Button onClick={handleCreateInvite} disabled={creatingInvite} size="sm" className="w-full">
-            {creatingInvite ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando...</>
-            ) : (
-              <><Plus className="w-4 h-4 mr-2" /> Gerar novo convite</>
-            )}
-          </Button>
-        </div>
-
-        {loadingInvites ? (
-          <div className="text-center py-6 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Carregando convites...
-          </div>
-        ) : invites.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Nenhum convite gerado ainda.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {invites.map((invite) => {
-              const url = `${baseUrl}/cadastro-lider/${invite.token}`;
-              const isExpired = new Date(invite.expires_at) < new Date();
-              const isUsed = !!invite.used_at;
-              const isCopied = copiedInviteId === invite.id;
-              return (
-                <div
-                  key={invite.id}
-                  className={`rounded-lg border p-3 space-y-2 ${isUsed || isExpired ? "bg-muted/40 opacity-70" : "bg-background"}`}
-                >
-                  <div className="flex items-center gap-2 flex-wrap text-xs">
-                    {isUsed ? (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-                        ✓ Usado em {format(new Date(invite.used_at!), "dd/MM/yyyy", { locale: ptBR })}
-                      </span>
-                    ) : isExpired ? (
-                      <span className="px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
-                        Expirado
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                        Válido até {format(new Date(invite.expires_at), "dd/MM/yyyy", { locale: ptBR })}
-                      </span>
-                    )}
-                    {invite.note && (
-                      <span className="text-muted-foreground truncate">— {invite.note}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      readOnly
-                      value={url}
-                      className="text-xs font-mono bg-muted/30 h-8 flex-1"
-                      onClick={(e) => (e.target as HTMLInputElement).select()}
-                    />
-                    {!isUsed && !isExpired && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0 shrink-0"
-                        onClick={() => handleCopyInvite(invite.token, invite.id)}
-                      >
-                        {isCopied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 w-8 p-0 shrink-0 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteInvite(invite.id)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
     </div>
   );
 }
