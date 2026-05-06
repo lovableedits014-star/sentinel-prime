@@ -488,13 +488,23 @@ export default function Territorial() {
   // ═══════════════════════════════════════
   type GeoEntry = { id: string; name: string | null; phone: string | null; cpf?: string | null; supporter_id?: string | null; city: string | null; neighborhood: string | null; state: string | null; created_at: string };
 
+  // Tenta extrair bairro do endereço livre (formato comum: "Rua X, 123 - Bairro, Cidade/UF")
+  const extractBairroFromEndereco = (endereco: string | null | undefined): string | null => {
+    if (!endereco) return null;
+    // padrão: "... - Bairro, ..." ou "... - Bairro/UF"
+    const m = endereco.match(/\s-\s*([^,/-]+?)\s*(?:[,/]|$)/);
+    if (m && m[1] && m[1].trim().length > 1) return m[1].trim();
+    return null;
+  };
+
   const allGeoEntries = useMemo<GeoEntry[]>(() => {
     const entries: GeoEntry[] = [];
     (allPessoas || []).forEach(p => entries.push({ id: `pessoa:${p.id}`, name: p.nome, phone: p.telefone, cpf: p.cpf, supporter_id: p.supporter_id, city: p.cidade, neighborhood: p.bairro, state: null, created_at: p.created_at }));
     (supporters || []).forEach(s => entries.push({ id: `supporter:${s.id}`, name: s.name, phone: s.phone, cpf: s.cpf, supporter_id: s.supporter_id, city: s.city, neighborhood: s.neighborhood, state: s.state, created_at: s.created_at }));
     (confirmedIndicados || []).forEach(i => entries.push({ id: `indicado:${i.id}`, name: i.nome, phone: i.telefone, city: i.cidade, neighborhood: i.bairro, state: null, created_at: i.created_at }));
+    (eleicaoRows || []).forEach(e => entries.push({ id: `eleicao:${e.id}`, name: e.nome, phone: e.telefone, city: e.cidade, neighborhood: extractBairroFromEndereco(e.endereco), state: null, created_at: e.created_at }));
     return dedupeByPerson(entries);
-  }, [supporters, confirmedIndicados, allPessoas]);
+  }, [supporters, confirmedIndicados, allPessoas, eleicaoRows]);
 
   // Heuristic: infer UF from explicit state field, or "Cidade - UF" / "Cidade/UF" suffix in city.
   const inferUF = (e: GeoEntry): string | null => {
