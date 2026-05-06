@@ -383,32 +383,10 @@ export default function Disparos() {
                   <SelectItem value="manual">📋 Pessoas (CRM)</SelectItem>
                   <SelectItem value="apoiadores">🙋 Apoiadores</SelectItem>
                   <SelectItem value="funcionarios">👷 Funcionários</SelectItem>
-                  <SelectItem value="contratados">📝 Contratados</SelectItem>
                   <SelectItem value="eleicao">🗳️ Eleição (Coord/Líder/Cabo)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {tipoDisparo === "manual" && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1.5">
-                  <Filter className="w-3.5 h-3.5" /> Filtrar por tag
-                </Label>
-                <Select value={tagFiltro} onValueChange={setTagFiltro}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_all">Todos com telefone</SelectItem>
-                    {tags.map((t) => (
-                      <SelectItem key={t.nome} value={t.nome}>
-                        {t.nome} ({t.count})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             {tipoDisparo === "eleicao" && (
               <>
