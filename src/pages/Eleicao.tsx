@@ -35,6 +35,7 @@ interface Pessoa {
   observacoes: string | null;
   email: string | null;
   user_id: string | null;
+  valor_contratacao: number | null;
   created_at: string;
 }
 
