@@ -573,7 +573,7 @@ export default function InfluenciadoresTab({ clientId }: { clientId: string }) {
     // Calcula posts únicos e respostas por supporter (unificado)
     const commentsBySupporter = new Map<string, any[]>();
     for (const c of allComments) {
-      const supporterId = profileKeyToSupporter.get(`${c.platform || "facebook"}:${c.platform_user_id}`);
+      const supporterId = profileKeyToSupporter.get(`${c.platform || "facebook"}:${cleanHandle(c.platform_user_id)}`);
       if (!supporterId) continue;
       if (!commentsBySupporter.has(supporterId)) commentsBySupporter.set(supporterId, []);
       commentsBySupporter.get(supporterId)!.push(c);
