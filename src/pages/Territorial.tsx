@@ -349,6 +349,7 @@ export default function Territorial() {
         "client",
         "territorial-supporters",
         "territorial-indicados",
+        "territorial-eleicao",
         "recruitment-pessoas",
         "recruitment-contratados",
         "recruitment-indicados",
