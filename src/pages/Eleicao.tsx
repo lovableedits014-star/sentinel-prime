@@ -158,6 +158,7 @@ export default function Eleicao() {
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
+      valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
     };
     const q = editing
       ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
