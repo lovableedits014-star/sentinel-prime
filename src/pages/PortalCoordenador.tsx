@@ -228,7 +228,36 @@ export default function PortalCoordenador() {
             <Button size="sm" onClick={() => openNew("lider", me.id)}><Plus className="w-3.5 h-3.5 mr-1" />Novo Líder</Button>
           )}
           <Button size="sm" variant="outline" onClick={() => openNew("cabo", me.id)}><Plus className="w-3.5 h-3.5 mr-1" />Novo Cabo eleitoral</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              const link = buildFotoLink(clientId!);
+              try {
+                await navigator.clipboard.writeText(link);
+                toast.success("Link da foto copiado!", { description: link });
+              } catch {
+                toast.info(link);
+              }
+            }}
+          >
+            <Copy className="w-3.5 h-3.5 mr-1" />Copiar link da foto
+          </Button>
         </div>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Camera className="w-4 h-4 text-primary" />Foto de perfil da campanha
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground mb-2">
+              Gere sua foto com a moldura oficial ou copie o link acima e envie para apoiadores.
+            </p>
+            {clientId && <CampaignFrameGenerator clientId={clientId} variant="showcase" />}
+          </CardContent>
+        </Card>
 
         {me.escopo === "campo_grande" && (
           <Card>
