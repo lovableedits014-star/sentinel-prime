@@ -55,9 +55,6 @@ const Settings = () => {
 
       {clientId && <WhatsAppPoolManager clientId={clientId} />}
 
-      {/* Consumo & Custos — apenas Super Admin */}
-      {clientId && isSuperAdmin && <UsageEstimatePanel clientId={clientId} />}
-
       {/* WhatsApp Oficial */}
       {clientId && <WhatsAppConfigCard clientId={clientId} />}
 
