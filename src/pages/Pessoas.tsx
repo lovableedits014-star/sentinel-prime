@@ -126,6 +126,16 @@ export default function Pessoas() {
       }
     }
 
+    function bairroFromEndereco(endereco: string | null): string | null {
+      if (!endereco) return null;
+      // Padrão: "Rua X, 123 - Bairro, Cidade/UF" ou "Rua X, 123, Bairro, Cidade"
+      const m = endereco.match(/-\s*([^,]+?)\s*,/);
+      if (m) return m[1].trim();
+      const parts = endereco.split(",").map(s => s.trim()).filter(Boolean);
+      if (parts.length >= 3) return parts[parts.length - 2] || null;
+      return null;
+    }
+
     (pRes.data || []).forEach((p: any) => add({
       key: `p:${p.id}`,
       source: "pessoas",
@@ -134,6 +144,7 @@ export default function Pessoas() {
       nome: p.nome,
       telefone: p.telefone,
       cidade: p.cidade,
+      bairro: p.bairro || null,
       whatsapp_confirmado: !!p.whatsapp_confirmado,
       roles: ["apoiador"],
     }));
@@ -145,6 +156,7 @@ export default function Pessoas() {
       nome: f.nome,
       telefone: f.telefone,
       cidade: f.cidade,
+      bairro: f.bairro || null,
       whatsapp_confirmado: !!f.whatsapp_confirmado,
       roles: ["funcionario"],
     }));
@@ -156,6 +168,7 @@ export default function Pessoas() {
       nome: e.nome,
       telefone: e.telefone,
       cidade: e.cidade,
+      bairro: bairroFromEndereco(e.endereco),
       whatsapp_confirmado: false,
       roles: [e.tipo],
     }));
