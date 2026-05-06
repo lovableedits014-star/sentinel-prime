@@ -8,7 +8,7 @@ import WhatsAppPoolManager from "@/components/settings/WhatsAppPoolManager";
 import TelemarketingSettingsCard from "@/components/settings/TelemarketingSettingsCard";
 import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
 import PublicLinksCard from "@/components/settings/PublicLinksCard";
-import UsageEstimatePanel from "@/components/settings/UsageEstimatePanel";
+
 import CampaignFramesCard from "@/components/settings/CampaignFramesCard";
 import PresenceSettingsCard from "@/components/settings/PresenceSettingsCard";
 import CampaignIdentityCard from "@/components/settings/CampaignIdentityCard";
