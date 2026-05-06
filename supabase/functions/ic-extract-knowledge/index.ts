@@ -388,6 +388,24 @@ Deno.serve(async (req) => {
       }
       documentId = insertedDoc?.id ?? null;
       derivedFacts = deriveFacts(doc);
+
+      // Gera embedding (best-effort) para busca semântica
+      if (documentId) {
+        try {
+          const embText = buildDocEmbeddingText({ ...docRow, ...doc });
+          const embedding = await generateEmbedding(embText);
+          await admin
+            .from("ic_knowledge_documents")
+            .update({
+              embedding: embedding as any,
+              embedding_model: EMBEDDING_MODEL,
+              embedded_at: new Date().toISOString(),
+            })
+            .eq("id", documentId);
+        } catch (e: any) {
+          console.warn("[ic-extract-knowledge] embedding falhou:", e?.message);
+        }
+      }
     } else {
       derivedFacts = await extractLegacyFacts(llmConfig, text);
     }
