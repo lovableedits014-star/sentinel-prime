@@ -16,7 +16,14 @@ function flattenList(arr: any): string[] {
   return arr.map((x) => txt(x)).filter(Boolean);
 }
 
-export async function exportLivroDeCampanha(clientId: string, clientName?: string) {
+export async function exportLivroDeCampanha(clientId: string, clientNameHint?: string) {
+  // 0. Try fetch client name
+  let clientName = clientNameHint;
+  if (!clientName) {
+    const { data: c } = await supabase.from("clients").select("name").eq("id", clientId).maybeSingle();
+    clientName = (c as any)?.name || "";
+  }
+
   // 1. Fetch all docs
   const { data, error } = await supabase
     .from("ic_knowledge_documents" as any)
