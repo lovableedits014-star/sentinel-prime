@@ -15,6 +15,7 @@ import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Sea
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
