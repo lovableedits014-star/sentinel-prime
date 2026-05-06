@@ -128,6 +128,7 @@ export default function Eleicao() {
       email: p.email || "",
       password: "",
       send_access: false,
+      valor_contratacao: p.valor_contratacao != null ? String(p.valor_contratacao) : "",
     });
     setDialogOpen(true);
   }
