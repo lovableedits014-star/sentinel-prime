@@ -34,14 +34,42 @@ function validEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
+
+function isConnectedStatus(status: unknown) {
+  const s = String(status || "").toLowerCase();
+  return s === "connected" || s === "open";
+}
+
+function isExplicitOfflineStatus(status: unknown) {
+  const s = String(status || "").toLowerCase();
+  return ["disconnected", "offline", "closed", "logged_out", "logout", "banned"].includes(s);
+}
+
+function bridgeStatus(data: any) {
+  return String(data?.status || data?.instance?.status || "").toLowerCase();
+}
+
+async function bridgeAction(bridgeUrl: string, bridgeKey: string, body: Record<string, unknown>, retries = 0) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(bridgeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+    if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < retries) {
+      await sleep(1000 * (attempt + 1));
+      continue;
+    }
+    return { res, data };
+  }
+  throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
+}
+
 async function bridgeSend(bridgeUrl: string, bridgeKey: string, phone: string, message: string) {
-  const res = await fetch(bridgeUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
-    body: JSON.stringify({ action: "send", phone, message }),
-  });
-  const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
-  return { res, data };
+  return await bridgeAction(bridgeUrl, bridgeKey, { action: "send", phone, message }, 2);
 }
 
 function sendFailure(res: Response, data: any) {
@@ -50,6 +78,52 @@ function sendFailure(res: Response, data: any) {
   if (data?.delivered === false) return data?.error || "Mensagem não entregue pelo WhatsApp";
   const confirmed = data?.delivered === true || Boolean(data?.messageId || data?.message_id || data?.id || data?.key?.id);
   return confirmed ? null : (data?.error || "Ponte não confirmou o envio da mensagem");
+}
+
+function isInstanceDisconnectedFailure(res: Response, data: any, failure: string) {
+  if (res.status === 401) return true;
+  const msg = String(data?.error || data?.message || failure || "").toLowerCase();
+  return msg.includes("instance") && (msg.includes("disconnect") || msg.includes("not connected") || msg.includes("offline"));
+}
+
+async function updateInstanceStatus(admin: any, inst: any, status: "connected" | "connecting" | "disconnected") {
+  if (!inst?.id) return;
+  const updates: any = { status, last_health_check_at: new Date().toISOString() };
+  if (status === "connected") {
+    updates.connected_since = inst.connected_since || new Date().toISOString();
+  }
+  if (status === "disconnected") {
+    updates.connected_since = null;
+    updates.last_disconnected_at = new Date().toISOString();
+  }
+  await admin.from("whatsapp_instances").update(updates).eq("id", inst.id);
+}
+
+async function tryReconnectInstance(admin: any, inst: any) {
+  if (!inst?.bridge_url || !inst?.bridge_api_key) return { status: "disconnected", reconnected: false, detail: "sem credenciais" };
+  const { res, data } = await bridgeAction(inst.bridge_url, inst.bridge_api_key, { action: "reconnect" }, 1);
+  const raw = bridgeStatus(data);
+  const status = isConnectedStatus(raw) ? "connected" : isExplicitOfflineStatus(raw) || res.status === 401 ? "disconnected" : "connecting";
+  await updateInstanceStatus(admin, inst, status as any);
+  return { status, reconnected: status === "connected", detail: raw || data?.error || data?.message || "sem status" };
+}
+
+async function preflightInstance(admin: any, inst: any) {
+  if (!inst?.bridge_url || !inst?.bridge_api_key) return { status: "disconnected", reconnected: false, detail: "sem credenciais" };
+  try {
+    const { res, data } = await bridgeAction(inst.bridge_url, inst.bridge_api_key, { action: "instance_status" }, 1);
+    const raw = bridgeStatus(data);
+    if (isConnectedStatus(raw)) {
+      await updateInstanceStatus(admin, inst, "connected");
+      return { status: "connected", reconnected: false, detail: raw };
+    }
+    if (isExplicitOfflineStatus(raw) || res.status === 401) {
+      await updateInstanceStatus(admin, inst, "disconnected");
+    }
+  } catch (err) {
+    console.warn("[eleicao-send-credentials] preflight status falhou:", (err as Error).message);
+  }
+  return await tryReconnectInstance(admin, inst);
 }
 
 Deno.serve(async (req) => {
