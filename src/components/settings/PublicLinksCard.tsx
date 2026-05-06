@@ -1,15 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Copy, Check, Link2, UserPlus, LogIn, Phone, QrCode, Printer, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { QRCodeCanvas } from "qrcode.react";
-import { supabase } from "@/integrations/supabase/client-selfhosted";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 interface PublicLinksCardProps {
   clientId: string;
@@ -22,15 +18,6 @@ interface LinkEntry {
   path: string;
   icon: React.ReactNode;
   color: string;
-}
-
-interface InviteToken {
-  id: string;
-  token: string;
-  created_at: string;
-  expires_at: string;
-  used_at: string | null;
-  note: string | null;
 }
 
 export default function PublicLinksCard({ clientId }: PublicLinksCardProps) {
