@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Brain, Trash2, ExternalLink, Loader2, Search, Sparkles, FileText,
   MapPin, Users, Megaphone, Quote, Hash, Flag, Calendar, FileAudio, BookOpen,
+  AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
@@ -35,7 +36,7 @@ const TIPO_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export function MemoriaPanel({ clientId, clientName }: { clientId: string | null | undefined; clientName?: string }) {
-  const [view, setView] = useState<"documentos" | "timeline" | "fatos">("documentos");
+  const [view, setView] = useState<"documentos" | "timeline" | "contradicoes" | "fatos">("documentos");
   const [exporting, setExporting] = useState(false);
   if (!clientId) {
     return <Card><CardContent className="p-6 text-sm text-muted-foreground">Selecione um cliente.</CardContent></Card>;
@@ -80,6 +81,7 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
         <TabsList>
           <TabsTrigger value="documentos"><FileText className="w-4 h-4 mr-1.5" />Documentos</TabsTrigger>
           <TabsTrigger value="timeline"><Calendar className="w-4 h-4 mr-1.5" />Timeline</TabsTrigger>
+          <TabsTrigger value="contradicoes"><AlertTriangle className="w-4 h-4 mr-1.5" />Contradições</TabsTrigger>
           <TabsTrigger value="fatos"><Sparkles className="w-4 h-4 mr-1.5" />Fatos avulsos</TabsTrigger>
         </TabsList>
         <TabsContent value="documentos" className="mt-4">
@@ -87,6 +89,9 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
         </TabsContent>
         <TabsContent value="timeline" className="mt-4">
           <DocumentsTimeline clientId={clientId} />
+        </TabsContent>
+        <TabsContent value="contradicoes" className="mt-4">
+          <ContradictionsList clientId={clientId} />
         </TabsContent>
         <TabsContent value="fatos" className="mt-4">
           <FactsList clientId={clientId} />
@@ -915,6 +920,120 @@ function DocumentsTimeline({ clientId }: { clientId: string }) {
       </div>
 
       <DocumentDrawer openId={openId} onClose={() => setOpenId(null)} />
+    </div>
+  );
+}
+
+/* =========================================================================
+ * CONTRADIÇÕES
+ * ========================================================================= */
+function ContradictionsList({ clientId }: { clientId: string }) {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["ic-contradictions", clientId],
+    queryFn: async () => {
+      const { data: rows, error } = await supabase
+        .from("ic_document_contradictions" as any)
+        .select("*")
+        .eq("client_id", clientId)
+        .order("severidade", { ascending: true })
+        .order("detected_at", { ascending: false });
+      if (error) throw error;
+      const docIds = Array.from(new Set((rows || []).flatMap((r: any) => [r.document_a_id, r.document_b_id])));
+      let docs: Record<string, any> = {};
+      if (docIds.length) {
+        const { data: dd } = await supabase
+          .from("ic_knowledge_documents")
+          .select("id, titulo, data_evento")
+          .in("id", docIds);
+        docs = Object.fromEntries((dd || []).map((d: any) => [d.id, d]));
+      }
+      return { rows: (rows || []) as any[], docs };
+    },
+  });
+
+  const detect = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("ic-detect-contradictions", {
+        body: { clientId, replace: true },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (d: any) => {
+      toast.success(`Análise concluída: ${d?.count ?? 0} contradição(ões).`);
+      qc.invalidateQueries({ queryKey: ["ic-contradictions", clientId] });
+    },
+    onError: (e: any) => toast.error(e.message || "Falha ao detectar contradições."),
+  });
+
+  const sevColor: Record<string, string> = {
+    alta: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30",
+    media: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+    baixa: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30",
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          Detecta mudanças de posição e promessas incompatíveis entre documentos. Usa o LLM configurado para o cliente.
+        </p>
+        <Button size="sm" onClick={() => detect.mutate()} disabled={detect.isPending}>
+          {detect.isPending
+            ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+            : <RefreshCw className="w-4 h-4 mr-1.5" />}
+          Reanalisar
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando…</CardContent></Card>
+      ) : !data?.rows.length ? (
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground text-center">
+            Nenhuma contradição detectada ainda. Clique em <strong>Reanalisar</strong> para rodar a análise.
+          </CardContent>
+        </Card>
+      ) : (
+        data.rows.map((c) => {
+          const a = data.docs[c.document_a_id];
+          const b = data.docs[c.document_b_id];
+          return (
+            <Card key={c.id} className={`border ${sevColor[c.severidade] || sevColor.media}`}>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className={sevColor[c.severidade] || sevColor.media}>
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      {c.severidade}
+                    </Badge>
+                    {c.tipo && <Badge variant="secondary" className="text-xs">{c.tipo.replace(/_/g, " ")}</Badge>}
+                    {c.tema && <span className="text-sm font-semibold">{c.tema}</span>}
+                  </div>
+                </div>
+                <p className="text-sm">{c.explicacao}</p>
+                <div className="grid md:grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-md border bg-card/50 p-2.5">
+                    <div className="font-medium text-muted-foreground mb-1">
+                      {a?.titulo || "Documento A"}
+                      {a?.data_evento && <span className="ml-1">· {new Date(a.data_evento).toLocaleDateString("pt-BR")}</span>}
+                    </div>
+                    {c.trecho_a && <div className="italic">"{c.trecho_a}"</div>}
+                  </div>
+                  <div className="rounded-md border bg-card/50 p-2.5">
+                    <div className="font-medium text-muted-foreground mb-1">
+                      {b?.titulo || "Documento B"}
+                      {b?.data_evento && <span className="ml-1">· {new Date(b.data_evento).toLocaleDateString("pt-BR")}</span>}
+                    </div>
+                    {c.trecho_b && <div className="italic">"{c.trecho_b}"</div>}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
     </div>
   );
 }
