@@ -2293,6 +2293,56 @@ export type Database = {
           },
         ]
       }
+      ic_memoria_insights: {
+        Row: {
+          acao_url: string | null
+          client_id: string
+          created_at: string
+          dados: Json
+          descricao: string
+          id: string
+          prioridade: string
+          status: string
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          acao_url?: string | null
+          client_id: string
+          created_at?: string
+          dados?: Json
+          descricao: string
+          id?: string
+          prioridade?: string
+          status?: string
+          tipo: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          acao_url?: string | null
+          client_id?: string
+          created_at?: string
+          dados?: Json
+          descricao?: string
+          id?: string
+          prioridade?: string
+          status?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ic_memoria_insights_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ic_promessas: {
         Row: {
           bairro: string | null
