@@ -415,26 +415,75 @@ export default function Eleicao() {
           <TabsTrigger value="interior">Coord. Interior</TabsTrigger>
         </TabsList>
 
-        {/* KPIs compactos */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          {([
-            { k: "total", label: "Total", color: "bg-foreground/5 text-foreground" },
-            { k: "coord", label: "Coord.", color: "bg-red-500/10 text-red-600" },
-            { k: "lider", label: "Líderes", color: "bg-blue-500/10 text-blue-600" },
-            { k: "cabo", label: "Cabos", color: "bg-green-500/10 text-green-600" },
-          ] as const).map(s => (
-            <div key={s.k} className={cn("px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5", s.color)}>
-              <span className="opacity-70">{s.label}</span>
-              <span className="font-bold tabular-nums">{(stats as any)[s.k]}</span>
-            </div>
-          ))}
+        {/* KPIs com cards visuais */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+          <KpiCard label="Total" value={stats.total} icon={Users} tone="neutral" />
+          <KpiCard label="Coordenadores" value={stats.coord} icon={Crown} tone="red" />
+          <KpiCard label="Líderes" value={stats.lider} icon={Users} tone="blue" />
+          <KpiCard label="Cabos" value={stats.cabo} icon={UserCheck} tone="green" />
+          <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" small />
         </div>
 
-        {/* Busca */}
-        <div className="relative mb-3">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9 h-9" placeholder="Buscar nome, telefone ou endereço…" value={search} onChange={e => setSearch(e.target.value)} />
+        {/* Toolbar: busca + tipo + status + ordenação + layout */}
+        <div className="flex flex-col lg:flex-row gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9 h-9" placeholder="Buscar nome, telefone ou endereço…" value={search} onChange={e => setSearch(e.target.value)} />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as any)}>
+              <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                <SelectItem value="coordenador">Coordenadores</SelectItem>
+                <SelectItem value="lider">Líderes</SelectItem>
+                <SelectItem value="cabo">Cabos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                <SelectItem value="sem_valor">⚠ Sem valor</SelectItem>
+                <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+              <SelectTrigger className="h-9 w-[130px]"><ArrowUpDown className="w-3.5 h-3.5 mr-1" /><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nome">Nome</SelectItem>
+                <SelectItem value="valor">Valor</SelectItem>
+                <SelectItem value="tipo">Tipo</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center border border-border rounded-md p-0.5 h-9">
+              <button
+                onClick={() => setLayoutMode("arvore")}
+                className={cn("h-8 px-2.5 rounded text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  layoutMode === "arvore" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                title="Visualização em árvore"
+              ><Network className="w-3.5 h-3.5" />Árvore</button>
+              <button
+                onClick={() => setLayoutMode("lista")}
+                className={cn("h-8 px-2.5 rounded text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  layoutMode === "lista" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                title="Visualização em lista"
+              ><List className="w-3.5 h-3.5" />Lista</button>
+            </div>
+          </div>
         </div>
+
+        {(statusFilter !== "todos" || tipoFilter !== "todos" || search) && (
+          <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+            <span>Mostrando <strong className="text-foreground">{escopoList.length}</strong> resultados</span>
+            <button onClick={() => { setStatusFilter("todos"); setTipoFilter("todos"); setSearch(""); }} className="text-primary hover:underline">limpar filtros</button>
+          </div>
+        )}
 
         {/* Chips de região (CG) */}
         {escopo === "campo_grande" && (
