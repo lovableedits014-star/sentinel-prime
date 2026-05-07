@@ -317,6 +317,13 @@ export default function Disparos() {
 
         <TabsContent value="disparos" className="space-y-4 sm:space-y-6">
 
+      {clientId && (
+        <BordoesBairrosWidget
+          clientId={clientId}
+          contexto="Use os bordões e cite promessas relevantes para reforçar a mensagem do disparo."
+        />
+      )}
+
       <SugestoesPanel />
 
       {/* Connection status banner */}
