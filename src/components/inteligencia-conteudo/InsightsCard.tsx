@@ -17,6 +17,13 @@ const PRIORIDADE_COLOR: Record<string, string> = {
 export function InsightsCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusMsg, setStatusMsg] = useState<string>("");
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastSuccess, setLastSuccess] = useState<string | null>(null);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (progressTimer.current) clearInterval(progressTimer.current); }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ["ic-insights", clientId],
@@ -36,8 +43,17 @@ export function InsightsCard({ clientId }: { clientId: string }) {
 
   async function runInsights() {
     setRunning(true);
+    setLastError(null);
+    setLastSuccess(null);
+    setProgress(5);
+    setStatusMsg("Analisando memória…");
+    if (progressTimer.current) clearInterval(progressTimer.current);
+    progressTimer.current = setInterval(() => {
+      setProgress((p) => (p < 90 ? p + Math.max(1, Math.round((90 - p) / 12)) : p));
+    }, 600);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      setStatusMsg("Gerando insights com IA…");
       const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ic-memoria-insights`, {
         method: "POST",
         headers: {
@@ -46,12 +62,24 @@ export function InsightsCard({ clientId }: { clientId: string }) {
         },
         body: JSON.stringify({ clientId }),
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Falha");
-      toast.success(`${j.gerados} insight(s) gerado(s)`);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Falha (HTTP ${r.status})`);
+      setProgress(100);
+      const msg = `${j.gerados ?? 0} insight(s) gerado(s)`;
+      setStatusMsg(msg);
+      setLastSuccess(msg);
+      toast.success(msg);
       qc.invalidateQueries({ queryKey: ["ic-insights", clientId] });
-    } catch (e: any) { toast.error(e.message); }
-    finally { setRunning(false); }
+    } catch (e: any) {
+      const msg = e?.message || "Erro ao gerar insights";
+      setLastError(msg);
+      setStatusMsg("");
+      toast.error(msg);
+    } finally {
+      if (progressTimer.current) { clearInterval(progressTimer.current); progressTimer.current = null; }
+      setRunning(false);
+      setTimeout(() => setProgress(0), 1500);
+    }
   }
 
   const updStatus = useMutation({
