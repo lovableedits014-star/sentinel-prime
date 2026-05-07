@@ -616,6 +616,13 @@ Deno.serve(async (req) => {
       let preflightByInstance: Record<string, PreflightResult> = {};
 
       for (let batch = 0; batch < Math.ceil(recipients.length / BATCH_SIZE); batch++) {
+        // Checa se o disparo foi cancelado pelo usuário
+        const { data: statusCheck } = await adminClient
+          .from("whatsapp_dispatches").select("status").eq("id", dispatch.id).maybeSingle();
+        if (statusCheck?.status === "cancelado") {
+          console.log(`[dispatch] ${dispatch.id} cancelado pelo usuário — interrompendo loop`);
+          return;
+        }
         if (Date.now() - startTime > MAX_RUNTIME_MS) {
           await adminClient.from("whatsapp_dispatches").update({
             enviados: sent,
@@ -632,6 +639,15 @@ Deno.serve(async (req) => {
         const batchItems = recipients.slice(batchStart, batchStart + BATCH_SIZE);
 
         for (const recipient of batchItems) {
+          // Checa cancelamento a cada N envios para responder rápido
+          if ((sent + failed) % 5 === 0) {
+            const { data: sc } = await adminClient
+              .from("whatsapp_dispatches").select("status").eq("id", dispatch.id).maybeSingle();
+            if (sc?.status === "cancelado") {
+              console.log(`[dispatch] ${dispatch.id} cancelado pelo usuário — interrompendo`);
+              return;
+            }
+          }
           if (Date.now() - startTime > MAX_RUNTIME_MS) {
             await adminClient.from("whatsapp_dispatches").update({
               enviados: sent,
