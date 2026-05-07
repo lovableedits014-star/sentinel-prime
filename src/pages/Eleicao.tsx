@@ -521,7 +521,7 @@ export default function Eleicao() {
           {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> :
             layoutMode === "lista" ? (
               <ListaPlana
-                pessoas={escopoList}
+                pessoas={regiaoFilter === "all" ? escopoList : escopoList.filter(p => p.regiao === regiaoFilter)}
                 sortBy={sortBy}
                 onEdit={openEdit}
                 onDelete={remove}
