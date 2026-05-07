@@ -283,7 +283,6 @@ export async function gerarContratoDocxBlob(
       headers: { default: new Header({ children: [headerStripe, headerSubtitle] }) },
       footers: { default: new Footer({ children: [footerLine] }) },
       children: [
-        monogramPara,
         sealPara,
         ...linhas.map((linha, i) => {
           if (i === 0 && linha.trim()) {
