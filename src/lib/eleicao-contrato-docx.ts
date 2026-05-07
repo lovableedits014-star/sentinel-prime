@@ -191,13 +191,6 @@ export async function gerarContratoDocxBlob(
         page: {
           size: { width: 12240, height: 15840 },
           margin: { top: 1800, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720 },
-          borders: {
-            // Borda interna sutil em todo o documento, na cor do cargo
-            pageBorderTop:    { style: BorderStyle.SINGLE, size: 8, color: theme.color, space: 24 },
-            pageBorderBottom: { style: BorderStyle.SINGLE, size: 8, color: theme.color, space: 24 },
-            pageBorderLeft:   { style: BorderStyle.SINGLE, size: 8, color: theme.color, space: 24 },
-            pageBorderRight:  { style: BorderStyle.SINGLE, size: 8, color: theme.color, space: 24 },
-          },
         },
       },
       headers: { default: new Header({ children: [headerStripe, headerSubtitle] }) },
