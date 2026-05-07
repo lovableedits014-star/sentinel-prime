@@ -16,6 +16,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
+import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
+import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
+import { gerarContratoIndividual } from "@/lib/eleicao-contrato-docx";
+import { FileDown } from "lucide-react";
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
