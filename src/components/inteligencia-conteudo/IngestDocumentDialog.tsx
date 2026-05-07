@@ -214,11 +214,37 @@ export function IngestDocumentDialog({ clientId, trigger }: Props) {
           </div>
         </div>
 
+        {(phase !== "idle" || progress > 0) && (
+          <div className="space-y-1.5 pt-1">
+            <Progress value={progress} className="h-1.5" />
+            {statusMsg && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                {(phase === "uploading" || phase === "extracting" || phase === "analyzing") && <Loader2 className="w-3 h-3 animate-spin" />}
+                {phase === "done" && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                {statusMsg}
+              </p>
+            )}
+          </div>
+        )}
+
+        {errorMsg && phase === "error" && (
+          <div className="rounded-md border border-red-500/40 bg-red-500/5 p-2.5 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-red-700 dark:text-red-400">Falha ao ingerir documento</p>
+              <p className="text-xs text-muted-foreground break-words">{errorMsg}</p>
+            </div>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => ingest.mutate()}>Tentar novamente</Button>
+          </div>
+        )}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={ingest.isPending}>Cancelar</Button>
-          <Button onClick={() => ingest.mutate()} disabled={ingest.isPending}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={ingest.isPending}>
+            {phase === "done" ? "Fechar" : "Cancelar"}
+          </Button>
+          <Button onClick={() => ingest.mutate()} disabled={ingest.isPending || phase === "done"}>
             {ingest.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Upload className="w-4 h-4 mr-1.5" />}
-            Ingerir e analisar
+            {ingest.isPending ? "Processando…" : "Ingerir e analisar"}
           </Button>
         </DialogFooter>
       </DialogContent>
