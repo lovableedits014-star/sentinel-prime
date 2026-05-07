@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, Loader2, Check, X, Megaphone, AlertTriangle, RefreshCw } from "lucide-react";
+import { Lightbulb, Loader2, Check, X, Megaphone, AlertTriangle, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const PRIORIDADE_COLOR: Record<string, string> = {
   alta: "border-red-500/40 bg-red-500/5",
