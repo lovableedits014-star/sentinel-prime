@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, FileUp, Link as LinkIcon, NotebookPen, Plus } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Loader2, Upload, FileUp, Link as LinkIcon, NotebookPen, Plus, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+
+type Phase = "idle" | "uploading" | "extracting" | "analyzing" | "done" | "error";
 
 interface Props {
   clientId: string;
