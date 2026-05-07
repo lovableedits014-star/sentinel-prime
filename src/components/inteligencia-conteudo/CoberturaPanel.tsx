@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, MapPin, AlertTriangle, Search } from "lucide-react";
+import { Loader2, MapPin, AlertTriangle, Search, ChevronRight } from "lucide-react";
+import { BairroDetalheDialog } from "./BairroDetalheDialog";
 
 const ALERT_META: Record<string, { label: string; color: string }> = {
   silenciado: { label: "Silenciado", color: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" },
