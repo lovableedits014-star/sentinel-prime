@@ -6,7 +6,15 @@ import { generateEmbedding, buildDocEmbeddingText, EMBEDDING_MODEL } from "../_s
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-type SourceType = "transcription" | "post" | "comment" | "manual";
+type SourceType = "transcription" | "post" | "comment" | "manual" | "pdf" | "url" | "manual_doc";
+
+const DOC_MODE_TYPES = new Set<SourceType>(["transcription", "pdf", "url", "manual_doc"]);
+const TIPO_DOCUMENTO_MAP: Record<string, string> = {
+  transcription: "transcricao",
+  pdf: "pdf",
+  url: "url",
+  manual_doc: "nota_manual",
+};
 
 interface ExtractRequest {
   clientId: string;
