@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2 } from "lucide-react";
+import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,29 @@ import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package } from "lucide-react";
+
+// ─── Helpers visuais ────────────────────────────────────────────
+const initials = (nome: string) =>
+  nome.trim().split(/\s+/).slice(0, 2).map(n => n[0]?.toUpperCase() || "").join("") || "?";
+
+const fmtBRL = (n?: number | null) =>
+  (n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const onlyDigits = (s: string) => s.replace(/\D/g, "");
+
+const waLink = (telefone: string) => {
+  const d = onlyDigits(telefone);
+  if (!d) return "";
+  const full = d.startsWith("55") ? d : `55${d}`;
+  return `https://wa.me/${full}`;
+};
+
+const fmtPhone = (s: string) => {
+  const d = onlyDigits(s);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s;
+};
 
 async function gerarContratosLote(
   pessoas: Pessoa[],
