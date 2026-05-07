@@ -19,8 +19,9 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"silencio" | "falas" | "promessas">("silencio");
   const [selectedBairro, setSelectedBairro] = useState<string | null>(null);
+  const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["ic-cobertura", clientId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cobertura_territorial" as any, { p_client_id: clientId });
@@ -28,6 +29,19 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
       return (data ?? []) as any[];
     },
   });
+
+  async function handleRefresh() {
+    try {
+      await Promise.all([
+        refetch(),
+        qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] }),
+        qc.invalidateQueries({ queryKey: ["ic-knowledge", clientId] }),
+      ]);
+      toast.success("Cobertura atualizada");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao atualizar cobertura");
+    }
+  }
 
   const filtered = useMemo(() => {
     let l = data ?? [];
