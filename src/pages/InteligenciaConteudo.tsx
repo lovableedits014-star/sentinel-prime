@@ -716,6 +716,7 @@ function DnaContent({ dna }: { dna: any }) {
 const FUNC_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
 function TranscricaoPanel({ clientId }: { clientId: string | null | undefined }) {
+  const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [language, setLanguage] = useState<string>("pt");
   const [maxWords, setMaxWords] = useState<number>(5);
