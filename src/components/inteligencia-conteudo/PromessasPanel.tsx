@@ -279,6 +279,20 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
   });
   const [novaEvidencia, setNovaEvidencia] = useState("");
   const [notas, setNotas] = useState("");
+  const [texto, setTexto] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [beneficiario, setBeneficiario] = useState("");
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  // Hidrata estado local quando muda a promessa carregada
+  useMemo(() => {
+    if (p) {
+      setTexto(p.texto || "");
+      setBairro(p.bairro || "");
+      setBeneficiario(p.beneficiario || "");
+      setNotas(p.notas || "");
+    }
+  }, [p?.id]);
 
   const upd = useMutation({
     mutationFn: async (patch: any) => {
@@ -288,6 +302,7 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] });
       qc.invalidateQueries({ queryKey: ["ic-promessa", openId] });
+      qc.invalidateQueries({ queryKey: ["ic-cobertura", clientId] });
       toast.success("Atualizado");
     },
     onError: (e: any) => toast.error(e.message),
@@ -300,81 +315,92 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] });
+      qc.invalidateQueries({ queryKey: ["ic-cobertura", clientId] });
       toast.success("Removida"); onClose();
+      setConfirmDel(false);
     },
+    onError: (e: any) => { toast.error(e.message); setConfirmDel(false); },
   });
+
+  const saveIfChanged = (field: string, current: string, original: string | null | undefined) => {
+    const curTrim = current.trim();
+    const orig = (original || "").trim();
+    if (curTrim === orig) return;
+    upd.mutate({ [field]: curTrim || null });
+  };
 
   return (
     <Sheet open={!!openId} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader><SheetTitle className="flex items-center gap-2"><Flag className="w-4 h-4 text-primary" />Promessa</SheetTitle></SheetHeader>
+        <SheetHeader><SheetTitle className="flex items-center gap-2"><Flag className="w-4 h-4 text-primary" />Editar promessa</SheetTitle></SheetHeader>
         {p && (
           <div className="mt-4 space-y-5">
-            <div className="space-y-2">
-              <p className="text-sm leading-relaxed">{p.texto}</p>
-              <div className="flex flex-wrap gap-1.5">
-                <Badge variant="outline">{TIPO_LABEL[p.tipo] || p.tipo}</Badge>
-                {p.bairro && <Badge variant="secondary"><MapPin className="w-3 h-3 mr-1" />{p.bairro}</Badge>}
-                {p.beneficiario && <Badge variant="secondary">Para: {p.beneficiario}</Badge>}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold">Texto da promessa</label>
+              <Textarea
+                value={texto}
+                onChange={e => setTexto(e.target.value)}
+                onBlur={() => { if (texto.trim()) saveIfChanged("texto", texto, p.texto); }}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Tipo</label>
+                <Select value={p.tipo} onValueChange={(v) => upd.mutate({ tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TIPO_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Status</label>
+                <Select value={p.status} onValueChange={(v) => upd.mutate({ status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_META).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold">Status</label>
-              <Select value={p.status} onValueChange={(v) => upd.mutate({ status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STATUS_META).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Bairro</label>
+                <Input
+                  value={bairro}
+                  onChange={e => setBairro(e.target.value)}
+                  onBlur={() => saveIfChanged("bairro", bairro, p.bairro)}
+                  placeholder="ex: Centro"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Beneficiário</label>
+                <Input
+                  value={beneficiario}
+                  onChange={e => setBeneficiario(e.target.value)}
+                  onBlur={() => saveIfChanged("beneficiario", beneficiario, p.beneficiario)}
+                  placeholder="ex: famílias do bairro"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold">Prazo (texto)</label>
-                <Input value={p.prazo_texto || ""} onChange={e => upd.mutate({ prazo_texto: e.target.value })} placeholder="ex: junho de 2025" />
+                <Input
+                  defaultValue={p.prazo_texto || ""}
+                  onBlur={e => { const v = e.target.value.trim(); if (v !== (p.prazo_texto || "")) upd.mutate({ prazo_texto: v || null }); }}
+                  placeholder="ex: junho de 2025"
+                />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold">Prazo (data)</label>
                 <Input type="date" value={p.prazo_data || ""} onChange={e => upd.mutate({ prazo_data: e.target.value || null })} />
               </div>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold">Evidências de cumprimento</label>
-              <div className="space-y-1.5">
-                {(p.evidencias || []).map((ev: any, i: number) => (
-                  <div key={i} className="flex items-center gap-2 text-xs bg-muted/50 rounded p-2">
-                    <ExternalLink className="w-3 h-3 shrink-0" />
-                    <a href={ev.url} target="_blank" rel="noreferrer" className="truncate flex-1 hover:underline">{ev.descricao || ev.url}</a>
-                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => upd.mutate({ evidencias: (p.evidencias || []).filter((_:any,idx:number)=>idx!==i) })}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input placeholder="URL ou descrição da evidência" value={novaEvidencia} onChange={e => setNovaEvidencia(e.target.value)} />
-                <Button size="sm" onClick={() => {
-                  if (!novaEvidencia.trim()) return;
-                  const isUrl = /^https?:\/\//.test(novaEvidencia);
-                  const ev = isUrl ? { url: novaEvidencia, descricao: novaEvidencia } : { descricao: novaEvidencia };
-                  upd.mutate({ evidencias: [...(p.evidencias || []), ev] });
-                  setNovaEvidencia("");
-                }}>+</Button>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold">Notas internas</label>
-              <Textarea value={notas || p.notas || ""} onChange={e => setNotas(e.target.value)} onBlur={() => notas !== (p.notas || "") && upd.mutate({ notas })} rows={3} />
-            </div>
-
-            {p.documento_origem_id && (
-              <div className="text-xs text-muted-foreground">
-                Origem: documento <code className="text-[10px]">{String(p.documento_origem_id).slice(0,8)}</code>
-              </div>
-            )}
 
             <Button variant="destructive" size="sm" onClick={() => { if (confirm("Remover promessa?")) del.mutate(); }}>
               <Trash2 className="w-4 h-4 mr-1.5" />Remover
