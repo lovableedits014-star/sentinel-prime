@@ -806,6 +806,11 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         {p.tipo === "coordenador" && p.user_id && (
           <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
         )}
+        {(!p.valor_contratacao || p.valor_contratacao === 0) && (
+          <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-600 bg-amber-500/10 shrink-0">
+            valor pendente
+          </Badge>
+        )}
         <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {p.telefone}</span>
         <span className="text-xs text-muted-foreground truncate hidden md:inline">· {p.endereco}</span>
       </div>
