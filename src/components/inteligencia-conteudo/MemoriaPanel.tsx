@@ -41,7 +41,7 @@ const TIPO_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export function MemoriaPanel({ clientId, clientName }: { clientId: string | null | undefined; clientName?: string }) {
-  const [view, setView] = useState<"documentos" | "promessas" | "cobertura" | "timeline" | "contradicoes" | "fatos">("documentos");
+  const [view, setView] = useState<"documentos" | "promessas" | "cobertura" | "drift" | "timeline" | "contradicoes" | "fatos">("documentos");
   const [exporting, setExporting] = useState(false);
   if (!clientId) {
     return <Card><CardContent className="p-6 text-sm text-muted-foreground">Selecione um cliente.</CardContent></Card>;
