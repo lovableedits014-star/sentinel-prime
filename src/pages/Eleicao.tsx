@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2 } from "lucide-react";
+import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,29 @@ import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package } from "lucide-react";
+
+// ─── Helpers visuais ────────────────────────────────────────────
+const initials = (nome: string) =>
+  nome.trim().split(/\s+/).slice(0, 2).map(n => n[0]?.toUpperCase() || "").join("") || "?";
+
+const fmtBRL = (n?: number | null) =>
+  (n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const onlyDigits = (s: string) => s.replace(/\D/g, "");
+
+const waLink = (telefone: string) => {
+  const d = onlyDigits(telefone);
+  if (!d) return "";
+  const full = d.startsWith("55") ? d : `55${d}`;
+  return `https://wa.me/${full}`;
+};
+
+const fmtPhone = (s: string) => {
+  const d = onlyDigits(s);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s;
+};
 
 async function gerarContratosLote(
   pessoas: Pessoa[],
@@ -291,13 +314,28 @@ export default function Eleicao() {
     }
   }
 
+  const [view, setView] = useState<"cadastros" | "pendentes" | "custos">("cadastros");
+  const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso">("todos");
+  const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
+  const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
+
+  const matchesStatus = (p: Pessoa) => {
+    if (statusFilter === "sem_valor") return !p.valor_contratacao || p.valor_contratacao === 0;
+    if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
+    return true;
+  };
+  const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
+
   const matchesSearch = (p: Pessoa) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return p.nome.toLowerCase().includes(q) || p.telefone.includes(search) || (p.endereco || "").toLowerCase().includes(q);
   };
 
-  const escopoList = pessoas.filter(p => p.escopo === escopo && matchesSearch(p));
+  const escopoList = pessoas.filter(p =>
+    p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p)
+  );
   const cgRegioes = useMemo(() => {
     if (escopo !== "campo_grande") return [];
     return REGIOES.filter(r => regiaoFilter === "all" || r.value === regiaoFilter);
@@ -311,11 +349,15 @@ export default function Eleicao() {
 
   const stats = useMemo(() => {
     const f = pessoas.filter(p => p.escopo === escopo);
+    const valorTotal = f.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+    const semValor = f.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
     return {
       coord: f.filter(p => p.tipo === "coordenador").length,
       lider: f.filter(p => p.tipo === "lider").length,
       cabo: f.filter(p => p.tipo === "cabo").length,
       total: f.length,
+      valorTotal,
+      semValor,
     };
   }, [pessoas, escopo]);
 
@@ -330,7 +372,7 @@ export default function Eleicao() {
     );
   }, [pessoas, form.tipo, form.escopo, form.regiao, form.cidade]);
 
-  const [view, setView] = useState<"cadastros" | "pendentes" | "custos">("cadastros");
+
 
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
@@ -373,26 +415,75 @@ export default function Eleicao() {
           <TabsTrigger value="interior">Coord. Interior</TabsTrigger>
         </TabsList>
 
-        {/* KPIs compactos */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          {([
-            { k: "total", label: "Total", color: "bg-foreground/5 text-foreground" },
-            { k: "coord", label: "Coord.", color: "bg-red-500/10 text-red-600" },
-            { k: "lider", label: "Líderes", color: "bg-blue-500/10 text-blue-600" },
-            { k: "cabo", label: "Cabos", color: "bg-green-500/10 text-green-600" },
-          ] as const).map(s => (
-            <div key={s.k} className={cn("px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5", s.color)}>
-              <span className="opacity-70">{s.label}</span>
-              <span className="font-bold tabular-nums">{(stats as any)[s.k]}</span>
-            </div>
-          ))}
+        {/* KPIs com cards visuais */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+          <KpiCard label="Total" value={stats.total} icon={Users} tone="neutral" />
+          <KpiCard label="Coordenadores" value={stats.coord} icon={Crown} tone="red" />
+          <KpiCard label="Líderes" value={stats.lider} icon={Users} tone="blue" />
+          <KpiCard label="Cabos" value={stats.cabo} icon={UserCheck} tone="green" />
+          <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" small />
         </div>
 
-        {/* Busca */}
-        <div className="relative mb-3">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9 h-9" placeholder="Buscar nome, telefone ou endereço…" value={search} onChange={e => setSearch(e.target.value)} />
+        {/* Toolbar: busca + tipo + status + ordenação + layout */}
+        <div className="flex flex-col lg:flex-row gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9 h-9" placeholder="Buscar nome, telefone ou endereço…" value={search} onChange={e => setSearch(e.target.value)} />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as any)}>
+              <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                <SelectItem value="coordenador">Coordenadores</SelectItem>
+                <SelectItem value="lider">Líderes</SelectItem>
+                <SelectItem value="cabo">Cabos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                <SelectItem value="sem_valor">⚠ Sem valor</SelectItem>
+                <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+              <SelectTrigger className="h-9 w-[130px]"><ArrowUpDown className="w-3.5 h-3.5 mr-1" /><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nome">Nome</SelectItem>
+                <SelectItem value="valor">Valor</SelectItem>
+                <SelectItem value="tipo">Tipo</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center border border-border rounded-md p-0.5 h-9">
+              <button
+                onClick={() => setLayoutMode("arvore")}
+                className={cn("h-8 px-2.5 rounded text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  layoutMode === "arvore" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                title="Visualização em árvore"
+              ><Network className="w-3.5 h-3.5" />Árvore</button>
+              <button
+                onClick={() => setLayoutMode("lista")}
+                className={cn("h-8 px-2.5 rounded text-xs font-medium flex items-center gap-1.5 transition-colors",
+                  layoutMode === "lista" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                title="Visualização em lista"
+              ><List className="w-3.5 h-3.5" />Lista</button>
+            </div>
+          </div>
         </div>
+
+        {(statusFilter !== "todos" || tipoFilter !== "todos" || search) && (
+          <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+            <span>Mostrando <strong className="text-foreground">{escopoList.length}</strong> resultados</span>
+            <button onClick={() => { setStatusFilter("todos"); setTipoFilter("todos"); setSearch(""); }} className="text-primary hover:underline">limpar filtros</button>
+          </div>
+        )}
 
         {/* Chips de região (CG) */}
         {escopo === "campo_grande" && (
@@ -428,6 +519,17 @@ export default function Eleicao() {
 
         <TabsContent value="campo_grande" className="space-y-2 mt-0">
           {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> :
+            layoutMode === "lista" ? (
+              <ListaPlana
+                pessoas={escopoList}
+                sortBy={sortBy}
+                onEdit={openEdit}
+                onDelete={remove}
+                onCredentials={openCred}
+                onSend={sendCredentials}
+                sendingId={sendingId}
+              />
+            ) : (
             cgRegioes.map(r => {
               const list = escopoList.filter(p => p.regiao === r.value);
               if (list.length === 0 && regiaoFilter === "all") return null;
@@ -445,23 +547,30 @@ export default function Eleicao() {
                   sendingId={sendingId}
                 />
               );
-            })
+            }))
           }
           {!loading && escopoList.length === 0 && (
             <Card className="py-12 text-center text-muted-foreground border-dashed">
               <Crown className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Nenhum cadastro em Campo Grande ainda</p>
+              <p className="text-sm">Nenhum cadastro encontrado</p>
               <Button variant="link" onClick={() => openNew({ escopo: "campo_grande" })}>Cadastrar primeiro</Button>
             </Card>
-          )}
-          {!loading && regiaoFilter === "all" && escopoList.length > 0 && cgRegioes.every(r => escopoList.filter(p => p.regiao === r.value).length === 0) && (
-            <p className="text-center text-sm text-muted-foreground py-6">Nenhum resultado</p>
           )}
         </TabsContent>
 
         <TabsContent value="interior" className="space-y-2 mt-0">
           {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> :
-            interiorCidades.length === 0 ? (
+            layoutMode === "lista" ? (
+              <ListaPlana
+                pessoas={escopoList}
+                sortBy={sortBy}
+                onEdit={openEdit}
+                onDelete={remove}
+                onCredentials={openCred}
+                onSend={sendCredentials}
+                sendingId={sendingId}
+              />
+            ) : interiorCidades.length === 0 ? (
               <Card className="py-12 text-center text-muted-foreground border-dashed">
                 <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">Nenhuma cidade cadastrada ainda</p>
@@ -706,23 +815,33 @@ function RegionBlock({
   const hasContent = pessoas.length > 0;
   const [open, setOpen] = useState(defaultOpen ?? hasContent);
 
+  const valorTotal = pessoas.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+  const semValor = pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
+
   return (
-    <Card className="overflow-hidden border-border/60">
+    <Card className="overflow-hidden border-border/60 shadow-sm">
       <div
         onClick={() => hasContent && setOpen(o => !o)}
         className={cn(
-          "flex items-center gap-2 px-3 py-2 group",
-          hasContent && "cursor-pointer hover:bg-muted/40"
+          "flex items-center gap-2 px-3 py-2.5 group bg-gradient-to-r from-muted/30 to-transparent",
+          hasContent && "cursor-pointer hover:from-muted/50"
         )}
       >
-        <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90", !hasContent && "opacity-30")} />
-        <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-        <p className="font-medium text-sm flex-1 truncate">{title}</p>
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-          {coords.length > 0 && <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 font-medium">{coords.length}c</span>}
-          {lideres.length > 0 && <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium">{lideres.length}l</span>}
-          {cabos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 font-medium">{cabos.length}cb</span>}
-          {!hasContent && <span className="italic">vazio</span>}
+        <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90", !hasContent && "opacity-30")} />
+        <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <MapPin className="w-3.5 h-3.5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate leading-tight">{title}</p>
+          <p className="text-[11px] text-muted-foreground tabular-nums">
+            {pessoas.length > 0 ? `${pessoas.length} pessoa(s) · ${fmtBRL(valorTotal)}` : "vazio"}
+            {semValor > 0 && <span className="ml-1 text-amber-600">· {semValor} sem valor</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
+          {coords.length > 0 && <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 font-medium" title="Coordenadores">{coords.length}<span className="hidden sm:inline">c</span></span>}
+          {lideres.length > 0 && <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium" title="Líderes">{lideres.length}<span className="hidden sm:inline">l</span></span>}
+          {cabos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 font-medium" title="Cabos">{cabos.length}<span className="hidden sm:inline">cb</span></span>}
         </div>
         {hasContent && (
           <Button
@@ -736,7 +855,7 @@ function RegionBlock({
             <span className="hidden lg:inline">Contratos</span>
           </Button>
         )}
-        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); onAdd(); }}>
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); onAdd(); }} title="Adicionar nesta área">
           <Plus className="w-3.5 h-3.5" />
         </Button>
       </div>
@@ -866,42 +985,91 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
+  const wa = waLink(p.telefone);
+  const semValor = !p.valor_contratacao || p.valor_contratacao === 0;
+  const tipoBg: Record<Tipo, string> = {
+    coordenador: "bg-red-500 text-white",
+    lider: "bg-blue-500 text-white",
+    cabo: "bg-green-500 text-white",
+  };
+
   return (
     <div
       className={cn(
-        "group flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 transition-colors",
+        "group relative flex items-center gap-2.5 px-3 py-2 hover:bg-muted/40 transition-colors border-l-2 border-transparent",
         onToggle && "cursor-pointer",
-        indent === 0 && "py-2"
+        indent === 0 && "py-2.5 hover:border-l-primary/50",
+        indent === 1 && "hover:border-l-blue-500/50",
+        indent === 2 && "hover:border-l-green-500/50",
       )}
-      style={{ paddingLeft: `${12 + indent * 20}px` }}
+      style={{ paddingLeft: `${10 + indent * 22}px` }}
       onClick={onToggle}
     >
       {onToggle ? (
-        <ChevronRight className={cn("w-3 h-3 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-90")} />
+        <ChevronRight className={cn("w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-90")} />
       ) : indent > 0 ? (
-        <div className="w-3 shrink-0 text-muted-foreground/40 text-xs">└</div>
+        <div className="w-3.5 shrink-0 text-muted-foreground/30 text-xs font-mono leading-none">└</div>
       ) : (
-        <div className="w-3 shrink-0" />
+        <div className="w-3.5 shrink-0" />
       )}
-      <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0", meta.color)}>
-        <Icon className="w-3 h-3" />
+
+      {/* Avatar com iniciais + ícone tipo */}
+      <div className="relative shrink-0">
+        <div className={cn(
+          "rounded-full flex items-center justify-center font-bold tabular-nums shadow-sm",
+          indent === 0 ? "w-9 h-9 text-xs" : "w-7 h-7 text-[10px]",
+          tipoBg[p.tipo],
+        )}>
+          {initials(p.nome)}
+        </div>
+        <div className={cn(
+          "absolute -bottom-0.5 -right-0.5 rounded-full bg-background border-2 border-background flex items-center justify-center",
+          indent === 0 ? "w-4 h-4" : "w-3.5 h-3.5",
+        )}>
+          <Icon className={cn("text-muted-foreground", indent === 0 ? "w-2.5 h-2.5" : "w-2 h-2")} />
+        </div>
       </div>
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className={cn("text-sm font-medium truncate", indent === 0 && "font-semibold")}>{p.nome}</span>
-        {p.tipo === "coordenador" && p.user_id && (
-          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
-        )}
-        {(!p.valor_contratacao || p.valor_contratacao === 0) && (
-          <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-600 bg-amber-500/10 shrink-0">
-            valor pendente
-          </Badge>
-        )}
-        <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {p.telefone}</span>
-        <span className="text-xs text-muted-foreground truncate hidden md:inline">· {p.endereco}</span>
+
+      {/* Nome + dados */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={cn("text-sm truncate", indent === 0 ? "font-semibold" : "font-medium")}>{p.nome}</span>
+          {p.tipo === "coordenador" && p.user_id && (
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
+          )}
+          {semValor ? (
+            <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-600 bg-amber-500/10 shrink-0 gap-0.5">
+              <AlertCircle className="w-2.5 h-2.5" />sem valor
+            </Badge>
+          ) : (
+            <span className="text-[10px] font-bold tabular-nums text-emerald-700 bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">
+              {fmtBRL(p.valor_contratacao)}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+          {p.telefone && (
+            <a
+              href={wa}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 hover:text-emerald-600 transition-colors"
+              title="Abrir no WhatsApp"
+            >
+              <MessageCircle className="w-3 h-3" />
+              <span className="tabular-nums">{fmtPhone(p.telefone)}</span>
+            </a>
+          )}
+          {p.endereco && (
+            <span className="truncate hidden md:inline">· <MapPin className="w-2.5 h-2.5 inline mr-0.5" />{p.endereco}</span>
+          )}
+        </div>
       </div>
+
       {teamCount !== undefined && (
-        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
-          <Users className="w-2.5 h-2.5 mr-0.5" />{teamCount}
+        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0 gap-0.5">
+          <Users className="w-2.5 h-2.5" />{teamCount}
         </Badge>
       )}
       {bulkAction && (
@@ -916,9 +1084,10 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <span className="hidden lg:inline">{bulkAction.label}</span>
         </Button>
       )}
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 focus:opacity-100">
+          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 opacity-50 group-hover:opacity-100 focus:opacity-100">
             <MoreHorizontal className="w-3.5 h-3.5" />
           </Button>
         </DropdownMenuTrigger>
@@ -926,8 +1095,13 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <DropdownMenuItem onClick={() => onEdit(p)}>
             <Edit2 className="w-3.5 h-3.5 mr-2" />Editar
           </DropdownMenuItem>
+          {p.telefone && (
+            <DropdownMenuItem onClick={() => window.open(wa, "_blank")}>
+              <MessageCircle className="w-3.5 h-3.5 mr-2" />Abrir WhatsApp
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
-            disabled={!p.valor_contratacao || p.valor_contratacao === 0}
+            disabled={semValor}
             onClick={async () => {
               try {
                 await gerarContratoIndividual(p as any, p.client_id);
@@ -959,5 +1133,73 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+// ─── KPI Card visual ────────────────────────────────────────────
+function KpiCard({ label, value, icon: Icon, tone, small }: {
+  label: string; value: number | string; icon: any;
+  tone: "neutral" | "red" | "blue" | "green" | "emerald"; small?: boolean;
+}) {
+  const tones: Record<string, string> = {
+    neutral: "from-muted/40 to-muted/10 text-foreground border-border/50",
+    red: "from-red-500/15 to-red-500/5 text-red-700 dark:text-red-400 border-red-500/20",
+    blue: "from-blue-500/15 to-blue-500/5 text-blue-700 dark:text-blue-400 border-blue-500/20",
+    green: "from-green-500/15 to-green-500/5 text-green-700 dark:text-green-400 border-green-500/20",
+    emerald: "from-emerald-500/15 to-emerald-500/5 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
+  };
+  return (
+    <div className={cn("relative rounded-xl border bg-gradient-to-br p-3 overflow-hidden", tones[tone])}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-wider opacity-70 font-semibold">{label}</p>
+          <p className={cn("font-bold tabular-nums leading-tight mt-0.5 truncate", small ? "text-base" : "text-2xl")}>{value}</p>
+        </div>
+        <Icon className={cn("opacity-40 shrink-0", small ? "w-4 h-4" : "w-5 h-5")} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Lista plana ordenável ──────────────────────────────────────
+function ListaPlana({ pessoas, sortBy, onEdit, onDelete, onCredentials, onSend, sendingId }: {
+  pessoas: Pessoa[];
+  sortBy: "nome" | "valor" | "tipo";
+  onEdit: (p: Pessoa) => void;
+  onDelete: (id: string) => void;
+  onCredentials: (p: Pessoa) => void;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
+  sendingId: string | null;
+}) {
+  const tipoOrder: Record<Tipo, number> = { coordenador: 0, lider: 1, cabo: 2 };
+  const sorted = [...pessoas].sort((a, b) => {
+    if (sortBy === "valor") return (b.valor_contratacao || 0) - (a.valor_contratacao || 0);
+    if (sortBy === "tipo") return tipoOrder[a.tipo] - tipoOrder[b.tipo] || a.nome.localeCompare(b.nome);
+    return a.nome.localeCompare(b.nome);
+  });
+
+  if (sorted.length === 0) {
+    return (
+      <Card className="py-12 text-center text-muted-foreground border-dashed">
+        <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+        <p className="text-sm">Nenhum resultado</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden divide-y divide-border/40">
+      {sorted.map(p => (
+        <PessoaRow
+          key={p.id}
+          p={p}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onCredentials={onCredentials}
+          onSend={onSend}
+          sendingId={sendingId}
+        />
+      ))}
+    </Card>
   );
 }
