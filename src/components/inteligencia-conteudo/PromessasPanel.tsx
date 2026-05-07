@@ -285,7 +285,7 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
   const [confirmDel, setConfirmDel] = useState(false);
 
   // Hidrata estado local quando muda a promessa carregada
-  useMemo(() => {
+  useEffect(() => {
     if (p) {
       setTexto(p.texto || "");
       setBairro(p.bairro || "");
