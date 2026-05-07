@@ -365,16 +365,7 @@ export default function Eleicao() {
     return true;
   };
   const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
-  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso">("todos");
-  const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
-  const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
 
-  const matchesStatus = (p: Pessoa) => {
-    if (statusFilter === "sem_valor") return !p.valor_contratacao || p.valor_contratacao === 0;
-    if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
-    return true;
-  };
-  const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
 
 
   return (
