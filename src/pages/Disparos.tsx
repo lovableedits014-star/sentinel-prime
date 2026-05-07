@@ -14,7 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
-  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban,
+  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
