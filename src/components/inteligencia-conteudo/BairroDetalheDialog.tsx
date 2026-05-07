@@ -26,15 +26,26 @@ export function BairroDetalheDialog({ clientId, bairro, open, onOpenChange }: Pr
     queryKey: ["ic-bairro-docs", clientId, bairro],
     enabled,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("ic_knowledge_documents" as any)
-        .select("id, titulo, tipo_documento, data_evento, created_at, resumo_executivo, pontos_principais, bairros_citados, tom_emocional, local")
-        .eq("client_id", clientId)
-        .contains("bairros_citados", JSON.stringify([bairro]))
-        .order("data_evento", { ascending: false, nullsFirst: false })
-        .limit(20);
-      if (error) throw error;
-      return (data ?? []) as any[];
+      // bairros_citados pode vir como array de strings OU array de objetos { nome, ... }.
+      const cols = "id, titulo, tipo_documento, data_evento, created_at, resumo_executivo, pontos_principais, bairros_citados, tom_emocional, local";
+      const [asObj, asStr] = await Promise.all([
+        supabase.from("ic_knowledge_documents" as any).select(cols)
+          .eq("client_id", clientId)
+          .contains("bairros_citados", [{ nome: bairro }] as any)
+          .limit(20),
+        supabase.from("ic_knowledge_documents" as any).select(cols)
+          .eq("client_id", clientId)
+          .contains("bairros_citados", [bairro] as any)
+          .limit(20),
+      ]);
+      if (asObj.error && asStr.error) throw asObj.error;
+      const merged = new Map<string, any>();
+      for (const row of [...(asObj.data ?? []), ...(asStr.data ?? [])]) merged.set((row as any).id, row);
+      return Array.from(merged.values()).sort((a: any, b: any) => {
+        const da = new Date(a.data_evento || a.created_at).getTime();
+        const db = new Date(b.data_evento || b.created_at).getTime();
+        return db - da;
+      }).slice(0, 20);
     },
   });
 
