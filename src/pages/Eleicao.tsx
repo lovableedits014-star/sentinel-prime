@@ -982,6 +982,9 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   onToggle?: () => void;
   bulkAction?: { label: string; onClick: () => void };
 }) {
+  const isSending = sendingId === p.id;
+  const meta = TIPO_META[p.tipo];
+  const Icon = meta.icon;
   const wa = waLink(p.telefone);
   const semValor = !p.valor_contratacao || p.valor_contratacao === 0;
   const tipoBg: Record<Tipo, string> = {
