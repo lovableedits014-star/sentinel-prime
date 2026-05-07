@@ -92,6 +92,7 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
           <TabsTrigger value="documentos"><FileText className="w-4 h-4 mr-1.5" />Documentos</TabsTrigger>
           <TabsTrigger value="promessas"><Flag className="w-4 h-4 mr-1.5" />Promessas</TabsTrigger>
           <TabsTrigger value="cobertura"><MapPin className="w-4 h-4 mr-1.5" />Cobertura</TabsTrigger>
+          <TabsTrigger value="drift"><AlertTriangle className="w-4 h-4 mr-1.5" />Drift</TabsTrigger>
           <TabsTrigger value="timeline"><Calendar className="w-4 h-4 mr-1.5" />Timeline</TabsTrigger>
           <TabsTrigger value="contradicoes"><AlertTriangle className="w-4 h-4 mr-1.5" />Contradições</TabsTrigger>
           <TabsTrigger value="fatos"><Sparkles className="w-4 h-4 mr-1.5" />Fatos avulsos</TabsTrigger>
