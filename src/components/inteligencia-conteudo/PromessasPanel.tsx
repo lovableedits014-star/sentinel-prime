@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
@@ -279,6 +279,20 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
   });
   const [novaEvidencia, setNovaEvidencia] = useState("");
   const [notas, setNotas] = useState("");
+  const [texto, setTexto] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [beneficiario, setBeneficiario] = useState("");
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  // Hidrata estado local quando muda a promessa carregada
+  useEffect(() => {
+    if (p) {
+      setTexto(p.texto || "");
+      setBairro(p.bairro || "");
+      setBeneficiario(p.beneficiario || "");
+      setNotas(p.notas || "");
+    }
+  }, [p?.id]);
 
   const upd = useMutation({
     mutationFn: async (patch: any) => {
@@ -288,6 +302,7 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] });
       qc.invalidateQueries({ queryKey: ["ic-promessa", openId] });
+      qc.invalidateQueries({ queryKey: ["ic-cobertura", clientId] });
       toast.success("Atualizado");
     },
     onError: (e: any) => toast.error(e.message),
@@ -300,39 +315,86 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] });
+      qc.invalidateQueries({ queryKey: ["ic-cobertura", clientId] });
       toast.success("Removida"); onClose();
+      setConfirmDel(false);
     },
+    onError: (e: any) => { toast.error(e.message); setConfirmDel(false); },
   });
+
+  const saveIfChanged = (field: string, current: string, original: string | null | undefined) => {
+    const curTrim = current.trim();
+    const orig = (original || "").trim();
+    if (curTrim === orig) return;
+    upd.mutate({ [field]: curTrim || null });
+  };
 
   return (
     <Sheet open={!!openId} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader><SheetTitle className="flex items-center gap-2"><Flag className="w-4 h-4 text-primary" />Promessa</SheetTitle></SheetHeader>
+        <SheetHeader><SheetTitle className="flex items-center gap-2"><Flag className="w-4 h-4 text-primary" />Editar promessa</SheetTitle></SheetHeader>
         {p && (
           <div className="mt-4 space-y-5">
-            <div className="space-y-2">
-              <p className="text-sm leading-relaxed">{p.texto}</p>
-              <div className="flex flex-wrap gap-1.5">
-                <Badge variant="outline">{TIPO_LABEL[p.tipo] || p.tipo}</Badge>
-                {p.bairro && <Badge variant="secondary"><MapPin className="w-3 h-3 mr-1" />{p.bairro}</Badge>}
-                {p.beneficiario && <Badge variant="secondary">Para: {p.beneficiario}</Badge>}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold">Texto da promessa</label>
+              <Textarea
+                value={texto}
+                onChange={e => setTexto(e.target.value)}
+                onBlur={() => { if (texto.trim()) saveIfChanged("texto", texto, p.texto); }}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Tipo</label>
+                <Select value={p.tipo} onValueChange={(v) => upd.mutate({ tipo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TIPO_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Status</label>
+                <Select value={p.status} onValueChange={(v) => upd.mutate({ status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_META).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold">Status</label>
-              <Select value={p.status} onValueChange={(v) => upd.mutate({ status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STATUS_META).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Bairro</label>
+                <Input
+                  value={bairro}
+                  onChange={e => setBairro(e.target.value)}
+                  onBlur={() => saveIfChanged("bairro", bairro, p.bairro)}
+                  placeholder="ex: Centro"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold">Beneficiário</label>
+                <Input
+                  value={beneficiario}
+                  onChange={e => setBeneficiario(e.target.value)}
+                  onBlur={() => saveIfChanged("beneficiario", beneficiario, p.beneficiario)}
+                  placeholder="ex: famílias do bairro"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold">Prazo (texto)</label>
-                <Input value={p.prazo_texto || ""} onChange={e => upd.mutate({ prazo_texto: e.target.value })} placeholder="ex: junho de 2025" />
+                <Input
+                  defaultValue={p.prazo_texto || ""}
+                  onBlur={e => { const v = e.target.value.trim(); if (v !== (p.prazo_texto || "")) upd.mutate({ prazo_texto: v || null }); }}
+                  placeholder="ex: junho de 2025"
+                />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold">Prazo (data)</label>
@@ -367,7 +429,7 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold">Notas internas</label>
-              <Textarea value={notas || p.notas || ""} onChange={e => setNotas(e.target.value)} onBlur={() => notas !== (p.notas || "") && upd.mutate({ notas })} rows={3} />
+              <Textarea value={notas} onChange={e => setNotas(e.target.value)} onBlur={() => { if (notas !== (p.notas || "")) upd.mutate({ notas: notas || null }); }} rows={3} />
             </div>
 
             {p.documento_origem_id && (
@@ -376,9 +438,22 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
               </div>
             )}
 
-            <Button variant="destructive" size="sm" onClick={() => { if (confirm("Remover promessa?")) del.mutate(); }}>
-              <Trash2 className="w-4 h-4 mr-1.5" />Remover
-            </Button>
+            {!confirmDel ? (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmDel(true)}>
+                <Trash2 className="w-4 h-4 mr-1.5" />Remover promessa
+              </Button>
+            ) : (
+              <div className="rounded-md border border-red-500/40 bg-red-500/5 p-3 space-y-2">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400">Confirmar exclusão? Esta ação não pode ser desfeita.</p>
+                <div className="flex gap-2">
+                  <Button variant="destructive" size="sm" onClick={() => del.mutate()} disabled={del.isPending}>
+                    {del.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
+                    Sim, remover
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setConfirmDel(false)}>Cancelar</Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </SheetContent>
