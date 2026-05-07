@@ -79,6 +79,8 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
         </CardHeader>
       </Card>
 
+      <InsightsCard clientId={clientId} />
+
       <Tabs value={view} onValueChange={(v) => setView(v as any)}>
         <TabsList>
           <TabsTrigger value="documentos"><FileText className="w-4 h-4 mr-1.5" />Documentos</TabsTrigger>
