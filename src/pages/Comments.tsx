@@ -19,6 +19,7 @@ import { useMilitantsMap, type MilitantRow } from "@/hooks/useMilitants";
 import { AuthorHistoryDrawer } from "@/components/comments/AuthorHistoryDrawer";
 import { AlertTriangle } from "lucide-react";
 import { syncCooldownRemaining, markSyncDone, formatCooldown } from "@/lib/sync-throttle";
+import { BordoesBairrosWidget } from "@/components/memoria-widgets/BordoesBairrosWidget";
 
 type Comment = CommentData;
 
