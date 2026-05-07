@@ -829,6 +829,17 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <DropdownMenuItem onClick={() => onEdit(p)}>
             <Edit2 className="w-3.5 h-3.5 mr-2" />Editar
           </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!p.valor_contratacao || p.valor_contratacao === 0}
+            onClick={async () => {
+              try {
+                await gerarContratoIndividual(p as any, p.client_id);
+                toast.success("Contrato gerado!");
+              } catch (e: any) { toast.error(e.message); }
+            }}
+          >
+            <FileDown className="w-3.5 h-3.5 mr-2" />Baixar contrato (.docx)
+          </DropdownMenuItem>
           {p.tipo === "coordenador" && onSend && (
             <>
               <DropdownMenuSeparator />
