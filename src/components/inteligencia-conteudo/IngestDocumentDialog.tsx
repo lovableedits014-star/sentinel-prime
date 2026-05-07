@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, FileUp, Link as LinkIcon, NotebookPen, Plus } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Loader2, Upload, FileUp, Link as LinkIcon, NotebookPen, Plus, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+
+type Phase = "idle" | "uploading" | "extracting" | "analyzing" | "done" | "error";
 
 interface Props {
   clientId: string;
@@ -30,13 +33,36 @@ export function IngestDocumentDialog({ clientId, trigger }: Props) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
 
+  // progresso/erro
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [progress, setProgress] = useState(0);
+  const [statusMsg, setStatusMsg] = useState<string>("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (progressTimer.current) clearInterval(progressTimer.current); }, []);
+
+  const stopAutoProgress = () => {
+    if (progressTimer.current) { clearInterval(progressTimer.current); progressTimer.current = null; }
+  };
+  const startAutoProgress = (cap: number) => {
+    stopAutoProgress();
+    progressTimer.current = setInterval(() => {
+      setProgress((p) => (p < cap ? p + Math.max(1, Math.round((cap - p) / 14)) : p));
+    }, 500);
+  };
+
   const reset = () => {
     setFile(null); setUrl(""); setManualText("");
     setTitle(""); setDate(""); setTab("pdf");
+    setPhase("idle"); setProgress(0); setStatusMsg(""); setErrorMsg(null);
+    stopAutoProgress();
   };
 
   const ingest = useMutation({
     mutationFn: async () => {
+      setErrorMsg(null);
+      setProgress(2);
       const payload: any = {
         clientId,
         mode: tab,
@@ -52,27 +78,46 @@ export function IngestDocumentDialog({ clientId, trigger }: Props) {
         if (!uid) throw new Error("Usuário não autenticado");
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const path = `${uid}/${clientId}/${Date.now()}_${safeName}`;
+        setPhase("uploading");
+        setStatusMsg("Enviando PDF…");
+        startAutoProgress(35);
         const up = await supabase.storage.from("ic-documents").upload(path, file, {
           contentType: "application/pdf",
         });
         if (up.error) throw new Error(`Upload falhou: ${up.error.message}`);
         payload.storagePath = path;
+        setProgress(40);
       } else if (tab === "url") {
         const u = url.trim();
         if (!/^https?:\/\//i.test(u)) throw new Error("URL inválida (http/https)");
         payload.url = u;
+        setProgress(15);
       } else {
         if (manualText.trim().length < 30) throw new Error("Nota muito curta (mín 30 caracteres)");
         payload.text = manualText.trim();
+        setProgress(15);
       }
+
+      setPhase("extracting");
+      setStatusMsg(tab === "url" ? "Buscando e extraindo conteúdo da URL…" : tab === "pdf" ? "Extraindo texto do PDF…" : "Processando texto…");
+      startAutoProgress(75);
 
       const { data, error } = await supabase.functions.invoke("ic-ingest-document", { body: payload });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
+
+      setPhase("analyzing");
+      setStatusMsg("Analisando fatos, promessas e insights com IA…");
+      startAutoProgress(95);
       return data;
     },
     onSuccess: (data: any) => {
-      toast.success(`Documento ingerido — ${data?.extracted ?? 0} fatos. Promessas e insights atualizando…`);
+      stopAutoProgress();
+      setProgress(100);
+      setPhase("done");
+      const msg = `Documento ingerido — ${data?.extracted ?? 0} fatos extraídos`;
+      setStatusMsg(`${msg}. Promessas e insights atualizando em segundo plano…`);
+      toast.success(msg);
       const refresh = () => {
         qc.invalidateQueries({ queryKey: ["ic-documents", clientId] });
         qc.invalidateQueries({ queryKey: ["ic-knowledge", clientId] });
@@ -83,10 +128,16 @@ export function IngestDocumentDialog({ clientId, trigger }: Props) {
       refresh();
       setTimeout(refresh, 6000);
       setTimeout(refresh, 20000);
-      setOpen(false);
-      reset();
+      setTimeout(() => { setOpen(false); reset(); }, 1800);
     },
-    onError: (e: any) => toast.error(e?.message || "Falha ao ingerir documento"),
+    onError: (e: any) => {
+      stopAutoProgress();
+      const msg = e?.message || "Falha ao ingerir documento";
+      setErrorMsg(msg);
+      setPhase("error");
+      setStatusMsg("");
+      toast.error(msg);
+    },
   });
 
   return (
@@ -163,11 +214,37 @@ export function IngestDocumentDialog({ clientId, trigger }: Props) {
           </div>
         </div>
 
+        {(phase !== "idle" || progress > 0) && (
+          <div className="space-y-1.5 pt-1">
+            <Progress value={progress} className="h-1.5" />
+            {statusMsg && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                {(phase === "uploading" || phase === "extracting" || phase === "analyzing") && <Loader2 className="w-3 h-3 animate-spin" />}
+                {phase === "done" && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                {statusMsg}
+              </p>
+            )}
+          </div>
+        )}
+
+        {errorMsg && phase === "error" && (
+          <div className="rounded-md border border-red-500/40 bg-red-500/5 p-2.5 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-red-700 dark:text-red-400">Falha ao ingerir documento</p>
+              <p className="text-xs text-muted-foreground break-words">{errorMsg}</p>
+            </div>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => ingest.mutate()}>Tentar novamente</Button>
+          </div>
+        )}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={ingest.isPending}>Cancelar</Button>
-          <Button onClick={() => ingest.mutate()} disabled={ingest.isPending}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={ingest.isPending}>
+            {phase === "done" ? "Fechar" : "Cancelar"}
+          </Button>
+          <Button onClick={() => ingest.mutate()} disabled={ingest.isPending || phase === "done"}>
             {ingest.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Upload className="w-4 h-4 mr-1.5" />}
-            Ingerir e analisar
+            {ingest.isPending ? "Processando…" : "Ingerir e analisar"}
           </Button>
         </DialogFooter>
       </DialogContent>
