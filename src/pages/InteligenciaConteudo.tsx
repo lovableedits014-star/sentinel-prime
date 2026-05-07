@@ -767,7 +767,7 @@ function TranscricaoPanel({ clientId }: { clientId: string | null | undefined })
       // Re-busca após o pipeline assíncrono (extração → promessas → insights) terminar
       const refreshMemory = () => {
         qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] });
-        qc.invalidateQueries({ queryKey: ["ic-memoria-insights", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-insights", clientId] });
         qc.invalidateQueries({ queryKey: ["ic-documents", clientId] });
         qc.invalidateQueries({ queryKey: ["ic-knowledge", clientId] });
         qc.invalidateQueries({ queryKey: ["ic-cobertura", clientId] });
