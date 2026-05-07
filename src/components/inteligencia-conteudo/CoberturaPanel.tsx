@@ -72,10 +72,14 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
 
   if ((data ?? []).length === 0) {
     return (
-      <Card><CardContent className="p-8 text-center text-sm text-muted-foreground space-y-2">
+      <Card><CardContent className="p-8 text-center text-sm text-muted-foreground space-y-3">
         <MapPin className="w-8 h-8 mx-auto text-muted-foreground/50" />
         <p>Nenhum bairro mapeado ainda.</p>
         <p className="text-xs">Conforme você sobe transcrições, os bairros mencionados pelo candidato aparecem aqui com o tempo desde a última visita ou menção.</p>
+        <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isFetching}>
+          {isFetching ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+          Atualizar
+        </Button>
       </CardContent></Card>
     );
   }
@@ -99,6 +103,10 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
           <option value="falas">Mais falas primeiro</option>
           <option value="promessas">Mais promessas primeiro</option>
         </select>
+        <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isFetching} className="h-9" title={dataUpdatedAt ? `Atualizado às ${new Date(dataUpdatedAt).toLocaleTimeString("pt-BR")}` : undefined}>
+          {isFetching ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+          Atualizar
+        </Button>
       </div>
 
       <Card>
