@@ -304,7 +304,7 @@ export default function Eleicao() {
     );
   }, [pessoas, form.tipo, form.escopo, form.regiao, form.cidade]);
 
-  const [view, setView] = useState<"cadastros" | "custos">("cadastros");
+  const [view, setView] = useState<"cadastros" | "pendentes" | "custos">("cadastros");
 
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
@@ -313,20 +313,33 @@ export default function Eleicao() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Eleição</h1>
           <p className="text-sm text-muted-foreground mt-1">Coordenadores, líderes e cabos eleitorais da campanha</p>
         </div>
-        {view === "cadastros" && (
-          <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
-        )}
+        <div className="flex items-center gap-2">
+          {clientId && <EleicaoContractTemplates clientId={clientId} />}
+          {view === "cadastros" && (
+            <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
+          )}
+        </div>
       </div>
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-2 w-full max-w-md">
+        <TabsList className="grid grid-cols-3 w-full max-w-xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
+          <TabsTrigger value="pendentes" className="gap-1.5">
+            Pendentes de valor
+            {pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length > 0 && (
+              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                {pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
         </TabsList>
       </Tabs>
 
       {view === "custos" ? (
         <PrevisaoCustos pessoas={pessoas as any} />
+      ) : view === "pendentes" ? (
+        clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
       ) : (
       <Tabs value={escopo} onValueChange={(v) => { setEscopo(v as Escopo); setRegiaoFilter("all"); }}>
         <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
