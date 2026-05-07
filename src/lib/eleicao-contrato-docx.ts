@@ -1,5 +1,14 @@
 // Geração de contratos em .docx para a Eleição (Coordenador, Líder, Cabo)
-import { Document, Packer, Paragraph, TextRun, AlignmentType, Header, Footer, BorderStyle, ShadingType, PageNumber } from "docx";
+// Diferenciação visual pensada para impressão preto e branco:
+// - Formas e símbolos diferentes (★ / ▌ / ·)
+// - Estilos de borda diferentes (dupla / sólida grossa / pontilhada)
+// - Fontes diferentes (serif / sans / sans condensada)
+// - Monograma grande (C / L / E) no topo
+// - Tons de cinza distintos para o cabeçalho
+import {
+  Document, Packer, Paragraph, TextRun, AlignmentType, Header, Footer,
+  BorderStyle, ShadingType, PageNumber,
+} from "docx";
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 
@@ -19,7 +28,7 @@ export interface PessoaContratada {
 
 export interface ContractTemplate {
   id: string;
-  tipo: string; // eleicao_coordenador | eleicao_lider | eleicao_cabo
+  tipo: string;
   titulo: string;
   conteudo: string;
 }
@@ -27,7 +36,6 @@ export interface ContractTemplate {
 const fmtBRL = (n: number) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Conversão simples de número para extenso (suficiente para valores típicos de contrato)
 function valorPorExtenso(n: number): string {
   if (!n || n <= 0) return "zero reais";
   const inteiro = Math.floor(n);
@@ -97,36 +105,83 @@ export function renderTemplate(
   return template.conteudo.replace(/\{(\w+)\}/g, (_m, k) => replacements[k] ?? `{${k}}`);
 }
 
-// Esquema visual por tipo — cada cargo tem cor, faixa, rodapé e selo distintos
-const TIPO_THEME: Record<EleicaoTipo, {
-  label: string;
-  color: string;       // hex sem #
-  shading: string;     // hex sem # (fundo da faixa do título)
+// ─── Esquema visual por tipo (preto e branco, formas distintas) ───────────────
+type Theme = {
+  label: string;        // título principal
+  prefix: string;       // prefixo do nome no arquivo
+  monogram: string;     // letra grande no topo
+  symbol: string;       // símbolo lateral (★, ▌, ·)
   fontTitle: string;
   fontBody: string;
-}> = {
+  // tons de cinza
+  bandFill: string;     // cor de fundo da faixa do header
+  bandText: string;     // cor do texto na faixa
+  sealFill: string;     // cor de fundo do selo grande
+  sealText: string;     // cor do texto do selo
+  // estilo das bordas
+  borderStyle: typeof BorderStyle.SINGLE | typeof BorderStyle.DOUBLE | typeof BorderStyle.THICK | typeof BorderStyle.DOTTED | typeof BorderStyle.DASHED;
+  borderSize: number;
+  // rodapé
+  footerBorderStyle: typeof BorderStyle.SINGLE | typeof BorderStyle.DOUBLE | typeof BorderStyle.DOTTED;
+  footerBorderSize: number;
+};
+
+const TIPO_THEME: Record<EleicaoTipo, Theme> = {
   coordenador: {
-    label: "COORDENAÇÃO DE CAMPANHA",
-    color: "B91C1C",         // vermelho institucional
-    shading: "FEE2E2",
+    label: "★ COORDENAÇÃO DE CAMPANHA ★",
+    prefix: "Coordenador",
+    monogram: "C",
+    symbol: "★",
     fontTitle: "Georgia",
     fontBody: "Georgia",
+    bandFill: "000000",        // faixa preta
+    bandText: "FFFFFF",
+    sealFill: "000000",
+    sealText: "FFFFFF",
+    borderStyle: BorderStyle.DOUBLE,
+    borderSize: 18,            // borda dupla bem grossa
+    footerBorderStyle: BorderStyle.DOUBLE,
+    footerBorderSize: 12,
   },
   lider: {
-    label: "LIDERANÇA REGIONAL",
-    color: "1D4ED8",         // azul institucional
-    shading: "DBEAFE",
-    fontTitle: "Calibri",
+    label: "▌▌▌  LIDERANÇA REGIONAL  ▌▌▌",
+    prefix: "Lider",
+    monogram: "L",
+    symbol: "▌",
+    fontTitle: "Arial Black",
     fontBody: "Calibri",
+    bandFill: "595959",        // faixa cinza médio
+    bandText: "FFFFFF",
+    sealFill: "D9D9D9",        // selo cinza claro
+    sealText: "000000",
+    borderStyle: BorderStyle.THICK,
+    borderSize: 18,            // sólida bem grossa
+    footerBorderStyle: BorderStyle.SINGLE,
+    footerBorderSize: 18,
   },
   cabo: {
-    label: "CABO ELEITORAL",
-    color: "111827",
-    shading: "F3F4F6",
-    fontTitle: "Arial",
+    label: "· · ·  CABO ELEITORAL  · · ·",
+    prefix: "Cabo",
+    monogram: "E",
+    symbol: "·",
+    fontTitle: "Arial Narrow",
     fontBody: "Arial",
+    bandFill: "FFFFFF",        // sem faixa cheia
+    bandText: "000000",
+    sealFill: "FFFFFF",
+    sealText: "000000",
+    borderStyle: BorderStyle.DOTTED,
+    borderSize: 8,             // pontilhada fina
+    footerBorderStyle: BorderStyle.DOTTED,
+    footerBorderSize: 6,
   },
 };
+
+function fileNameFor(pessoa: PessoaContratada): string {
+  const t = TIPO_THEME[pessoa.tipo];
+  const safe = pessoa.nome.replace(/[^\w\s-]/g, "").trim();
+  return `${t.prefix} ${safe}.docx`;
+}
 
 export async function gerarContratoDocxBlob(
   template: ContractTemplate,
@@ -138,48 +193,86 @@ export async function gerarContratoDocxBlob(
   const linhas = texto.split("\n");
   const theme = TIPO_THEME[pessoa.tipo];
 
-  // Faixa colorida no topo (header) com tipo do contrato
+  // Faixa do header (estilo varia: preta sólida / cinza / sem fundo)
   const headerStripe = new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 0, after: 0 },
-    shading: { type: ShadingType.CLEAR, color: "auto", fill: theme.color },
+    shading: { type: ShadingType.CLEAR, color: "auto", fill: theme.bandFill },
     border: {
-      top:    { style: BorderStyle.SINGLE, size: 4, color: theme.color },
-      bottom: { style: BorderStyle.SINGLE, size: 4, color: theme.color },
-      left:   { style: BorderStyle.SINGLE, size: 4, color: theme.color },
-      right:  { style: BorderStyle.SINGLE, size: 4, color: theme.color },
+      top:    { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
+      bottom: { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
+      left:   { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
+      right:  { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
     },
     children: [new TextRun({
       text: `  ${theme.label}  `,
       bold: true,
-      color: "FFFFFF",
+      color: theme.bandText,
       size: 22,
       font: theme.fontTitle,
+      allCaps: true,
     })],
   });
 
   const headerSubtitle = new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 60, after: 0 },
+    spacing: { before: 80, after: 0 },
     children: [new TextRun({
       text: contratante,
       size: 16,
-      color: "6B7280",
+      color: "000000",
       font: theme.fontBody,
+      italics: pessoa.tipo === "coordenador",
     })],
   });
 
-  // Rodapé com selo de identificação visual
+  // Rodapé com estilo de borda diferente por tipo
   const footerLine = new Paragraph({
     alignment: AlignmentType.CENTER,
-    border: { top: { style: BorderStyle.SINGLE, size: 6, color: theme.color, space: 4 } },
-    spacing: { before: 60, after: 0 },
+    border: { top: { style: theme.footerBorderStyle, size: theme.footerBorderSize, color: "000000", space: 4 } },
+    spacing: { before: 80, after: 0 },
     children: [
-      new TextRun({ text: `${theme.label} · `, bold: true, color: theme.color, size: 16, font: theme.fontBody }),
-      new TextRun({ text: pessoa.nome, size: 16, color: "374151", font: theme.fontBody }),
-      new TextRun({ text: "   ·   Página ", size: 16, color: "9CA3AF", font: theme.fontBody }),
-      new TextRun({ children: [PageNumber.CURRENT], size: 16, color: "9CA3AF", font: theme.fontBody }),
+      new TextRun({ text: `${theme.symbol} ${theme.prefix.toUpperCase()} `, bold: true, color: "000000", size: 16, font: theme.fontTitle }),
+      new TextRun({ text: pessoa.nome, size: 16, color: "000000", font: theme.fontBody }),
+      new TextRun({ text: `   ${theme.symbol}   Página `, size: 16, color: "000000", font: theme.fontBody }),
+      new TextRun({ children: [PageNumber.CURRENT], size: 16, color: "000000", font: theme.fontBody }),
     ],
+  });
+
+  // Monograma gigante (C / L / E) — diferenciador visual primário
+  const monogramPara = new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 240, after: 60 },
+    children: [new TextRun({
+      text: theme.monogram,
+      bold: true,
+      size: 144, // ~72pt
+      color: theme.sealText,
+      font: theme.fontTitle,
+    })],
+  });
+
+  // Selo / faixa identificadora abaixo do monograma
+  const sealPara = new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 240 },
+    shading: theme.sealFill !== "FFFFFF"
+      ? { type: ShadingType.CLEAR, color: "auto", fill: theme.sealFill }
+      : undefined,
+    border: {
+      top:    { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
+      bottom: { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
+      left:   { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
+      right:  { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
+    },
+    children: [new TextRun({
+      text: `   ${theme.label}   `,
+      bold: true,
+      color: theme.sealText,
+      size: 24,
+      font: theme.fontTitle,
+      allCaps: true,
+    })],
   });
 
   const doc = new Document({
@@ -191,36 +284,33 @@ export async function gerarContratoDocxBlob(
         page: {
           size: { width: 12240, height: 15840 },
           margin: { top: 1800, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720 },
+          // borda de página com estilo diferente por tipo (tripla camada visual)
+          borders: {
+            pageBorderTop:    { style: theme.borderStyle, size: theme.borderSize, color: "000000", space: 24 },
+            pageBorderBottom: { style: theme.borderStyle, size: theme.borderSize, color: "000000", space: 24 },
+            pageBorderLeft:   { style: theme.borderStyle, size: theme.borderSize, color: "000000", space: 24 },
+            pageBorderRight:  { style: theme.borderStyle, size: theme.borderSize, color: "000000", space: 24 },
+          },
         },
       },
       headers: { default: new Header({ children: [headerStripe, headerSubtitle] }) },
       footers: { default: new Footer({ children: [footerLine] }) },
       children: [
-        // Selo grande no início — facilita identificação visual ao folhear
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 240, after: 120 },
-          shading: { type: ShadingType.CLEAR, color: "auto", fill: theme.shading },
-          border: {
-            top: { style: BorderStyle.SINGLE, size: 12, color: theme.color },
-            bottom: { style: BorderStyle.SINGLE, size: 12, color: theme.color },
-            left: { style: BorderStyle.SINGLE, size: 12, color: theme.color },
-            right: { style: BorderStyle.SINGLE, size: 12, color: theme.color },
-          },
-          children: [new TextRun({
-            text: `   ${theme.label}   `,
-            bold: true,
-            color: theme.color,
-            size: 28,
-            font: theme.fontTitle,
-          })],
-        }),
+        monogramPara,
+        sealPara,
         ...linhas.map((linha, i) => {
           if (i === 0 && linha.trim()) {
             return new Paragraph({
               alignment: AlignmentType.CENTER,
-              spacing: { before: 240, after: 240 },
-              children: [new TextRun({ text: linha, bold: true, size: 28, color: theme.color, font: theme.fontTitle })],
+              spacing: { before: 120, after: 240 },
+              children: [new TextRun({
+                text: linha,
+                bold: true,
+                size: 28,
+                color: "000000",
+                font: theme.fontTitle,
+                allCaps: pessoa.tipo === "coordenador",
+              })],
             });
           }
           return new Paragraph({
@@ -286,8 +376,7 @@ export async function gerarLoteZip(
     const tpl = tplByTipo.get(tipoToTemplateKey(p.tipo));
     if (!tpl) { pulados.push(p.nome); continue; }
     const blob = await gerarContratoDocxBlob(tpl, p, contratante, parents);
-    const safe = p.nome.replace(/[^\w\s-]/g, "").trim();
-    zip.file(`Contrato - ${safe}.docx`, blob);
+    zip.file(fileNameFor(p), blob);
   }
   const blob = await zip.generateAsync({ type: "blob" });
   return { blob, pulados };
@@ -301,6 +390,5 @@ export async function gerarContratoIndividual(
   const tpl = tplByTipo.get(tipoToTemplateKey(pessoa.tipo));
   if (!tpl) throw new Error(`Modelo de contrato não encontrado para tipo ${pessoa.tipo}`);
   const blob = await gerarContratoDocxBlob(tpl, pessoa, contratante, parents);
-  const safe = pessoa.nome.replace(/[^\w\s-]/g, "").trim();
-  downloadBlob(blob, `Contrato - ${safe}.docx`);
+  downloadBlob(blob, fileNameFor(pessoa));
 }
