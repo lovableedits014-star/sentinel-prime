@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
 import { PromessasPanel } from "./PromessasPanel";
 import { InsightsCard } from "./InsightsCard";
+import { CoberturaPanel } from "./CoberturaPanel";
 import { findBestSegment, formatTime, type AudioSegment } from "./audioMatch";
 import { useRef, useEffect, createContext, useContext } from "react";
 import { Play } from "lucide-react";
