@@ -18,8 +18,34 @@ import { cn } from "@/lib/utils";
 import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
-import { gerarContratoIndividual } from "@/lib/eleicao-contrato-docx";
-import { FileDown } from "lucide-react";
+import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
+import { FileDown, Package } from "lucide-react";
+
+async function gerarContratosLote(
+  pessoas: Pessoa[],
+  clientId: string,
+  zipName: string,
+) {
+  const elegiveis = pessoas.filter(p => p.valor_contratacao && p.valor_contratacao > 0);
+  const pendentes = pessoas.length - elegiveis.length;
+  if (elegiveis.length === 0) {
+    toast.error("Nenhuma pessoa do time com valor definido. Defina os valores em 'Pendentes de valor'.");
+    return;
+  }
+  const t = toast.loading(`Gerando ${elegiveis.length} contrato(s)…`);
+  try {
+    const { blob, pulados } = await gerarLoteZip(elegiveis as any, clientId);
+    downloadBlob(blob, `${zipName}.zip`);
+    toast.dismiss(t);
+    let msg = `${elegiveis.length} contrato(s) gerado(s)`;
+    if (pendentes > 0) msg += ` · ${pendentes} sem valor`;
+    if (pulados.length > 0) msg += ` · ${pulados.length} sem modelo`;
+    toast.success(msg);
+  } catch (e: any) {
+    toast.dismiss(t);
+    toast.error(e.message);
+  }
+}
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
@@ -698,6 +724,18 @@ function RegionBlock({
           {cabos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 font-medium">{cabos.length}cb</span>}
           {!hasContent && <span className="italic">vazio</span>}
         </div>
+        {hasContent && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-[11px] gap-1 hidden md:inline-flex"
+            onClick={(e) => { e.stopPropagation(); gerarContratosLote(pessoas, pessoas[0].client_id, `Contratos - ${title}`); }}
+            title={`Gerar contratos de ${title}`}
+          >
+            <Package className="w-3 h-3" />
+            <span className="hidden lg:inline">Contratos</span>
+          </Button>
+        )}
         <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); onAdd(); }}>
           <Plus className="w-3.5 h-3.5" />
         </Button>
@@ -732,9 +770,11 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
 }) {
   const lideres = all.filter(p => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
-  const totalEquipe = lideres.length + cabosDir.length + lideres.reduce((acc, l) => acc + all.filter(p => p.tipo === "cabo" && p.parent_id === l.id).length, 0);
+  const cabosLid = lideres.flatMap(l => all.filter(p => p.tipo === "cabo" && p.parent_id === l.id));
+  const totalEquipe = lideres.length + cabosDir.length + cabosLid.length;
   const [expanded, setExpanded] = useState(false);
   const hasTeam = totalEquipe > 0;
+  const allDoTime = [coord, ...lideres, ...cabosDir, ...cabosLid];
 
   return (
     <div className="border-b last:border-b-0">
@@ -748,18 +788,25 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
         teamCount={hasTeam ? totalEquipe : undefined}
         expanded={expanded}
         onToggle={hasTeam ? () => setExpanded(e => !e) : undefined}
+        bulkAction={hasTeam ? {
+          label: "Contratos da equipe",
+          onClick: () => gerarContratosLote(allDoTime, coord.client_id, `Contratos - ${coord.nome}`),
+        } : undefined}
       />
       {expanded && hasTeam && (
-        <div className="bg-background/50 pb-1">
-          {lideres.map(l => {
-            const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === l.id);
-            return (
-              <div key={l.id}>
-                <PessoaRow p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />
-                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={2} />)}
-              </div>
-            );
-          })}
+        <div className="bg-muted/10 pb-1">
+          {lideres.map(l => (
+            <LiderBlock
+              key={l.id}
+              lider={l}
+              all={all}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onCredentials={onCredentials}
+              onSend={onSend}
+              sendingId={sendingId}
+            />
+          ))}
           {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />)}
         </div>
       )}
@@ -767,7 +814,41 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle }: {
+function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendingId }: {
+  lider: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null;
+}) {
+  const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === lider.id);
+  const [open, setOpen] = useState(true);
+  const hasCabos = cabos.length > 0;
+  const time = [lider, ...cabos];
+
+  return (
+    <div className="border-t border-border/40">
+      <PessoaRow
+        p={lider}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onCredentials={onCredentials}
+        onSend={onSend}
+        sendingId={sendingId}
+        indent={1}
+        teamCount={hasCabos ? cabos.length : undefined}
+        expanded={open}
+        onToggle={hasCabos ? () => setOpen(o => !o) : undefined}
+        bulkAction={hasCabos ? {
+          label: "Contratos do time",
+          onClick: () => gerarContratosLote(time, lider.client_id, `Contratos - ${lider.nome}`),
+        } : undefined}
+      />
+      {open && cabos.map(cb => (
+        <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={2} />
+      ))}
+    </div>
+  );
+}
+
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
@@ -778,6 +859,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   teamCount?: number;
   expanded?: boolean;
   onToggle?: () => void;
+  bulkAction?: { label: string; onClick: () => void };
 }) {
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
@@ -786,7 +868,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
     <div
       className={cn(
         "group flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 transition-colors",
-        onToggle && "cursor-pointer"
+        onToggle && "cursor-pointer",
+        indent === 0 && "py-2"
       )}
       style={{ paddingLeft: `${12 + indent * 20}px` }}
       onClick={onToggle}
@@ -802,7 +885,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         <Icon className="w-3 h-3" />
       </div>
       <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className="text-sm font-medium truncate">{p.nome}</span>
+        <span className={cn("text-sm font-medium truncate", indent === 0 && "font-semibold")}>{p.nome}</span>
         {p.tipo === "coordenador" && p.user_id && (
           <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
         )}
@@ -818,6 +901,18 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
           <Users className="w-2.5 h-2.5 mr-0.5" />{teamCount}
         </Badge>
+      )}
+      {bulkAction && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-[11px] gap-1 shrink-0 hidden md:inline-flex"
+          onClick={(e) => { e.stopPropagation(); bulkAction.onClick(); }}
+          title={bulkAction.label}
+        >
+          <Package className="w-3 h-3" />
+          <span className="hidden lg:inline">{bulkAction.label}</span>
+        </Button>
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
