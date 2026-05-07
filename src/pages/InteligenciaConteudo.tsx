@@ -760,10 +760,20 @@ function TranscricaoPanel({ clientId }: { clientId: string | null | undefined })
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `Falha (${res.status})`);
-      toast.success("Transcrição concluída");
+      toast.success("Transcrição concluída — promessas e insights serão atualizados em segundos");
       setFile(null);
       setActiveId(json.transcription.id);
       list.refetch();
+      // Re-busca após o pipeline assíncrono (extração → promessas → insights) terminar
+      const refreshMemory = () => {
+        qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-memoria-insights", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-documents", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-knowledge", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-cobertura", clientId] });
+      };
+      setTimeout(refreshMemory, 8000);
+      setTimeout(refreshMemory, 25000);
     } catch (e: any) {
       toast.error(e.message ?? "Falha ao transcrever");
     } finally {
