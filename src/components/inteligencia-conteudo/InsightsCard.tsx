@@ -102,9 +102,38 @@ export function InsightsCard({ clientId }: { clientId: string }) {
           <Badge variant="secondary" className="ml-1 text-[10px]">{items.length}</Badge>
           <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={runInsights} disabled={running}>
             {running ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
-            Atualizar
+            {running ? "Atualizando…" : "Atualizar"}
           </Button>
         </div>
+
+        {(running || progress > 0) && (
+          <div className="space-y-1">
+            <Progress value={progress} className="h-1.5" />
+            {statusMsg && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                {running && <Loader2 className="w-3 h-3 animate-spin" />}
+                {statusMsg}
+              </p>
+            )}
+          </div>
+        )}
+
+        {lastError && !running && (
+          <div className="rounded-md border border-red-500/40 bg-red-500/5 p-2 flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-red-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold text-red-700 dark:text-red-400">Falha ao gerar insights</p>
+              <p className="text-[11px] text-muted-foreground break-words">{lastError}</p>
+            </div>
+            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={runInsights}>Tentar novamente</Button>
+          </div>
+        )}
+
+        {lastSuccess && !running && !lastError && (
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> {lastSuccess}
+          </p>
+        )}
 
         {items.length === 0 ? (
           <p className="text-xs text-muted-foreground">
