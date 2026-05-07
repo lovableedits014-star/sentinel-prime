@@ -239,20 +239,7 @@ export async function gerarContratoDocxBlob(
     ],
   });
 
-  // Monograma gigante (C / L / E) — diferenciador visual primário
-  const monogramPara = new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 240, after: 60 },
-    children: [new TextRun({
-      text: theme.monogram,
-      bold: true,
-      size: 144, // ~72pt
-      color: theme.sealText,
-      font: theme.fontTitle,
-    })],
-  });
-
-  // Selo / faixa identificadora abaixo do monograma
+  // Selo / faixa identificadora no topo
   const sealPara = new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { before: 0, after: 240 },
@@ -296,7 +283,6 @@ export async function gerarContratoDocxBlob(
       headers: { default: new Header({ children: [headerStripe, headerSubtitle] }) },
       footers: { default: new Footer({ children: [footerLine] }) },
       children: [
-        monogramPara,
         sealPara,
         ...linhas.map((linha, i) => {
           if (i === 0 && linha.trim()) {
