@@ -108,6 +108,17 @@ export default function CalendarioPolitico() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { ativos: estilosAtivos } = useEstilosTema();
 
+  const { data: client } = useQuery({
+    queryKey: ["client-calendario"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from("clients").select("id").eq("user_id", user.id).maybeSingle();
+      return data;
+    },
+  });
+  const clientId = client?.id;
+
   // Buscamos 3 anos para que navegação prev/next nos limites não quebre
   const yearsToLoad = useMemo(() => {
     const base = cursor.year;
