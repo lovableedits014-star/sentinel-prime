@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
 import { PromessasPanel } from "./PromessasPanel";
+import { InsightsCard } from "./InsightsCard";
 import { findBestSegment, formatTime, type AudioSegment } from "./audioMatch";
 import { useRef, useEffect, createContext, useContext } from "react";
 import { Play } from "lucide-react";
@@ -77,6 +78,8 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
           </div>
         </CardHeader>
       </Card>
+
+      <InsightsCard clientId={clientId} />
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)}>
         <TabsList>
