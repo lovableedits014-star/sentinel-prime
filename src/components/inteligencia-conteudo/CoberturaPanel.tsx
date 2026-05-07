@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, MapPin, AlertTriangle, Search, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, MapPin, AlertTriangle, Search, ChevronRight, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { BairroDetalheDialog } from "./BairroDetalheDialog";
 
 const ALERT_META: Record<string, { label: string; color: string }> = {
@@ -17,8 +19,9 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"silencio" | "falas" | "promessas">("silencio");
   const [selectedBairro, setSelectedBairro] = useState<string | null>(null);
+  const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["ic-cobertura", clientId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_cobertura_territorial" as any, { p_client_id: clientId });
@@ -26,6 +29,19 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
       return (data ?? []) as any[];
     },
   });
+
+  async function handleRefresh() {
+    try {
+      await Promise.all([
+        refetch(),
+        qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] }),
+        qc.invalidateQueries({ queryKey: ["ic-knowledge", clientId] }),
+      ]);
+      toast.success("Cobertura atualizada");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao atualizar cobertura");
+    }
+  }
 
   const filtered = useMemo(() => {
     let l = data ?? [];
@@ -56,10 +72,14 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
 
   if ((data ?? []).length === 0) {
     return (
-      <Card><CardContent className="p-8 text-center text-sm text-muted-foreground space-y-2">
+      <Card><CardContent className="p-8 text-center text-sm text-muted-foreground space-y-3">
         <MapPin className="w-8 h-8 mx-auto text-muted-foreground/50" />
         <p>Nenhum bairro mapeado ainda.</p>
         <p className="text-xs">Conforme você sobe transcrições, os bairros mencionados pelo candidato aparecem aqui com o tempo desde a última visita ou menção.</p>
+        <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isFetching}>
+          {isFetching ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+          Atualizar
+        </Button>
       </CardContent></Card>
     );
   }
@@ -83,6 +103,10 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
           <option value="falas">Mais falas primeiro</option>
           <option value="promessas">Mais promessas primeiro</option>
         </select>
+        <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isFetching} className="h-9" title={dataUpdatedAt ? `Atualizado às ${new Date(dataUpdatedAt).toLocaleTimeString("pt-BR")}` : undefined}>
+          {isFetching ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+          Atualizar
+        </Button>
       </div>
 
       <Card>
