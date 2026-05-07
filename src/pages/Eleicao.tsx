@@ -790,7 +790,13 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
         onToggle={hasTeam ? () => setExpanded(e => !e) : undefined}
         bulkAction={hasTeam ? {
           label: "Contratos da equipe",
-          onClick: () => gerarContratosLote(allDoTime, coord.client_id, `Contratos - ${coord.nome}`),
+          onClick: () => {
+            const local = coord.cidade || (coord.regiao ? (coord.regiao.charAt(0).toUpperCase() + coord.regiao.slice(1)) : "");
+            const zipName = local
+              ? `Coordenador ${coord.nome} - ${local}`
+              : `Coordenador ${coord.nome}`;
+            gerarContratosLote(allDoTime, coord.client_id, zipName);
+          },
         } : undefined}
       />
       {expanded && hasTeam && (
