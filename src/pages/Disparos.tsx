@@ -14,8 +14,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
-  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake,
+  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SugestoesPanel } from "@/components/disparos/SugestoesPanel";
 import DispatchLogDialog from "@/components/disparos/DispatchLogDialog";
@@ -62,6 +66,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   enviando: { label: "Enviando...", color: "bg-primary/10 text-primary", icon: Loader2 },
   pausado_timeout: { label: "Retomando…", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Loader2 },
   pausado_janela: { label: "Aguardando janela", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Clock },
+  pausado_sem_instancia: { label: "Sem instância", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: WifiOff },
   concluido: { label: "Concluído", color: "bg-emerald-500/15 text-emerald-600", icon: CheckCircle },
   falhou: { label: "Falhou", color: "bg-destructive/10 text-destructive", icon: XCircle },
   cancelado: { label: "Cancelado", color: "bg-muted text-muted-foreground", icon: XCircle },
@@ -149,7 +154,7 @@ export default function Disparos() {
     refetchInterval: (data: any) => {
       const rows = (data?.state?.data?.rows as DispatchRow[] | undefined) || [];
       const hasActive = rows.some(
-        (d) => ["pendente","enviando","pausado_timeout","pausado_janela"].includes(d.status)
+        (d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status)
       );
       return hasActive ? 3000 : false;
     },
@@ -293,8 +298,36 @@ export default function Disparos() {
     }
   };
 
+  const handleCancelDispatch = async (dispatchId: string, titulo: string) => {
+    try {
+      // Marca o disparo como cancelado e zera os pendentes para parar a fila e o cron de resume.
+      const { error: e1 } = await supabase
+        .from("whatsapp_dispatches" as any)
+        .update({
+          status: "cancelado",
+          pause_reason: "Cancelado pelo usuário",
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", dispatchId);
+      if (e1) throw e1;
+
+      // Marca itens pendentes como cancelados (não serão mais enviados em retomadas)
+      await supabase
+        .from("whatsapp_dispatch_items" as any)
+        .update({ status: "cancelado", erro: "Disparo cancelado pelo usuário" })
+        .eq("dispatch_id", dispatchId)
+        .eq("status", "pendente");
+
+      toast.success(`Disparo "${titulo}" cancelado.`);
+      refetch();
+    } catch (err: any) {
+      toast.error("Erro ao cancelar: " + (err.message || "tente novamente"));
+    }
+  };
+
   const isConnected = !!bridgeConfigured;
-  const activeDispatch = dispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela"].includes(d.status));
+  const activeDispatch = dispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -504,14 +537,41 @@ export default function Disparos() {
       {activeDispatch && (
         <Card className="border-primary/30">
           <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="font-medium text-sm">Enviando mensagens...</span>
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                <span className="font-medium text-sm truncate">{activeDispatch.titulo}</span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {activeDispatch.enviados} / {activeDispatch.total_destinatarios}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground">
+                  {activeDispatch.enviados} / {activeDispatch.total_destinatarios}
+                </span>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="h-7 gap-1">
+                      <Ban className="h-3.5 w-3.5" /> Cancelar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancelar disparo?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Os {Math.max(0, activeDispatch.total_destinatarios - activeDispatch.enviados - activeDispatch.falhas)} envios pendentes serão interrompidos.
+                        Mensagens já enviadas não podem ser revertidas.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Voltar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => handleCancelDispatch(activeDispatch.id, activeDispatch.titulo)}
+                      >
+                        Sim, cancelar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
             {activeDispatch.total_destinatarios > 0 && (
               <Progress
@@ -519,9 +579,12 @@ export default function Disparos() {
                 className="h-2"
               />
             )}
-            <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+            <div className="flex gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
               <span>✅ {activeDispatch.enviados} enviados</span>
               {activeDispatch.falhas > 0 && <span className="text-destructive">❌ {activeDispatch.falhas} falhas</span>}
+              {activeDispatch.status !== "enviando" && (
+                <span className="text-amber-600">⏸ {statusConfig[activeDispatch.status]?.label || activeDispatch.status}</span>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -608,6 +671,32 @@ export default function Disparos() {
                             </Badge>
                           )}
                           <DispatchLogDialog dispatchId={d.id} titulo={d.titulo} />
+                          {["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status) && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-destructive hover:text-destructive">
+                                  <Ban className="h-3 w-3" /> Cancelar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancelar disparo?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    "{d.titulo}" será interrompido. {Math.max(0, d.total_destinatarios - d.enviados - d.falhas)} envios pendentes não serão entregues.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Voltar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => handleCancelDispatch(d.id, d.titulo)}
+                                  >
+                                    Sim, cancelar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                           <span className="ml-auto">
                             {new Date(d.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </span>
