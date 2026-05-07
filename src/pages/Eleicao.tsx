@@ -519,6 +519,17 @@ export default function Eleicao() {
 
         <TabsContent value="campo_grande" className="space-y-2 mt-0">
           {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> :
+            layoutMode === "lista" ? (
+              <ListaPlana
+                pessoas={escopoList}
+                sortBy={sortBy}
+                onEdit={openEdit}
+                onDelete={remove}
+                onCredentials={openCred}
+                onSend={sendCredentials}
+                sendingId={sendingId}
+              />
+            ) : (
             cgRegioes.map(r => {
               const list = escopoList.filter(p => p.regiao === r.value);
               if (list.length === 0 && regiaoFilter === "all") return null;
@@ -536,23 +547,30 @@ export default function Eleicao() {
                   sendingId={sendingId}
                 />
               );
-            })
+            }))
           }
           {!loading && escopoList.length === 0 && (
             <Card className="py-12 text-center text-muted-foreground border-dashed">
               <Crown className="w-10 h-10 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Nenhum cadastro em Campo Grande ainda</p>
+              <p className="text-sm">Nenhum cadastro encontrado</p>
               <Button variant="link" onClick={() => openNew({ escopo: "campo_grande" })}>Cadastrar primeiro</Button>
             </Card>
-          )}
-          {!loading && regiaoFilter === "all" && escopoList.length > 0 && cgRegioes.every(r => escopoList.filter(p => p.regiao === r.value).length === 0) && (
-            <p className="text-center text-sm text-muted-foreground py-6">Nenhum resultado</p>
           )}
         </TabsContent>
 
         <TabsContent value="interior" className="space-y-2 mt-0">
           {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> :
-            interiorCidades.length === 0 ? (
+            layoutMode === "lista" ? (
+              <ListaPlana
+                pessoas={escopoList}
+                sortBy={sortBy}
+                onEdit={openEdit}
+                onDelete={remove}
+                onCredentials={openCred}
+                onSend={sendCredentials}
+                sendingId={sendingId}
+              />
+            ) : interiorCidades.length === 0 ? (
               <Card className="py-12 text-center text-muted-foreground border-dashed">
                 <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">Nenhuma cidade cadastrada ainda</p>
