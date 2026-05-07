@@ -537,14 +537,41 @@ export default function Disparos() {
       {activeDispatch && (
         <Card className="border-primary/30">
           <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                <span className="font-medium text-sm">Enviando mensagens...</span>
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                <span className="font-medium text-sm truncate">{activeDispatch.titulo}</span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {activeDispatch.enviados} / {activeDispatch.total_destinatarios}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground">
+                  {activeDispatch.enviados} / {activeDispatch.total_destinatarios}
+                </span>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="h-7 gap-1">
+                      <Ban className="h-3.5 w-3.5" /> Cancelar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancelar disparo?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Os {Math.max(0, activeDispatch.total_destinatarios - activeDispatch.enviados - activeDispatch.falhas)} envios pendentes serão interrompidos.
+                        Mensagens já enviadas não podem ser revertidas.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Voltar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => handleCancelDispatch(activeDispatch.id, activeDispatch.titulo)}
+                      >
+                        Sim, cancelar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
             {activeDispatch.total_destinatarios > 0 && (
               <Progress
@@ -552,9 +579,12 @@ export default function Disparos() {
                 className="h-2"
               />
             )}
-            <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+            <div className="flex gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
               <span>✅ {activeDispatch.enviados} enviados</span>
               {activeDispatch.falhas > 0 && <span className="text-destructive">❌ {activeDispatch.falhas} falhas</span>}
+              {activeDispatch.status !== "enviando" && (
+                <span className="text-amber-600">⏸ {statusConfig[activeDispatch.status]?.label || activeDispatch.status}</span>
+              )}
             </div>
           </CardContent>
         </Card>
