@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, Loader2, Check, X, Megaphone, AlertTriangle, RefreshCw } from "lucide-react";
+import { Lightbulb, Loader2, Check, X, Megaphone, AlertTriangle, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const PRIORIDADE_COLOR: Record<string, string> = {
   alta: "border-red-500/40 bg-red-500/5",
@@ -16,6 +17,13 @@ const PRIORIDADE_COLOR: Record<string, string> = {
 export function InsightsCard({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusMsg, setStatusMsg] = useState<string>("");
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastSuccess, setLastSuccess] = useState<string | null>(null);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (progressTimer.current) clearInterval(progressTimer.current); }, []);
 
   const { data, isLoading } = useQuery({
     queryKey: ["ic-insights", clientId],
@@ -35,8 +43,17 @@ export function InsightsCard({ clientId }: { clientId: string }) {
 
   async function runInsights() {
     setRunning(true);
+    setLastError(null);
+    setLastSuccess(null);
+    setProgress(5);
+    setStatusMsg("Analisando memória…");
+    if (progressTimer.current) clearInterval(progressTimer.current);
+    progressTimer.current = setInterval(() => {
+      setProgress((p) => (p < 90 ? p + Math.max(1, Math.round((90 - p) / 12)) : p));
+    }, 600);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      setStatusMsg("Gerando insights com IA…");
       const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ic-memoria-insights`, {
         method: "POST",
         headers: {
@@ -45,12 +62,24 @@ export function InsightsCard({ clientId }: { clientId: string }) {
         },
         body: JSON.stringify({ clientId }),
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Falha");
-      toast.success(`${j.gerados} insight(s) gerado(s)`);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `Falha (HTTP ${r.status})`);
+      setProgress(100);
+      const msg = `${j.gerados ?? 0} insight(s) gerado(s)`;
+      setStatusMsg(msg);
+      setLastSuccess(msg);
+      toast.success(msg);
       qc.invalidateQueries({ queryKey: ["ic-insights", clientId] });
-    } catch (e: any) { toast.error(e.message); }
-    finally { setRunning(false); }
+    } catch (e: any) {
+      const msg = e?.message || "Erro ao gerar insights";
+      setLastError(msg);
+      setStatusMsg("");
+      toast.error(msg);
+    } finally {
+      if (progressTimer.current) { clearInterval(progressTimer.current); progressTimer.current = null; }
+      setRunning(false);
+      setTimeout(() => setProgress(0), 1500);
+    }
   }
 
   const updStatus = useMutation({
@@ -73,9 +102,38 @@ export function InsightsCard({ clientId }: { clientId: string }) {
           <Badge variant="secondary" className="ml-1 text-[10px]">{items.length}</Badge>
           <Button size="sm" variant="ghost" className="ml-auto h-7" onClick={runInsights} disabled={running}>
             {running ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
-            Atualizar
+            {running ? "Atualizando…" : "Atualizar"}
           </Button>
         </div>
+
+        {(running || progress > 0) && (
+          <div className="space-y-1">
+            <Progress value={progress} className="h-1.5" />
+            {statusMsg && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                {running && <Loader2 className="w-3 h-3 animate-spin" />}
+                {statusMsg}
+              </p>
+            )}
+          </div>
+        )}
+
+        {lastError && !running && (
+          <div className="rounded-md border border-red-500/40 bg-red-500/5 p-2 flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-red-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold text-red-700 dark:text-red-400">Falha ao gerar insights</p>
+              <p className="text-[11px] text-muted-foreground break-words">{lastError}</p>
+            </div>
+            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={runInsights}>Tentar novamente</Button>
+          </div>
+        )}
+
+        {lastSuccess && !running && !lastError && (
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> {lastSuccess}
+          </p>
+        )}
 
         {items.length === 0 ? (
           <p className="text-xs text-muted-foreground">
