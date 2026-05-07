@@ -417,6 +417,20 @@ Deno.serve(async (req) => {
           console.warn("[ic-extract-knowledge] embedding falhou:", e?.message);
         }
       }
+
+      // Dispara extração de promessas estruturadas e regeneração de insights (fire-and-forget)
+      if (documentId) {
+        fetch(`${SUPABASE_URL}/functions/v1/ic-extract-promessas`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({ clientId, documentId }),
+        }).catch((e) => console.error("[ic-extract-knowledge] promessas fire failed:", e));
+      }
+      fetch(`${SUPABASE_URL}/functions/v1/ic-memoria-insights`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+        body: JSON.stringify({ clientId }),
+      }).catch((e) => console.error("[ic-extract-knowledge] insights fire failed:", e));
     } else {
       derivedFacts = await extractLegacyFacts(llmConfig, text);
     }
