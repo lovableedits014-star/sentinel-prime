@@ -982,45 +982,91 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   onToggle?: () => void;
   bulkAction?: { label: string; onClick: () => void };
 }) {
-  const isSending = sendingId === p.id;
-  const meta = TIPO_META[p.tipo];
-  const Icon = meta.icon;
+  const wa = waLink(p.telefone);
+  const semValor = !p.valor_contratacao || p.valor_contratacao === 0;
+  const tipoBg: Record<Tipo, string> = {
+    coordenador: "bg-red-500 text-white",
+    lider: "bg-blue-500 text-white",
+    cabo: "bg-green-500 text-white",
+  };
+
   return (
     <div
       className={cn(
-        "group flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 transition-colors",
+        "group relative flex items-center gap-2.5 px-3 py-2 hover:bg-muted/40 transition-colors border-l-2 border-transparent",
         onToggle && "cursor-pointer",
-        indent === 0 && "py-2"
+        indent === 0 && "py-2.5 hover:border-l-primary/50",
+        indent === 1 && "hover:border-l-blue-500/50",
+        indent === 2 && "hover:border-l-green-500/50",
       )}
-      style={{ paddingLeft: `${12 + indent * 20}px` }}
+      style={{ paddingLeft: `${10 + indent * 22}px` }}
       onClick={onToggle}
     >
       {onToggle ? (
-        <ChevronRight className={cn("w-3 h-3 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-90")} />
+        <ChevronRight className={cn("w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-90")} />
       ) : indent > 0 ? (
-        <div className="w-3 shrink-0 text-muted-foreground/40 text-xs">└</div>
+        <div className="w-3.5 shrink-0 text-muted-foreground/30 text-xs font-mono leading-none">└</div>
       ) : (
-        <div className="w-3 shrink-0" />
+        <div className="w-3.5 shrink-0" />
       )}
-      <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0", meta.color)}>
-        <Icon className="w-3 h-3" />
+
+      {/* Avatar com iniciais + ícone tipo */}
+      <div className="relative shrink-0">
+        <div className={cn(
+          "rounded-full flex items-center justify-center font-bold tabular-nums shadow-sm",
+          indent === 0 ? "w-9 h-9 text-xs" : "w-7 h-7 text-[10px]",
+          tipoBg[p.tipo],
+        )}>
+          {initials(p.nome)}
+        </div>
+        <div className={cn(
+          "absolute -bottom-0.5 -right-0.5 rounded-full bg-background border-2 border-background flex items-center justify-center",
+          indent === 0 ? "w-4 h-4" : "w-3.5 h-3.5",
+        )}>
+          <Icon className={cn("text-muted-foreground", indent === 0 ? "w-2.5 h-2.5" : "w-2 h-2")} />
+        </div>
       </div>
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className={cn("text-sm font-medium truncate", indent === 0 && "font-semibold")}>{p.nome}</span>
-        {p.tipo === "coordenador" && p.user_id && (
-          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
-        )}
-        {(!p.valor_contratacao || p.valor_contratacao === 0) && (
-          <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-600 bg-amber-500/10 shrink-0">
-            valor pendente
-          </Badge>
-        )}
-        <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {p.telefone}</span>
-        <span className="text-xs text-muted-foreground truncate hidden md:inline">· {p.endereco}</span>
+
+      {/* Nome + dados */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={cn("text-sm truncate", indent === 0 ? "font-semibold" : "font-medium")}>{p.nome}</span>
+          {p.tipo === "coordenador" && p.user_id && (
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
+          )}
+          {semValor ? (
+            <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-600 bg-amber-500/10 shrink-0 gap-0.5">
+              <AlertCircle className="w-2.5 h-2.5" />sem valor
+            </Badge>
+          ) : (
+            <span className="text-[10px] font-bold tabular-nums text-emerald-700 bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">
+              {fmtBRL(p.valor_contratacao)}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+          {p.telefone && (
+            <a
+              href={wa}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 hover:text-emerald-600 transition-colors"
+              title="Abrir no WhatsApp"
+            >
+              <MessageCircle className="w-3 h-3" />
+              <span className="tabular-nums">{fmtPhone(p.telefone)}</span>
+            </a>
+          )}
+          {p.endereco && (
+            <span className="truncate hidden md:inline">· <MapPin className="w-2.5 h-2.5 inline mr-0.5" />{p.endereco}</span>
+          )}
+        </div>
       </div>
+
       {teamCount !== undefined && (
-        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
-          <Users className="w-2.5 h-2.5 mr-0.5" />{teamCount}
+        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0 gap-0.5">
+          <Users className="w-2.5 h-2.5" />{teamCount}
         </Badge>
       )}
       {bulkAction && (
@@ -1035,9 +1081,10 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <span className="hidden lg:inline">{bulkAction.label}</span>
         </Button>
       )}
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 focus:opacity-100">
+          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 opacity-50 group-hover:opacity-100 focus:opacity-100">
             <MoreHorizontal className="w-3.5 h-3.5" />
           </Button>
         </DropdownMenuTrigger>
@@ -1045,8 +1092,13 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <DropdownMenuItem onClick={() => onEdit(p)}>
             <Edit2 className="w-3.5 h-3.5 mr-2" />Editar
           </DropdownMenuItem>
+          {p.telefone && (
+            <DropdownMenuItem onClick={() => window.open(wa, "_blank")}>
+              <MessageCircle className="w-3.5 h-3.5 mr-2" />Abrir WhatsApp
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
-            disabled={!p.valor_contratacao || p.valor_contratacao === 0}
+            disabled={semValor}
             onClick={async () => {
               try {
                 await gerarContratoIndividual(p as any, p.client_id);
@@ -1078,5 +1130,73 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+// ─── KPI Card visual ────────────────────────────────────────────
+function KpiCard({ label, value, icon: Icon, tone, small }: {
+  label: string; value: number | string; icon: any;
+  tone: "neutral" | "red" | "blue" | "green" | "emerald"; small?: boolean;
+}) {
+  const tones: Record<string, string> = {
+    neutral: "from-muted/40 to-muted/10 text-foreground border-border/50",
+    red: "from-red-500/15 to-red-500/5 text-red-700 dark:text-red-400 border-red-500/20",
+    blue: "from-blue-500/15 to-blue-500/5 text-blue-700 dark:text-blue-400 border-blue-500/20",
+    green: "from-green-500/15 to-green-500/5 text-green-700 dark:text-green-400 border-green-500/20",
+    emerald: "from-emerald-500/15 to-emerald-500/5 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
+  };
+  return (
+    <div className={cn("relative rounded-xl border bg-gradient-to-br p-3 overflow-hidden", tones[tone])}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-wider opacity-70 font-semibold">{label}</p>
+          <p className={cn("font-bold tabular-nums leading-tight mt-0.5 truncate", small ? "text-base" : "text-2xl")}>{value}</p>
+        </div>
+        <Icon className={cn("opacity-40 shrink-0", small ? "w-4 h-4" : "w-5 h-5")} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Lista plana ordenável ──────────────────────────────────────
+function ListaPlana({ pessoas, sortBy, onEdit, onDelete, onCredentials, onSend, sendingId }: {
+  pessoas: Pessoa[];
+  sortBy: "nome" | "valor" | "tipo";
+  onEdit: (p: Pessoa) => void;
+  onDelete: (id: string) => void;
+  onCredentials: (p: Pessoa) => void;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
+  sendingId: string | null;
+}) {
+  const tipoOrder: Record<Tipo, number> = { coordenador: 0, lider: 1, cabo: 2 };
+  const sorted = [...pessoas].sort((a, b) => {
+    if (sortBy === "valor") return (b.valor_contratacao || 0) - (a.valor_contratacao || 0);
+    if (sortBy === "tipo") return tipoOrder[a.tipo] - tipoOrder[b.tipo] || a.nome.localeCompare(b.nome);
+    return a.nome.localeCompare(b.nome);
+  });
+
+  if (sorted.length === 0) {
+    return (
+      <Card className="py-12 text-center text-muted-foreground border-dashed">
+        <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+        <p className="text-sm">Nenhum resultado</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden divide-y divide-border/40">
+      {sorted.map(p => (
+        <PessoaRow
+          key={p.id}
+          p={p}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onCredentials={onCredentials}
+          onSend={onSend}
+          sendingId={sendingId}
+        />
+      ))}
+    </Card>
   );
 }
