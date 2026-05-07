@@ -842,10 +842,6 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
         teamCount={hasCabos ? cabos.length : undefined}
         expanded={open}
         onToggle={hasCabos ? () => setOpen(o => !o) : undefined}
-        bulkAction={hasCabos ? {
-          label: "Contratos do time",
-          onClick: () => gerarContratosLote(time, lider.client_id, `Contratos - ${lider.nome}`),
-        } : undefined}
       />
       {open && cabos.map(cb => (
         <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={2} />
