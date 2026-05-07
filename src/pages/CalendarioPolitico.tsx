@@ -274,6 +274,13 @@ export default function CalendarioPolitico() {
           </div>
         </div>
 
+        {clientId && (
+          <PromessasNoCalendarioWidget
+            clientId={clientId}
+            monthDate={new Date(cursor.year, cursor.month, 1)}
+          />
+        )}
+
         {/* Grade mensal — largura total */}
         <Card>
             <CardHeader className="pb-3">
