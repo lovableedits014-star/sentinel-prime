@@ -153,7 +153,7 @@ export default function Disparos() {
     refetchInterval: (data: any) => {
       const rows = (data?.state?.data?.rows as DispatchRow[] | undefined) || [];
       const hasActive = rows.some(
-        (d) => ["pendente","enviando","pausado_timeout","pausado_janela"].includes(d.status)
+        (d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status)
       );
       return hasActive ? 3000 : false;
     },
