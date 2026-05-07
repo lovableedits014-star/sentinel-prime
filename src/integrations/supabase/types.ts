@@ -2173,6 +2173,68 @@ export type Database = {
           },
         ]
       }
+      ic_drift_analyses: {
+        Row: {
+          client_id: string
+          created_at: string
+          descricao: string
+          documentos_analisados: number
+          exemplos: Json
+          id: string
+          metadata: Json
+          periodo_fim: string
+          periodo_inicio: string
+          severidade: string
+          status: string
+          tema: string
+          tipo_mudanca: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          descricao: string
+          documentos_analisados?: number
+          exemplos?: Json
+          id?: string
+          metadata?: Json
+          periodo_fim: string
+          periodo_inicio: string
+          severidade?: string
+          status?: string
+          tema: string
+          tipo_mudanca?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          descricao?: string
+          documentos_analisados?: number
+          exemplos?: Json
+          id?: string
+          metadata?: Json
+          periodo_fim?: string
+          periodo_inicio?: string
+          severidade?: string
+          status?: string
+          tema?: string
+          tipo_mudanca?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ic_drift_analyses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ic_knowledge_documents: {
         Row: {
           adversarios_citados: Json
