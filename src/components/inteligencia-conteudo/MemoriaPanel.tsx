@@ -106,6 +106,9 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
         <TabsContent value="cobertura" className="mt-4">
           <CoberturaPanel clientId={clientId} />
         </TabsContent>
+        <TabsContent value="drift" className="mt-4">
+          <DriftPanel clientId={clientId} />
+        </TabsContent>
         <TabsContent value="timeline" className="mt-4">
           <DocumentsTimeline clientId={clientId} />
         </TabsContent>
