@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, MapPin, AlertTriangle, Search } from "lucide-react";
+import { Loader2, MapPin, AlertTriangle, Search, ChevronRight } from "lucide-react";
+import { BairroDetalheDialog } from "./BairroDetalheDialog";
 
 const ALERT_META: Record<string, { label: string; color: string }> = {
   silenciado: { label: "Silenciado", color: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" },
@@ -15,6 +16,7 @@ const ALERT_META: Record<string, { label: string; color: string }> = {
 export function CoberturaPanel({ clientId }: { clientId: string }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"silencio" | "falas" | "promessas">("silencio");
+  const [selectedBairro, setSelectedBairro] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["ic-cobertura", clientId],
@@ -94,14 +96,23 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
                 <th className="text-center p-3">Promessas abertas</th>
                 <th className="text-left p-3">Tom</th>
                 <th className="text-center p-3">Status</th>
+                <th className="w-8 p-3"></th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((r: any) => {
                 const meta = ALERT_META[r.nivel_alerta] || ALERT_META.ok;
                 return (
-                  <tr key={r.bairro} className="border-b last:border-0 hover:bg-muted/30">
-                    <td className="p-3 font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-muted-foreground" />{r.bairro}</td>
+                  <tr
+                    key={r.bairro}
+                    className="border-b last:border-0 hover:bg-muted/40 cursor-pointer transition-colors"
+                    onClick={() => setSelectedBairro(r.bairro)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedBairro(r.bairro); } }}
+                    title="Ver detalhes do bairro"
+                  >
+                    <td className="p-3 font-medium"><span className="flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-muted-foreground" />{r.bairro}</span></td>
                     <td className="p-3 text-muted-foreground">
                       {r.ultima_mencao ? new Date(r.ultima_mencao).toLocaleDateString("pt-BR") : "—"}
                       {r.dias_silencio !== null && <span className="text-xs ml-1">({r.dias_silencio}d)</span>}
@@ -115,6 +126,7 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
                         {meta.label}
                       </Badge>
                     </td>
+                    <td className="p-3 text-muted-foreground"><ChevronRight className="w-4 h-4" /></td>
                   </tr>
                 );
               })}
@@ -122,6 +134,13 @@ export function CoberturaPanel({ clientId }: { clientId: string }) {
           </table>
         </CardContent>
       </Card>
+
+      <BairroDetalheDialog
+        clientId={clientId}
+        bairro={selectedBairro}
+        open={!!selectedBairro}
+        onOpenChange={(o) => { if (!o) setSelectedBairro(null); }}
+      />
     </div>
   );
 }
