@@ -239,28 +239,7 @@ export async function gerarContratoDocxBlob(
     ],
   });
 
-  // Selo / faixa identificadora no topo
-  const sealPara = new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 240 },
-    shading: theme.sealFill !== "FFFFFF"
-      ? { type: ShadingType.CLEAR, color: "auto", fill: theme.sealFill }
-      : undefined,
-    border: {
-      top:    { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
-      bottom: { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
-      left:   { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
-      right:  { style: theme.borderStyle, size: theme.borderSize, color: "000000" },
-    },
-    children: [new TextRun({
-      text: `   ${theme.label}   `,
-      bold: true,
-      color: theme.sealText,
-      size: 24,
-      font: theme.fontTitle,
-      allCaps: true,
-    })],
-  });
+  // (selo removido — a faixa já aparece no cabeçalho)
 
   const doc = new Document({
     styles: {
@@ -283,7 +262,7 @@ export async function gerarContratoDocxBlob(
       headers: { default: new Header({ children: [headerStripe, headerSubtitle] }) },
       footers: { default: new Footer({ children: [footerLine] }) },
       children: [
-        sealPara,
+        
         ...linhas.map((linha, i) => {
           if (i === 0 && linha.trim()) {
             return new Paragraph({
