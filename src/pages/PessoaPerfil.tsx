@@ -365,6 +365,9 @@ export default function PessoaPerfil() {
           {/* TAGS Políticas */}
           <TagsPoliticas pessoaId={pessoa.id} clientId={pessoa.client_id} />
 
+          {/* Citações na memória */}
+          <MencoesNaMemoriaWidget clientId={pessoa.client_id} pessoaNome={pessoa.nome} />
+
           {pessoa.notas_internas && (
             <Card>
               <CardHeader><CardTitle className="text-base">Notas Internas</CardTitle></CardHeader>
