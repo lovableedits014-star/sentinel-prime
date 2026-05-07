@@ -2,8 +2,8 @@
 // extrai texto e dispara ic-extract-knowledge para virar documento estruturado.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/ic-utils.ts";
-// pdfjs-dist legacy build funciona em Deno/Workers (puro JS).
-import * as pdfjs from "https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs";
+// unpdf é projetado para serverless/Deno, sem dependência de canvas
+import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -25,19 +25,9 @@ interface IngestRequest {
 }
 
 async function extractPdfText(bytes: Uint8Array): Promise<string> {
-  // Desabilita worker — roda em main thread
-  // @ts-ignore
-  const loadingTask = pdfjs.getDocument({ data: bytes, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: false });
-  const doc = await loadingTask.promise;
-  let out = "";
-  const max = Math.min(doc.numPages, 200);
-  for (let i = 1; i <= max; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    const strs = (content.items as any[]).map((it) => (typeof it?.str === "string" ? it.str : "")).filter(Boolean);
-    out += strs.join(" ") + "\n\n";
-  }
-  return out.trim();
+  const pdf = await getDocumentProxy(bytes);
+  const { text } = await extractText(pdf, { mergePages: true });
+  return (Array.isArray(text) ? text.join("\n\n") : String(text || "")).trim();
 }
 
 function htmlToText(html: string): string {

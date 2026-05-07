@@ -72,11 +72,17 @@ export function IngestDocumentDialog({ clientId, trigger }: Props) {
       return data;
     },
     onSuccess: (data: any) => {
-      toast.success(`Documento ingerido — ${data?.extracted ?? 0} fatos extraídos`);
-      qc.invalidateQueries({ queryKey: ["ic-documents", clientId] });
-      qc.invalidateQueries({ queryKey: ["ic-knowledge", clientId] });
-      qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] });
-      qc.invalidateQueries({ queryKey: ["ic-cobertura", clientId] });
+      toast.success(`Documento ingerido — ${data?.extracted ?? 0} fatos. Promessas e insights atualizando…`);
+      const refresh = () => {
+        qc.invalidateQueries({ queryKey: ["ic-documents", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-knowledge", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-promessas", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-insights", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-cobertura", clientId] });
+      };
+      refresh();
+      setTimeout(refresh, 6000);
+      setTimeout(refresh, 20000);
       setOpen(false);
       reset();
     },
