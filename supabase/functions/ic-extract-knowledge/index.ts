@@ -6,7 +6,15 @@ import { generateEmbedding, buildDocEmbeddingText, EMBEDDING_MODEL } from "../_s
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-type SourceType = "transcription" | "post" | "comment" | "manual";
+type SourceType = "transcription" | "post" | "comment" | "manual" | "pdf" | "url" | "manual_doc";
+
+const DOC_MODE_TYPES = new Set<SourceType>(["transcription", "pdf", "url", "manual_doc"]);
+const TIPO_DOCUMENTO_MAP: Record<string, string> = {
+  transcription: "transcricao",
+  pdf: "pdf",
+  url: "url",
+  manual_doc: "nota_manual",
+};
 
 interface ExtractRequest {
   clientId: string;
@@ -333,29 +341,32 @@ Deno.serve(async (req) => {
     if (!llmConfig.model) llmConfig.model = baseConfig.model;
 
     const runId = extractionRunId || crypto.randomUUID();
-    const isDocMode = sourceType === "transcription"; // hoje, só transcrição vira documento
+    const isDocMode = DOC_MODE_TYPES.has(sourceType);
 
     let documentId: string | null = null;
     let derivedFacts: DerivedFact[] = [];
 
     if (isDocMode) {
-      console.log(`[ic-extract-knowledge] DOC MODE — ${text.length} chars`);
+      console.log(`[ic-extract-knowledge] DOC MODE (${sourceType}) — ${text.length} chars`);
       const doc = await extractDocument(llmConfig, text, documentTitleHint);
 
-      // Apaga documento anterior dessa transcrição (re-processa) — fatos descem em cascata
+      // Apaga documento anterior dessa fonte (re-processa)
       if (sourceId) {
-        await admin
-          .from("ic_knowledge_documents")
-          .delete()
-          .eq("client_id", clientId)
-          .eq("transcription_id", sourceId);
+        const delQ = admin.from("ic_knowledge_documents").delete().eq("client_id", clientId);
+        if (sourceType === "transcription") {
+          await delQ.eq("transcription_id", sourceId);
+        } else {
+          await delQ.eq("source_ref", sourceId);
+        }
       }
 
-      const docRow = {
+      const docRow: any = {
         client_id: clientId,
-        transcription_id: sourceId ?? null,
-        tipo_documento: "transcricao",
-        titulo: (doc.titulo || documentTitleHint || "Transcrição").slice(0, 200),
+        transcription_id: sourceType === "transcription" ? (sourceId ?? null) : null,
+        source_ref: sourceType !== "transcription" ? (sourceId ?? null) : null,
+        source_url: sourceUrl ?? null,
+        tipo_documento: TIPO_DOCUMENTO_MAP[sourceType] || "outro",
+        titulo: (doc.titulo || documentTitleHint || "Documento").slice(0, 200),
         data_evento: sourceDate ?? null,
         texto_integral: text,
         resumo_executivo: doc.resumo_executivo || "",
