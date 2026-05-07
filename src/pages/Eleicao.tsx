@@ -724,6 +724,18 @@ function RegionBlock({
           {cabos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 font-medium">{cabos.length}cb</span>}
           {!hasContent && <span className="italic">vazio</span>}
         </div>
+        {hasContent && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-[11px] gap-1 hidden md:inline-flex"
+            onClick={(e) => { e.stopPropagation(); gerarContratosLote(pessoas, pessoas[0].client_id, `Contratos - ${title}`); }}
+            title={`Gerar contratos de ${title}`}
+          >
+            <Package className="w-3 h-3" />
+            <span className="hidden lg:inline">Contratos</span>
+          </Button>
+        )}
         <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); onAdd(); }}>
           <Plus className="w-3.5 h-3.5" />
         </Button>
