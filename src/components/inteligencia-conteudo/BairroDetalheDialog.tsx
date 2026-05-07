@@ -26,11 +26,15 @@ export function BairroDetalheDialog({ clientId, bairro, open, onOpenChange }: Pr
     queryKey: ["ic-bairro-docs", clientId, bairro],
     enabled,
     queryFn: async () => {
+      // bairros_citados pode vir como array de strings OU array de objetos { nome, contexto, tipo_mencao }.
+      // Tentamos os dois formatos via .or() com containment JSONB (cs).
+      const objMatch = JSON.stringify([{ nome: bairro }]);
+      const strMatch = JSON.stringify([bairro]);
       const { data, error } = await supabase
         .from("ic_knowledge_documents" as any)
         .select("id, titulo, tipo_documento, data_evento, created_at, resumo_executivo, pontos_principais, bairros_citados, tom_emocional, local")
         .eq("client_id", clientId)
-        .contains("bairros_citados", JSON.stringify([bairro]))
+        .or(`bairros_citados.cs.${objMatch},bairros_citados.cs.${strMatch}`)
         .order("data_evento", { ascending: false, nullsFirst: false })
         .limit(20);
       if (error) throw error;
