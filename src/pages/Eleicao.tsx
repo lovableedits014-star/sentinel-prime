@@ -18,8 +18,34 @@ import { cn } from "@/lib/utils";
 import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
-import { gerarContratoIndividual } from "@/lib/eleicao-contrato-docx";
-import { FileDown } from "lucide-react";
+import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
+import { FileDown, Package, FolderTree } from "lucide-react";
+
+async function gerarContratosLote(
+  pessoas: Pessoa[],
+  clientId: string,
+  zipName: string,
+) {
+  const elegiveis = pessoas.filter(p => p.valor_contratacao && p.valor_contratacao > 0);
+  const pendentes = pessoas.length - elegiveis.length;
+  if (elegiveis.length === 0) {
+    toast.error("Nenhuma pessoa do time com valor definido. Defina os valores em 'Pendentes de valor'.");
+    return;
+  }
+  const t = toast.loading(`Gerando ${elegiveis.length} contrato(s)…`);
+  try {
+    const { blob, pulados } = await gerarLoteZip(elegiveis as any, clientId);
+    downloadBlob(blob, `${zipName}.zip`);
+    toast.dismiss(t);
+    let msg = `${elegiveis.length} contrato(s) gerado(s)`;
+    if (pendentes > 0) msg += ` · ${pendentes} sem valor`;
+    if (pulados.length > 0) msg += ` · ${pulados.length} sem modelo`;
+    toast.success(msg);
+  } catch (e: any) {
+    toast.dismiss(t);
+    toast.error(e.message);
+  }
+}
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
