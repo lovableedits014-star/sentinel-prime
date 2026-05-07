@@ -1,5 +1,5 @@
 // Geração de contratos em .docx para a Eleição (Coordenador, Líder, Cabo)
-import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, Header, Footer, BorderStyle, ShadingType, PageNumber } from "docx";
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 
