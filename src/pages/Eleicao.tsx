@@ -815,23 +815,33 @@ function RegionBlock({
   const hasContent = pessoas.length > 0;
   const [open, setOpen] = useState(defaultOpen ?? hasContent);
 
+  const valorTotal = pessoas.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+  const semValor = pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
+
   return (
-    <Card className="overflow-hidden border-border/60">
+    <Card className="overflow-hidden border-border/60 shadow-sm">
       <div
         onClick={() => hasContent && setOpen(o => !o)}
         className={cn(
-          "flex items-center gap-2 px-3 py-2 group",
-          hasContent && "cursor-pointer hover:bg-muted/40"
+          "flex items-center gap-2 px-3 py-2.5 group bg-gradient-to-r from-muted/30 to-transparent",
+          hasContent && "cursor-pointer hover:from-muted/50"
         )}
       >
-        <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90", !hasContent && "opacity-30")} />
-        <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-        <p className="font-medium text-sm flex-1 truncate">{title}</p>
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-          {coords.length > 0 && <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 font-medium">{coords.length}c</span>}
-          {lideres.length > 0 && <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium">{lideres.length}l</span>}
-          {cabos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 font-medium">{cabos.length}cb</span>}
-          {!hasContent && <span className="italic">vazio</span>}
+        <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90", !hasContent && "opacity-30")} />
+        <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <MapPin className="w-3.5 h-3.5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate leading-tight">{title}</p>
+          <p className="text-[11px] text-muted-foreground tabular-nums">
+            {pessoas.length > 0 ? `${pessoas.length} pessoa(s) · ${fmtBRL(valorTotal)}` : "vazio"}
+            {semValor > 0 && <span className="ml-1 text-amber-600">· {semValor} sem valor</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0">
+          {coords.length > 0 && <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 font-medium" title="Coordenadores">{coords.length}<span className="hidden sm:inline">c</span></span>}
+          {lideres.length > 0 && <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium" title="Líderes">{lideres.length}<span className="hidden sm:inline">l</span></span>}
+          {cabos.length > 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 font-medium" title="Cabos">{cabos.length}<span className="hidden sm:inline">cb</span></span>}
         </div>
         {hasContent && (
           <Button
@@ -845,7 +855,7 @@ function RegionBlock({
             <span className="hidden lg:inline">Contratos</span>
           </Button>
         )}
-        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); onAdd(); }}>
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); onAdd(); }} title="Adicionar nesta área">
           <Plus className="w-3.5 h-3.5" />
         </Button>
       </div>
