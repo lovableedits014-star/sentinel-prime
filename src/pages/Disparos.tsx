@@ -671,6 +671,32 @@ export default function Disparos() {
                             </Badge>
                           )}
                           <DispatchLogDialog dispatchId={d.id} titulo={d.titulo} />
+                          {["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status) && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-destructive hover:text-destructive">
+                                  <Ban className="h-3 w-3" /> Cancelar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancelar disparo?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    "{d.titulo}" será interrompido. {Math.max(0, d.total_destinatarios - d.enviados - d.falhas)} envios pendentes não serão entregues.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Voltar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => handleCancelDispatch(d.id, d.titulo)}
+                                  >
+                                    Sim, cancelar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                           <span className="ml-auto">
                             {new Date(d.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </span>
