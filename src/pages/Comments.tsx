@@ -818,6 +818,13 @@ const Comments = () => {
         </div>
       </div>
 
+      {clientId && (
+        <BordoesBairrosWidget
+          clientId={clientId}
+          contexto="Use os bordões e mantenha as promessas em mente ao responder comentários."
+        />
+      )}
+
       {/* Stats — compact row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-card rounded-xl border p-3 sm:p-4 flex items-center gap-3">
