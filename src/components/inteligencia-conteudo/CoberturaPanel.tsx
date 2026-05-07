@@ -16,6 +16,7 @@ const ALERT_META: Record<string, { label: string; color: string }> = {
 export function CoberturaPanel({ clientId }: { clientId: string }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"silencio" | "falas" | "promessas">("silencio");
+  const [selectedBairro, setSelectedBairro] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["ic-cobertura", clientId],
