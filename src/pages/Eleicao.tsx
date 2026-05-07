@@ -320,7 +320,9 @@ export default function Eleicao() {
     return p.nome.toLowerCase().includes(q) || p.telefone.includes(search) || (p.endereco || "").toLowerCase().includes(q);
   };
 
-  const escopoList = pessoas.filter(p => p.escopo === escopo && matchesSearch(p));
+  const escopoList = pessoas.filter(p =>
+    p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p)
+  );
   const cgRegioes = useMemo(() => {
     if (escopo !== "campo_grande") return [];
     return REGIOES.filter(r => regiaoFilter === "all" || r.value === regiaoFilter);
@@ -334,11 +336,15 @@ export default function Eleicao() {
 
   const stats = useMemo(() => {
     const f = pessoas.filter(p => p.escopo === escopo);
+    const valorTotal = f.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+    const semValor = f.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
     return {
       coord: f.filter(p => p.tipo === "coordenador").length,
       lider: f.filter(p => p.tipo === "lider").length,
       cabo: f.filter(p => p.tipo === "cabo").length,
       total: f.length,
+      valorTotal,
+      semValor,
     };
   }, [pessoas, escopo]);
 
