@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
 import { PromessasPanel } from "./PromessasPanel";
 import { InsightsCard } from "./InsightsCard";
+import { CoberturaPanel } from "./CoberturaPanel";
 import { findBestSegment, formatTime, type AudioSegment } from "./audioMatch";
 import { useRef, useEffect, createContext, useContext } from "react";
 import { Play } from "lucide-react";
@@ -38,7 +39,7 @@ const TIPO_LABEL: Record<string, { label: string; color: string }> = {
 };
 
 export function MemoriaPanel({ clientId, clientName }: { clientId: string | null | undefined; clientName?: string }) {
-  const [view, setView] = useState<"documentos" | "promessas" | "timeline" | "contradicoes" | "fatos">("documentos");
+  const [view, setView] = useState<"documentos" | "promessas" | "cobertura" | "timeline" | "contradicoes" | "fatos">("documentos");
   const [exporting, setExporting] = useState(false);
   if (!clientId) {
     return <Card><CardContent className="p-6 text-sm text-muted-foreground">Selecione um cliente.</CardContent></Card>;
@@ -85,6 +86,7 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
         <TabsList>
           <TabsTrigger value="documentos"><FileText className="w-4 h-4 mr-1.5" />Documentos</TabsTrigger>
           <TabsTrigger value="promessas"><Flag className="w-4 h-4 mr-1.5" />Promessas</TabsTrigger>
+          <TabsTrigger value="cobertura"><MapPin className="w-4 h-4 mr-1.5" />Cobertura</TabsTrigger>
           <TabsTrigger value="timeline"><Calendar className="w-4 h-4 mr-1.5" />Timeline</TabsTrigger>
           <TabsTrigger value="contradicoes"><AlertTriangle className="w-4 h-4 mr-1.5" />Contradições</TabsTrigger>
           <TabsTrigger value="fatos"><Sparkles className="w-4 h-4 mr-1.5" />Fatos avulsos</TabsTrigger>
@@ -94,6 +96,9 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
         </TabsContent>
         <TabsContent value="promessas" className="mt-4">
           <PromessasPanel clientId={clientId} />
+        </TabsContent>
+        <TabsContent value="cobertura" className="mt-4">
+          <CoberturaPanel clientId={clientId} />
         </TabsContent>
         <TabsContent value="timeline" className="mt-4">
           <DocumentsTimeline clientId={clientId} />

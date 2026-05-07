@@ -5869,6 +5869,18 @@ export type Database = {
           whatsapp_window_start: string
         }[]
       }
+      get_cobertura_territorial: {
+        Args: { p_client_id: string }
+        Returns: {
+          bairro: string
+          dias_silencio: number
+          n_falas: number
+          n_promessas_abertas: number
+          nivel_alerta: string
+          tom_predominante: string
+          ultima_mencao: string
+        }[]
+      }
       get_migracoes_partidarias: {
         Args: { p_min_votos?: number; p_uf?: string }
         Returns: {
