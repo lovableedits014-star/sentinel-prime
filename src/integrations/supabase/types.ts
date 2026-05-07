@@ -2199,6 +2199,8 @@ export type Database = {
           propostas: Json
           provider: string | null
           resumo_executivo: string | null
+          source_ref: string | null
+          source_url: string | null
           status: string
           tags: string[]
           texto_integral: string
@@ -2233,6 +2235,8 @@ export type Database = {
           propostas?: Json
           provider?: string | null
           resumo_executivo?: string | null
+          source_ref?: string | null
+          source_url?: string | null
           status?: string
           tags?: string[]
           texto_integral: string
@@ -2267,6 +2271,8 @@ export type Database = {
           propostas?: Json
           provider?: string | null
           resumo_executivo?: string | null
+          source_ref?: string | null
+          source_url?: string | null
           status?: string
           tags?: string[]
           texto_integral?: string
