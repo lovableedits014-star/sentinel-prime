@@ -13,6 +13,7 @@ import EditarPessoaDialog from "@/components/pessoas/EditarPessoaDialog";
 import AddSocialDialog from "@/components/pessoas/AddSocialDialog";
 import TimelinePolitica from "@/components/pessoas/TimelinePolitica";
 import TagsPoliticas from "@/components/pessoas/TagsPoliticas";
+import { MencoesNaMemoriaWidget } from "@/components/memoria-widgets/MencoesNaMemoriaWidget";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { getWhatsAppLink } from "@/lib/social-url";
 
@@ -363,6 +364,9 @@ export default function PessoaPerfil() {
 
           {/* TAGS Políticas */}
           <TagsPoliticas pessoaId={pessoa.id} clientId={pessoa.client_id} />
+
+          {/* Citações na memória */}
+          <MencoesNaMemoriaWidget clientId={pessoa.client_id} pessoaNome={pessoa.nome} />
 
           {pessoa.notas_internas && (
             <Card>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { PromessasNoCalendarioWidget } from "@/components/memoria-widgets/PromessasNoCalendarioWidget";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,17 @@ export default function CalendarioPolitico() {
   const [cursor, setCursor] = useState({ year: todayParts.year, month: todayParts.month });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { ativos: estilosAtivos } = useEstilosTema();
+
+  const { data: client } = useQuery({
+    queryKey: ["client-calendario"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from("clients").select("id").eq("user_id", user.id).maybeSingle();
+      return data;
+    },
+  });
+  const clientId = client?.id;
 
   // Buscamos 3 anos para que navegação prev/next nos limites não quebre
   const yearsToLoad = useMemo(() => {
@@ -261,6 +273,13 @@ export default function CalendarioPolitico() {
             <EstilosTemaSelector />
           </div>
         </div>
+
+        {clientId && (
+          <PromessasNoCalendarioWidget
+            clientId={clientId}
+            monthDate={new Date(cursor.year, cursor.month, 1)}
+          />
+        )}
 
         {/* Grade mensal — largura total */}
         <Card>

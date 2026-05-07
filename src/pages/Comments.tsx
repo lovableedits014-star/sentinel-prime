@@ -19,6 +19,7 @@ import { useMilitantsMap, type MilitantRow } from "@/hooks/useMilitants";
 import { AuthorHistoryDrawer } from "@/components/comments/AuthorHistoryDrawer";
 import { AlertTriangle } from "lucide-react";
 import { syncCooldownRemaining, markSyncDone, formatCooldown } from "@/lib/sync-throttle";
+import { BordoesBairrosWidget } from "@/components/memoria-widgets/BordoesBairrosWidget";
 
 type Comment = CommentData;
 
@@ -816,6 +817,13 @@ const Comments = () => {
           </Button>
         </div>
       </div>
+
+      {clientId && (
+        <BordoesBairrosWidget
+          clientId={clientId}
+          contexto="Use os bordões e mantenha as promessas em mente ao responder comentários."
+        />
+      )}
 
       {/* Stats — compact row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

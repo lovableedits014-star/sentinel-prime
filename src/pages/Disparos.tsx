@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { BordoesBairrosWidget } from "@/components/memoria-widgets/BordoesBairrosWidget";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -315,6 +316,13 @@ export default function Disparos() {
         </TabsList>
 
         <TabsContent value="disparos" className="space-y-4 sm:space-y-6">
+
+      {clientId && (
+        <BordoesBairrosWidget
+          clientId={clientId}
+          contexto="Use os bordões e cite promessas relevantes para reforçar a mensagem do disparo."
+        />
+      )}
 
       <SugestoesPanel />
 
