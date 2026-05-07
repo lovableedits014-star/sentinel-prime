@@ -297,8 +297,36 @@ export default function Disparos() {
     }
   };
 
+  const handleCancelDispatch = async (dispatchId: string, titulo: string) => {
+    try {
+      // Marca o disparo como cancelado e zera os pendentes para parar a fila e o cron de resume.
+      const { error: e1 } = await supabase
+        .from("whatsapp_dispatches" as any)
+        .update({
+          status: "cancelado",
+          pause_reason: "Cancelado pelo usuário",
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", dispatchId);
+      if (e1) throw e1;
+
+      // Marca itens pendentes como cancelados (não serão mais enviados em retomadas)
+      await supabase
+        .from("whatsapp_dispatch_items" as any)
+        .update({ status: "cancelado", erro: "Disparo cancelado pelo usuário" })
+        .eq("dispatch_id", dispatchId)
+        .eq("status", "pendente");
+
+      toast.success(`Disparo "${titulo}" cancelado.`);
+      refetch();
+    } catch (err: any) {
+      toast.error("Erro ao cancelar: " + (err.message || "tente novamente"));
+    }
+  };
+
   const isConnected = !!bridgeConfigured;
-  const activeDispatch = dispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela"].includes(d.status));
+  const activeDispatch = dispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
