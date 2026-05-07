@@ -402,9 +402,58 @@ function PromessaDrawer({ openId, onClose, clientId }: { openId: string | null; 
               </div>
             </div>
 
-            <Button variant="destructive" size="sm" onClick={() => { if (confirm("Remover promessa?")) del.mutate(); }}>
-              <Trash2 className="w-4 h-4 mr-1.5" />Remover
-            </Button>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold">Evidências de cumprimento</label>
+              <div className="space-y-1.5">
+                {(p.evidencias || []).map((ev: any, i: number) => (
+                  <div key={i} className="flex items-center gap-2 text-xs bg-muted/50 rounded p-2">
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                    <a href={ev.url} target="_blank" rel="noreferrer" className="truncate flex-1 hover:underline">{ev.descricao || ev.url}</a>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => upd.mutate({ evidencias: (p.evidencias || []).filter((_:any,idx:number)=>idx!==i) })}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input placeholder="URL ou descrição da evidência" value={novaEvidencia} onChange={e => setNovaEvidencia(e.target.value)} />
+                <Button size="sm" onClick={() => {
+                  if (!novaEvidencia.trim()) return;
+                  const isUrl = /^https?:\/\//.test(novaEvidencia);
+                  const ev = isUrl ? { url: novaEvidencia, descricao: novaEvidencia } : { descricao: novaEvidencia };
+                  upd.mutate({ evidencias: [...(p.evidencias || []), ev] });
+                  setNovaEvidencia("");
+                }}>+</Button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold">Notas internas</label>
+              <Textarea value={notas} onChange={e => setNotas(e.target.value)} onBlur={() => { if (notas !== (p.notas || "")) upd.mutate({ notas: notas || null }); }} rows={3} />
+            </div>
+
+            {p.documento_origem_id && (
+              <div className="text-xs text-muted-foreground">
+                Origem: documento <code className="text-[10px]">{String(p.documento_origem_id).slice(0,8)}</code>
+              </div>
+            )}
+
+            {!confirmDel ? (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmDel(true)}>
+                <Trash2 className="w-4 h-4 mr-1.5" />Remover promessa
+              </Button>
+            ) : (
+              <div className="rounded-md border border-red-500/40 bg-red-500/5 p-3 space-y-2">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400">Confirmar exclusão? Esta ação não pode ser desfeita.</p>
+                <div className="flex gap-2">
+                  <Button variant="destructive" size="sm" onClick={() => del.mutate()} disabled={del.isPending}>
+                    {del.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1.5" />}
+                    Sim, remover
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setConfirmDel(false)}>Cancelar</Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </SheetContent>
