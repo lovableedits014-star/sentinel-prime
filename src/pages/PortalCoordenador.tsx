@@ -350,6 +350,9 @@ export default function PortalCoordenador() {
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Novo {TIPO_META[form.tipo].label}</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            <div className="text-[11px] bg-muted/50 border border-border/60 rounded-md px-2.5 py-1.5 text-muted-foreground">
+              ℹ️ O valor do contrato será definido pela administração da campanha.
+            </div>
             {form.tipo === "cabo" && me.escopo === "campo_grande" && myLideres.length > 0 && (
               <div>
                 <Label>Vincular a líder (opcional)</Label>
