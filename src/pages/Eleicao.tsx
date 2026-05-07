@@ -836,7 +836,7 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle }: {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
@@ -847,6 +847,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   teamCount?: number;
   expanded?: boolean;
   onToggle?: () => void;
+  bulkAction?: { label: string; onClick: () => void };
 }) {
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
@@ -855,7 +856,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
     <div
       className={cn(
         "group flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 transition-colors",
-        onToggle && "cursor-pointer"
+        onToggle && "cursor-pointer",
+        indent === 0 && "py-2"
       )}
       style={{ paddingLeft: `${12 + indent * 20}px` }}
       onClick={onToggle}
@@ -871,7 +873,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         <Icon className="w-3 h-3" />
       </div>
       <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className="text-sm font-medium truncate">{p.nome}</span>
+        <span className={cn("text-sm font-medium truncate", indent === 0 && "font-semibold")}>{p.nome}</span>
         {p.tipo === "coordenador" && p.user_id && (
           <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
         )}
@@ -887,6 +889,18 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
           <Users className="w-2.5 h-2.5 mr-0.5" />{teamCount}
         </Badge>
+      )}
+      {bulkAction && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-[11px] gap-1 shrink-0 hidden md:inline-flex"
+          onClick={(e) => { e.stopPropagation(); bulkAction.onClick(); }}
+          title={bulkAction.label}
+        >
+          <Package className="w-3 h-3" />
+          <span className="hidden lg:inline">{bulkAction.label}</span>
+        </Button>
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
