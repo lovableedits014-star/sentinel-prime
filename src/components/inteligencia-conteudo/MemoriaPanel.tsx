@@ -19,6 +19,7 @@ import { exportLivroDeCampanha } from "./exportLivroCampanha";
 import { PromessasPanel } from "./PromessasPanel";
 import { InsightsCard } from "./InsightsCard";
 import { CoberturaPanel } from "./CoberturaPanel";
+import { IngestDocumentDialog } from "./IngestDocumentDialog";
 import { findBestSegment, formatTime, type AudioSegment } from "./audioMatch";
 import { useRef, useEffect, createContext, useContext } from "react";
 import { Play } from "lucide-react";
