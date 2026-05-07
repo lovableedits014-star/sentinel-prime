@@ -827,7 +827,7 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
   const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === lider.id);
   const [open, setOpen] = useState(true);
   const hasCabos = cabos.length > 0;
-  const time = [lider, ...cabos];
+  
 
   return (
     <div className="border-t border-border/40">
