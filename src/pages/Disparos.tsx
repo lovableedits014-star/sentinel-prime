@@ -477,13 +477,32 @@ export default function Disparos() {
             )}
           </div>
 
-          {/* Mission quick-fill button */}
-          {activeMissions.length > 0 && (
-            <Button variant="outline" size="sm" className="gap-2 border-primary/30 text-primary hover:bg-primary/5" onClick={handleUseMissions}>
-              <Target className="h-4 w-4" />
-              Preencher com Missões Ativas ({activeMissions.length})
-            </Button>
-          )}
+          {/* Quick-fill buttons */}
+          <div className="flex flex-wrap gap-2">
+            {activeMissions.length > 0 && (
+              <Button variant="outline" size="sm" className="gap-2 border-primary/30 text-primary hover:bg-primary/5" onClick={handleUseMissions}>
+                <Target className="h-4 w-4" />
+                Preencher com Missões Ativas ({activeMissions.length})
+              </Button>
+            )}
+            {clientId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                onClick={() => {
+                  const link = `${window.location.origin}/foto/${clientId}`;
+                  setTitulo("Monte sua foto oficial da campanha");
+                  setMensagem(
+                    `Olá {nome}! 📸\n\nQueremos você na nossa campanha! Monte agora sua foto de perfil com a moldura oficial e use no WhatsApp e nas redes sociais.\n\nÉ rapidinho — basta acessar o link, enviar sua foto e baixar a versão pronta:\n\n👉 ${link}\n\nDepois compartilhe com os amigos para fortalecer ainda mais a nossa força! 💪`
+                  );
+                }}
+              >
+                <Sparkles className="h-4 w-4" />
+                Preencher com Foto da Campanha
+              </Button>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label>Título do disparo</Label>
