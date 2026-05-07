@@ -378,6 +378,11 @@ Deno.serve(async (req) => {
       if (!d) {
         return new Response(JSON.stringify({ error: "Dispatch not found" }), { status: 404, headers: corsHeaders });
       }
+      if (d.status === "cancelado") {
+        return new Response(JSON.stringify({ skipped: true, reason: "cancelado" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       client_id = d.client_id;
       titulo = d.titulo;
       mensagem = d.mensagem_template;
