@@ -758,9 +758,11 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
 }) {
   const lideres = all.filter(p => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
-  const totalEquipe = lideres.length + cabosDir.length + lideres.reduce((acc, l) => acc + all.filter(p => p.tipo === "cabo" && p.parent_id === l.id).length, 0);
+  const cabosLid = lideres.flatMap(l => all.filter(p => p.tipo === "cabo" && p.parent_id === l.id));
+  const totalEquipe = lideres.length + cabosDir.length + cabosLid.length;
   const [expanded, setExpanded] = useState(false);
   const hasTeam = totalEquipe > 0;
+  const allDoTime = [coord, ...lideres, ...cabosDir, ...cabosLid];
 
   return (
     <div className="border-b last:border-b-0">
@@ -774,21 +776,62 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
         teamCount={hasTeam ? totalEquipe : undefined}
         expanded={expanded}
         onToggle={hasTeam ? () => setExpanded(e => !e) : undefined}
+        bulkAction={hasTeam ? {
+          label: "Contratos da equipe",
+          onClick: () => gerarContratosLote(allDoTime, coord.client_id, `Contratos - ${coord.nome}`),
+        } : undefined}
       />
       {expanded && hasTeam && (
-        <div className="bg-background/50 pb-1">
-          {lideres.map(l => {
-            const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === l.id);
-            return (
-              <div key={l.id}>
-                <PessoaRow p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />
-                {cabos.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={2} />)}
-              </div>
-            );
-          })}
+        <div className="bg-muted/10 pb-1">
+          {lideres.map(l => (
+            <LiderBlock
+              key={l.id}
+              lider={l}
+              all={all}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onCredentials={onCredentials}
+              onSend={onSend}
+              sendingId={sendingId}
+            />
+          ))}
           {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />)}
         </div>
       )}
+    </div>
+  );
+}
+
+function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendingId }: {
+  lider: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null;
+}) {
+  const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === lider.id);
+  const [open, setOpen] = useState(true);
+  const hasCabos = cabos.length > 0;
+  const time = [lider, ...cabos];
+
+  return (
+    <div className="border-t border-border/40">
+      <PessoaRow
+        p={lider}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onCredentials={onCredentials}
+        onSend={onSend}
+        sendingId={sendingId}
+        indent={1}
+        teamCount={hasCabos ? cabos.length : undefined}
+        expanded={open}
+        onToggle={hasCabos ? () => setOpen(o => !o) : undefined}
+        bulkAction={hasCabos ? {
+          label: "Contratos do time",
+          onClick: () => gerarContratosLote(time, lider.client_id, `Contratos - ${lider.nome}`),
+        } : undefined}
+      />
+      {open && cabos.map(cb => (
+        <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={2} />
+      ))}
     </div>
   );
 }
