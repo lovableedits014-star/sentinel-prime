@@ -1,5 +1,5 @@
 // Geração de contratos em .docx para a Eleição (Coordenador, Líder, Cabo)
-import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, Header, Footer, BorderStyle, ShadingType, PageNumber } from "docx";
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 
@@ -97,6 +97,37 @@ export function renderTemplate(
   return template.conteudo.replace(/\{(\w+)\}/g, (_m, k) => replacements[k] ?? `{${k}}`);
 }
 
+// Esquema visual por tipo — cada cargo tem cor, faixa, rodapé e selo distintos
+const TIPO_THEME: Record<EleicaoTipo, {
+  label: string;
+  color: string;       // hex sem #
+  shading: string;     // hex sem # (fundo da faixa do título)
+  fontTitle: string;
+  fontBody: string;
+}> = {
+  coordenador: {
+    label: "COORDENAÇÃO DE CAMPANHA",
+    color: "B91C1C",         // vermelho institucional
+    shading: "FEE2E2",
+    fontTitle: "Georgia",
+    fontBody: "Georgia",
+  },
+  lider: {
+    label: "LIDERANÇA REGIONAL",
+    color: "1D4ED8",         // azul institucional
+    shading: "DBEAFE",
+    fontTitle: "Calibri",
+    fontBody: "Calibri",
+  },
+  cabo: {
+    label: "CABO ELEITORAL",
+    color: "111827",
+    shading: "F3F4F6",
+    fontTitle: "Arial",
+    fontBody: "Arial",
+  },
+};
+
 export async function gerarContratoDocxBlob(
   template: ContractTemplate,
   pessoa: PessoaContratada,
@@ -105,32 +136,100 @@ export async function gerarContratoDocxBlob(
 ): Promise<Blob> {
   const texto = renderTemplate(template, pessoa, contratante, parents);
   const linhas = texto.split("\n");
+  const theme = TIPO_THEME[pessoa.tipo];
+
+  // Faixa colorida no topo (header) com tipo do contrato
+  const headerStripe = new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0 },
+    shading: { type: ShadingType.CLEAR, color: "auto", fill: theme.color },
+    border: {
+      top:    { style: BorderStyle.SINGLE, size: 4, color: theme.color },
+      bottom: { style: BorderStyle.SINGLE, size: 4, color: theme.color },
+      left:   { style: BorderStyle.SINGLE, size: 4, color: theme.color },
+      right:  { style: BorderStyle.SINGLE, size: 4, color: theme.color },
+    },
+    children: [new TextRun({
+      text: `  ${theme.label}  `,
+      bold: true,
+      color: "FFFFFF",
+      size: 22,
+      font: theme.fontTitle,
+    })],
+  });
+
+  const headerSubtitle = new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 60, after: 0 },
+    children: [new TextRun({
+      text: contratante,
+      size: 16,
+      color: "6B7280",
+      font: theme.fontBody,
+    })],
+  });
+
+  // Rodapé com selo de identificação visual
+  const footerLine = new Paragraph({
+    alignment: AlignmentType.CENTER,
+    border: { top: { style: BorderStyle.SINGLE, size: 6, color: theme.color, space: 4 } },
+    spacing: { before: 60, after: 0 },
+    children: [
+      new TextRun({ text: `${theme.label} · `, bold: true, color: theme.color, size: 16, font: theme.fontBody }),
+      new TextRun({ text: pessoa.nome, size: 16, color: "374151", font: theme.fontBody }),
+      new TextRun({ text: "   ·   Página ", size: 16, color: "9CA3AF", font: theme.fontBody }),
+      new TextRun({ children: [PageNumber.CURRENT], size: 16, color: "9CA3AF", font: theme.fontBody }),
+    ],
+  });
 
   const doc = new Document({
     styles: {
-      default: { document: { run: { font: "Arial", size: 22 } } },
+      default: { document: { run: { font: theme.fontBody, size: 22 } } },
     },
     sections: [{
       properties: {
         page: {
           size: { width: 12240, height: 15840 },
-          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+          margin: { top: 1800, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720 },
         },
       },
-      children: linhas.map((linha, i) => {
-        // Primeira linha tratada como título centralizado em negrito
-        if (i === 0 && linha.trim()) {
+      headers: { default: new Header({ children: [headerStripe, headerSubtitle] }) },
+      footers: { default: new Footer({ children: [footerLine] }) },
+      children: [
+        // Selo grande no início — facilita identificação visual ao folhear
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 240, after: 120 },
+          shading: { type: ShadingType.CLEAR, color: "auto", fill: theme.shading },
+          border: {
+            top: { style: BorderStyle.SINGLE, size: 12, color: theme.color },
+            bottom: { style: BorderStyle.SINGLE, size: 12, color: theme.color },
+            left: { style: BorderStyle.SINGLE, size: 12, color: theme.color },
+            right: { style: BorderStyle.SINGLE, size: 12, color: theme.color },
+          },
+          children: [new TextRun({
+            text: `   ${theme.label}   `,
+            bold: true,
+            color: theme.color,
+            size: 28,
+            font: theme.fontTitle,
+          })],
+        }),
+        ...linhas.map((linha, i) => {
+          if (i === 0 && linha.trim()) {
+            return new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 240, after: 240 },
+              children: [new TextRun({ text: linha, bold: true, size: 28, color: theme.color, font: theme.fontTitle })],
+            });
+          }
           return new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 240 },
-            children: [new TextRun({ text: linha, bold: true, size: 26 })],
+            spacing: { after: 120 },
+            alignment: AlignmentType.JUSTIFIED,
+            children: [new TextRun({ text: linha || " ", font: theme.fontBody })],
           });
-        }
-        return new Paragraph({
-          spacing: { after: 120 },
-          children: [new TextRun({ text: linha || " " })],
-        });
-      }),
+        }),
+      ],
     }],
   });
 
