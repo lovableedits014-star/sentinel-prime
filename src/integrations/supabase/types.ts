@@ -2293,6 +2293,82 @@ export type Database = {
           },
         ]
       }
+      ic_promessas: {
+        Row: {
+          bairro: string | null
+          beneficiario: string | null
+          client_id: string
+          created_at: string
+          documento_origem_id: string | null
+          evidencias: Json
+          id: string
+          notas: string | null
+          prazo_data: string | null
+          prazo_texto: string | null
+          status: string
+          texto: string
+          tipo: string
+          transcription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          bairro?: string | null
+          beneficiario?: string | null
+          client_id: string
+          created_at?: string
+          documento_origem_id?: string | null
+          evidencias?: Json
+          id?: string
+          notas?: string | null
+          prazo_data?: string | null
+          prazo_texto?: string | null
+          status?: string
+          texto: string
+          tipo?: string
+          transcription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bairro?: string | null
+          beneficiario?: string | null
+          client_id?: string
+          created_at?: string
+          documento_origem_id?: string | null
+          evidencias?: Json
+          id?: string
+          notas?: string | null
+          prazo_data?: string | null
+          prazo_texto?: string | null
+          status?: string
+          texto?: string
+          tipo?: string
+          transcription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ic_promessas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ic_promessas_documento_origem_id_fkey"
+            columns: ["documento_origem_id"]
+            isOneToOne: false
+            referencedRelation: "ic_knowledge_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ic_promessas_transcription_id_fkey"
+            columns: ["transcription_id"]
+            isOneToOne: false
+            referencedRelation: "ic_transcriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ic_transcriptions: {
         Row: {
           client_id: string
@@ -5994,6 +6070,10 @@ export type Database = {
       }
       unaccent: { Args: { "": string }; Returns: string }
       user_can_access_client: { Args: { _client_id: string }; Returns: boolean }
+      user_has_client_access: {
+        Args: { _client_id: string; _user_id: string }
+        Returns: boolean
+      }
       validate_lider_invite_token: {
         Args: { _token: string }
         Returns: {
