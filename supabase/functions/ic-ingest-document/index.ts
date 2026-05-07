@@ -25,19 +25,9 @@ interface IngestRequest {
 }
 
 async function extractPdfText(bytes: Uint8Array): Promise<string> {
-  // Desabilita worker — roda em main thread
-  // @ts-ignore
-  const loadingTask = pdfjs.getDocument({ data: bytes, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: false });
-  const doc = await loadingTask.promise;
-  let out = "";
-  const max = Math.min(doc.numPages, 200);
-  for (let i = 1; i <= max; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    const strs = (content.items as any[]).map((it) => (typeof it?.str === "string" ? it.str : "")).filter(Boolean);
-    out += strs.join(" ") + "\n\n";
-  }
-  return out.trim();
+  const pdf = await getDocumentProxy(bytes);
+  const { text } = await extractText(pdf, { mergePages: true });
+  return (Array.isArray(text) ? text.join("\n\n") : String(text || "")).trim();
 }
 
 function htmlToText(html: string): string {
