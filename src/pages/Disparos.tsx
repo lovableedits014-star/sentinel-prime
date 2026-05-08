@@ -193,6 +193,7 @@ export default function Disparos() {
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
   const [groupSearch, setGroupSearch] = useState("");
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
   const {
     groups: waGroups,
@@ -200,9 +201,11 @@ export default function Disparos() {
     totalActive: groupsTotalActive,
     inactiveCount: groupsInactiveCount,
     noPostCount: groupsNoPostCount,
+    favoriteCount: groupsFavoriteCount,
     lastSyncedAt: groupsLastSyncedAt,
     isSyncing: groupsSyncing,
     syncFromPrimary: syncGroupsFromPrimary,
+    toggleFavorite: toggleGroupFavorite,
     lastError: groupsLastError,
     hasPrimaryInstance,
     primaryConnected,
@@ -212,9 +215,15 @@ export default function Disparos() {
   } = useWhatsAppGroups(clientId);
   const filteredGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
-    if (!q) return waGroups;
-    return waGroups.filter((g) => (g.name || g.group_jid).toLowerCase().includes(q));
-  }, [waGroups, groupSearch]);
+    let list = waGroups;
+    if (onlyFavorites) list = list.filter((g) => g.is_favorite);
+    if (q) list = list.filter((g) => (g.name || g.group_jid).toLowerCase().includes(q));
+    // Favoritos sempre primeiro, depois alfabético
+    return [...list].sort((a, b) => {
+      if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+      return (a.name || a.group_jid).localeCompare(b.name || b.group_jid, "pt-BR");
+    });
+  }, [waGroups, groupSearch, onlyFavorites]);
   const totalGroupMembers = useMemo(
     () => waGroups.filter((g) => selectedGroupJids.includes(g.group_jid))
       .reduce((s, g) => s + (g.participants_count || 0), 0),
