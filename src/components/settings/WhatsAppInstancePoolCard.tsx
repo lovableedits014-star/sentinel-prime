@@ -403,6 +403,35 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
                 </Tooltip>
               </TooltipProvider>
             )}
+            {instance.is_primary && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => syncFromInstance(instance.id)}
+                      disabled={isSyncing}
+                      className="border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                    >
+                      {isSyncing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                      ) : (
+                        <Users className="w-3.5 h-3.5 mr-1" />
+                      )}
+                      Sincronizar grupos{groupsForThisInstance > 0 ? ` (${groupsForThisInstance})` : ""}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Lista os grupos de WhatsApp em que este número participa, para
+                      você poder enviar disparos diretamente para eles a partir da página
+                      Disparos. Pode rodar quantas vezes quiser.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </>
         )}
 
