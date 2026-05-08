@@ -28,13 +28,22 @@ export function useWhatsAppGroups(clientId: string | undefined) {
         .from("whatsapp_groups" as any)
         .select("id, group_jid, name, picture_url, participants_count, is_admin, is_announcement, is_active, last_synced_at, instance_id")
         .eq("client_id", clientId)
-        .eq("is_active", true)
         .order("name", { ascending: true });
       if (error) throw error;
       return (data as any) || [];
     },
     enabled: !!clientId,
   });
+
+  const allGroups = groupsQuery.data || [];
+  const activeGroups = allGroups.filter((g) => g.is_active);
+  const inactiveCount = allGroups.length - activeGroups.length;
+  const noPostCount = activeGroups.filter((g) => g.is_announcement && !g.is_admin).length;
+  const lastSyncedAt = activeGroups.reduce<string | null>((acc, g) => {
+    if (!g.last_synced_at) return acc;
+    if (!acc || g.last_synced_at > acc) return g.last_synced_at;
+    return acc;
+  }, null);
 
   const syncFromInstance = useCallback(
     async (instanceId: string) => {
@@ -63,7 +72,12 @@ export function useWhatsAppGroups(clientId: string | undefined) {
   );
 
   return {
-    groups: groupsQuery.data || [],
+    groups: activeGroups,
+    allGroups,
+    totalActive: activeGroups.length,
+    inactiveCount,
+    noPostCount,
+    lastSyncedAt,
     isLoading: groupsQuery.isLoading,
     isSyncing,
     syncFromInstance,

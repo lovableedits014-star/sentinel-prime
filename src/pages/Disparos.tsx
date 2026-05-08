@@ -194,7 +194,14 @@ export default function Disparos() {
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
   const [groupSearch, setGroupSearch] = useState("");
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
-  const { groups: waGroups, isLoading: loadingGroups } = useWhatsAppGroups(clientId);
+  const {
+    groups: waGroups,
+    isLoading: loadingGroups,
+    totalActive: groupsTotalActive,
+    inactiveCount: groupsInactiveCount,
+    noPostCount: groupsNoPostCount,
+    lastSyncedAt: groupsLastSyncedAt,
+  } = useWhatsAppGroups(clientId);
   const filteredGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
     if (!q) return waGroups;
@@ -500,6 +507,31 @@ export default function Disparos() {
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
             <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+              {/* Status dos grupos */}
+              <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-border/50">
+                <Badge variant="secondary" className="gap-1">
+                  <Users className="h-3 w-3" />
+                  {groupsTotalActive} grupo(s) ativo(s)
+                </Badge>
+                <Badge variant="outline" className="gap-1 text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  {groupsLastSyncedAt
+                    ? `Sincronizado ${new Date(groupsLastSyncedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`
+                    : "Nunca sincronizado"}
+                </Badge>
+                {groupsNoPostCount > 0 && (
+                  <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400">
+                    <Ban className="h-3 w-3" />
+                    {groupsNoPostCount} sem permissão de envio
+                  </Badge>
+                )}
+                {groupsInactiveCount > 0 && (
+                  <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
+                    <XCircle className="h-3 w-3" />
+                    {groupsInactiveCount} removido(s) do WhatsApp
+                  </Badge>
+                )}
+              </div>
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-sm">Grupos disponíveis</Label>
                 <span className="text-xs text-muted-foreground">
