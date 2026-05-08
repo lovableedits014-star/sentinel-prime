@@ -103,7 +103,9 @@ async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string
       // tenta o próximo formato de payload.
       if (isGroup) {
         const errMsg = String(data?.error || "").toLowerCase();
+        const acceptedWithoutProof = res.ok && !data?.delivered && !(data?.messageId || data?.message_id || data?.id || data?.key?.id);
         const unsupported =
+          acceptedWithoutProof ||
           errMsg.includes("unsupported action") ||
           errMsg.includes("available:") ||
           errMsg.includes("número inválido") ||
@@ -955,7 +957,8 @@ Deno.serve(async (req) => {
       await adminClient.from("whatsapp_dispatches").update({
         enviados: sent,
         falhas: failed,
-        status: "concluido",
+        status: failed > 0 && sent === 0 ? "falhou" : "concluido",
+        error_message: failed > 0 && sent === 0 ? "Nenhum envio foi confirmado pela ponte WhatsApp." : null,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }).eq("id", dispatch.id);
