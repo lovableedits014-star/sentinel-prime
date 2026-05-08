@@ -576,26 +576,95 @@ export default function Disparos() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              {/* Botão principal — espelho de "Sincronizar grupos" em Configurações → WhatsApp */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2 border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                onClick={() => setConfirmSyncGroupsOpen(true)}
-                disabled={groupsSyncing || !hasPrimaryInstance || !primaryConnected}
-                title={
-                  !hasPrimaryInstance
-                    ? "Defina uma instância como Principal em Configurações → WhatsApp"
-                    : !primaryConnected
-                    ? "Instância principal desconectada"
-                    : "Sincronizar grupos da instância principal"
-                }
-              >
-                {groupsSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-                Sincronizar grupos
-                {primaryInstance?.apelido ? ` (${primaryInstance.apelido})` : ""}
-                {groupsTotalActive > 0 ? ` · ${groupsTotalActive}` : ""}
-              </Button>
+              {/* Botão principal (sincroniza a instância principal) + dropdown de outras instâncias */}
+              <div className="flex w-full gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 gap-2 border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                  onClick={() => setConfirmSyncGroupsOpen(true)}
+                  disabled={groupsSyncing || !hasPrimaryInstance || !primaryConnected}
+                  title={
+                    !hasPrimaryInstance
+                      ? "Defina uma instância como Principal em Configurações → WhatsApp"
+                      : !primaryConnected
+                      ? "Instância principal desconectada"
+                      : "Sincronizar grupos da instância principal"
+                  }
+                >
+                  {groupsSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                  Sincronizar grupos
+                  {primaryInstance?.apelido ? ` (${primaryInstance.apelido})` : ""}
+                  {groupsTotalActive > 0 ? ` · ${groupsTotalActive}` : ""}
+                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 shrink-0"
+                      disabled={groupsSyncing || waInstances.length === 0}
+                      title="Sincronizar de outras instâncias"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-72">
+                    <DropdownMenuLabel>Sincronizar de…</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      disabled={groupsSyncing || waConnectedInstances.length < 2}
+                      onSelect={(e) => { e.preventDefault(); syncGroupsFromMany(); }}
+                    >
+                      <Zap className="h-3.5 w-3.5 mr-2" />
+                      <div className="flex-1">
+                        <div className="text-sm">Todas as instâncias conectadas</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {waConnectedInstances.length} conectada(s) — sincroniza em sequência
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {waInstances.length === 0 && (
+                      <div className="px-2 py-3 text-xs text-muted-foreground text-center">
+                        Nenhuma instância cadastrada
+                      </div>
+                    )}
+                    {waInstances.map((inst) => {
+                      const connected = ["connected", "open"].includes(String(inst.status || "").toLowerCase());
+                      const syncingThis = syncingInstanceId === inst.id;
+                      return (
+                        <DropdownMenuItem
+                          key={inst.id}
+                          disabled={groupsSyncing || !connected}
+                          onSelect={(e) => { e.preventDefault(); syncGroupsFromInstance(inst.id); }}
+                          className="gap-2"
+                        >
+                          {syncingThis ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : connected ? (
+                            <Wifi className="h-3.5 w-3.5 text-emerald-600" />
+                          ) : (
+                            <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm flex items-center gap-1.5 truncate">
+                              {inst.apelido || `Instância ${inst.id.slice(0, 8)}`}
+                              {inst.is_primary && (
+                                <Badge variant="secondary" className="h-4 px-1 text-[9px]">principal</Badge>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground truncate">
+                              {inst.phone_number || "—"} · {connected ? "conectada" : (inst.status || "desconectada")}
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
               {/* Indicador de progresso em tempo real */}
               {(groupsSyncing || (latestSyncLog && syncElapsedMs > 0 && Date.now() - new Date(latestSyncLog.ts).getTime() < 4000)) && (
