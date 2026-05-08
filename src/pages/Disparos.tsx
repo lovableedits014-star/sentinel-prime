@@ -674,6 +674,55 @@ export default function Disparos() {
                   </ScrollArea>
                 </>
               )}
+
+              {/* Logs de sincronização */}
+              {(groupsSyncLogs.length > 0 || groupsSyncing) && (
+                <div className="mt-2 border rounded-md bg-background/60">
+                  <div className="flex items-center justify-between px-2 py-1.5 border-b">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                      <MessageSquare className="h-3 w-3" />
+                      Logs de sincronização
+                      {groupsSyncing && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                    </span>
+                    {groupsSyncLogs.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-1.5 text-[10px] text-muted-foreground"
+                        onClick={clearGroupsSyncLogs}
+                      >
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="h-32">
+                    <ul className="p-2 space-y-1 font-mono text-[11px] leading-snug">
+                      {groupsSyncLogs.length === 0 ? (
+                        <li className="text-muted-foreground italic">Aguardando…</li>
+                      ) : (
+                        groupsSyncLogs.map((log) => (
+                          <li
+                            key={log.id}
+                            className={
+                              log.level === "error"
+                                ? "text-destructive"
+                                : log.level === "success"
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-foreground/80"
+                            }
+                          >
+                            <span className="text-muted-foreground mr-2">
+                              {new Date(log.ts).toLocaleTimeString("pt-BR", { hour12: false })}
+                            </span>
+                            {log.message}
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </ScrollArea>
+                </div>
+              )}
             </div>
           )}
           <div className="flex flex-wrap gap-2">
