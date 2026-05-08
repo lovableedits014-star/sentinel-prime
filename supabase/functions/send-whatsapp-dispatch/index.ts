@@ -621,8 +621,9 @@ Deno.serve(async (req) => {
       // Create dispatch items (status=pendente por padrão)
       const items = recipients.map((r) => ({
         dispatch_id: dispatch.id,
-        telefone: r.telefone,
+        telefone: r.telefone || null,
         nome: r.nome,
+        group_jid: r.group_jid || null,
       }));
 
       for (let i = 0; i < items.length; i += 100) {
