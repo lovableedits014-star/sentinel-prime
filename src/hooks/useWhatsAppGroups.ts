@@ -64,6 +64,7 @@ export type SyncLogEntry = {
 export function useWhatsAppGroups(clientId: string | undefined) {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncingInstanceId, setSyncingInstanceId] = useState<string | null>(null);
   const [lastError, setLastError] = useState<GroupsSyncError | null>(null);
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
 
