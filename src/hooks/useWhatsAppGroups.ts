@@ -12,6 +12,7 @@ export type WhatsAppGroup = {
   is_admin: boolean;
   is_announcement: boolean;
   is_active: boolean;
+  is_favorite: boolean;
   last_synced_at: string;
   instance_id: string;
 };
