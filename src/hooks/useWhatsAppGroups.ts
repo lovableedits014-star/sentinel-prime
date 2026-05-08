@@ -74,7 +74,7 @@ export function useWhatsAppGroups(clientId: string | undefined) {
       if (!clientId) return [];
       const { data, error } = await supabase
         .from("whatsapp_groups" as any)
-        .select("id, group_jid, name, picture_url, participants_count, is_admin, is_announcement, is_active, last_synced_at, instance_id")
+        .select("id, group_jid, name, picture_url, participants_count, is_admin, is_announcement, is_active, is_favorite, last_synced_at, instance_id")
         .eq("client_id", clientId)
         .order("name", { ascending: true });
       if (error) throw error;
