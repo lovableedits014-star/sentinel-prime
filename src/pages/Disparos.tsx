@@ -530,7 +530,7 @@ export default function Disparos() {
                 type="button"
                 variant="outline"
                 className="w-full gap-2 border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                onClick={() => syncGroupsFromPrimary()}
+                onClick={() => setConfirmSyncGroupsOpen(true)}
                 disabled={groupsSyncing || !hasPrimaryInstance || !primaryConnected}
                 title={
                   !hasPrimaryInstance
@@ -575,7 +575,7 @@ export default function Disparos() {
                     size="sm"
                     variant="ghost"
                     className="h-6 px-2 text-xs gap-1 ml-auto"
-                    onClick={() => syncGroupsFromPrimary()}
+                    onClick={() => setConfirmSyncGroupsOpen(true)}
                     disabled={groupsSyncing || !primaryConnected}
                     title={!primaryConnected ? "Instância principal desconectada" : "Re-sincronizar agora"}
                   >
@@ -638,7 +638,7 @@ export default function Disparos() {
                     size="sm"
                     variant="outline"
                     className="gap-2"
-                    onClick={() => syncGroupsFromPrimary()}
+                    onClick={() => setConfirmSyncGroupsOpen(true)}
                     disabled={groupsSyncing || !hasPrimaryInstance || !primaryConnected}
                   >
                     {groupsSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
