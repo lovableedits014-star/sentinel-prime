@@ -195,5 +195,7 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     primaryInstance,
     primaryConnected,
     hasPrimaryInstance: !!primaryInstance,
+    syncLogs,
+    clearSyncLogs: clearLogs,
   };
 }
