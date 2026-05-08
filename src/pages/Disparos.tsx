@@ -515,6 +515,26 @@ export default function Disparos() {
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
             <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+              {/* Botão principal — espelho de "Sincronizar grupos" em Configurações → WhatsApp */}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2 border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                onClick={() => syncGroupsFromPrimary()}
+                disabled={groupsSyncing || !hasPrimaryInstance || !primaryConnected}
+                title={
+                  !hasPrimaryInstance
+                    ? "Defina uma instância como Principal em Configurações → WhatsApp"
+                    : !primaryConnected
+                    ? "Instância principal desconectada"
+                    : "Sincronizar grupos da instância principal"
+                }
+              >
+                {groupsSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                Sincronizar grupos
+                {primaryInstance?.apelido ? ` (${primaryInstance.apelido})` : ""}
+                {groupsTotalActive > 0 ? ` · ${groupsTotalActive}` : ""}
+              </Button>
               {/* Status dos grupos */}
               <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-border/50">
                 <Badge variant="secondary" className="gap-1">
