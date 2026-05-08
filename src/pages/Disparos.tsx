@@ -195,6 +195,7 @@ export default function Disparos() {
   const [groupSearch, setGroupSearch] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
+  const [confirmSyncGroupsOpen, setConfirmSyncGroupsOpen] = useState(false);
   const {
     groups: waGroups,
     isLoading: loadingGroups,
@@ -524,12 +525,31 @@ export default function Disparos() {
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
             <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+              <AlertDialog open={confirmSyncGroupsOpen} onOpenChange={setConfirmSyncGroupsOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Sincronizar grupos do WhatsApp?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Vamos consultar a instância principal{primaryInstance?.apelido ? ` "${primaryInstance.apelido}"` : ""} e atualizar a lista de grupos (nome, foto, membros e permissões). Os grupos favoritados ⭐ são preservados.
+                      {groupsLastSyncedAt && (
+                        <> A última sincronização foi em {new Date(groupsLastSyncedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}.</>
+                      )}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => syncGroupsFromPrimary()}>
+                      Sincronizar agora
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               {/* Botão principal — espelho de "Sincronizar grupos" em Configurações → WhatsApp */}
               <Button
                 type="button"
                 variant="outline"
                 className="w-full gap-2 border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20"
-                onClick={() => syncGroupsFromPrimary()}
+                onClick={() => setConfirmSyncGroupsOpen(true)}
                 disabled={groupsSyncing || !hasPrimaryInstance || !primaryConnected}
                 title={
                   !hasPrimaryInstance
@@ -574,7 +594,7 @@ export default function Disparos() {
                     size="sm"
                     variant="ghost"
                     className="h-6 px-2 text-xs gap-1 ml-auto"
-                    onClick={() => syncGroupsFromPrimary()}
+                    onClick={() => setConfirmSyncGroupsOpen(true)}
                     disabled={groupsSyncing || !primaryConnected}
                     title={!primaryConnected ? "Instância principal desconectada" : "Re-sincronizar agora"}
                   >
@@ -637,7 +657,7 @@ export default function Disparos() {
                     size="sm"
                     variant="outline"
                     className="gap-2"
-                    onClick={() => syncGroupsFromPrimary()}
+                    onClick={() => setConfirmSyncGroupsOpen(true)}
                     disabled={groupsSyncing || !hasPrimaryInstance || !primaryConnected}
                   >
                     {groupsSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
