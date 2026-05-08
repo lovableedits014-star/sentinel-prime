@@ -462,18 +462,40 @@ Deno.serve(async (req) => {
     const interMax = (clientData.whatsapp_inter_instance_delay_max ?? 3) * 1000;
 
     // Build recipient list — em modo resume usa items pendentes; senão, busca por tipo
-    let recipients: { telefone: string; nome: string }[] = [];
+    let recipients: { telefone?: string; nome: string; group_jid?: string }[] = [];
     let dispatch: any;
+
+    // Lista de JIDs de grupos vinda do payload (modo "grupos")
+    const groupJids: string[] = Array.isArray(payload.group_jids)
+      ? payload.group_jids.filter((j: any) => typeof j === "string" && j.endsWith("@g.us"))
+      : [];
 
     if (isResume && existingDispatchId) {
       const { data: pendingItems } = await adminClient
         .from("whatsapp_dispatch_items")
-        .select("telefone, nome")
+        .select("telefone, nome, group_jid")
         .eq("dispatch_id", existingDispatchId)
         .eq("status", "pendente");
-      recipients = (pendingItems || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
+      recipients = (pendingItems || []).map((r: any) => ({
+        telefone: r.telefone || undefined,
+        nome: r.nome || "",
+        group_jid: r.group_jid || undefined,
+      }));
       dispatch = { id: existingDispatchId };
       console.log(`[resume] dispatch=${existingDispatchId} pending=${recipients.length}`);
+    } else if (tipo === "grupos") {
+      if (groupJids.length > 0) {
+        const { data: gs } = await adminClient
+          .from("whatsapp_groups")
+          .select("group_jid, name")
+          .eq("client_id", client_id)
+          .in("group_jid", groupJids);
+        const nameByJid = new Map((gs || []).map((g: any) => [g.group_jid, g.name]));
+        recipients = groupJids.map((jid) => ({
+          group_jid: jid,
+          nome: nameByJid.get(jid) || jid,
+        }));
+      }
     } else if (tipo === "eleicao") {
       let q = adminClient.from("eleicao_pessoas")
         .select("telefone, nome")
