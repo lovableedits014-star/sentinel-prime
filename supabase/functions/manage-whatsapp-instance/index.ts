@@ -65,6 +65,21 @@ const toBoolean = (value: unknown, fallback = false) => {
 
 const firstDefined = (...values: unknown[]) => values.find((value) => value !== undefined && value !== null);
 
+const normalizeParticipantJid = (value: unknown) => String(value || "")
+  .replace(/:\d+(?=@)/, "")
+  .trim()
+  .toLowerCase();
+
+const isParticipantAdmin = (participant: any) => toBoolean(participant?.admin ?? participant?.isAdmin ?? participant?.role);
+
+const deriveIsAdminFromParticipants = (group: any, ownJids: Set<string>) => {
+  if (!Array.isArray(group?.participants) || ownJids.size === 0) return false;
+  return group.participants.some((p: any) => {
+    const jid = normalizeParticipantJid(firstDefined(p?.id, p?.jid, p?.participant, p?.user, p?.phone));
+    return ownJids.has(jid) && isParticipantAdmin(p);
+  });
+};
+
 function normalizeBrazilPhoneForBridge(raw: string): string {
   const digits = String(raw).replace(/\D/g, "");
   if (!digits) return "";
