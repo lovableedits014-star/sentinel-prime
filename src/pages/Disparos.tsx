@@ -195,6 +195,7 @@ export default function Disparos() {
   const [groupSearch, setGroupSearch] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
+  const [confirmSyncGroupsOpen, setConfirmSyncGroupsOpen] = useState(false);
   const {
     groups: waGroups,
     isLoading: loadingGroups,
