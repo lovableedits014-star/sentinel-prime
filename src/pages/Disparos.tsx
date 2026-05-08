@@ -204,6 +204,7 @@ export default function Disparos() {
       .reduce((s, g) => s + (g.participants_count || 0), 0),
     [waGroups, selectedGroupJids]
   );
+  const handleUseMissions = () => {
     const links = activeMissions.map((m: any, i: number) => {
       const platformLabel = m.platform === "instagram" ? "📸 Instagram" : "📘 Facebook";
       return `${i + 1}. ${platformLabel} — ${m.title || "Publicação"}\n👉 ${m.post_url}`;
