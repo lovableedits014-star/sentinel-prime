@@ -196,6 +196,8 @@ export default function Disparos() {
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
   const [confirmSyncGroupsOpen, setConfirmSyncGroupsOpen] = useState(false);
+  const [syncStartedAt, setSyncStartedAt] = useState<number | null>(null);
+  const [syncElapsedMs, setSyncElapsedMs] = useState(0);
   const {
     groups: waGroups,
     isLoading: loadingGroups,
@@ -230,6 +232,19 @@ export default function Disparos() {
       .reduce((s, g) => s + (g.participants_count || 0), 0),
     [waGroups, selectedGroupJids]
   );
+
+  // Cronômetro / progresso da sincronização de grupos
+  useEffect(() => {
+    if (groupsSyncing) {
+      const start = Date.now();
+      setSyncStartedAt(start);
+      setSyncElapsedMs(0);
+      const t = window.setInterval(() => setSyncElapsedMs(Date.now() - start), 250);
+      return () => window.clearInterval(t);
+    }
+    setSyncStartedAt(null);
+  }, [groupsSyncing]);
+  const latestSyncLog = groupsSyncLogs[0];
   const handleUseMissions = () => {
     const links = activeMissions.map((m: any, i: number) => {
       const platformLabel = m.platform === "instagram" ? "📸 Instagram" : "📘 Facebook";
@@ -564,6 +579,36 @@ export default function Disparos() {
                 {primaryInstance?.apelido ? ` (${primaryInstance.apelido})` : ""}
                 {groupsTotalActive > 0 ? ` · ${groupsTotalActive}` : ""}
               </Button>
+
+              {/* Indicador de progresso em tempo real */}
+              {(groupsSyncing || (latestSyncLog && syncElapsedMs > 0 && Date.now() - new Date(latestSyncLog.ts).getTime() < 4000)) && (
+                <div className="rounded-md border border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20 p-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="flex items-center gap-1.5 font-medium text-blue-700 dark:text-blue-300 min-w-0">
+                      {groupsSyncing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                      ) : latestSyncLog?.level === "error" ? (
+                        <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                      ) : (
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      )}
+                      <span className="truncate">
+                        {latestSyncLog?.message || "Iniciando sincronização…"}
+                      </span>
+                    </span>
+                    <span className="tabular-nums text-muted-foreground shrink-0">
+                      {(syncElapsedMs / 1000).toFixed(1)}s
+                    </span>
+                  </div>
+                  <div className="relative h-1 w-full overflow-hidden rounded-full bg-blue-200/60 dark:bg-blue-900/40">
+                    {groupsSyncing ? (
+                      <div className="absolute inset-y-0 w-1/3 rounded-full bg-blue-500 animate-[indeterminate_1.2s_ease-in-out_infinite]" />
+                    ) : (
+                      <div className={`absolute inset-y-0 left-0 w-full rounded-full ${latestSyncLog?.level === "error" ? "bg-destructive" : "bg-emerald-500"}`} />
+                    )}
+                  </div>
+                </div>
+              )}
               {/* Status dos grupos */}
               <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-border/50">
                 <Badge variant="secondary" className="gap-1">
