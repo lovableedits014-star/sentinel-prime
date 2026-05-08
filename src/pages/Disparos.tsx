@@ -252,8 +252,15 @@ export default function Disparos() {
     }).join("\n\n");
 
     setTitulo("Missão: Interaja nas publicações");
+    // Em envio para grupos não existe destinatário individual — não usar {nome}
+    const saudacao = tipoDisparo === "grupos"
+      ? "Pessoal! 🎯"
+      : "Olá {nome}! 🎯";
+    const cta = tipoDisparo === "grupos"
+      ? "A participação de cada um faz toda a diferença! 💪"
+      : "Sua participação faz toda a diferença! 💪";
     setMensagem(
-      `Olá {nome}! 🎯\n\nTemos missões importantes para você!\n\nAcesse as publicações abaixo e interaja (curta, comente e compartilhe):\n\n${links}\n\nSua participação faz toda a diferença! 💪`
+      `${saudacao}\n\nTemos missões importantes${tipoDisparo === "grupos" ? " para o grupo" : " para você"}!\n\nAcesse as publicações abaixo e interaja (curta, comente e compartilhe):\n\n${links}\n\n${cta}`
     );
   };
 
