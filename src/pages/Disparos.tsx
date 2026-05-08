@@ -232,6 +232,19 @@ export default function Disparos() {
       .reduce((s, g) => s + (g.participants_count || 0), 0),
     [waGroups, selectedGroupJids]
   );
+
+  // Cronômetro / progresso da sincronização de grupos
+  useEffect(() => {
+    if (groupsSyncing) {
+      const start = Date.now();
+      setSyncStartedAt(start);
+      setSyncElapsedMs(0);
+      const t = window.setInterval(() => setSyncElapsedMs(Date.now() - start), 250);
+      return () => window.clearInterval(t);
+    }
+    setSyncStartedAt(null);
+  }, [groupsSyncing]);
+  const latestSyncLog = groupsSyncLogs[0];
   const handleUseMissions = () => {
     const links = activeMissions.map((m: any, i: number) => {
       const platformLabel = m.platform === "instagram" ? "📸 Instagram" : "📘 Facebook";
