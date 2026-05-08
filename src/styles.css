@@ -138,3 +138,8 @@
 #lovable-badge {
   display: none !important;
 }
+
+@keyframes indeterminate {
+  0% { left: -35%; }
+  100% { left: 100%; }
+}
