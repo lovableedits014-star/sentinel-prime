@@ -194,7 +194,14 @@ export default function Disparos() {
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
   const [groupSearch, setGroupSearch] = useState("");
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
-  const { groups: waGroups, isLoading: loadingGroups } = useWhatsAppGroups(clientId);
+  const {
+    groups: waGroups,
+    isLoading: loadingGroups,
+    totalActive: groupsTotalActive,
+    inactiveCount: groupsInactiveCount,
+    noPostCount: groupsNoPostCount,
+    lastSyncedAt: groupsLastSyncedAt,
+  } = useWhatsAppGroups(clientId);
   const filteredGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
     if (!q) return waGroups;
