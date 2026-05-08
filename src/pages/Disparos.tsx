@@ -537,6 +537,20 @@ export default function Disparos() {
                     {groupsInactiveCount} removido(s) do WhatsApp
                   </Badge>
                 )}
+                {hasPrimaryInstance && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs gap-1 ml-auto"
+                    onClick={() => syncGroupsFromPrimary()}
+                    disabled={groupsSyncing || !primaryConnected}
+                    title={!primaryConnected ? "Instância principal desconectada" : "Re-sincronizar agora"}
+                  >
+                    {groupsSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                    {groupsLastSyncedAt ? "Re-sincronizar" : "Sincronizar"}
+                  </Button>
+                )}
               </div>
 
               {/* Erro da última sincronização */}
