@@ -785,20 +785,32 @@ Deno.serve(async (req) => {
       }
 
       // Marca grupos que sumiram como inativos
+      let inactiveMarked = 0;
       if (seenJids.length > 0) {
-        await adminClient
+        const { count } = await adminClient
           .from("whatsapp_groups")
-          .update({ is_active: false, updated_at: now })
+          .update({ is_active: false, updated_at: now }, { count: "exact" })
           .eq("instance_id", instance_id)
+          .eq("is_active", true)
           .not("group_jid", "in", `(${seenJids.map((j) => `"${j.replace(/"/g, '')}"`).join(",")})`);
+        inactiveMarked = count || 0;
       } else {
-        await adminClient
+        const { count } = await adminClient
           .from("whatsapp_groups")
-          .update({ is_active: false, updated_at: now })
-          .eq("instance_id", instance_id);
+          .update({ is_active: false, updated_at: now }, { count: "exact" })
+          .eq("instance_id", instance_id)
+          .eq("is_active", true);
+        inactiveMarked = count || 0;
       }
 
-      return jsonResponse({ success: true, total: upserts.length, synced_at: now });
+      return jsonResponse({
+        success: true,
+        total: upserts.length,
+        total_chats: allChats.length,
+        total_groups: rawGroups.length,
+        inactive_marked: inactiveMarked,
+        synced_at: now,
+      });
     }
 
     if (action === "ensure_connected") {
