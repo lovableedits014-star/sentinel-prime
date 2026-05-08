@@ -65,7 +65,10 @@ async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string
   // A primeira que NÃO devolver "unsupported"/"número inválido" vence.
   const attempts: Array<Record<string, unknown>> = isGroup
     ? [
-        { action: "send_group", group_jid: phone, jid: phone, to: phone, message },
+        { action: "send_group", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, message },
+        { action: "send", jid: phone, group_jid: phone, remoteJid: phone, chatId: phone, is_group: true, isGroup: true, message },
+        { action: "send", remoteJid: phone, chatId: phone, is_group: true, isGroup: true, message },
+        { action: "send", chatId: phone, is_group: true, isGroup: true, message },
         { action: "send", to: phone, jid: phone, group_jid: phone, is_group: true, message },
         { action: "send", phone, message }, // último recurso (formato legado)
       ]
@@ -106,7 +109,11 @@ async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string
           errMsg.includes("número inválido") ||
           errMsg.includes("numero invalido") ||
           errMsg.includes("invalid number") ||
-          errMsg.includes("invalid phone");
+          errMsg.includes("invalid phone") ||
+          errMsg.includes("phone required") ||
+          errMsg.includes("telefone obrigatório") ||
+          errMsg.includes("telefone obrigatorio") ||
+          errMsg.includes("phone is required");
         if (unsupported) {
           console.warn(`[group send] payload "${body.action}" rejeitado (${data?.error || res.status}) — tentando próximo formato`);
           break; // sai do retry interno e pula pro próximo `attempts`
@@ -118,6 +125,15 @@ async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string
   }
 
   // Se chegou aqui sem sucesso, devolve o último resultado pra que getSendFailure capture o erro.
+  if (isGroup && lastRes) {
+    return {
+      res: lastRes,
+      data: {
+        ...lastData,
+        error: lastData?.error || "A VPS/bridge ainda não aceita envio para grupos: ela não suporta action=send_group e está validando o JID do grupo como número de telefone.",
+      },
+    };
+  }
   if (lastRes) return { res: lastRes, data: lastData };
   throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
 }
