@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
@@ -535,7 +536,7 @@ export default function Disparos() {
                         return (
                           <label
                             key={g.group_jid}
-                            className={`flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer ${cantSend ? "opacity-50" : ""}`}
+                            className={`flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer ${cantSend ? "opacity-50" : ""}`}
                           >
                             <Checkbox
                               checked={checked}
@@ -546,12 +547,19 @@ export default function Disparos() {
                                 );
                               }}
                             />
+                            <Avatar className="h-9 w-9 shrink-0">
+                              {g.picture_url ? <AvatarImage src={g.picture_url} alt={g.name || g.group_jid} /> : null}
+                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                {(g.name || "G").slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm truncate">{g.name || g.group_jid}</p>
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-sm truncate font-medium">{g.name || g.group_jid}</p>
+                              <p className="text-[11px] text-muted-foreground flex items-center gap-1 flex-wrap">
+                                <Users className="h-3 w-3" />
                                 {g.participants_count} membros
-                                {g.is_admin ? " · você é admin" : ""}
-                                {cantSend ? " · só admins podem postar" : ""}
+                                {g.is_admin ? " · admin" : ""}
+                                {cantSend ? " · só admins postam" : ""}
                               </p>
                             </div>
                           </label>
