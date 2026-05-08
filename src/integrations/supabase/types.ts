@@ -5636,6 +5636,7 @@ export type Database = {
           is_active: boolean | null
           is_admin: boolean | null
           is_announcement: boolean | null
+          is_favorite: boolean
           last_synced_at: string
           name: string | null
           participants_count: number | null
@@ -5651,6 +5652,7 @@ export type Database = {
           is_active?: boolean | null
           is_admin?: boolean | null
           is_announcement?: boolean | null
+          is_favorite?: boolean
           last_synced_at?: string
           name?: string | null
           participants_count?: number | null
@@ -5666,6 +5668,7 @@ export type Database = {
           is_active?: boolean | null
           is_admin?: boolean | null
           is_announcement?: boolean | null
+          is_favorite?: boolean
           last_synced_at?: string
           name?: string | null
           participants_count?: number | null

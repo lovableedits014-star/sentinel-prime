@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
-  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles,
+  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -193,6 +193,7 @@ export default function Disparos() {
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
   const [groupSearch, setGroupSearch] = useState("");
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
   const {
     groups: waGroups,
@@ -200,9 +201,11 @@ export default function Disparos() {
     totalActive: groupsTotalActive,
     inactiveCount: groupsInactiveCount,
     noPostCount: groupsNoPostCount,
+    favoriteCount: groupsFavoriteCount,
     lastSyncedAt: groupsLastSyncedAt,
     isSyncing: groupsSyncing,
     syncFromPrimary: syncGroupsFromPrimary,
+    toggleFavorite: toggleGroupFavorite,
     lastError: groupsLastError,
     hasPrimaryInstance,
     primaryConnected,
@@ -212,9 +215,15 @@ export default function Disparos() {
   } = useWhatsAppGroups(clientId);
   const filteredGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
-    if (!q) return waGroups;
-    return waGroups.filter((g) => (g.name || g.group_jid).toLowerCase().includes(q));
-  }, [waGroups, groupSearch]);
+    let list = waGroups;
+    if (onlyFavorites) list = list.filter((g) => g.is_favorite);
+    if (q) list = list.filter((g) => (g.name || g.group_jid).toLowerCase().includes(q));
+    // Favoritos sempre primeiro, depois alfabético
+    return [...list].sort((a, b) => {
+      if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+      return (a.name || a.group_jid).localeCompare(b.name || b.group_jid, "pt-BR");
+    });
+  }, [waGroups, groupSearch, onlyFavorites]);
   const totalGroupMembers = useMemo(
     () => waGroups.filter((g) => selectedGroupJids.includes(g.group_jid))
       .reduce((s, g) => s + (g.participants_count || 0), 0),
@@ -643,11 +652,29 @@ export default function Disparos() {
                     onChange={(e) => setGroupSearch(e.target.value)}
                     className="h-8 text-sm"
                   />
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
+                    <Button
+                      type="button" size="sm"
+                      variant={onlyFavorites ? "default" : "outline"}
+                      className="h-6 text-xs px-2 gap-1"
+                      onClick={() => setOnlyFavorites((v) => !v)}
+                      title="Mostrar apenas grupos marcados como favoritos"
+                    >
+                      <Star className={`h-3 w-3 ${onlyFavorites ? "fill-current" : ""}`} />
+                      Favoritos{groupsFavoriteCount > 0 ? ` (${groupsFavoriteCount})` : ""}
+                    </Button>
                     <Button
                       type="button" size="sm" variant="ghost" className="h-6 text-xs px-2"
                       onClick={() => setSelectedGroupJids(filteredGroups.map((g) => g.group_jid))}
                     >Selecionar todos</Button>
+                    {groupsFavoriteCount > 0 && (
+                      <Button
+                        type="button" size="sm" variant="ghost" className="h-6 text-xs px-2"
+                        onClick={() => setSelectedGroupJids(
+                          waGroups.filter((g) => g.is_favorite && !(g.is_announcement && !g.is_admin)).map((g) => g.group_jid)
+                        )}
+                      >Selecionar favoritos</Button>
+                    )}
                     <Button
                       type="button" size="sm" variant="ghost" className="h-6 text-xs px-2"
                       onClick={() => setSelectedGroupJids([])}
@@ -659,35 +686,46 @@ export default function Disparos() {
                         const checked = selectedGroupJids.includes(g.group_jid);
                         const cantSend = g.is_announcement && !g.is_admin;
                         return (
-                          <label
+                          <div
                             key={g.group_jid}
-                            className={`flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer ${cantSend ? "opacity-50" : ""}`}
+                            className={`flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 ${cantSend ? "opacity-50" : ""}`}
                           >
-                            <Checkbox
-                              checked={checked}
-                              disabled={cantSend}
-                              onCheckedChange={(v) => {
-                                setSelectedGroupJids((prev) =>
-                                  v ? [...prev, g.group_jid] : prev.filter((j) => j !== g.group_jid)
-                                );
-                              }}
-                            />
-                            <Avatar className="h-9 w-9 shrink-0">
-                              {g.picture_url ? <AvatarImage src={g.picture_url} alt={g.name || g.group_jid} /> : null}
-                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                {(g.name || "G").slice(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm truncate font-medium">{g.name || g.group_jid}</p>
-                              <p className="text-[11px] text-muted-foreground flex items-center gap-1 flex-wrap">
-                                <Users className="h-3 w-3" />
-                                {g.participants_count} membros
-                                {g.is_admin ? " · admin" : ""}
-                                {cantSend ? " · só admins postam" : ""}
-                              </p>
-                            </div>
-                          </label>
+                            <button
+                              type="button"
+                              onClick={() => toggleGroupFavorite(g.id, !g.is_favorite)}
+                              className="p-1 -m-1 rounded hover:bg-muted shrink-0"
+                              title={g.is_favorite ? "Remover dos favoritos" : "Marcar como favorito"}
+                              aria-label={g.is_favorite ? "Remover dos favoritos" : "Marcar como favorito"}
+                            >
+                              <Star className={`h-4 w-4 ${g.is_favorite ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+                            </button>
+                            <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                              <Checkbox
+                                checked={checked}
+                                disabled={cantSend}
+                                onCheckedChange={(v) => {
+                                  setSelectedGroupJids((prev) =>
+                                    v ? [...prev, g.group_jid] : prev.filter((j) => j !== g.group_jid)
+                                  );
+                                }}
+                              />
+                              <Avatar className="h-9 w-9 shrink-0">
+                                {g.picture_url ? <AvatarImage src={g.picture_url} alt={g.name || g.group_jid} /> : null}
+                                <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                  {(g.name || "G").slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm truncate font-medium">{g.name || g.group_jid}</p>
+                                <p className="text-[11px] text-muted-foreground flex items-center gap-1 flex-wrap">
+                                  <Users className="h-3 w-3" />
+                                  {g.participants_count} membros
+                                  {g.is_admin ? " · admin" : ""}
+                                  {cantSend ? " · só admins postam" : ""}
+                                </p>
+                              </div>
+                            </label>
+                          </div>
                         );
                       })}
                     </div>

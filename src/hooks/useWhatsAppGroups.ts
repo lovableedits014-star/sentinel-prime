@@ -12,6 +12,7 @@ export type WhatsAppGroup = {
   is_admin: boolean;
   is_announcement: boolean;
   is_active: boolean;
+  is_favorite: boolean;
   last_synced_at: string;
   instance_id: string;
 };
@@ -73,7 +74,7 @@ export function useWhatsAppGroups(clientId: string | undefined) {
       if (!clientId) return [];
       const { data, error } = await supabase
         .from("whatsapp_groups" as any)
-        .select("id, group_jid, name, picture_url, participants_count, is_admin, is_announcement, is_active, last_synced_at, instance_id")
+        .select("id, group_jid, name, picture_url, participants_count, is_admin, is_announcement, is_active, is_favorite, last_synced_at, instance_id")
         .eq("client_id", clientId)
         .order("name", { ascending: true });
       if (error) throw error;
@@ -179,17 +180,44 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     await syncFromInstance(primaryInstance.id);
   }, [primaryInstance?.id, syncFromInstance]);
 
+  const favoriteCount = activeGroups.filter((g) => g.is_favorite).length;
+
+  const toggleFavorite = useCallback(
+    async (groupId: string, next: boolean) => {
+      if (!clientId) return;
+      // Optimistic update
+      queryClient.setQueryData<WhatsAppGroup[]>(["whatsapp-groups", clientId], (prev) =>
+        (prev || []).map((g) => (g.id === groupId ? { ...g, is_favorite: next } : g))
+      );
+      const { error } = await supabase
+        .from("whatsapp_groups" as any)
+        .update({ is_favorite: next })
+        .eq("id", groupId)
+        .eq("client_id", clientId);
+      if (error) {
+        // rollback
+        queryClient.setQueryData<WhatsAppGroup[]>(["whatsapp-groups", clientId], (prev) =>
+          (prev || []).map((g) => (g.id === groupId ? { ...g, is_favorite: !next } : g))
+        );
+        toast.error("Não foi possível atualizar favorito", { description: error.message });
+      }
+    },
+    [clientId, queryClient]
+  );
+
   return {
     groups: activeGroups,
     allGroups,
     totalActive: activeGroups.length,
     inactiveCount,
     noPostCount,
+    favoriteCount,
     lastSyncedAt,
     isLoading: groupsQuery.isLoading,
     isSyncing,
     syncFromInstance,
     syncFromPrimary,
+    toggleFavorite,
     refetch: groupsQuery.refetch,
     lastError,
     primaryInstance,
