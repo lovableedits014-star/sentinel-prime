@@ -45,6 +45,13 @@ function parseSyncError(raw: string): GroupsSyncError {
   };
 }
 
+export type SyncLogEntry = {
+  id: string;
+  ts: string;
+  level: "info" | "success" | "error";
+  message: string;
+};
+
 export function useWhatsAppGroups(clientId: string | undefined) {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
