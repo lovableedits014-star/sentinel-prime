@@ -753,6 +753,10 @@ Deno.serve(async (req) => {
       if (!activeInstanceRow.bridge_api_key) {
         return jsonResponse({ success: false, error: "Instância sem credencial — conecte primeiro" }, 400);
       }
+      const ownJids = new Set([
+        normalizeParticipantJid(activeInstanceRow.phone_number ? `${activeInstanceRow.phone_number}@s.whatsapp.net` : ""),
+        normalizeParticipantJid(activeInstanceRow.phone_number ? `${activeInstanceRow.phone_number}@c.us` : ""),
+      ].filter(Boolean));
       // A bridge não tem action 'list_groups' — usamos 'chats' e filtramos JIDs @g.us
       const bridgeRes = await fetch(BRIDGE_URL, {
         method: "POST",
@@ -816,7 +820,7 @@ Deno.serve(async (req) => {
           picture_url: g?.picture || g?.picture_url || g?.profilePic || g?.imgUrl || null,
           participants_count:
             Number(g?.participants_count ?? g?.size ?? (Array.isArray(g?.participants) ? g.participants.length : 0)) || 0,
-          is_admin: toBoolean(isAdminValue),
+          is_admin: toBoolean(isAdminValue, deriveIsAdminFromParticipants(g, ownJids)),
           is_announcement: toBoolean(isAnnouncementValue),
           is_active: true,
           last_synced_at: now,
