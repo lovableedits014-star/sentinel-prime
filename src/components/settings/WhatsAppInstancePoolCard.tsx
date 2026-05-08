@@ -11,9 +11,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import {
-  Loader2, QrCode, Send, Trash2, Wifi, WifiOff, Pencil, Check, X, RefreshCw, Power, Star, Phone, Webhook
+  Loader2, QrCode, Send, Trash2, Wifi, WifiOff, Pencil, Check, X, RefreshCw, Power, Star, Phone, Webhook, Users
 } from "lucide-react";
 import { toast } from "sonner";
+import { useWhatsAppGroups } from "@/hooks/useWhatsAppGroups";
 
 export interface PoolInstance {
   id: string;
