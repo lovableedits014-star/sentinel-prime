@@ -82,6 +82,8 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
   const [showTest, setShowTest] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { groups, isSyncing, syncFromInstance } = useWhatsAppGroups(clientId);
+  const groupsForThisInstance = groups.filter((g) => g.instance_id === instance.id).length;
 
   useEffect(() => setName(instance.apelido), [instance.apelido]);
 
