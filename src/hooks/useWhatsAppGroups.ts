@@ -72,7 +72,12 @@ export function useWhatsAppGroups(clientId: string | undefined) {
   );
 
   return {
-    groups: groupsQuery.data || [],
+    groups: activeGroups,
+    allGroups,
+    totalActive: activeGroups.length,
+    inactiveCount,
+    noPostCount,
+    lastSyncedAt,
     isLoading: groupsQuery.isLoading,
     isSyncing,
     syncFromInstance,
