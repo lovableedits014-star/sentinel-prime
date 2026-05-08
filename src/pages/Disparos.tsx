@@ -201,6 +201,12 @@ export default function Disparos() {
     inactiveCount: groupsInactiveCount,
     noPostCount: groupsNoPostCount,
     lastSyncedAt: groupsLastSyncedAt,
+    isSyncing: groupsSyncing,
+    syncFromPrimary: syncGroupsFromPrimary,
+    lastError: groupsLastError,
+    hasPrimaryInstance,
+    primaryConnected,
+    primaryInstance,
   } = useWhatsAppGroups(clientId);
   const filteredGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
