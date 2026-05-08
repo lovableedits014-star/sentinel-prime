@@ -798,15 +798,29 @@ Deno.serve(async (req) => {
             }
           }
 
+          // Para grupos, o "destino" é o JID e a mensagem não tem {nome} de pessoa.
+          const isGroup = !!recipient.group_jid;
+          const destination = isGroup
+            ? recipient.group_jid!
+            : cleanPhoneForBridge(recipient.telefone || "");
+          // Helper para localizar este item específico no banco
+          const itemMatch = (q: any) => {
+            const base = q.eq("dispatch_id", dispatch.id);
+            return isGroup
+              ? base.eq("group_jid", recipient.group_jid)
+              : base.eq("telefone", recipient.telefone);
+          };
+
           try {
-            const personalizedMsg = mensagem.replace(/{nome}/g, recipient.nome);
-            const phoneClean = cleanPhoneForBridge(recipient.telefone);
-            console.log(`[dispatch] inst=${instanceId ?? "legacy"} preflight=${preflight.status}${preflight.reconnected ? "(reconectado)" : ""} phone=${phoneClean}`);
+            const personalizedMsg = isGroup
+              ? mensagem // sem personalização individual em grupo
+              : mensagem.replace(/{nome}/g, recipient.nome);
+            console.log(`[dispatch] inst=${instanceId ?? "legacy"} preflight=${preflight.status}${preflight.reconnected ? "(reconectado)" : ""} ${isGroup ? "group" : "phone"}=${destination}`);
 
             const { res: sendRes, data: sendData } = await fetchBridgeSend({
               bridgeUrl,
               bridgeApiKey,
-              phone: phoneClean,
+              phone: destination,
               message: personalizedMsg,
             });
 
@@ -814,10 +828,8 @@ Deno.serve(async (req) => {
 
             if (!failure) {
               sent++;
-              await adminClient.from("whatsapp_dispatch_items")
-                .update({ status: "enviado", enviado_em: new Date().toISOString() })
-                .eq("dispatch_id", dispatch.id)
-                .eq("telefone", recipient.telefone);
+              await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                .update({ status: "enviado", enviado_em: new Date().toISOString() }));
               if (instanceId) {
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
@@ -843,10 +855,8 @@ Deno.serve(async (req) => {
                 continue;
               }
               failed++;
-              await adminClient.from("whatsapp_dispatch_items")
-                .update({ status: "falha", erro: String(failure).slice(0, 200) })
-                .eq("dispatch_id", dispatch.id)
-                .eq("telefone", recipient.telefone);
+              await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                .update({ status: "falha", erro: String(failure).slice(0, 200) }));
               if (instanceId) {
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
@@ -858,10 +868,8 @@ Deno.serve(async (req) => {
             }
           } catch (err) {
             failed++;
-            await adminClient.from("whatsapp_dispatch_items")
-              .update({ status: "falha", erro: String(err).slice(0, 200) })
-              .eq("dispatch_id", dispatch.id)
-              .eq("telefone", recipient.telefone);
+            await itemMatch(adminClient.from("whatsapp_dispatch_items")
+              .update({ status: "falha", erro: String(err).slice(0, 200) }));
             if (instanceId) {
               await adminClient.rpc("log_whatsapp_send", {
                 p_instance_id: instanceId, p_client_id: client_id,
