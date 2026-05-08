@@ -52,6 +52,34 @@ const sanitizeBridgeData = (data: any) => {
   return safe;
 };
 
+const toBoolean = (value: unknown, fallback = false) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "sim", "admin", "superadmin"].includes(normalized)) return true;
+    if (["false", "0", "no", "não", "nao", "none", "member", "null", "undefined", ""].includes(normalized)) return false;
+  }
+  return fallback;
+};
+
+const firstDefined = (...values: unknown[]) => values.find((value) => value !== undefined && value !== null);
+
+const normalizeParticipantJid = (value: unknown) => String(value || "")
+  .replace(/:\d+(?=@)/, "")
+  .trim()
+  .toLowerCase();
+
+const isParticipantAdmin = (participant: any) => toBoolean(participant?.admin ?? participant?.isAdmin ?? participant?.role);
+
+const deriveIsAdminFromParticipants = (group: any, ownJids: Set<string>) => {
+  if (!Array.isArray(group?.participants) || ownJids.size === 0) return false;
+  return group.participants.some((p: any) => {
+    const jid = normalizeParticipantJid(firstDefined(p?.id, p?.jid, p?.participant, p?.user, p?.phone));
+    return ownJids.has(jid) && isParticipantAdmin(p);
+  });
+};
+
 function normalizeBrazilPhoneForBridge(raw: string): string {
   const digits = String(raw).replace(/\D/g, "");
   if (!digits) return "";
@@ -592,7 +620,7 @@ Deno.serve(async (req) => {
     if (instance_id) {
       const { data: inst } = await adminClient
         .from("whatsapp_instances")
-        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since")
+        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since, phone_number")
         .eq("id", instance_id)
         .eq("client_id", resolvedClientId)
         .maybeSingle();
@@ -725,6 +753,11 @@ Deno.serve(async (req) => {
       if (!activeInstanceRow.bridge_api_key) {
         return jsonResponse({ success: false, error: "Instância sem credencial — conecte primeiro" }, 400);
       }
+      const ownJids = new Set([
+        normalizeParticipantJid(activeInstanceRow.phone_number || ""),
+        normalizeParticipantJid(activeInstanceRow.phone_number ? `${activeInstanceRow.phone_number}@s.whatsapp.net` : ""),
+        normalizeParticipantJid(activeInstanceRow.phone_number ? `${activeInstanceRow.phone_number}@c.us` : ""),
+      ].filter(Boolean));
       // A bridge não tem action 'list_groups' — usamos 'chats' e filtramos JIDs @g.us
       const bridgeRes = await fetch(BRIDGE_URL, {
         method: "POST",
@@ -760,6 +793,26 @@ Deno.serve(async (req) => {
         const jid = String(g?.id || g?.jid || g?.chatId || g?.group_id || g?.groupId || "").trim();
         if (!jid) return null;
         seenJids.push(jid);
+        const isAdminValue = firstDefined(
+          g?.is_admin,
+          g?.isAdmin,
+          g?.iAmAdmin,
+          g?.meIsAdmin,
+          g?.amIAdmin,
+          g?.isMeAdmin,
+          g?.myAdmin,
+          g?.role,
+          g?.participant?.admin
+        );
+        const isAnnouncementValue = firstDefined(
+          g?.is_announcement,
+          g?.announce,
+          g?.isAnnounce,
+          g?.restrict,
+          g?.announcement,
+          g?.onlyAdmins,
+          g?.only_admins
+        );
         return {
           client_id: resolvedClientId,
           instance_id: instance_id,
@@ -768,8 +821,8 @@ Deno.serve(async (req) => {
           picture_url: g?.picture || g?.picture_url || g?.profilePic || g?.imgUrl || null,
           participants_count:
             Number(g?.participants_count ?? g?.size ?? (Array.isArray(g?.participants) ? g.participants.length : 0)) || 0,
-          is_admin: Boolean(g?.is_admin ?? g?.isAdmin ?? g?.iAmAdmin ?? false),
-          is_announcement: Boolean(g?.is_announcement ?? g?.announce ?? g?.isAnnounce ?? false),
+          is_admin: toBoolean(isAdminValue) || deriveIsAdminFromParticipants(g, ownJids),
+          is_announcement: toBoolean(isAnnouncementValue),
           is_active: true,
           last_synced_at: now,
         };
