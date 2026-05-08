@@ -56,6 +56,16 @@ export function useWhatsAppGroups(clientId: string | undefined) {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastError, setLastError] = useState<GroupsSyncError | null>(null);
+  const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
+
+  const pushLog = useCallback((level: SyncLogEntry["level"], message: string) => {
+    setSyncLogs((prev) => [
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ts: new Date().toISOString(), level, message },
+      ...prev,
+    ].slice(0, 50));
+  }, []);
+
+  const clearLogs = useCallback(() => setSyncLogs([]), []);
 
   const groupsQuery = useQuery<WhatsAppGroup[]>({
     queryKey: ["whatsapp-groups", clientId],
