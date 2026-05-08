@@ -201,6 +201,12 @@ export default function Disparos() {
     inactiveCount: groupsInactiveCount,
     noPostCount: groupsNoPostCount,
     lastSyncedAt: groupsLastSyncedAt,
+    isSyncing: groupsSyncing,
+    syncFromPrimary: syncGroupsFromPrimary,
+    lastError: groupsLastError,
+    hasPrimaryInstance,
+    primaryConnected,
+    primaryInstance,
   } = useWhatsAppGroups(clientId);
   const filteredGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
@@ -531,7 +537,47 @@ export default function Disparos() {
                     {groupsInactiveCount} removido(s) do WhatsApp
                   </Badge>
                 )}
+                {hasPrimaryInstance && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs gap-1 ml-auto"
+                    onClick={() => syncGroupsFromPrimary()}
+                    disabled={groupsSyncing || !primaryConnected}
+                    title={!primaryConnected ? "Instância principal desconectada" : "Re-sincronizar agora"}
+                  >
+                    {groupsSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                    {groupsLastSyncedAt ? "Re-sincronizar" : "Sincronizar"}
+                  </Button>
+                )}
               </div>
+
+              {/* Erro da última sincronização */}
+              {groupsLastError && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1">
+                  <div className="flex items-start gap-2">
+                    <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-destructive">
+                        {groupsLastError.isUnsupportedAction
+                          ? "Ponte WhatsApp desatualizada"
+                          : groupsLastError.isNotConnected
+                          ? "Instância não conectada"
+                          : "Falha ao sincronizar grupos"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 break-words">
+                        {groupsLastError.isUnsupportedAction
+                          ? "A bridge não reconhece a action 'sync_groups'. Atualize a bridge ou peça ao suporte para liberar o endpoint 'chats'."
+                          : groupsLastError.isNotConnected
+                          ? "Conecte a instância principal em Configurações → WhatsApp e tente novamente."
+                          : groupsLastError.message}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-sm">Grupos disponíveis</Label>
                 <span className="text-xs text-muted-foreground">
@@ -539,9 +585,34 @@ export default function Disparos() {
                 </span>
               </div>
               {waGroups.length === 0 && !loadingGroups ? (
-                <p className="text-xs text-muted-foreground py-2">
-                  Nenhum grupo sincronizado ainda. Vá em <strong>Configurações → WhatsApp</strong> e clique em <strong>"Sincronizar grupos"</strong> no card da instância principal.
-                </p>
+                <div className="rounded-md border border-dashed bg-background/50 p-4 space-y-3 text-center">
+                  <Users className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Nenhum grupo disponível ainda</p>
+                    <p className="text-xs text-muted-foreground">
+                      {!hasPrimaryInstance ? (
+                        <>Defina uma instância como <strong>Principal</strong> em <strong>Configurações → WhatsApp</strong> para poder sincronizar os grupos.</>
+                      ) : !primaryConnected ? (
+                        <>A instância principal <strong>{primaryInstance?.apelido || ""}</strong> está desconectada. Conecte-a em <strong>Configurações → WhatsApp</strong> antes de sincronizar.</>
+                      ) : groupsLastError ? (
+                        <>A última sincronização falhou — corrija o erro acima e tente novamente.</>
+                      ) : (
+                        <>Clique em <strong>Sincronizar agora</strong> para listar os grupos do WhatsApp da instância principal{primaryInstance?.apelido ? ` "${primaryInstance.apelido}"` : ""}.</>
+                      )}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => syncGroupsFromPrimary()}
+                    disabled={groupsSyncing || !hasPrimaryInstance || !primaryConnected}
+                  >
+                    {groupsSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
+                    Sincronizar agora
+                  </Button>
+                </div>
               ) : (
                 <>
                   <Input
