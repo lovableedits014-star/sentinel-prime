@@ -145,9 +145,14 @@ export function useWhatsAppGroups(clientId: string | undefined) {
         if (inactiveMarked > 0) {
           pushLog("info", `${inactiveMarked} grupo(s) marcado(s) como inativo(s) (sumiram da lista do WhatsApp).`);
         }
+        // Refetch ANTES de marcar isSyncing=false para que badges (totalActive,
+        // lastSyncedAt, inactiveCount) já reflitam os dados novos quando o
+        // spinner sumir. invalidate marca como stale; refetchQueries força a
+        // ida ao banco mesmo que o useQuery não esteja em foco.
+        await queryClient.refetchQueries({ queryKey: ["whatsapp-groups", clientId], type: "active" });
+        await queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", clientId] });
         pushLog("success", `✔ Concluído em ${elapsed}s — ${upserted} grupo(s) gravado(s) no banco.`);
         toast.success(`✅ ${upserted} grupo(s) sincronizado(s)`);
-        await queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", clientId] });
       } catch (e: any) {
         const parsed = parseSyncError(String(e?.message || ""));
         setLastError(parsed);
