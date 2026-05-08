@@ -725,34 +725,39 @@ Deno.serve(async (req) => {
       if (!activeInstanceRow.bridge_api_key) {
         return jsonResponse({ success: false, error: "Instância sem credencial — conecte primeiro" }, 400);
       }
+      // A bridge não tem action 'list_groups' — usamos 'chats' e filtramos JIDs @g.us
       const bridgeRes = await fetch(BRIDGE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Api-Key": activeInstanceRow.bridge_api_key },
-        body: JSON.stringify({ action: "list_groups" }),
+        body: JSON.stringify({ action: "chats" }),
       });
       const bridgeData = await bridgeRes.json().catch(() => ({}));
       if (!bridgeRes.ok || bridgeData?.success === false) {
         return jsonResponse({
           success: false,
-          error: bridgeData?.error || `Bridge respondeu ${bridgeRes.status} — verifique se a ponte suporta a action 'list_groups'.`,
+          error: bridgeData?.error || `Bridge respondeu ${bridgeRes.status} ao listar chats.`,
           details: sanitizeBridgeData(bridgeData),
         });
       }
-      // Aceita formatos comuns: {groups:[...]} ou array direto
-      const rawGroups: any[] = Array.isArray(bridgeData)
+      // Aceita formatos comuns e filtra só grupos (@g.us)
+      const allChats: any[] = Array.isArray(bridgeData)
         ? bridgeData
-        : Array.isArray(bridgeData?.groups)
-          ? bridgeData.groups
+        : Array.isArray(bridgeData?.chats)
+          ? bridgeData.chats
           : Array.isArray(bridgeData?.data)
             ? bridgeData.data
-            : Array.isArray(bridgeData?.chats)
-              ? bridgeData.chats.filter((c: any) => String(c?.id || c?.jid || "").endsWith("@g.us"))
+            : Array.isArray(bridgeData?.groups)
+              ? bridgeData.groups
               : [];
+      const rawGroups = allChats.filter((c: any) => {
+        const id = String(c?.id || c?.jid || c?.chatId || c?.group_id || "");
+        return id.endsWith("@g.us") || c?.isGroup === true || c?.is_group === true;
+      });
 
       const now = new Date().toISOString();
       const seenJids: string[] = [];
       const upserts = rawGroups.map((g: any) => {
-        const jid = String(g?.id || g?.jid || g?.group_id || g?.groupId || "").trim();
+        const jid = String(g?.id || g?.jid || g?.chatId || g?.group_id || g?.groupId || "").trim();
         if (!jid) return null;
         seenJids.push(jid);
         return {
