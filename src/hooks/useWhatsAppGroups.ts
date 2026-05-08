@@ -15,6 +15,8 @@ export type WhatsAppGroup = {
   is_favorite: boolean;
   last_synced_at: string;
   instance_id: string;
+  /** Lista das instâncias do cliente que enxergam esse grupo (depois do dedupe). */
+  instance_ids?: string[];
 };
 
 export type WhatsAppInstanceLite = {
