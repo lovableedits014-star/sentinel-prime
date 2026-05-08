@@ -462,18 +462,40 @@ Deno.serve(async (req) => {
     const interMax = (clientData.whatsapp_inter_instance_delay_max ?? 3) * 1000;
 
     // Build recipient list — em modo resume usa items pendentes; senão, busca por tipo
-    let recipients: { telefone: string; nome: string }[] = [];
+    let recipients: { telefone?: string; nome: string; group_jid?: string }[] = [];
     let dispatch: any;
+
+    // Lista de JIDs de grupos vinda do payload (modo "grupos")
+    const groupJids: string[] = Array.isArray(payload.group_jids)
+      ? payload.group_jids.filter((j: any) => typeof j === "string" && j.endsWith("@g.us"))
+      : [];
 
     if (isResume && existingDispatchId) {
       const { data: pendingItems } = await adminClient
         .from("whatsapp_dispatch_items")
-        .select("telefone, nome")
+        .select("telefone, nome, group_jid")
         .eq("dispatch_id", existingDispatchId)
         .eq("status", "pendente");
-      recipients = (pendingItems || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
+      recipients = (pendingItems || []).map((r: any) => ({
+        telefone: r.telefone || undefined,
+        nome: r.nome || "",
+        group_jid: r.group_jid || undefined,
+      }));
       dispatch = { id: existingDispatchId };
       console.log(`[resume] dispatch=${existingDispatchId} pending=${recipients.length}`);
+    } else if (tipo === "grupos") {
+      if (groupJids.length > 0) {
+        const { data: gs } = await adminClient
+          .from("whatsapp_groups")
+          .select("group_jid, name")
+          .eq("client_id", client_id)
+          .in("group_jid", groupJids);
+        const nameByJid = new Map((gs || []).map((g: any) => [g.group_jid, g.name]));
+        recipients = groupJids.map((jid) => ({
+          group_jid: jid,
+          nome: nameByJid.get(jid) || jid,
+        }));
+      }
     } else if (tipo === "eleicao") {
       let q = adminClient.from("eleicao_pessoas")
         .select("telefone, nome")
@@ -599,8 +621,9 @@ Deno.serve(async (req) => {
       // Create dispatch items (status=pendente por padrão)
       const items = recipients.map((r) => ({
         dispatch_id: dispatch.id,
-        telefone: r.telefone,
+        telefone: r.telefone || null,
         nome: r.nome,
+        group_jid: r.group_jid || null,
       }));
 
       for (let i = 0; i < items.length; i += 100) {
@@ -775,15 +798,29 @@ Deno.serve(async (req) => {
             }
           }
 
+          // Para grupos, o "destino" é o JID e a mensagem não tem {nome} de pessoa.
+          const isGroup = !!recipient.group_jid;
+          const destination = isGroup
+            ? recipient.group_jid!
+            : cleanPhoneForBridge(recipient.telefone || "");
+          // Helper para localizar este item específico no banco
+          const itemMatch = (q: any) => {
+            const base = q.eq("dispatch_id", dispatch.id);
+            return isGroup
+              ? base.eq("group_jid", recipient.group_jid)
+              : base.eq("telefone", recipient.telefone);
+          };
+
           try {
-            const personalizedMsg = mensagem.replace(/{nome}/g, recipient.nome);
-            const phoneClean = cleanPhoneForBridge(recipient.telefone);
-            console.log(`[dispatch] inst=${instanceId ?? "legacy"} preflight=${preflight.status}${preflight.reconnected ? "(reconectado)" : ""} phone=${phoneClean}`);
+            const personalizedMsg = isGroup
+              ? mensagem // sem personalização individual em grupo
+              : mensagem.replace(/{nome}/g, recipient.nome);
+            console.log(`[dispatch] inst=${instanceId ?? "legacy"} preflight=${preflight.status}${preflight.reconnected ? "(reconectado)" : ""} ${isGroup ? "group" : "phone"}=${destination}`);
 
             const { res: sendRes, data: sendData } = await fetchBridgeSend({
               bridgeUrl,
               bridgeApiKey,
-              phone: phoneClean,
+              phone: destination,
               message: personalizedMsg,
             });
 
@@ -791,10 +828,8 @@ Deno.serve(async (req) => {
 
             if (!failure) {
               sent++;
-              await adminClient.from("whatsapp_dispatch_items")
-                .update({ status: "enviado", enviado_em: new Date().toISOString() })
-                .eq("dispatch_id", dispatch.id)
-                .eq("telefone", recipient.telefone);
+              await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                .update({ status: "enviado", enviado_em: new Date().toISOString() }));
               if (instanceId) {
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
@@ -820,10 +855,8 @@ Deno.serve(async (req) => {
                 continue;
               }
               failed++;
-              await adminClient.from("whatsapp_dispatch_items")
-                .update({ status: "falha", erro: String(failure).slice(0, 200) })
-                .eq("dispatch_id", dispatch.id)
-                .eq("telefone", recipient.telefone);
+              await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                .update({ status: "falha", erro: String(failure).slice(0, 200) }));
               if (instanceId) {
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
@@ -835,10 +868,8 @@ Deno.serve(async (req) => {
             }
           } catch (err) {
             failed++;
-            await adminClient.from("whatsapp_dispatch_items")
-              .update({ status: "falha", erro: String(err).slice(0, 200) })
-              .eq("dispatch_id", dispatch.id)
-              .eq("telefone", recipient.telefone);
+            await itemMatch(adminClient.from("whatsapp_dispatch_items")
+              .update({ status: "falha", erro: String(err).slice(0, 200) }));
             if (instanceId) {
               await adminClient.rpc("log_whatsapp_send", {
                 p_instance_id: instanceId, p_client_id: client_id,

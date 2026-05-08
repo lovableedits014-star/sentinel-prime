@@ -5508,30 +5508,33 @@ export type Database = {
           dispatch_id: string
           enviado_em: string | null
           erro: string | null
+          group_jid: string | null
           id: string
           nome: string
           status: string
-          telefone: string
+          telefone: string | null
         }
         Insert: {
           created_at?: string
           dispatch_id: string
           enviado_em?: string | null
           erro?: string | null
+          group_jid?: string | null
           id?: string
           nome: string
           status?: string
-          telefone: string
+          telefone?: string | null
         }
         Update: {
           created_at?: string
           dispatch_id?: string
           enviado_em?: string | null
           erro?: string | null
+          group_jid?: string | null
           id?: string
           nome?: string
           status?: string
-          telefone?: string
+          telefone?: string | null
         }
         Relationships: [
           {
@@ -5619,6 +5622,69 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_groups: {
+        Row: {
+          client_id: string
+          created_at: string
+          group_jid: string
+          id: string
+          instance_id: string
+          is_active: boolean | null
+          is_admin: boolean | null
+          is_announcement: boolean | null
+          last_synced_at: string
+          name: string | null
+          participants_count: number | null
+          picture_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          group_jid: string
+          id?: string
+          instance_id: string
+          is_active?: boolean | null
+          is_admin?: boolean | null
+          is_announcement?: boolean | null
+          last_synced_at?: string
+          name?: string | null
+          participants_count?: number | null
+          picture_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          group_jid?: string
+          id?: string
+          instance_id?: string
+          is_active?: boolean | null
+          is_admin?: boolean | null
+          is_announcement?: boolean | null
+          last_synced_at?: string
+          name?: string | null
+          participants_count?: number | null
+          picture_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_groups_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_groups_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
         ]

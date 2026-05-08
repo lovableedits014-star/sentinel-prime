@@ -715,6 +715,87 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, webhook_url: webhookUrl, bridge: bridgeData });
     }
 
+    // === SYNC GROUPS (lista grupos do WhatsApp em que essa instância participa) ===
+    // Faz chamada à bridge para obter os grupos do número conectado e faz upsert
+    // em whatsapp_groups. Grupos que sumiram da listagem são marcados is_active=false.
+    if (action === "sync_groups") {
+      if (!instance_id || !activeInstanceRow) {
+        return jsonResponse({ success: false, error: "instance_id obrigatório" }, 400);
+      }
+      if (!activeInstanceRow.bridge_api_key) {
+        return jsonResponse({ success: false, error: "Instância sem credencial — conecte primeiro" }, 400);
+      }
+      const bridgeRes = await fetch(BRIDGE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": activeInstanceRow.bridge_api_key },
+        body: JSON.stringify({ action: "list_groups" }),
+      });
+      const bridgeData = await bridgeRes.json().catch(() => ({}));
+      if (!bridgeRes.ok || bridgeData?.success === false) {
+        return jsonResponse({
+          success: false,
+          error: bridgeData?.error || `Bridge respondeu ${bridgeRes.status} — verifique se a ponte suporta a action 'list_groups'.`,
+          details: sanitizeBridgeData(bridgeData),
+        });
+      }
+      // Aceita formatos comuns: {groups:[...]} ou array direto
+      const rawGroups: any[] = Array.isArray(bridgeData)
+        ? bridgeData
+        : Array.isArray(bridgeData?.groups)
+          ? bridgeData.groups
+          : Array.isArray(bridgeData?.data)
+            ? bridgeData.data
+            : Array.isArray(bridgeData?.chats)
+              ? bridgeData.chats.filter((c: any) => String(c?.id || c?.jid || "").endsWith("@g.us"))
+              : [];
+
+      const now = new Date().toISOString();
+      const seenJids: string[] = [];
+      const upserts = rawGroups.map((g: any) => {
+        const jid = String(g?.id || g?.jid || g?.group_id || g?.groupId || "").trim();
+        if (!jid) return null;
+        seenJids.push(jid);
+        return {
+          client_id: resolvedClientId,
+          instance_id: instance_id,
+          group_jid: jid,
+          name: g?.subject || g?.name || g?.title || jid,
+          picture_url: g?.picture || g?.picture_url || g?.profilePic || g?.imgUrl || null,
+          participants_count:
+            Number(g?.participants_count ?? g?.size ?? (Array.isArray(g?.participants) ? g.participants.length : 0)) || 0,
+          is_admin: Boolean(g?.is_admin ?? g?.isAdmin ?? g?.iAmAdmin ?? false),
+          is_announcement: Boolean(g?.is_announcement ?? g?.announce ?? g?.isAnnounce ?? false),
+          is_active: true,
+          last_synced_at: now,
+        };
+      }).filter(Boolean) as any[];
+
+      if (upserts.length > 0) {
+        const { error: upErr } = await adminClient
+          .from("whatsapp_groups")
+          .upsert(upserts, { onConflict: "instance_id,group_jid" });
+        if (upErr) {
+          return jsonResponse({ success: false, error: `Falha ao salvar grupos: ${upErr.message}` }, 500);
+        }
+      }
+
+      // Marca grupos que sumiram como inativos
+      if (seenJids.length > 0) {
+        await adminClient
+          .from("whatsapp_groups")
+          .update({ is_active: false, updated_at: now })
+          .eq("instance_id", instance_id)
+          .not("group_jid", "in", `(${seenJids.map((j) => `"${j.replace(/"/g, '')}"`).join(",")})`);
+      } else {
+        await adminClient
+          .from("whatsapp_groups")
+          .update({ is_active: false, updated_at: now })
+          .eq("instance_id", instance_id);
+      }
+
+      return jsonResponse({ success: true, total: upserts.length, synced_at: now });
+    }
+
     if (action === "ensure_connected") {
       if (!instance_id || !activeInstanceRow) {
         return jsonResponse({ success: false, error: "instance_id obrigatório" }, 400);

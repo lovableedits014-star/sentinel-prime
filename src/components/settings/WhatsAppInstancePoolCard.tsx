@@ -11,9 +11,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import {
-  Loader2, QrCode, Send, Trash2, Wifi, WifiOff, Pencil, Check, X, RefreshCw, Power, Star, Phone, Webhook
+  Loader2, QrCode, Send, Trash2, Wifi, WifiOff, Pencil, Check, X, RefreshCw, Power, Star, Phone, Webhook, Users
 } from "lucide-react";
 import { toast } from "sonner";
+import { useWhatsAppGroups } from "@/hooks/useWhatsAppGroups";
 
 export interface PoolInstance {
   id: string;
@@ -81,6 +82,8 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
   const [showTest, setShowTest] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { groups, isSyncing, syncFromInstance } = useWhatsAppGroups(clientId);
+  const groupsForThisInstance = groups.filter((g) => g.instance_id === instance.id).length;
 
   useEffect(() => setName(instance.apelido), [instance.apelido]);
 
@@ -395,6 +398,35 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
                       Registra o webhook desta instância (número oficial) para confirmar
                       automaticamente o WhatsApp dos contatos assim que eles enviam uma
                       mensagem. Só precisa fazer isso 1 vez por instância.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {instance.is_primary && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => syncFromInstance(instance.id)}
+                      disabled={isSyncing}
+                      className="border-blue-500/40 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                    >
+                      {isSyncing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                      ) : (
+                        <Users className="w-3.5 h-3.5 mr-1" />
+                      )}
+                      Sincronizar grupos{groupsForThisInstance > 0 ? ` (${groupsForThisInstance})` : ""}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Lista os grupos de WhatsApp em que este número participa, para
+                      você poder enviar disparos diretamente para eles a partir da página
+                      Disparos. Pode rodar quantas vezes quiser.
                     </p>
                   </TooltipContent>
                 </Tooltip>
