@@ -89,23 +89,46 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     enabled: !!clientId,
   });
 
-  const primaryQuery = useQuery<PrimaryInstance>({
-    queryKey: ["whatsapp-primary-instance", clientId],
+  const instancesQuery = useQuery<WhatsAppInstanceLite[]>({
+    queryKey: ["whatsapp-instances", clientId],
     queryFn: async () => {
-      if (!clientId) return null;
+      if (!clientId) return [];
       const { data, error } = await supabase
         .from("whatsapp_instances" as any)
-        .select("id, apelido, status, is_primary")
+        .select("id, apelido, status, is_primary, phone_number")
         .eq("client_id", clientId)
-        .eq("is_primary", true)
-        .maybeSingle();
+        .order("is_primary", { ascending: false })
+        .order("apelido", { ascending: true });
       if (error) throw error;
-      return (data as any) || null;
+      return (data as any) || [];
     },
     enabled: !!clientId,
   });
 
-  const allGroups = groupsQuery.data || [];
+  const instances = instancesQuery.data || [];
+  const primaryInstance = instances.find((i) => i.is_primary) || null;
+  const connectedInstances = instances.filter((i) => isConnectedStatus(i.status));
+
+  // Dedupe por group_jid (mesmo grupo pode existir em várias instâncias).
+  // Preferência: primeiro o que é admin, depois o mais recente. Mantém referência
+  // de quais instâncias enxergam o grupo para exibir badge no UI.
+  const allRawGroups = groupsQuery.data || [];
+  const allGroups = (() => {
+    const byJid = new Map<string, WhatsAppGroup & { instance_ids: string[] }>();
+    for (const g of allRawGroups) {
+      const existing = byJid.get(g.group_jid);
+      if (!existing) {
+        byJid.set(g.group_jid, { ...g, instance_ids: [g.instance_id] });
+        continue;
+      }
+      existing.instance_ids.push(g.instance_id);
+      const better =
+        (g.is_admin && !existing.is_admin) ||
+        (g.is_admin === existing.is_admin && g.last_synced_at > existing.last_synced_at);
+      if (better) byJid.set(g.group_jid, { ...g, instance_ids: existing.instance_ids });
+    }
+    return Array.from(byJid.values());
+  })();
   const activeGroups = allGroups.filter((g) => g.is_active);
   const inactiveCount = allGroups.length - activeGroups.length;
   const noPostCount = activeGroups.filter((g) => g.is_announcement && !g.is_admin).length;
@@ -115,8 +138,7 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     return acc;
   }, null);
 
-  const primaryInstance = primaryQuery.data || null;
-  const primaryConnected = !!primaryInstance && ["connected", "open"].includes(String(primaryInstance.status || "").toLowerCase());
+  const primaryConnected = isConnectedStatus(primaryInstance?.status);
 
   const syncFromInstance = useCallback(
     async (instanceId: string) => {
