@@ -17,12 +17,18 @@ export type WhatsAppGroup = {
   instance_id: string;
 };
 
-type PrimaryInstance = {
+export type WhatsAppInstanceLite = {
   id: string;
   apelido: string | null;
   status: string | null;
   is_primary: boolean;
-} | null;
+  phone_number: string | null;
+};
+
+type PrimaryInstance = WhatsAppInstanceLite | null;
+
+const isConnectedStatus = (s: string | null | undefined) =>
+  ["connected", "open"].includes(String(s || "").toLowerCase());
 
 export type GroupsSyncError = {
   message: string;
