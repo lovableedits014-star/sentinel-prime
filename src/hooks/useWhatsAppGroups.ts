@@ -45,10 +45,27 @@ function parseSyncError(raw: string): GroupsSyncError {
   };
 }
 
+export type SyncLogEntry = {
+  id: string;
+  ts: string;
+  level: "info" | "success" | "error";
+  message: string;
+};
+
 export function useWhatsAppGroups(clientId: string | undefined) {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastError, setLastError] = useState<GroupsSyncError | null>(null);
+  const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
+
+  const pushLog = useCallback((level: SyncLogEntry["level"], message: string) => {
+    setSyncLogs((prev) => [
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ts: new Date().toISOString(), level, message },
+      ...prev,
+    ].slice(0, 50));
+  }, []);
+
+  const clearLogs = useCallback(() => setSyncLogs([]), []);
 
   const groupsQuery = useQuery<WhatsAppGroup[]>({
     queryKey: ["whatsapp-groups", clientId],
@@ -102,6 +119,11 @@ export function useWhatsAppGroups(clientId: string | undefined) {
       }
       setIsSyncing(true);
       setLastError(null);
+      const startedAt = Date.now();
+      const instLabel = primaryInstance?.id === instanceId
+        ? primaryInstance?.apelido || "instância principal"
+        : `instância ${instanceId.slice(0, 8)}`;
+      pushLog("info", `▶ Iniciando sincronização (${instLabel})…`);
       try {
         const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
           body: { action: "sync_groups", client_id: clientId, instance_id: instanceId },
@@ -110,11 +132,25 @@ export function useWhatsAppGroups(clientId: string | undefined) {
         if (data?.error || data?.success === false) {
           throw new Error(data?.error || "Falha ao sincronizar grupos");
         }
-        toast.success(`✅ ${data?.total || 0} grupo(s) sincronizado(s)`);
+        const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+        const totalChats = Number(data?.total_chats ?? 0);
+        const totalGroups = Number(data?.total_groups ?? data?.total ?? 0);
+        const upserted = Number(data?.total ?? 0);
+        const inactiveMarked = Number(data?.inactive_marked ?? 0);
+        const filtered = Math.max(0, totalChats - totalGroups);
+        if (totalChats > 0) {
+          pushLog("info", `Bridge retornou ${totalChats} chat(s) — ${totalGroups} identificados como grupo(s) (@g.us), ${filtered} descartado(s) como conversa individual.`);
+        }
+        if (inactiveMarked > 0) {
+          pushLog("info", `${inactiveMarked} grupo(s) marcado(s) como inativo(s) (sumiram da lista do WhatsApp).`);
+        }
+        pushLog("success", `✔ Concluído em ${elapsed}s — ${upserted} grupo(s) gravado(s) no banco.`);
+        toast.success(`✅ ${upserted} grupo(s) sincronizado(s)`);
         await queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", clientId] });
       } catch (e: any) {
         const parsed = parseSyncError(String(e?.message || ""));
         setLastError(parsed);
+        pushLog("error", `✖ ${parsed.message}`);
         if (parsed.isUnsupportedAction) {
           toast.error("Ponte WhatsApp desatualizada", {
             description: "A action 'sync_groups' não está disponível nesta versão da bridge. Verifique se a bridge foi atualizada.",
@@ -130,7 +166,7 @@ export function useWhatsAppGroups(clientId: string | undefined) {
         setIsSyncing(false);
       }
     },
-    [clientId, queryClient]
+    [clientId, queryClient, pushLog, primaryInstance?.id, primaryInstance?.apelido]
   );
 
   const syncFromPrimary = useCallback(async () => {
@@ -159,5 +195,7 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     primaryInstance,
     primaryConnected,
     hasPrimaryInstance: !!primaryInstance,
+    syncLogs,
+    clearSyncLogs: clearLogs,
   };
 }
