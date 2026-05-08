@@ -757,7 +757,7 @@ Deno.serve(async (req) => {
       const now = new Date().toISOString();
       const seenJids: string[] = [];
       const upserts = rawGroups.map((g: any) => {
-        const jid = String(g?.id || g?.jid || g?.group_id || g?.groupId || "").trim();
+        const jid = String(g?.id || g?.jid || g?.chatId || g?.group_id || g?.groupId || "").trim();
         if (!jid) return null;
         seenJids.push(jid);
         return {
