@@ -15,14 +15,22 @@ export type WhatsAppGroup = {
   is_favorite: boolean;
   last_synced_at: string;
   instance_id: string;
+  /** Lista das instâncias do cliente que enxergam esse grupo (depois do dedupe). */
+  instance_ids?: string[];
 };
 
-type PrimaryInstance = {
+export type WhatsAppInstanceLite = {
   id: string;
   apelido: string | null;
   status: string | null;
   is_primary: boolean;
-} | null;
+  phone_number: string | null;
+};
+
+type PrimaryInstance = WhatsAppInstanceLite | null;
+
+const isConnectedStatus = (s: string | null | undefined) =>
+  ["connected", "open"].includes(String(s || "").toLowerCase());
 
 export type GroupsSyncError = {
   message: string;
@@ -56,6 +64,7 @@ export type SyncLogEntry = {
 export function useWhatsAppGroups(clientId: string | undefined) {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncingInstanceId, setSyncingInstanceId] = useState<string | null>(null);
   const [lastError, setLastError] = useState<GroupsSyncError | null>(null);
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
 
@@ -83,23 +92,46 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     enabled: !!clientId,
   });
 
-  const primaryQuery = useQuery<PrimaryInstance>({
-    queryKey: ["whatsapp-primary-instance", clientId],
+  const instancesQuery = useQuery<WhatsAppInstanceLite[]>({
+    queryKey: ["whatsapp-instances", clientId],
     queryFn: async () => {
-      if (!clientId) return null;
+      if (!clientId) return [];
       const { data, error } = await supabase
         .from("whatsapp_instances" as any)
-        .select("id, apelido, status, is_primary")
+        .select("id, apelido, status, is_primary, phone_number")
         .eq("client_id", clientId)
-        .eq("is_primary", true)
-        .maybeSingle();
+        .order("is_primary", { ascending: false })
+        .order("apelido", { ascending: true });
       if (error) throw error;
-      return (data as any) || null;
+      return (data as any) || [];
     },
     enabled: !!clientId,
   });
 
-  const allGroups = groupsQuery.data || [];
+  const instances = instancesQuery.data || [];
+  const primaryInstance = instances.find((i) => i.is_primary) || null;
+  const connectedInstances = instances.filter((i) => isConnectedStatus(i.status));
+
+  // Dedupe por group_jid (mesmo grupo pode existir em várias instâncias).
+  // Preferência: primeiro o que é admin, depois o mais recente. Mantém referência
+  // de quais instâncias enxergam o grupo para exibir badge no UI.
+  const allRawGroups = groupsQuery.data || [];
+  const allGroups = (() => {
+    const byJid = new Map<string, WhatsAppGroup & { instance_ids: string[] }>();
+    for (const g of allRawGroups) {
+      const existing = byJid.get(g.group_jid);
+      if (!existing) {
+        byJid.set(g.group_jid, { ...g, instance_ids: [g.instance_id] });
+        continue;
+      }
+      existing.instance_ids.push(g.instance_id);
+      const better =
+        (g.is_admin && !existing.is_admin) ||
+        (g.is_admin === existing.is_admin && g.last_synced_at > existing.last_synced_at);
+      if (better) byJid.set(g.group_jid, { ...g, instance_ids: existing.instance_ids });
+    }
+    return Array.from(byJid.values());
+  })();
   const activeGroups = allGroups.filter((g) => g.is_active);
   const inactiveCount = allGroups.length - activeGroups.length;
   const noPostCount = activeGroups.filter((g) => g.is_announcement && !g.is_admin).length;
@@ -109,20 +141,22 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     return acc;
   }, null);
 
-  const primaryInstance = primaryQuery.data || null;
-  const primaryConnected = !!primaryInstance && ["connected", "open"].includes(String(primaryInstance.status || "").toLowerCase());
+  const primaryConnected = isConnectedStatus(primaryInstance?.status);
 
   const syncFromInstance = useCallback(
     async (instanceId: string) => {
       if (!clientId) {
         toast.error("Cliente não identificado");
-        return;
+        return { ok: false as const };
       }
       setIsSyncing(true);
+      setSyncingInstanceId(instanceId);
       setLastError(null);
       const startedAt = Date.now();
-      const instLabel = primaryInstance?.id === instanceId
-        ? primaryInstance?.apelido || "instância principal"
+      const inst = (queryClient.getQueryData<WhatsAppInstanceLite[]>(["whatsapp-instances", clientId]) || [])
+        .find((i) => i.id === instanceId);
+      const instLabel = inst?.apelido
+        ? (inst.is_primary ? `${inst.apelido} (principal)` : inst.apelido)
         : `instância ${instanceId.slice(0, 8)}`;
       pushLog("info", `▶ Iniciando sincronização (${instLabel})…`);
       try {
@@ -140,39 +174,38 @@ export function useWhatsAppGroups(clientId: string | undefined) {
         const inactiveMarked = Number(data?.inactive_marked ?? 0);
         const filtered = Math.max(0, totalChats - totalGroups);
         if (totalChats > 0) {
-          pushLog("info", `Bridge retornou ${totalChats} chat(s) — ${totalGroups} identificados como grupo(s) (@g.us), ${filtered} descartado(s) como conversa individual.`);
+          pushLog("info", `[${instLabel}] ${totalChats} chat(s) — ${totalGroups} grupo(s), ${filtered} conversa(s) descartada(s).`);
         }
         if (inactiveMarked > 0) {
-          pushLog("info", `${inactiveMarked} grupo(s) marcado(s) como inativo(s) (sumiram da lista do WhatsApp).`);
+          pushLog("info", `[${instLabel}] ${inactiveMarked} grupo(s) marcado(s) como inativo(s).`);
         }
-        // Refetch ANTES de marcar isSyncing=false para que badges (totalActive,
-        // lastSyncedAt, inactiveCount) já reflitam os dados novos quando o
-        // spinner sumir. invalidate marca como stale; refetchQueries força a
-        // ida ao banco mesmo que o useQuery não esteja em foco.
         await queryClient.refetchQueries({ queryKey: ["whatsapp-groups", clientId], type: "active" });
         await queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", clientId] });
-        pushLog("success", `✔ Concluído em ${elapsed}s — ${upserted} grupo(s) gravado(s) no banco.`);
-        toast.success(`✅ ${upserted} grupo(s) sincronizado(s)`);
+        pushLog("success", `✔ [${instLabel}] concluído em ${elapsed}s — ${upserted} grupo(s) gravado(s).`);
+        toast.success(`✅ ${instLabel}: ${upserted} grupo(s) sincronizado(s)`);
+        return { ok: true as const, upserted };
       } catch (e: any) {
         const parsed = parseSyncError(String(e?.message || ""));
         setLastError(parsed);
-        pushLog("error", `✖ ${parsed.message}`);
+        pushLog("error", `✖ [${instLabel}] ${parsed.message}`);
         if (parsed.isUnsupportedAction) {
           toast.error("Ponte WhatsApp desatualizada", {
-            description: "A action 'sync_groups' não está disponível nesta versão da bridge. Verifique se a bridge foi atualizada.",
+            description: "A action 'sync_groups' não está disponível nesta versão da bridge.",
           });
         } else if (parsed.isNotConnected) {
-          toast.error("Instância não conectada", {
-            description: "Conecte a instância principal em Configurações → WhatsApp antes de sincronizar.",
+          toast.error(`${instLabel} não conectada`, {
+            description: "Conecte a instância em Configurações → WhatsApp antes de sincronizar.",
           });
         } else {
-          toast.error("Erro ao sincronizar grupos", { description: parsed.message });
+          toast.error(`Erro ao sincronizar (${instLabel})`, { description: parsed.message });
         }
+        return { ok: false as const };
       } finally {
         setIsSyncing(false);
+        setSyncingInstanceId(null);
       }
     },
-    [clientId, queryClient, pushLog, primaryInstance?.id, primaryInstance?.apelido]
+    [clientId, queryClient, pushLog]
   );
 
   const syncFromPrimary = useCallback(async () => {
@@ -184,6 +217,40 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     }
     await syncFromInstance(primaryInstance.id);
   }, [primaryInstance?.id, syncFromInstance]);
+
+  /**
+   * Sincroniza várias instâncias em sequência (nunca em paralelo, para evitar
+   * conflito de upsert e respeitar rate-limit da bridge). Se `ids` for omitido,
+   * usa todas as instâncias conectadas.
+   */
+  const syncFromMany = useCallback(
+    async (ids?: string[]) => {
+      const targetIds = (ids && ids.length > 0)
+        ? ids
+        : connectedInstances.map((i) => i.id);
+      if (targetIds.length === 0) {
+        toast.error("Nenhuma instância conectada", {
+          description: "Conecte ao menos uma instância em Configurações → WhatsApp.",
+        });
+        return;
+      }
+      pushLog("info", `▶ Sincronizando ${targetIds.length} instância(s) em sequência…`);
+      let okCount = 0;
+      let totalUpserted = 0;
+      for (const id of targetIds) {
+        const r = await syncFromInstance(id);
+        if (r.ok) {
+          okCount += 1;
+          totalUpserted += r.upserted || 0;
+        }
+      }
+      pushLog(
+        okCount === targetIds.length ? "success" : "info",
+        `■ Lote concluído: ${okCount}/${targetIds.length} instância(s), ${totalUpserted} grupo(s) gravado(s).`
+      );
+    },
+    [connectedInstances, syncFromInstance, pushLog]
+  );
 
   const favoriteCount = activeGroups.filter((g) => g.is_favorite).length;
 
@@ -220,11 +287,15 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     lastSyncedAt,
     isLoading: groupsQuery.isLoading,
     isSyncing,
+    syncingInstanceId,
     syncFromInstance,
     syncFromPrimary,
+    syncFromMany,
     toggleFavorite,
     refetch: groupsQuery.refetch,
     lastError,
+    instances,
+    connectedInstances,
     primaryInstance,
     primaryConnected,
     hasPrimaryInstance: !!primaryInstance,
