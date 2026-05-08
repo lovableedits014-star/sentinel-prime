@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { useWhatsAppGroups } from "@/hooks/useWhatsAppGroups";
+import { Checkbox } from "@/components/ui/checkbox";
 import { BordoesBairrosWidget } from "@/components/memoria-widgets/BordoesBairrosWidget";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
