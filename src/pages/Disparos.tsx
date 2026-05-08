@@ -525,6 +525,25 @@ export default function Disparos() {
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
             <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+              <AlertDialog open={confirmSyncGroupsOpen} onOpenChange={setConfirmSyncGroupsOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Sincronizar grupos do WhatsApp?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Vamos consultar a instância principal{primaryInstance?.apelido ? ` "${primaryInstance.apelido}"` : ""} e atualizar a lista de grupos (nome, foto, membros e permissões). Os grupos favoritados ⭐ são preservados.
+                      {groupsLastSyncedAt && (
+                        <> A última sincronização foi em {new Date(groupsLastSyncedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}.</>
+                      )}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => syncGroupsFromPrimary()}>
+                      Sincronizar agora
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               {/* Botão principal — espelho de "Sincronizar grupos" em Configurações → WhatsApp */}
               <Button
                 type="button"
