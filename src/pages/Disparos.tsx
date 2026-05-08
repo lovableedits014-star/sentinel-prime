@@ -191,7 +191,19 @@ export default function Disparos() {
   const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
-  const handleUseMissions = () => {
+  const [groupSearch, setGroupSearch] = useState("");
+  const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
+  const { groups: waGroups, isLoading: loadingGroups } = useWhatsAppGroups(clientId);
+  const filteredGroups = useMemo(() => {
+    const q = groupSearch.trim().toLowerCase();
+    if (!q) return waGroups;
+    return waGroups.filter((g) => (g.name || g.group_jid).toLowerCase().includes(q));
+  }, [waGroups, groupSearch]);
+  const totalGroupMembers = useMemo(
+    () => waGroups.filter((g) => selectedGroupJids.includes(g.group_jid))
+      .reduce((s, g) => s + (g.participants_count || 0), 0),
+    [waGroups, selectedGroupJids]
+  );
     const links = activeMissions.map((m: any, i: number) => {
       const platformLabel = m.platform === "instagram" ? "📸 Instagram" : "📘 Facebook";
       return `${i + 1}. ${platformLabel} — ${m.title || "Publicação"}\n👉 ${m.post_url}`;
