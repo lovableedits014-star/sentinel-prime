@@ -873,6 +873,7 @@ export default function Disparos() {
                                   {g.participants_count} membros
                                   {g.is_admin ? " · admin" : ""}
                                   {cantSend ? " · só admins postam" : ""}
+                                  {g.instance_ids && g.instance_ids.length > 1 ? ` · em ${g.instance_ids.length} instâncias` : ""}
                                 </p>
                               </div>
                             </label>
