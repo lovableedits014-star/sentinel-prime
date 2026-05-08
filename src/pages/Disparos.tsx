@@ -307,6 +307,7 @@ export default function Disparos() {
       setTitulo("");
       setMensagem("");
       setTagFiltro("_all");
+      setSelectedGroupJids([]);
       refetch();
     } catch (err: any) {
       toast.error("Erro: " + (err.message || "tente novamente"));
