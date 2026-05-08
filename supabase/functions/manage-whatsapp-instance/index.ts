@@ -773,6 +773,26 @@ Deno.serve(async (req) => {
         const jid = String(g?.id || g?.jid || g?.chatId || g?.group_id || g?.groupId || "").trim();
         if (!jid) return null;
         seenJids.push(jid);
+        const isAdminValue = firstDefined(
+          g?.is_admin,
+          g?.isAdmin,
+          g?.iAmAdmin,
+          g?.meIsAdmin,
+          g?.amIAdmin,
+          g?.isMeAdmin,
+          g?.myAdmin,
+          g?.role,
+          g?.participant?.admin
+        );
+        const isAnnouncementValue = firstDefined(
+          g?.is_announcement,
+          g?.announce,
+          g?.isAnnounce,
+          g?.restrict,
+          g?.announcement,
+          g?.onlyAdmins,
+          g?.only_admins
+        );
         return {
           client_id: resolvedClientId,
           instance_id: instance_id,
@@ -781,8 +801,8 @@ Deno.serve(async (req) => {
           picture_url: g?.picture || g?.picture_url || g?.profilePic || g?.imgUrl || null,
           participants_count:
             Number(g?.participants_count ?? g?.size ?? (Array.isArray(g?.participants) ? g.participants.length : 0)) || 0,
-          is_admin: Boolean(g?.is_admin ?? g?.isAdmin ?? g?.iAmAdmin ?? false),
-          is_announcement: Boolean(g?.is_announcement ?? g?.announce ?? g?.isAnnounce ?? false),
+          is_admin: toBoolean(isAdminValue),
+          is_announcement: toBoolean(isAnnouncementValue),
           is_active: true,
           last_synced_at: now,
         };
