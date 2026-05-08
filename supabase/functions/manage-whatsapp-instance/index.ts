@@ -52,6 +52,19 @@ const sanitizeBridgeData = (data: any) => {
   return safe;
 };
 
+const toBoolean = (value: unknown, fallback = false) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "sim", "admin", "superadmin"].includes(normalized)) return true;
+    if (["false", "0", "no", "não", "nao", "none", "member", "null", "undefined", ""].includes(normalized)) return false;
+  }
+  return fallback;
+};
+
+const firstDefined = (...values: unknown[]) => values.find((value) => value !== undefined && value !== null);
+
 function normalizeBrazilPhoneForBridge(raw: string): string {
   const digits = String(raw).replace(/\D/g, "");
   if (!digits) return "";
