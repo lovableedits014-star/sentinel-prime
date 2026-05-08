@@ -496,7 +496,73 @@ export default function Disparos() {
             )}
           </div>
 
-          {/* Quick-fill buttons */}
+          {/* Seletor de grupos */}
+          {tipoDisparo === "grupos" && (
+            <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-sm">Grupos disponíveis</Label>
+                <span className="text-xs text-muted-foreground">
+                  {selectedGroupJids.length} selecionado(s) · ~{totalGroupMembers} membros
+                </span>
+              </div>
+              {waGroups.length === 0 && !loadingGroups ? (
+                <p className="text-xs text-muted-foreground py-2">
+                  Nenhum grupo sincronizado ainda. Vá em <strong>Configurações → WhatsApp</strong> e clique em <strong>"Sincronizar grupos"</strong> no card da instância principal.
+                </p>
+              ) : (
+                <>
+                  <Input
+                    placeholder="Buscar grupo..."
+                    value={groupSearch}
+                    onChange={(e) => setGroupSearch(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                  <div className="flex items-center gap-2 text-xs">
+                    <Button
+                      type="button" size="sm" variant="ghost" className="h-6 text-xs px-2"
+                      onClick={() => setSelectedGroupJids(filteredGroups.map((g) => g.group_jid))}
+                    >Selecionar todos</Button>
+                    <Button
+                      type="button" size="sm" variant="ghost" className="h-6 text-xs px-2"
+                      onClick={() => setSelectedGroupJids([])}
+                    >Limpar</Button>
+                  </div>
+                  <ScrollArea className="h-56 border rounded-md bg-background">
+                    <div className="p-1">
+                      {filteredGroups.map((g) => {
+                        const checked = selectedGroupJids.includes(g.group_jid);
+                        const cantSend = g.is_announcement && !g.is_admin;
+                        return (
+                          <label
+                            key={g.group_jid}
+                            className={`flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer ${cantSend ? "opacity-50" : ""}`}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={cantSend}
+                              onCheckedChange={(v) => {
+                                setSelectedGroupJids((prev) =>
+                                  v ? [...prev, g.group_jid] : prev.filter((j) => j !== g.group_jid)
+                                );
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm truncate">{g.name || g.group_jid}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {g.participants_count} membros
+                                {g.is_admin ? " · você é admin" : ""}
+                                {cantSend ? " · só admins podem postar" : ""}
+                              </p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {activeMissions.length > 0 && (
               <Button variant="outline" size="sm" className="gap-2 border-primary/30 text-primary hover:bg-primary/5" onClick={handleUseMissions}>
