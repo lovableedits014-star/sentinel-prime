@@ -57,28 +57,68 @@ const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
 
 async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string; phone: string; message: string }) {
   const { bridgeUrl, bridgeApiKey, phone, message } = params;
+  const isGroup = typeof phone === "string" && phone.endsWith("@g.us");
 
-  for (let attempt = 0; attempt <= 2; attempt++) {
-    const res = await fetch(bridgeUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": bridgeApiKey,
-      },
-      body: JSON.stringify({ action: "send", phone, message }),
-    });
+  // Para grupos, montamos uma cadeia de tentativas com formatos diferentes
+  // pois bridges variam: algumas aceitam `action:"send_group"` com `group_jid`,
+  // outras aceitam o JID direto em `to` ou `phone` no `action:"send"`.
+  // A primeira que NÃO devolver "unsupported"/"número inválido" vence.
+  const attempts: Array<Record<string, unknown>> = isGroup
+    ? [
+        { action: "send_group", group_jid: phone, jid: phone, to: phone, message },
+        { action: "send", to: phone, jid: phone, group_jid: phone, is_group: true, message },
+        { action: "send", phone, message }, // último recurso (formato legado)
+      ]
+    : [{ action: "send", phone, message }];
 
-    const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+  let lastRes: Response | null = null;
+  let lastData: any = null;
 
-    if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < 2) {
-      console.warn(`Bridge send returned ${res.status}; retrying attempt ${attempt + 2}/3`);
-      await sleep(1000 * (attempt + 1));
-      continue;
+  for (const body of attempts) {
+    for (let attempt = 0; attempt <= 2; attempt++) {
+      const res = await fetch(bridgeUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": bridgeApiKey,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+
+      if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < 2) {
+        console.warn(`Bridge send returned ${res.status}; retrying attempt ${attempt + 2}/3`);
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+
+      lastRes = res;
+      lastData = data;
+
+      // Se for grupo e a bridge respondeu "action não suportada" ou "número inválido",
+      // tenta o próximo formato de payload.
+      if (isGroup) {
+        const errMsg = String(data?.error || "").toLowerCase();
+        const unsupported =
+          errMsg.includes("unsupported action") ||
+          errMsg.includes("available:") ||
+          errMsg.includes("número inválido") ||
+          errMsg.includes("numero invalido") ||
+          errMsg.includes("invalid number") ||
+          errMsg.includes("invalid phone");
+        if (unsupported) {
+          console.warn(`[group send] payload "${body.action}" rejeitado (${data?.error || res.status}) — tentando próximo formato`);
+          break; // sai do retry interno e pula pro próximo `attempts`
+        }
+      }
+
+      return { res, data };
     }
-
-    return { res, data };
   }
 
+  // Se chegou aqui sem sucesso, devolve o último resultado pra que getSendFailure capture o erro.
+  if (lastRes) return { res: lastRes, data: lastData };
   throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
 }
 
