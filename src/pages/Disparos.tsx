@@ -218,8 +218,9 @@ export default function Disparos() {
 
   // Count recipients based on filter
   const { data: recipientCount = 0 } = useQuery<number>({
-    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao],
+    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao, selectedGroupJids.length],
     queryFn: async () => {
+      if (tipoDisparo === "grupos") return selectedGroupJids.length;
       if (tipoDisparo === "eleicao") {
         let q = supabase.from("eleicao_pessoas" as any)
           .select("*", { count: "exact", head: true })
