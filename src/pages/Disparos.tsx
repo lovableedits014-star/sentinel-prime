@@ -294,6 +294,7 @@ export default function Disparos() {
           eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
           eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
           eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
+          group_jids: tipoDisparo === "grupos" ? selectedGroupJids : undefined,
           batch_size: pol.batch_size,
           delay_min: pol.delay_min,
           delay_max: pol.delay_max,
