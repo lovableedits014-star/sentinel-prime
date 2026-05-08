@@ -754,6 +754,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: "Instância sem credencial — conecte primeiro" }, 400);
       }
       const ownJids = new Set([
+        normalizeParticipantJid(activeInstanceRow.phone_number || ""),
         normalizeParticipantJid(activeInstanceRow.phone_number ? `${activeInstanceRow.phone_number}@s.whatsapp.net` : ""),
         normalizeParticipantJid(activeInstanceRow.phone_number ? `${activeInstanceRow.phone_number}@c.us` : ""),
       ].filter(Boolean));
@@ -820,7 +821,7 @@ Deno.serve(async (req) => {
           picture_url: g?.picture || g?.picture_url || g?.profilePic || g?.imgUrl || null,
           participants_count:
             Number(g?.participants_count ?? g?.size ?? (Array.isArray(g?.participants) ? g.participants.length : 0)) || 0,
-          is_admin: toBoolean(isAdminValue, deriveIsAdminFromParticipants(g, ownJids)),
+          is_admin: toBoolean(isAdminValue) || deriveIsAdminFromParticipants(g, ownJids),
           is_announcement: toBoolean(isAnnouncementValue),
           is_active: true,
           last_synced_at: now,
