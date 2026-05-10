@@ -712,8 +712,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Detecta se já existe um disparo ativo para este cliente — nesse caso o
+    // novo disparo entra como "enfileirado" e é promovido depois.
+    let shouldQueue = false;
     if (!isResume) {
-      // Create dispatch record
+      const { data: activeOnes } = await adminClient
+        .from("whatsapp_dispatches")
+        .select("id")
+        .eq("client_id", client_id)
+        .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+        .limit(1);
+      shouldQueue = !!(activeOnes && activeOnes.length > 0);
+    }
+
+    if (!isResume) {
+      // Create dispatch record (queued or active)
       const { data: newDispatch, error: dispatchErr } = await adminClient
         .from("whatsapp_dispatches")
         .insert({
@@ -723,8 +736,8 @@ Deno.serve(async (req) => {
           mensagem_template: mensagem,
           total_destinatarios: recipients.length,
           tag_filtro,
-          status: "enviando",
-          started_at: new Date().toISOString(),
+          status: shouldQueue ? "enfileirado" : "enviando",
+          started_at: shouldQueue ? null : new Date().toISOString(),
           batch_size: BATCH_SIZE,
           delay_min_seconds: Math.round(DELAY_MIN_MS / 1000),
           delay_max_seconds: Math.round(DELAY_MAX_MS / 1000),
@@ -748,6 +761,14 @@ Deno.serve(async (req) => {
 
       for (let i = 0; i < items.length; i += 100) {
         await adminClient.from("whatsapp_dispatch_items").insert(items.slice(i, i + 100));
+      }
+
+      // Se entrou na fila, retorna sem processar — será promovido quando o atual terminar
+      if (shouldQueue) {
+        return new Response(
+          JSON.stringify({ success: true, dispatch_id: dispatch.id, total: recipients.length, queued: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     }
 
