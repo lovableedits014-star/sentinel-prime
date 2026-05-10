@@ -466,6 +466,34 @@ Deno.serve(async (req) => {
       console.warn("ranking RPC falhou, seguindo sem comparativo estadual:", rkErr);
     }
 
+    // Resolve codigo_ibge — meta pode vir sem ele em dossiês antigos.
+    // Fallback: lookup por nome+UF em municipios_indicadores e tea_municipios_ms.
+    const meta0: any = dossie.dados_brutos?.meta || {};
+    let codigoIbgeResolvido: number | null =
+      Number(meta0?.codigo_ibge ?? meta0?.codigoIbge) || null;
+    if (!codigoIbgeResolvido && meta0?.municipio && meta0?.uf) {
+      try {
+        const { data: mi } = await supa
+          .from("municipios_indicadores")
+          .select("codigo_ibge")
+          .ilike("nome", String(meta0.municipio))
+          .eq("uf", String(meta0.uf).toUpperCase())
+          .maybeSingle();
+        if (mi?.codigo_ibge) codigoIbgeResolvido = Number(mi.codigo_ibge);
+      } catch (_e) { /* ignore */ }
+      if (!codigoIbgeResolvido && String(meta0?.uf || "").toUpperCase() === "MS") {
+        try {
+          const { data: tm } = await supa
+            .from("tea_municipios_ms")
+            .select("codigo_ibge")
+            .ilike("nome", String(meta0.municipio))
+            .maybeSingle();
+          if (tm?.codigo_ibge) codigoIbgeResolvido = Number(tm.codigo_ibge);
+        } catch (_e) { /* ignore */ }
+      }
+    }
+    console.log("codigo_ibge resolvido:", codigoIbgeResolvido, "para", meta0?.municipio, meta0?.uf);
+
     // ===== Votos reais (TSE local) =====
     // Agrega tse_votacao_zona por ano/cargo: total de votos contabilizados,
     // qtd de zonas, top 3 candidatos. NÃO temos eleitorado apto/comparecimento
@@ -473,40 +501,44 @@ Deno.serve(async (req) => {
     // tse_comparecimento_municipio.
     let votosReais: any = null;
     try {
-      const meta: any = dossie.dados_brutos?.meta || {};
-      const codigoIbge = meta?.codigo_ibge ?? meta?.codigoIbge;
-      if (codigoIbge) {
-        const { data: rows } = await supa
-          .from("tse_votacao_zona")
-          .select("ano,turno,cargo,zona,nome_urna,partido,votos,situacao")
-          .eq("cod_municipio", Number(codigoIbge))
-          .order("ano", { ascending: false })
-          .limit(5000);
-        if (rows && rows.length) {
-          const buckets: Record<string, any> = {};
-          for (const r of rows as any[]) {
-            const k = `${r.ano}|${r.turno}|${r.cargo}`;
-            const b = buckets[k] ||= {
-              ano: r.ano, turno: r.turno, cargo: r.cargo,
-              total_votos: 0, zonas: new Set<number>(),
-              candidatos: {} as Record<string, { nome: string; partido: string; votos: number; eleito: boolean }>,
-            };
-            b.total_votos += Number(r.votos || 0);
-            if (r.zona != null) b.zonas.add(r.zona);
-            const ck = `${r.nome_urna}|${r.partido}`;
-            const cand = b.candidatos[ck] ||= { nome: r.nome_urna, partido: r.partido, votos: 0, eleito: false };
-            cand.votos += Number(r.votos || 0);
-            if (String(r.situacao || "").toLowerCase().includes("eleit")) cand.eleito = true;
-          }
-          const ciclos = Object.values(buckets).map((b: any) => ({
-            ano: b.ano, turno: b.turno, cargo: b.cargo,
-            total_votos: b.total_votos, n_zonas: b.zonas.size,
-            top: Object.values(b.candidatos)
-              .sort((a: any, x: any) => x.votos - a.votos).slice(0, 5),
-          })).sort((a: any, b: any) => b.ano - a.ano || a.cargo.localeCompare(b.cargo));
-          votosReais = { ciclos };
-        }
+      let q = supa
+        .from("tse_votacao_zona")
+        .select("ano,turno,cargo,zona,nome_urna,partido,votos,situacao")
+        .order("ano", { ascending: false })
+        .limit(5000);
+      if (codigoIbgeResolvido) {
+        q = q.eq("cod_municipio", codigoIbgeResolvido);
+      } else if (meta0?.municipio && meta0?.uf) {
+        q = q.ilike("municipio", String(meta0.municipio)).eq("uf", String(meta0.uf).toUpperCase());
+      } else {
+        q = q.limit(0);
       }
+      const { data: rows } = await q;
+      if (rows && rows.length) {
+        const buckets: Record<string, any> = {};
+        for (const r of rows as any[]) {
+          const k = `${r.ano}|${r.turno}|${r.cargo}`;
+          const b = buckets[k] ||= {
+            ano: r.ano, turno: r.turno, cargo: r.cargo,
+            total_votos: 0, zonas: new Set<number>(),
+            candidatos: {} as Record<string, { nome: string; partido: string; votos: number; eleito: boolean }>,
+          };
+          b.total_votos += Number(r.votos || 0);
+          if (r.zona != null) b.zonas.add(r.zona);
+          const ck = `${r.nome_urna}|${r.partido}`;
+          const cand = b.candidatos[ck] ||= { nome: r.nome_urna, partido: r.partido, votos: 0, eleito: false };
+          cand.votos += Number(r.votos || 0);
+          if (String(r.situacao || "").toLowerCase().includes("eleit")) cand.eleito = true;
+        }
+        const ciclos = Object.values(buckets).map((b: any) => ({
+          ano: b.ano, turno: b.turno, cargo: b.cargo,
+          total_votos: b.total_votos, n_zonas: b.zonas.size,
+          top: Object.values(b.candidatos)
+            .sort((a: any, x: any) => x.votos - a.votos).slice(0, 5),
+        })).sort((a: any, b: any) => b.ano - a.ano || a.cargo.localeCompare(b.cargo));
+        votosReais = { ciclos };
+      }
+      console.log("votos_reais ciclos:", votosReais?.ciclos?.length || 0);
     } catch (vErr) {
       console.warn("votos reais erro:", (vErr as Error).message);
     }
@@ -514,16 +546,14 @@ Deno.serve(async (req) => {
     // ===== TEA (autismo) — somente MS =====
     let teaMunicipio: any = null;
     try {
-      const meta: any = dossie.dados_brutos?.meta || {};
-      const codigoIbge = meta?.codigo_ibge ?? meta?.codigoIbge;
-      if (codigoIbge && String(meta?.uf || "").toUpperCase() === "MS") {
-        const { data: tea } = await supa
-          .from("tea_municipios_ms")
-          .select("*")
-          .eq("codigo_ibge", Number(codigoIbge))
-          .maybeSingle();
+      if (String(meta0?.uf || "").toUpperCase() === "MS") {
+        let qt = supa.from("tea_municipios_ms").select("*").limit(1);
+        if (codigoIbgeResolvido) qt = qt.eq("codigo_ibge", codigoIbgeResolvido);
+        else if (meta0?.municipio) qt = qt.ilike("nome", String(meta0.municipio));
+        const { data: tea } = await qt.maybeSingle();
         if (tea) teaMunicipio = tea;
       }
+      console.log("tea encontrado:", !!teaMunicipio);
     } catch (tErr) {
       console.warn("tea erro:", (tErr as Error).message);
     }
