@@ -336,7 +336,9 @@ Deno.serve(async (req) => {
         }).eq("id", next.id);
 
         // Auto-invoke modo resume para processar o próximo
-        EdgeRuntime?.waitUntil?.(invokeResumeDispatch(next.id));
+        const edgeRuntime = (globalThis as any).EdgeRuntime;
+        if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(next.id));
+        else void invokeResumeDispatch(next.id);
 
         console.log(`[promote-queue] cliente=${cid} → próximo=${next.id}`);
         return next.id;
