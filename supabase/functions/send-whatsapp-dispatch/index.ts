@@ -1045,6 +1045,9 @@ Deno.serve(async (req) => {
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }).eq("id", dispatch.id);
+
+      // Fila: tenta promover o próximo disparo enfileirado deste cliente
+      await promoteNextQueued(client_id);
     };
 
     if (typeof (globalThis as any).EdgeRuntime !== "undefined") {
