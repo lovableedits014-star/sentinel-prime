@@ -343,7 +343,7 @@ export default function Disparos() {
     setSending(true);
     try {
       const pol = POLICIES[politica];
-      const { error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+      const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
         body: {
           client_id: clientId,
           titulo: titulo.trim(),
@@ -362,7 +362,11 @@ export default function Disparos() {
       });
       if (error) throw error;
 
-      toast.success("📤 Disparo iniciado! Acompanhe o progresso abaixo.");
+      if ((resp as any)?.queued) {
+        toast.success("📥 Adicionado à fila! Será enviado assim que o disparo atual terminar.");
+      } else {
+        toast.success("📤 Disparo iniciado! Acompanhe o progresso abaixo.");
+      }
       setTitulo("");
       setMensagem("");
       setTagFiltro("_all");
