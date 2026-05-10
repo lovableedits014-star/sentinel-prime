@@ -401,6 +401,12 @@ export default function Disparos() {
         .eq("status", "pendente");
 
       toast.success(`Disparo "${titulo}" cancelado.`);
+      // Promove o próximo da fila (se houver)
+      try {
+        await supabase.functions.invoke("send-whatsapp-dispatch", {
+          body: { action: "promote_queue", client_id: clientId },
+        });
+      } catch { /* não bloqueia o cancelamento */ }
       refetch();
     } catch (err: any) {
       toast.error("Erro ao cancelar: " + (err.message || "tente novamente"));
