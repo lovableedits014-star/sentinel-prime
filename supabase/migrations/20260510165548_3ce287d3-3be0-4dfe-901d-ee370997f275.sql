@@ -1,0 +1,1 @@
+DELETE FROM public.eleicao_pessoas WHERE created_at = '2026-05-07 00:49:37.745462+00';
