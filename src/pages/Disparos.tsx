@@ -1078,6 +1078,24 @@ export default function Disparos() {
         </Card>
       )}
 
+      {queuedDispatches.length > 0 && (
+        <Card className="border-sky-500/30 bg-sky-500/5">
+          <CardContent className="py-3 px-4 flex items-center gap-3 text-sm">
+            <Clock className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-medium text-sky-700 dark:text-sky-400">
+                {queuedDispatches.length} disparo{queuedDispatches.length > 1 ? "s" : ""} na fila
+              </span>
+              <span className="text-muted-foreground"> · serão enviados em sequência</span>
+              <div className="text-xs text-muted-foreground truncate mt-0.5">
+                Próximos: {queuedDispatches.slice(0, 3).map((d) => d.titulo).join(" • ")}
+                {queuedDispatches.length > 3 ? ` • +${queuedDispatches.length - 3}` : ""}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Dispatch history */}
       <Card>
         <CardHeader className="pb-3">
