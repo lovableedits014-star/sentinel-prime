@@ -173,6 +173,21 @@ export default function Disparos() {
   const totalCount = historyResult?.count || 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  const { data: activeQueueDispatches = [] } = useQuery<DispatchRow[]>({
+    queryKey: ["whatsapp-dispatch-queue", clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("whatsapp_dispatches" as any)
+        .select("*")
+        .eq("client_id", clientId)
+        .in("status", ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+        .order("created_at", { ascending: true });
+      return (data as unknown as DispatchRow[]) || [];
+    },
+    enabled: !!clientId,
+    refetchInterval: 3000,
+  });
+
   // Realtime for dispatches
   useEffect(() => {
     if (!clientId) return;
@@ -183,7 +198,10 @@ export default function Disparos() {
         schema: "public",
         table: "whatsapp_dispatches",
         filter: `client_id=eq.${clientId}`,
-      }, () => refetch())
+      }, () => {
+        refetch();
+        queryClient.invalidateQueries({ queryKey: ["whatsapp-dispatch-queue", clientId] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [clientId, refetch]);
@@ -414,8 +432,8 @@ export default function Disparos() {
   };
 
   const isConnected = !!bridgeConfigured;
-  const activeDispatch = dispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
-  const queuedDispatches = dispatches.filter((d) => d.status === "enfileirado");
+  const activeDispatch = activeQueueDispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
+  const queuedDispatches = activeQueueDispatches.filter((d) => d.status === "enfileirado");
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -979,7 +997,7 @@ export default function Disparos() {
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               placeholder="Ex: Convite para caminhada sábado"
-              disabled={sending || !!activeDispatch}
+              disabled={sending}
             />
           </div>
 
@@ -990,7 +1008,7 @@ export default function Disparos() {
               onChange={(e) => setMensagem(e.target.value)}
               placeholder="Olá {nome}! Temos uma missão importante..."
               rows={4}
-              disabled={sending || !!activeDispatch}
+              disabled={sending}
             />
             <p className="text-xs text-muted-foreground">
               Use <code className="bg-muted px-1 rounded">{"{nome}"}</code> para personalizar com o nome do destinatário.
@@ -1007,12 +1025,12 @@ export default function Disparos() {
 
             <Button
               onClick={handleSend}
-              disabled={sending || !!activeDispatch || !isConnected || recipientCount === 0}
+              disabled={sending || !isConnected || recipientCount === 0}
             >
               {sending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Iniciando...</>
               ) : activeDispatch ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Envio em andamento...</>
+                <><Clock className="h-4 w-4 mr-2" /> Adicionar à fila</>
               ) : (
                 <><Send className="h-4 w-4 mr-2" /> Enviar</>
               )}

@@ -285,6 +285,27 @@ Deno.serve(async (req) => {
     const isRetryQueue = !!payload.retry_queue_id;
     const isPromoteQueue = payload.action === "promote_queue";
 
+    const invokeResumeDispatch = async (dispatchId: string, delayMs = 0) => {
+      try {
+        if (delayMs > 0) await sleep(delayMs);
+        const fnUrl = `${supabaseUrl}/functions/v1/send-whatsapp-dispatch`;
+        const res = await fetch(fnUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceKey}`,
+            "apikey": serviceKey,
+          },
+          body: JSON.stringify({ resume_dispatch_id: dispatchId }),
+        });
+        if (!res.ok) {
+          console.warn(`[resume] auto-invoke dispatch=${dispatchId} falhou status=${res.status}`);
+        }
+      } catch (e) {
+        console.warn(`[resume] auto-invoke dispatch=${dispatchId} erro:`, (e as Error).message);
+      }
+    };
+
     // Helper: promove o próximo disparo enfileirado do cliente, se houver, e
     // dispara o processamento internamente (auto-invoke via fetch da própria função).
     const promoteNextQueued = async (cid: string) => {
@@ -315,16 +336,9 @@ Deno.serve(async (req) => {
         }).eq("id", next.id);
 
         // Auto-invoke modo resume para processar o próximo
-        const fnUrl = `${supabaseUrl}/functions/v1/send-whatsapp-dispatch`;
-        fetch(fnUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceKey}`,
-            "apikey": serviceKey,
-          },
-          body: JSON.stringify({ resume_dispatch_id: next.id }),
-        }).catch((e) => console.warn("[promote-queue] auto-invoke falhou:", (e as Error).message));
+        const edgeRuntime = (globalThis as any).EdgeRuntime;
+        if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(next.id));
+        else void invokeResumeDispatch(next.id);
 
         console.log(`[promote-queue] cliente=${cid} → próximo=${next.id}`);
         return next.id;
@@ -513,6 +527,13 @@ Deno.serve(async (req) => {
       delay_max = d.delay_max_seconds;
       batch_pause = d.batch_pause_seconds;
       existingDispatchId = d.id;
+      await adminClient.from("whatsapp_dispatches").update({
+        status: "enviando",
+        pause_reason: null,
+        paused_until: null,
+        started_at: d.started_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq("id", d.id);
     } else {
       // ====== MODO NOVO DISPARO (chamado pelo usuário) ======
       const authHeader = req.headers.get("Authorization");
@@ -704,6 +725,7 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }).eq("id", existingDispatchId);
+        await promoteNextQueued(client_id);
         return new Response(JSON.stringify({ success: true, completed: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       return new Response(
@@ -720,7 +742,7 @@ Deno.serve(async (req) => {
         .from("whatsapp_dispatches")
         .select("id")
         .eq("client_id", client_id)
-        .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+        .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia","enfileirado"])
         .limit(1);
       shouldQueue = !!(activeOnes && activeOnes.length > 0);
     }
@@ -773,6 +795,7 @@ Deno.serve(async (req) => {
     }
 
     const processDispatch = async () => {
+      try {
       // Em modo resume começamos contadores a partir do que já foi feito
       const { data: prevStats } = await adminClient
         .from("whatsapp_dispatch_items")
@@ -801,6 +824,9 @@ Deno.serve(async (req) => {
             paused_until: new Date(Date.now() + 5000).toISOString(),
             updated_at: new Date().toISOString(),
           }).eq("id", dispatch.id);
+          const edgeRuntime = (globalThis as any).EdgeRuntime;
+          if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 5000));
+          else void invokeResumeDispatch(dispatch.id, 5000);
           return;
         }
 
@@ -826,6 +852,9 @@ Deno.serve(async (req) => {
               paused_until: new Date(Date.now() + 5000).toISOString(),
               updated_at: new Date().toISOString(),
             }).eq("id", dispatch.id);
+            const edgeRuntime = (globalThis as any).EdgeRuntime;
+            if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 5000));
+            else void invokeResumeDispatch(dispatch.id, 5000);
             return;
           }
 
@@ -1048,6 +1077,16 @@ Deno.serve(async (req) => {
 
       // Fila: tenta promover o próximo disparo enfileirado deste cliente
       await promoteNextQueued(client_id);
+      } catch (err) {
+        console.error(`[dispatch] erro fatal dispatch=${dispatch.id}:`, err);
+        await adminClient.from("whatsapp_dispatches").update({
+          status: "falhou",
+          error_message: String((err as Error).message || err).slice(0, 300),
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq("id", dispatch.id);
+        await promoteNextQueued(client_id);
+      }
     };
 
     if (typeof (globalThis as any).EdgeRuntime !== "undefined") {
