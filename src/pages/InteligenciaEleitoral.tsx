@@ -253,13 +253,14 @@ const InteligenciaEleitoralInner = () => {
 
         {/* NARRATIVA POLÍTICA */}
         <TabsContent value="narrativa" className="mt-4">
-          <Card className="mb-4">
+          <Card className="mb-4 border-l-4 border-l-primary">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Megaphone className="w-5 h-5 text-primary" /> Narrativa Política
               </CardTitle>
-              <CardDescription>
-                Geração de narrativas e mensagens-chave a partir dos dados acima. Use depois de explorar Panorama e Inteligência Política.
+              <CardDescription className="space-y-1.5">
+                <span className="block"><strong>O que é:</strong> a IA pega tudo que você explorou nas abas anteriores e <em>escreve</em> — discursos, posts, manchetes, dossiê do município.</span>
+                <span className="block"><strong>Para que serve:</strong> sair daqui com material pronto para WhatsApp, redes e debate. Para um dossiê <strong>focado em Autismo</strong>, vá em "Inteligência Política → Bandeira: Autismo · MS" e exporte o PDF.</span>
               </CardDescription>
             </CardHeader>
           </Card>
@@ -268,7 +269,7 @@ const InteligenciaEleitoralInner = () => {
       </Tabs>
 
       <p className="text-xs text-muted-foreground text-center pt-4">
-        Fontes: TSE (Tribunal Superior Eleitoral) · Câmara dos Deputados · Senado Federal · IBGE.
+        Fontes: TSE (Tribunal Superior Eleitoral) · Câmara dos Deputados · Senado Federal · IBGE · CNES/DataSUS · INEP.
       </p>
     </div>
   );
