@@ -5077,6 +5077,114 @@ export type Database = {
           },
         ]
       }
+      tea_municipios_ms: {
+        Row: {
+          atualizado_em: string
+          bpc_def_qtd: number | null
+          caps_qtd: number | null
+          capsi_qtd: number | null
+          codigo_ibge: number
+          created_at: string
+          est_tea_0_17_max: number | null
+          est_tea_0_17_min: number | null
+          est_tea_total_max: number | null
+          est_tea_total_min: number | null
+          fonte_json: Json | null
+          gap_escolar_max: number | null
+          gap_escolar_min: number | null
+          hab_por_caps: number | null
+          id: string
+          matriculas_tea_ano: number | null
+          matriculas_tea_inep: number | null
+          nome: string
+          observacoes: string | null
+          populacao: number | null
+          populacao_ano: number | null
+          uf: string
+        }
+        Insert: {
+          atualizado_em?: string
+          bpc_def_qtd?: number | null
+          caps_qtd?: number | null
+          capsi_qtd?: number | null
+          codigo_ibge: number
+          created_at?: string
+          est_tea_0_17_max?: number | null
+          est_tea_0_17_min?: number | null
+          est_tea_total_max?: number | null
+          est_tea_total_min?: number | null
+          fonte_json?: Json | null
+          gap_escolar_max?: number | null
+          gap_escolar_min?: number | null
+          hab_por_caps?: number | null
+          id?: string
+          matriculas_tea_ano?: number | null
+          matriculas_tea_inep?: number | null
+          nome: string
+          observacoes?: string | null
+          populacao?: number | null
+          populacao_ano?: number | null
+          uf?: string
+        }
+        Update: {
+          atualizado_em?: string
+          bpc_def_qtd?: number | null
+          caps_qtd?: number | null
+          capsi_qtd?: number | null
+          codigo_ibge?: number
+          created_at?: string
+          est_tea_0_17_max?: number | null
+          est_tea_0_17_min?: number | null
+          est_tea_total_max?: number | null
+          est_tea_total_min?: number | null
+          fonte_json?: Json | null
+          gap_escolar_max?: number | null
+          gap_escolar_min?: number | null
+          hab_por_caps?: number | null
+          id?: string
+          matriculas_tea_ano?: number | null
+          matriculas_tea_inep?: number | null
+          nome?: string
+          observacoes?: string | null
+          populacao?: number | null
+          populacao_ano?: number | null
+          uf?: string
+        }
+        Relationships: []
+      }
+      tea_sync_log: {
+        Row: {
+          caps_coletados: number | null
+          created_at: string
+          duracao_ms: number | null
+          erros: Json | null
+          id: string
+          municipios_processados: number | null
+          status: string
+          uf: string
+        }
+        Insert: {
+          caps_coletados?: number | null
+          created_at?: string
+          duracao_ms?: number | null
+          erros?: Json | null
+          id?: string
+          municipios_processados?: number | null
+          status: string
+          uf?: string
+        }
+        Update: {
+          caps_coletados?: number | null
+          created_at?: string
+          duracao_ms?: number | null
+          erros?: Json | null
+          id?: string
+          municipios_processados?: number | null
+          status?: string
+          uf?: string
+        }
+        Relationships: []
+      }
       team_members: {
         Row: {
           client_id: string
