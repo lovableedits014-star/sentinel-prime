@@ -404,7 +404,8 @@ export default function Disparos() {
   };
 
   const isConnected = !!bridgeConfigured;
-  const activeDispatch = dispatches.find((d) => ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
+  const activeDispatch = dispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
+  const queuedDispatches = dispatches.filter((d) => d.status === "enfileirado");
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
