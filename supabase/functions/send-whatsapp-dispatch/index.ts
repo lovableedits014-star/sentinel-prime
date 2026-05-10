@@ -725,6 +725,7 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }).eq("id", existingDispatchId);
+        await promoteNextQueued(client_id);
         return new Response(JSON.stringify({ success: true, completed: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       return new Response(
@@ -794,6 +795,7 @@ Deno.serve(async (req) => {
     }
 
     const processDispatch = async () => {
+      try {
       // Em modo resume começamos contadores a partir do que já foi feito
       const { data: prevStats } = await adminClient
         .from("whatsapp_dispatch_items")
@@ -822,6 +824,9 @@ Deno.serve(async (req) => {
             paused_until: new Date(Date.now() + 5000).toISOString(),
             updated_at: new Date().toISOString(),
           }).eq("id", dispatch.id);
+          const edgeRuntime = (globalThis as any).EdgeRuntime;
+          if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 5000));
+          else void invokeResumeDispatch(dispatch.id, 5000);
           return;
         }
 
@@ -847,6 +852,9 @@ Deno.serve(async (req) => {
               paused_until: new Date(Date.now() + 5000).toISOString(),
               updated_at: new Date().toISOString(),
             }).eq("id", dispatch.id);
+            const edgeRuntime = (globalThis as any).EdgeRuntime;
+            if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 5000));
+            else void invokeResumeDispatch(dispatch.id, 5000);
             return;
           }
 
