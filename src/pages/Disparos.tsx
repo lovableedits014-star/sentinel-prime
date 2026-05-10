@@ -163,7 +163,7 @@ export default function Disparos() {
     refetchInterval: (data: any) => {
       const rows = (data?.state?.data?.rows as DispatchRow[] | undefined) || [];
       const hasActive = rows.some(
-        (d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status)
+        (d) => ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status)
       );
       return hasActive ? 3000 : false;
     },
@@ -404,7 +404,7 @@ export default function Disparos() {
   };
 
   const isConnected = !!bridgeConfigured;
-  const activeDispatch = dispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
+  const activeDispatch = dispatches.find((d) => ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -1148,7 +1148,7 @@ export default function Disparos() {
                             </Badge>
                           )}
                           <DispatchLogDialog dispatchId={d.id} titulo={d.titulo} />
-                          {["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status) && (
+                          {["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status) && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-destructive hover:text-destructive">
