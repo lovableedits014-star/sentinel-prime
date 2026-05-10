@@ -1077,6 +1077,16 @@ Deno.serve(async (req) => {
 
       // Fila: tenta promover o próximo disparo enfileirado deste cliente
       await promoteNextQueued(client_id);
+      } catch (err) {
+        console.error(`[dispatch] erro fatal dispatch=${dispatch.id}:`, err);
+        await adminClient.from("whatsapp_dispatches").update({
+          status: "falhou",
+          error_message: String((err as Error).message || err).slice(0, 300),
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq("id", dispatch.id);
+        await promoteNextQueued(client_id);
+      }
     };
 
     if (typeof (globalThis as any).EdgeRuntime !== "undefined") {
