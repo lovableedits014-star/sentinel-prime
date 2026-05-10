@@ -642,6 +642,83 @@ function buildDossiePdf(dossie: any, download = true) {
     }
   }
 
+  // VOTAÇÃO REAL (TSE)
+  const votosReais: any = dossie.dados_brutos?.votos_reais;
+  if (votosReais?.ciclos?.length) {
+    y += 12;
+    sectionTitle("Votação Real no Município (TSE)", C.accent);
+    paragraph(
+      "Totais de votos contabilizados por urna, por cargo e ano. Eleitorado apto / comparecimento / abstenção ainda não disponíveis na base — necessária importação adicional do TSE.",
+      { size: 9, color: C.muted },
+    );
+    y += 4;
+    for (const ciclo of votosReais.ciclos.slice(0, 8)) {
+      ensure(60);
+      setFill(C.light);
+      setStroke(C.border);
+      doc.roundedRect(margin, y, contentW, 18, 3, 3, "FD");
+      setText(C.primary);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text(
+        `${ciclo.ano} · ${ciclo.cargo} (${ciclo.turno}o turno) · ${Number(ciclo.total_votos).toLocaleString("pt-BR")} votos · ${ciclo.n_zonas} zona(s)`,
+        margin + 8,
+        y + 12,
+      );
+      y += 24;
+      for (const t of (ciclo.top || []).slice(0, 3)) {
+        ensure(14);
+        setText(C.text);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        const marca = t.eleito ? " [ELEITO]" : "";
+        doc.text(
+          `   - ${t.nome} (${t.partido}): ${Number(t.votos).toLocaleString("pt-BR")} votos${marca}`,
+          margin,
+          y,
+        );
+        y += 12;
+      }
+      y += 4;
+    }
+  }
+
+  // BANDEIRA AUTISMO (TEA) — só MS
+  const tea: any = dossie.dados_brutos?.tea;
+  if (tea && tea.populacao) {
+    y += 12;
+    sectionTitle("Bandeira do Candidato: Autismo (TEA) no Município", C.warn);
+    paragraph(
+      "Estimativas e dados oficiais (IBGE, INEP, CNES/DATASUS) para sustentar a bandeira política do autismo com numeros locais.",
+      { size: 9, color: C.muted },
+    );
+    y += 4;
+    const fmt = (n: any) => (n == null ? "—" : Number(n).toLocaleString("pt-BR"));
+    const linhas: Array<[string, string]> = [
+      [`Populacao (${tea.populacao_ano || ""})`, fmt(tea.populacao)],
+      ["Estimativa TEA total (OMS 1:100 -> CDC 1:36)", `${fmt(tea.est_tea_total_min)} a ${fmt(tea.est_tea_total_max)}`],
+      ["Estimativa TEA 0-17 anos", `${fmt(tea.est_tea_0_17_min)} a ${fmt(tea.est_tea_0_17_max)}`],
+      [`Matriculas TEA na rede (INEP ${tea.matriculas_tea_ano || ""})`, fmt(tea.matriculas_tea_inep)],
+      ["Gap escolar estimado (TEA fora da escola)", `${fmt(tea.gap_escolar_min)} a ${fmt(tea.gap_escolar_max)}`],
+      ["CAPS no municipio", fmt(tea.caps_qtd)],
+      ["CAPSi (infanto-juvenil)", `${fmt(tea.capsi_qtd)}${(tea.capsi_qtd || 0) === 0 ? "  [SEM CAPSi]" : ""}`],
+      ["Beneficiarios BPC por deficiencia", fmt(tea.bpc_def_qtd)],
+      ["Habitantes por CAPS", fmt(tea.hab_por_caps)],
+    ];
+    for (const [k, v] of linhas) {
+      ensure(18);
+      setFill(C.light);
+      doc.rect(margin, y, contentW, 16, "F");
+      setText(C.text);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(k, margin + 8, y + 11);
+      doc.setFont("helvetica", "bold");
+      doc.text(String(v), pageW - margin - 8, y + 11, { align: "right" });
+      y += 18;
+    }
+  }
+
   drawFooter();
 
   if (download) doc.save(`dossie-${cidade}-${uf}.pdf`);

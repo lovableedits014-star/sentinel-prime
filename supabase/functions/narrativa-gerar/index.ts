@@ -466,6 +466,68 @@ Deno.serve(async (req) => {
       console.warn("ranking RPC falhou, seguindo sem comparativo estadual:", rkErr);
     }
 
+    // ===== Votos reais (TSE local) =====
+    // Agrega tse_votacao_zona por ano/cargo: total de votos contabilizados,
+    // qtd de zonas, top 3 candidatos. NÃO temos eleitorado apto/comparecimento
+    // para calcular abstenção real — esses campos ficam null até importarmos
+    // tse_comparecimento_municipio.
+    let votosReais: any = null;
+    try {
+      const meta: any = dossie.dados_brutos?.meta || {};
+      const codigoIbge = meta?.codigo_ibge ?? meta?.codigoIbge;
+      if (codigoIbge) {
+        const { data: rows } = await supa
+          .from("tse_votacao_zona")
+          .select("ano,turno,cargo,zona,nome_urna,partido,votos,situacao")
+          .eq("cod_municipio", Number(codigoIbge))
+          .order("ano", { ascending: false })
+          .limit(5000);
+        if (rows && rows.length) {
+          const buckets: Record<string, any> = {};
+          for (const r of rows as any[]) {
+            const k = `${r.ano}|${r.turno}|${r.cargo}`;
+            const b = buckets[k] ||= {
+              ano: r.ano, turno: r.turno, cargo: r.cargo,
+              total_votos: 0, zonas: new Set<number>(),
+              candidatos: {} as Record<string, { nome: string; partido: string; votos: number; eleito: boolean }>,
+            };
+            b.total_votos += Number(r.votos || 0);
+            if (r.zona != null) b.zonas.add(r.zona);
+            const ck = `${r.nome_urna}|${r.partido}`;
+            const cand = b.candidatos[ck] ||= { nome: r.nome_urna, partido: r.partido, votos: 0, eleito: false };
+            cand.votos += Number(r.votos || 0);
+            if (String(r.situacao || "").toLowerCase().includes("eleit")) cand.eleito = true;
+          }
+          const ciclos = Object.values(buckets).map((b: any) => ({
+            ano: b.ano, turno: b.turno, cargo: b.cargo,
+            total_votos: b.total_votos, n_zonas: b.zonas.size,
+            top: Object.values(b.candidatos)
+              .sort((a: any, x: any) => x.votos - a.votos).slice(0, 5),
+          })).sort((a: any, b: any) => b.ano - a.ano || a.cargo.localeCompare(b.cargo));
+          votosReais = { ciclos };
+        }
+      }
+    } catch (vErr) {
+      console.warn("votos reais erro:", (vErr as Error).message);
+    }
+
+    // ===== TEA (autismo) — somente MS =====
+    let teaMunicipio: any = null;
+    try {
+      const meta: any = dossie.dados_brutos?.meta || {};
+      const codigoIbge = meta?.codigo_ibge ?? meta?.codigoIbge;
+      if (codigoIbge && String(meta?.uf || "").toUpperCase() === "MS") {
+        const { data: tea } = await supa
+          .from("tea_municipios_ms")
+          .select("*")
+          .eq("codigo_ibge", Number(codigoIbge))
+          .maybeSingle();
+        if (tea) teaMunicipio = tea;
+      }
+    } catch (tErr) {
+      console.warn("tea erro:", (tErr as Error).message);
+    }
+
     // Busca contexto web em tempo real (Wikipedia + Google News + sites .gov.br)
     let contextoWeb: any = null;
     try {
@@ -490,12 +552,46 @@ Deno.serve(async (req) => {
       console.warn("contexto web erro (seguindo sem):", (webErr as Error).message);
     }
 
+    // Bloco extra de prompt: votos reais + TEA (autismo)
+    const votosBlock = (() => {
+      if (!votosReais?.ciclos?.length) return "";
+      const linhas = ["VOTAÇÃO REAL NO MUNICÍPIO (TSE — totais por urna agregados):"];
+      for (const c of votosReais.ciclos.slice(0, 12)) {
+        linhas.push(`- ${c.ano} ${c.cargo} (${c.turno}º turno) · ${c.total_votos.toLocaleString("pt-BR")} votos contabilizados em ${c.n_zonas} zona(s)`);
+        for (const t of c.top.slice(0, 3)) {
+          linhas.push(`    • ${t.nome} (${t.partido}): ${t.votos.toLocaleString("pt-BR")} votos${t.eleito ? " ✓ ELEITO" : ""}`);
+        }
+      }
+      linhas.push("(Obs.: eleitorado apto, comparecimento e abstenção ainda não disponíveis na base — não invente esses números.)");
+      return linhas.join("\n") + "\n\n";
+    })();
+
+    const teaBlock = (() => {
+      if (!teaMunicipio) return "";
+      const t = teaMunicipio;
+      const fmt = (n: any) => (n == null ? "—" : Number(n).toLocaleString("pt-BR"));
+      return `BANDEIRA AUTISMO (TEA) NO MUNICÍPIO — dados oficiais (IBGE + CNES + INEP):
+- População ${t.populacao_ano || ""}: ${fmt(t.populacao)}
+- Estimativa TEA total: ${fmt(t.est_tea_total_min)} a ${fmt(t.est_tea_total_max)} pessoas (faixa OMS 1:100 → CDC 1:36)
+- Estimativa TEA 0-17 anos: ${fmt(t.est_tea_0_17_min)} a ${fmt(t.est_tea_0_17_max)}
+- Matrículas TEA na rede (INEP ${t.matriculas_tea_ano || ""}): ${fmt(t.matriculas_tea_inep)}
+- Gap escolar estimado (TEA fora da escola): ${fmt(t.gap_escolar_min)} a ${fmt(t.gap_escolar_max)} crianças
+- CAPS no município: ${fmt(t.caps_qtd)} | CAPSi (infanto-juvenil): ${fmt(t.capsi_qtd)}${(t.capsi_qtd || 0) === 0 ? " ⚠️ SEM CAPSi — vácuo de atendimento" : ""}
+- Beneficiários BPC por deficiência: ${fmt(t.bpc_def_qtd)}
+- Habitantes por CAPS: ${fmt(t.hab_por_caps)}
+USE estes números para amarrar a bandeira do candidato (autismo) à realidade local — pelo menos 1 ataque e 1 discurso devem mencionar o gap escolar ou ausência/sobrecarga de CAPSi.
+
+`;
+    })();
+
+    const userPrompt = votosBlock + teaBlock + buildUserPrompt(dossie, rankingMap, contextoWeb);
+
     let aiJson: any;
     try {
       aiJson = await callLLMRaw(llmConfig, {
         messages: [
           { role: "system", content: buildSystemPrompt(perfil) },
-          { role: "user", content: buildUserPrompt(dossie, rankingMap, contextoWeb) },
+          { role: "user", content: userPrompt },
         ],
         tools: [TOOL_SCHEMA],
         tool_choice: { type: "function", function: { name: "gerar_pacote_narrativa" } },
@@ -523,12 +619,15 @@ Deno.serve(async (req) => {
     if (!tcArgs) throw new Error("IA não retornou tool_call estruturada");
     const conteudos = JSON.parse(tcArgs);
 
-    // (Sanitização de roteiro estratégico removida — feature substituída por curiosidades_locais.)
+    // Persiste enriquecimentos no dados_brutos para o PDF poder renderizar
+    // sem depender do que a IA gerou.
+    const dadosBrutos = { ...(dossie.dados_brutos || {}), votos_reais: votosReais, tea: teaMunicipio };
 
     await supa
       .from("narrativa_dossies")
       .update({
         conteudos,
+        dados_brutos: dadosBrutos,
         status: "pronto",
         generated_at: new Date().toISOString(),
       })
