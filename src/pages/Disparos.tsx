@@ -1096,6 +1096,7 @@ export default function Disparos() {
                 <SelectContent>
                   <SelectItem value="_all">Todos os status</SelectItem>
                   <SelectItem value="pendente">Aguardando</SelectItem>
+                  <SelectItem value="enfileirado">Na fila</SelectItem>
                   <SelectItem value="enviando">Enviando</SelectItem>
                   <SelectItem value="concluido">Concluído</SelectItem>
                   <SelectItem value="falhou">Falhou</SelectItem>
