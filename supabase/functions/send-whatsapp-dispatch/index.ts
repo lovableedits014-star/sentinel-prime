@@ -742,7 +742,7 @@ Deno.serve(async (req) => {
         .from("whatsapp_dispatches")
         .select("id")
         .eq("client_id", client_id)
-        .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+        .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia","enfileirado"])
         .limit(1);
       shouldQueue = !!(activeOnes && activeOnes.length > 0);
     }
