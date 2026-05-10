@@ -301,7 +301,7 @@ const TOOL_SCHEMA = {
         },
         curiosidades_locais: {
           type: "array",
-          minItems: 5,
+          minItems: 3,
           maxItems: 10,
           description: "Resumo cultural, histórico e curiosidades da cidade para o candidato chegar conhecendo o lugar. Baseado nos textos da Wikipedia (seções História, Cultura, Economia, Personalidades, Gastronomia, etc.) presentes em CONTEXTO RECENTE DA WEB.",
           items: {
