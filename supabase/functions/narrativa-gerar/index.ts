@@ -615,16 +615,43 @@ Deno.serve(async (req) => {
       if (!teaMunicipio) return "";
       const t = teaMunicipio;
       const fmt = (n: any) => (n == null ? "—" : Number(n).toLocaleString("pt-BR"));
+      const semCapsi = (t.capsi_qtd || 0) === 0;
+      const rk = teaRanking || {};
+      const totalMun = rk?.total_municipios || 79;
+      const rkLine = (label: string, pos: any, ascHint?: string) =>
+        pos ? `    · ${label}: ${pos}º de ${totalMun} em MS${ascHint ? " " + ascHint : ""}` : "";
+
+      const leisLinhas = teaLeis.length === 0
+        ? "- Legislação municipal TEA mapeada: nenhuma encontrada na base (oportunidade de propor)."
+        : teaLeis.map((l: any) => `- ${l.tipo.toUpperCase()}${l.numero ? " nº " + l.numero : ""}${l.ano ? "/" + l.ano : ""} — ${l.ementa || "(sem ementa)"}${l.url_fonte ? " [fonte: " + l.url_fonte + "]" : ""}`).join("\n");
+
       return `BANDEIRA AUTISMO (TEA) NO MUNICÍPIO — dados oficiais (IBGE + CNES + INEP):
 - População ${t.populacao_ano || ""}: ${fmt(t.populacao)}
 - Estimativa TEA total: ${fmt(t.est_tea_total_min)} a ${fmt(t.est_tea_total_max)} pessoas (faixa OMS 1:100 → CDC 1:36)
-- Estimativa TEA 0-17 anos: ${fmt(t.est_tea_0_17_min)} a ${fmt(t.est_tea_0_17_max)}
-- Matrículas TEA na rede (INEP ${t.matriculas_tea_ano || ""}): ${fmt(t.matriculas_tea_inep)}
-- Gap escolar estimado (TEA fora da escola): ${fmt(t.gap_escolar_min)} a ${fmt(t.gap_escolar_max)} crianças
-- CAPS no município: ${fmt(t.caps_qtd)} | CAPSi (infanto-juvenil): ${fmt(t.capsi_qtd)}${(t.capsi_qtd || 0) === 0 ? " ⚠️ SEM CAPSi — vácuo de atendimento" : ""}
-- Beneficiários BPC por deficiência: ${fmt(t.bpc_def_qtd)}
-- Habitantes por CAPS: ${fmt(t.hab_por_caps)}
-USE estes números para amarrar a bandeira do candidato (autismo) à realidade local — pelo menos 1 ataque e 1 discurso devem mencionar o gap escolar ou ausência/sobrecarga de CAPSi.
+- Recorte por gênero (CDC 4:1): homens ${fmt(t.est_tea_homens_min)}–${fmt(t.est_tea_homens_max)} | mulheres ${fmt(t.est_tea_mulheres_min)}–${fmt(t.est_tea_mulheres_max)} (subdiagnóstico feminino é uma pauta crítica)
+- Faixas etárias estimadas com TEA:
+    · 0-5 anos (creche/pré): ${fmt(t.est_tea_0_5_min)}–${fmt(t.est_tea_0_5_max)} (diagnóstico precoce)
+    · 6-14 anos (fundamental): ${fmt(t.est_tea_6_14_min)}–${fmt(t.est_tea_6_14_max)} (núcleo do gap escolar)
+    · 15-17 anos (médio/transição): ${fmt(t.est_tea_15_17_min)}–${fmt(t.est_tea_15_17_max)}
+    · 18+ adultos: ${fmt(t.est_tea_adultos_min)}–${fmt(t.est_tea_adultos_max)} (invisibilizados — sem política pública)
+- Matrículas TEA na rede (INEP ${t.matriculas_tea_ano || ""}): ${fmt(t.matriculas_tea_inep)} | cobertura escolar: ${t.pct_cobertura_escolar != null ? t.pct_cobertura_escolar + "%" : "—"}
+- Gap escolar (estimativa 6-14 não matriculada): ${fmt(t.gap_escolar_min)} a ${fmt(t.gap_escolar_max)} crianças
+- Saúde — CNES detalhado:
+    · CAPS I: ${fmt(t.caps_i_qtd)} | CAPS II: ${fmt(t.caps_ii_qtd)} | CAPS III: ${fmt(t.caps_iii_qtd)} | CAPS AD: ${fmt(t.caps_ad_qtd)} | CAPSi: ${fmt(t.capsi_qtd)}${semCapsi ? " ⚠️ SEM CAPSi" : ""}
+    · CER (reabilitação): ${fmt(t.cer_qtd)} | UBS: ${fmt(t.ubs_qtd)} | habitantes/CAPS: ${fmt(t.hab_por_caps)}
+    · Tempo médio estimado p/ diagnóstico: ${t.tempo_diag_estimado_meses ? t.tempo_diag_estimado_meses + " meses" : "—"} (proxy: sem CAPSi → fila >2 anos)
+- Assistência social — BPC por deficiência: ${fmt(t.bpc_def_qtd)} | cobertura sobre estim. TEA: ${t.bpc_def_pct_estimado_tea != null ? t.bpc_def_pct_estimado_tea + "%" : "—"}
+- Política pública local mapeada: lei CIPTEA: ${t.lei_ciptea ? "SIM (" + (t.lei_ciptea_numero || "") + ")" : "NÃO encontrada"} | fila zero: ${t.lei_fila_zero ? "SIM" : "NÃO"} | centro de referência TEA: ${t.centro_referencia_tea ? "SIM" : "NÃO"} | política de capacitação: ${t.politica_capacitacao ? "SIM" : "NÃO"}
+${leisLinhas}
+- Ranking estadual (entre os ${totalMun} municípios de MS):
+${rkLine("população", rk.rank_populacao)}
+${rkLine("estimativa TEA absoluta", rk.rank_tea_estimado)}
+${rkLine("nº de CAPSi", rk.rank_capsi, "(quanto menor, melhor a cobertura)")}
+${rkLine("habitantes por CAPS", rk.rank_habitantes_por_caps, "(1º = melhor cobertura)")}
+${rkLine("cobertura escolar TEA", rk.rank_cobertura_escolar)}
+${rkLine("cobertura BPC sobre TEA estimado", rk.rank_cobertura_bpc)}
+
+USE estes números para amarrar a bandeira do candidato (autismo) à realidade local. Pelo menos 1 ataque e 1 discurso DEVEM mencionar concretamente: (a) ausência/sobrecarga de CAPSi, (b) gap escolar das crianças 6-14, (c) ausência de lei CIPTEA ou centro de referência, ou (d) invisibilidade dos adultos com TEA. Cite o ranking estadual quando ele for desfavorável (ex.: "estamos entre os piores de MS em X").
 
 `;
     })();
