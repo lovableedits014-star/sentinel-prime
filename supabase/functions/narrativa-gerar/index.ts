@@ -545,15 +545,30 @@ Deno.serve(async (req) => {
 
     // ===== TEA (autismo) — somente MS =====
     let teaMunicipio: any = null;
+    let teaRanking: any = null;
+    let teaLeis: any[] = [];
     try {
       if (String(meta0?.uf || "").toUpperCase() === "MS") {
         let qt = supa.from("tea_municipios_ms").select("*").limit(1);
         if (codigoIbgeResolvido) qt = qt.eq("codigo_ibge", codigoIbgeResolvido);
         else if (meta0?.municipio) qt = qt.ilike("nome", String(meta0.municipio));
         const { data: tea } = await qt.maybeSingle();
-        if (tea) teaMunicipio = tea;
+        if (tea) {
+          teaMunicipio = tea;
+          // Ranking estadual (RPC)
+          if (tea.codigo_ibge) {
+            const { data: rk } = await supa.rpc("tea_ranking_ms", { p_codigo_ibge: tea.codigo_ibge });
+            teaRanking = rk || null;
+            // Leis municipais (se houver)
+            const { data: leis } = await supa
+              .from("tea_legislacao_municipal")
+              .select("tipo,numero,ano,ementa,url_fonte,status")
+              .eq("codigo_ibge", tea.codigo_ibge);
+            teaLeis = leis || [];
+          }
+        }
       }
-      console.log("tea encontrado:", !!teaMunicipio);
+      console.log("tea encontrado:", !!teaMunicipio, "ranking:", !!teaRanking, "leis:", teaLeis.length);
     } catch (tErr) {
       console.warn("tea erro:", (tErr as Error).message);
     }
