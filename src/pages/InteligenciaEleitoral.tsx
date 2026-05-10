@@ -160,7 +160,7 @@ const InteligenciaEleitoralInner = () => {
           </TabsTrigger>
           <TabsTrigger value="hiperlocal" className="flex items-center gap-2 py-2.5">
             <Building2 className="w-4 h-4" />
-            <span>Hiperlocal · CG/MS</span>
+            <span>Foco Campo Grande</span>
           </TabsTrigger>
           <TabsTrigger value="narrativa" className="flex items-center gap-2 py-2.5">
             <Megaphone className="w-4 h-4" />
