@@ -285,6 +285,27 @@ Deno.serve(async (req) => {
     const isRetryQueue = !!payload.retry_queue_id;
     const isPromoteQueue = payload.action === "promote_queue";
 
+    const invokeResumeDispatch = async (dispatchId: string, delayMs = 0) => {
+      try {
+        if (delayMs > 0) await sleep(delayMs);
+        const fnUrl = `${supabaseUrl}/functions/v1/send-whatsapp-dispatch`;
+        const res = await fetch(fnUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceKey}`,
+            "apikey": serviceKey,
+          },
+          body: JSON.stringify({ resume_dispatch_id: dispatchId }),
+        });
+        if (!res.ok) {
+          console.warn(`[resume] auto-invoke dispatch=${dispatchId} falhou status=${res.status}`);
+        }
+      } catch (e) {
+        console.warn(`[resume] auto-invoke dispatch=${dispatchId} erro:`, (e as Error).message);
+      }
+    };
+
     // Helper: promove o próximo disparo enfileirado do cliente, se houver, e
     // dispara o processamento internamente (auto-invoke via fetch da própria função).
     const promoteNextQueued = async (cid: string) => {
@@ -315,16 +336,7 @@ Deno.serve(async (req) => {
         }).eq("id", next.id);
 
         // Auto-invoke modo resume para processar o próximo
-        const fnUrl = `${supabaseUrl}/functions/v1/send-whatsapp-dispatch`;
-        fetch(fnUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceKey}`,
-            "apikey": serviceKey,
-          },
-          body: JSON.stringify({ resume_dispatch_id: next.id }),
-        }).catch((e) => console.warn("[promote-queue] auto-invoke falhou:", (e as Error).message));
+        EdgeRuntime?.waitUntil?.(invokeResumeDispatch(next.id));
 
         console.log(`[promote-queue] cliente=${cid} → próximo=${next.id}`);
         return next.id;
@@ -513,6 +525,13 @@ Deno.serve(async (req) => {
       delay_max = d.delay_max_seconds;
       batch_pause = d.batch_pause_seconds;
       existingDispatchId = d.id;
+      await adminClient.from("whatsapp_dispatches").update({
+        status: "enviando",
+        pause_reason: null,
+        paused_until: null,
+        started_at: d.started_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq("id", d.id);
     } else {
       // ====== MODO NOVO DISPARO (chamado pelo usuário) ======
       const authHeader = req.headers.get("Authorization");
