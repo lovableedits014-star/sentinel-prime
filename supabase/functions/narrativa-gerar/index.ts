@@ -693,7 +693,7 @@ USE estes números para amarrar a bandeira do candidato (autismo) à realidade l
 
     // Persiste enriquecimentos no dados_brutos para o PDF poder renderizar
     // sem depender do que a IA gerou.
-    const dadosBrutos = { ...(dossie.dados_brutos || {}), votos_reais: votosReais, tea: teaMunicipio };
+    const dadosBrutos = { ...(dossie.dados_brutos || {}), votos_reais: votosReais, tea: teaMunicipio, tea_ranking: teaRanking, tea_leis: teaLeis };
 
     await supa
       .from("narrativa_dossies")
