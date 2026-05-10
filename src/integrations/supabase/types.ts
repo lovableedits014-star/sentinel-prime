@@ -5077,77 +5077,293 @@ export type Database = {
           },
         ]
       }
+      tea_fonte_cache: {
+        Row: {
+          codigo_ibge: number
+          coletado_em: string | null
+          fonte: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          codigo_ibge: number
+          coletado_em?: string | null
+          fonte: string
+          id?: string
+          payload: Json
+        }
+        Update: {
+          codigo_ibge?: number
+          coletado_em?: string | null
+          fonte?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
+      tea_legislacao_municipal: {
+        Row: {
+          ano: number | null
+          codigo_ibge: number
+          created_at: string | null
+          ementa: string | null
+          encontrado_via: string | null
+          id: string
+          municipio: string
+          numero: string | null
+          status: string | null
+          tipo: string
+          uf: string
+          updated_at: string | null
+          url_fonte: string | null
+        }
+        Insert: {
+          ano?: number | null
+          codigo_ibge: number
+          created_at?: string | null
+          ementa?: string | null
+          encontrado_via?: string | null
+          id?: string
+          municipio: string
+          numero?: string | null
+          status?: string | null
+          tipo: string
+          uf: string
+          updated_at?: string | null
+          url_fonte?: string | null
+        }
+        Update: {
+          ano?: number | null
+          codigo_ibge?: number
+          created_at?: string | null
+          ementa?: string | null
+          encontrado_via?: string | null
+          id?: string
+          municipio?: string
+          numero?: string | null
+          status?: string | null
+          tipo?: string
+          uf?: string
+          updated_at?: string | null
+          url_fonte?: string | null
+        }
+        Relationships: []
+      }
       tea_municipios_ms: {
         Row: {
           atualizado_em: string
+          bpc_def_0_17: number | null
+          bpc_def_pct_estimado_tea: number | null
           bpc_def_qtd: number | null
+          caps_ad_qtd: number | null
+          caps_i_qtd: number | null
+          caps_ii_qtd: number | null
+          caps_iii_qtd: number | null
           caps_qtd: number | null
           capsi_qtd: number | null
+          centro_referencia_tea: boolean | null
+          cer_qtd: number | null
           codigo_ibge: number
+          cras_qtd: number | null
+          creas_qtd: number | null
           created_at: string
+          escolas_com_aee: number | null
           est_tea_0_17_max: number | null
           est_tea_0_17_min: number | null
+          est_tea_0_5_max: number | null
+          est_tea_0_5_min: number | null
+          est_tea_15_17_max: number | null
+          est_tea_15_17_min: number | null
+          est_tea_6_14_max: number | null
+          est_tea_6_14_min: number | null
+          est_tea_adultos_max: number | null
+          est_tea_adultos_min: number | null
+          est_tea_homens_max: number | null
+          est_tea_homens_min: number | null
+          est_tea_mulheres_max: number | null
+          est_tea_mulheres_min: number | null
           est_tea_total_max: number | null
           est_tea_total_min: number | null
+          fonoaudiologos_qtd: number | null
           fonte_json: Json | null
           gap_escolar_max: number | null
           gap_escolar_min: number | null
+          gap_escolar_real_max: number | null
+          gap_escolar_real_min: number | null
           hab_por_caps: number | null
           id: string
+          legislacao_atualizado_em: string | null
+          lei_ciptea: boolean | null
+          lei_ciptea_numero: string | null
+          lei_fila_zero: boolean | null
           matriculas_tea_ano: number | null
+          matriculas_tea_creche: number | null
+          matriculas_tea_estadual: number | null
+          matriculas_tea_fundamental: number | null
           matriculas_tea_inep: number | null
+          matriculas_tea_medio: number | null
+          matriculas_tea_municipal: number | null
+          matriculas_tea_privada: number | null
           nome: string
           observacoes: string | null
+          pct_cobertura_escolar: number | null
+          pediatras_qtd: number | null
+          politica_capacitacao: boolean | null
+          pop_0_5: number | null
+          pop_15_17: number | null
+          pop_18_mais: number | null
+          pop_6_14: number | null
           populacao: number | null
           populacao_ano: number | null
+          profs_aee: number | null
+          psicologos_qtd: number | null
+          tempo_diag_estimado_meses: number | null
+          terapeutas_ocup_qtd: number | null
+          ubs_qtd: number | null
           uf: string
         }
         Insert: {
           atualizado_em?: string
+          bpc_def_0_17?: number | null
+          bpc_def_pct_estimado_tea?: number | null
           bpc_def_qtd?: number | null
+          caps_ad_qtd?: number | null
+          caps_i_qtd?: number | null
+          caps_ii_qtd?: number | null
+          caps_iii_qtd?: number | null
           caps_qtd?: number | null
           capsi_qtd?: number | null
+          centro_referencia_tea?: boolean | null
+          cer_qtd?: number | null
           codigo_ibge: number
+          cras_qtd?: number | null
+          creas_qtd?: number | null
           created_at?: string
+          escolas_com_aee?: number | null
           est_tea_0_17_max?: number | null
           est_tea_0_17_min?: number | null
+          est_tea_0_5_max?: number | null
+          est_tea_0_5_min?: number | null
+          est_tea_15_17_max?: number | null
+          est_tea_15_17_min?: number | null
+          est_tea_6_14_max?: number | null
+          est_tea_6_14_min?: number | null
+          est_tea_adultos_max?: number | null
+          est_tea_adultos_min?: number | null
+          est_tea_homens_max?: number | null
+          est_tea_homens_min?: number | null
+          est_tea_mulheres_max?: number | null
+          est_tea_mulheres_min?: number | null
           est_tea_total_max?: number | null
           est_tea_total_min?: number | null
+          fonoaudiologos_qtd?: number | null
           fonte_json?: Json | null
           gap_escolar_max?: number | null
           gap_escolar_min?: number | null
+          gap_escolar_real_max?: number | null
+          gap_escolar_real_min?: number | null
           hab_por_caps?: number | null
           id?: string
+          legislacao_atualizado_em?: string | null
+          lei_ciptea?: boolean | null
+          lei_ciptea_numero?: string | null
+          lei_fila_zero?: boolean | null
           matriculas_tea_ano?: number | null
+          matriculas_tea_creche?: number | null
+          matriculas_tea_estadual?: number | null
+          matriculas_tea_fundamental?: number | null
           matriculas_tea_inep?: number | null
+          matriculas_tea_medio?: number | null
+          matriculas_tea_municipal?: number | null
+          matriculas_tea_privada?: number | null
           nome: string
           observacoes?: string | null
+          pct_cobertura_escolar?: number | null
+          pediatras_qtd?: number | null
+          politica_capacitacao?: boolean | null
+          pop_0_5?: number | null
+          pop_15_17?: number | null
+          pop_18_mais?: number | null
+          pop_6_14?: number | null
           populacao?: number | null
           populacao_ano?: number | null
+          profs_aee?: number | null
+          psicologos_qtd?: number | null
+          tempo_diag_estimado_meses?: number | null
+          terapeutas_ocup_qtd?: number | null
+          ubs_qtd?: number | null
           uf?: string
         }
         Update: {
           atualizado_em?: string
+          bpc_def_0_17?: number | null
+          bpc_def_pct_estimado_tea?: number | null
           bpc_def_qtd?: number | null
+          caps_ad_qtd?: number | null
+          caps_i_qtd?: number | null
+          caps_ii_qtd?: number | null
+          caps_iii_qtd?: number | null
           caps_qtd?: number | null
           capsi_qtd?: number | null
+          centro_referencia_tea?: boolean | null
+          cer_qtd?: number | null
           codigo_ibge?: number
+          cras_qtd?: number | null
+          creas_qtd?: number | null
           created_at?: string
+          escolas_com_aee?: number | null
           est_tea_0_17_max?: number | null
           est_tea_0_17_min?: number | null
+          est_tea_0_5_max?: number | null
+          est_tea_0_5_min?: number | null
+          est_tea_15_17_max?: number | null
+          est_tea_15_17_min?: number | null
+          est_tea_6_14_max?: number | null
+          est_tea_6_14_min?: number | null
+          est_tea_adultos_max?: number | null
+          est_tea_adultos_min?: number | null
+          est_tea_homens_max?: number | null
+          est_tea_homens_min?: number | null
+          est_tea_mulheres_max?: number | null
+          est_tea_mulheres_min?: number | null
           est_tea_total_max?: number | null
           est_tea_total_min?: number | null
+          fonoaudiologos_qtd?: number | null
           fonte_json?: Json | null
           gap_escolar_max?: number | null
           gap_escolar_min?: number | null
+          gap_escolar_real_max?: number | null
+          gap_escolar_real_min?: number | null
           hab_por_caps?: number | null
           id?: string
+          legislacao_atualizado_em?: string | null
+          lei_ciptea?: boolean | null
+          lei_ciptea_numero?: string | null
+          lei_fila_zero?: boolean | null
           matriculas_tea_ano?: number | null
+          matriculas_tea_creche?: number | null
+          matriculas_tea_estadual?: number | null
+          matriculas_tea_fundamental?: number | null
           matriculas_tea_inep?: number | null
+          matriculas_tea_medio?: number | null
+          matriculas_tea_municipal?: number | null
+          matriculas_tea_privada?: number | null
           nome?: string
           observacoes?: string | null
+          pct_cobertura_escolar?: number | null
+          pediatras_qtd?: number | null
+          politica_capacitacao?: boolean | null
+          pop_0_5?: number | null
+          pop_15_17?: number | null
+          pop_18_mais?: number | null
+          pop_6_14?: number | null
           populacao?: number | null
           populacao_ano?: number | null
+          profs_aee?: number | null
+          psicologos_qtd?: number | null
+          tempo_diag_estimado_meses?: number | null
+          terapeutas_ocup_qtd?: number | null
+          ubs_qtd?: number | null
           uf?: string
         }
         Relationships: []
@@ -6344,6 +6560,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      tea_ranking_ms: { Args: { p_codigo_ibge: number }; Returns: Json }
       tele_list_contatos: {
         Args: { _client_id: string; _nome: string; _senha: string }
         Returns: {
