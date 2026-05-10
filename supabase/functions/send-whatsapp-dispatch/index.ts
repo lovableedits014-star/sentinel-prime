@@ -283,6 +283,68 @@ Deno.serve(async (req) => {
     }
     const isResume = !!payload.resume_dispatch_id;
     const isRetryQueue = !!payload.retry_queue_id;
+    const isPromoteQueue = payload.action === "promote_queue";
+
+    // Helper: promove o próximo disparo enfileirado do cliente, se houver, e
+    // dispara o processamento internamente (auto-invoke via fetch da própria função).
+    const promoteNextQueued = async (cid: string) => {
+      try {
+        // Só promove se NÃO houver outro disparo ativo agora
+        const { data: active } = await adminClient
+          .from("whatsapp_dispatches")
+          .select("id")
+          .eq("client_id", cid)
+          .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+          .limit(1);
+        if (active && active.length > 0) return null;
+
+        const { data: next } = await adminClient
+          .from("whatsapp_dispatches")
+          .select("id")
+          .eq("client_id", cid)
+          .eq("status", "enfileirado")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (!next) return null;
+
+        await adminClient.from("whatsapp_dispatches").update({
+          status: "enviando",
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq("id", next.id);
+
+        // Auto-invoke modo resume para processar o próximo
+        const fnUrl = `${supabaseUrl}/functions/v1/send-whatsapp-dispatch`;
+        fetch(fnUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceKey}`,
+            "apikey": serviceKey,
+          },
+          body: JSON.stringify({ resume_dispatch_id: next.id }),
+        }).catch((e) => console.warn("[promote-queue] auto-invoke falhou:", (e as Error).message));
+
+        console.log(`[promote-queue] cliente=${cid} → próximo=${next.id}`);
+        return next.id;
+      } catch (e) {
+        console.warn("[promote-queue] erro:", (e as Error).message);
+        return null;
+      }
+    };
+
+    // ====== MODO PROMOTE QUEUE (usado pelo frontend após cancelar) ======
+    if (isPromoteQueue) {
+      const cid = payload.client_id as string;
+      if (!cid) {
+        return new Response(JSON.stringify({ error: "client_id obrigatório" }), { status: 400, headers: corsHeaders });
+      }
+      const promoted = await promoteNextQueued(cid);
+      return new Response(JSON.stringify({ success: true, promoted_dispatch_id: promoted }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // ====== MODO RETRY QUEUE (chamado pelo cron resume_whatsapp_on_reconnect) ======
     // Envio único proveniente da fila de retentativas. Não cria registro de dispatch
