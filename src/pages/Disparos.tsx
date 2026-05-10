@@ -173,6 +173,21 @@ export default function Disparos() {
   const totalCount = historyResult?.count || 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  const { data: activeQueueDispatches = [] } = useQuery<DispatchRow[]>({
+    queryKey: ["whatsapp-dispatch-queue", clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("whatsapp_dispatches" as any)
+        .select("*")
+        .eq("client_id", clientId)
+        .in("status", ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+        .order("created_at", { ascending: true });
+      return (data as unknown as DispatchRow[]) || [];
+    },
+    enabled: !!clientId,
+    refetchInterval: 3000,
+  });
+
   // Realtime for dispatches
   useEffect(() => {
     if (!clientId) return;
@@ -183,7 +198,10 @@ export default function Disparos() {
         schema: "public",
         table: "whatsapp_dispatches",
         filter: `client_id=eq.${clientId}`,
-      }, () => refetch())
+      }, () => {
+        refetch();
+        queryClient.invalidateQueries({ queryKey: ["whatsapp-dispatch-queue", clientId] });
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [clientId, refetch]);
