@@ -71,6 +71,7 @@ type TagOption = { nome: string; count: number };
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   pendente: { label: "Aguardando", color: "bg-muted text-muted-foreground", icon: Clock },
+  enfileirado: { label: "Na fila", color: "bg-sky-500/15 text-sky-700 dark:text-sky-400", icon: Clock },
   enviando: { label: "Enviando...", color: "bg-primary/10 text-primary", icon: Loader2 },
   pausado_timeout: { label: "Retomando…", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Loader2 },
   pausado_janela: { label: "Aguardando janela", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Clock },
@@ -162,7 +163,7 @@ export default function Disparos() {
     refetchInterval: (data: any) => {
       const rows = (data?.state?.data?.rows as DispatchRow[] | undefined) || [];
       const hasActive = rows.some(
-        (d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status)
+        (d) => ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status)
       );
       return hasActive ? 3000 : false;
     },
@@ -342,7 +343,7 @@ export default function Disparos() {
     setSending(true);
     try {
       const pol = POLICIES[politica];
-      const { error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+      const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
         body: {
           client_id: clientId,
           titulo: titulo.trim(),
@@ -361,7 +362,11 @@ export default function Disparos() {
       });
       if (error) throw error;
 
-      toast.success("📤 Disparo iniciado! Acompanhe o progresso abaixo.");
+      if ((resp as any)?.queued) {
+        toast.success("📥 Adicionado à fila! Será enviado assim que o disparo atual terminar.");
+      } else {
+        toast.success("📤 Disparo iniciado! Acompanhe o progresso abaixo.");
+      }
       setTitulo("");
       setMensagem("");
       setTagFiltro("_all");
@@ -396,6 +401,12 @@ export default function Disparos() {
         .eq("status", "pendente");
 
       toast.success(`Disparo "${titulo}" cancelado.`);
+      // Promove o próximo da fila (se houver)
+      try {
+        await supabase.functions.invoke("send-whatsapp-dispatch", {
+          body: { action: "promote_queue", client_id: clientId },
+        });
+      } catch { /* não bloqueia o cancelamento */ }
       refetch();
     } catch (err: any) {
       toast.error("Erro ao cancelar: " + (err.message || "tente novamente"));
@@ -404,6 +415,7 @@ export default function Disparos() {
 
   const isConnected = !!bridgeConfigured;
   const activeDispatch = dispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
+  const queuedDispatches = dispatches.filter((d) => d.status === "enfileirado");
 
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -1066,6 +1078,24 @@ export default function Disparos() {
         </Card>
       )}
 
+      {queuedDispatches.length > 0 && (
+        <Card className="border-sky-500/30 bg-sky-500/5">
+          <CardContent className="py-3 px-4 flex items-center gap-3 text-sm">
+            <Clock className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-medium text-sky-700 dark:text-sky-400">
+                {queuedDispatches.length} disparo{queuedDispatches.length > 1 ? "s" : ""} na fila
+              </span>
+              <span className="text-muted-foreground"> · serão enviados em sequência</span>
+              <div className="text-xs text-muted-foreground truncate mt-0.5">
+                Próximos: {queuedDispatches.slice(0, 3).map((d) => d.titulo).join(" • ")}
+                {queuedDispatches.length > 3 ? ` • +${queuedDispatches.length - 3}` : ""}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Dispatch history */}
       <Card>
         <CardHeader className="pb-3">
@@ -1084,6 +1114,7 @@ export default function Disparos() {
                 <SelectContent>
                   <SelectItem value="_all">Todos os status</SelectItem>
                   <SelectItem value="pendente">Aguardando</SelectItem>
+                  <SelectItem value="enfileirado">Na fila</SelectItem>
                   <SelectItem value="enviando">Enviando</SelectItem>
                   <SelectItem value="concluido">Concluído</SelectItem>
                   <SelectItem value="falhou">Falhou</SelectItem>
@@ -1147,7 +1178,7 @@ export default function Disparos() {
                             </Badge>
                           )}
                           <DispatchLogDialog dispatchId={d.id} titulo={d.titulo} />
-                          {["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status) && (
+                          {["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status) && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-destructive hover:text-destructive">
