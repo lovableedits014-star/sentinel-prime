@@ -170,14 +170,14 @@ const InteligenciaEleitoralInner = () => {
 
         {/* PANORAMA — votos por município + partidos */}
         <TabsContent value="panorama" className="mt-4">
-          <Card className="mb-4">
+          <Card className="mb-4 border-l-4 border-l-primary">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-primary" /> Panorama eleitoral
               </CardTitle>
-              <CardDescription>
-                Como os votos se distribuem no território (mapa de calor) e como partidos se moveram entre 2022 e 2024.
-                Use os filtros no topo para focar em UF/município/cargo.
+              <CardDescription className="space-y-1.5">
+                <span className="block"><strong>O que é:</strong> a foto do território nas últimas eleições (TSE 2022 + 2024) — onde estão os votos e como os partidos se moveram.</span>
+                <span className="block"><strong>Para que serve:</strong> decidir <em>onde investir comício, visita e presença</em>; ver onde o partido perdeu/ganhou força e quais cidades virariam com pouca margem.</span>
               </CardDescription>
             </CardHeader>
           </Card>
@@ -191,16 +191,16 @@ const InteligenciaEleitoralInner = () => {
           </Tabs>
         </TabsContent>
 
-        {/* CANDIDATOS & CHAPA — análise individual + composição + simulador (3 sub-abas, era 2 abas separadas) */}
+        {/* CANDIDATOS & CHAPA */}
         <TabsContent value="candidatos" className="mt-4">
-          <Card className="mb-4">
+          <Card className="mb-4 border-l-4 border-l-primary">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" /> Candidatos & Chapa
               </CardTitle>
-              <CardDescription>
-                Compare candidatos lado a lado, identifique talentos cruzando 2022 + 2024, ou monte uma chapa hipotética
-                e veja sua cobertura territorial.
+              <CardDescription className="space-y-1.5">
+                <span className="block"><strong>O que é:</strong> raio-x dos adversários e dos potenciais aliados — quem foi votado, onde, com quanto.</span>
+                <span className="block"><strong>Para que serve:</strong> decidir <em>quem chamar para a chapa</em>, identificar o real concorrente em cada cidade e simular cenários antes de fechar alianças.</span>
               </CardDescription>
             </CardHeader>
           </Card>
@@ -216,18 +216,18 @@ const InteligenciaEleitoralInner = () => {
           </Tabs>
         </TabsContent>
 
-        {/* INTELIGÊNCIA POLÍTICA — Câmara/Senado + IBGE/DataSUS/INEP */}
+        {/* INTELIGÊNCIA POLÍTICA */}
         <TabsContent value="politico" className="mt-4">
-          <Card className="mb-4">
+          <Card className="mb-4 border-l-4 border-l-primary">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Vote className="w-5 h-5 text-primary" /> Inteligência Política
               </CardTitle>
-              <CardDescription>
-                <strong>Munição em tempo real:</strong> votações, projetos e presença dos adversários (API oficial Câmara/Senado)
-                cruzados com indicadores socioeconômicos por município (IBGE).
+              <CardDescription className="space-y-1.5">
+                <span className="block"><strong>O que é:</strong> munição em tempo real — votações, projetos e presença dos adversários (Câmara/Senado), contexto socioeconômico do município (IBGE) e <strong className="text-primary">dados da bandeira do candidato (Autismo/MS)</strong>.</span>
+                <span className="block"><strong>Para que serve:</strong> argumentos para debate ("seu adversário faltou X votações"), demanda local que casa com o programa, e dossiê pronto da bandeira política.</span>
                 {f.municipio !== "__all__" && (
-                  <> · Foco atual: <Badge variant="outline" className="ml-1">{f.municipio}/{f.uf}</Badge></>
+                  <span className="block">Foco atual: <Badge variant="outline" className="ml-1">{f.municipio}/{f.uf}</Badge></span>
                 )}
               </CardDescription>
             </CardHeader>
@@ -235,15 +235,16 @@ const InteligenciaEleitoralInner = () => {
           <PulsoPolitico />
         </TabsContent>
 
-        {/* HIPERLOCAL — Campo Grande only */}
+        {/* FOCO CAMPO GRANDE */}
         <TabsContent value="hiperlocal" className="mt-4">
-          <Card className="mb-4">
+          <Card className="mb-4 border-l-4 border-l-primary">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary" /> Análise hiperlocal
+                <Building2 className="w-5 h-5 text-primary" /> Foco Campo Grande
               </CardTitle>
-              <CardDescription>
-                Granularidade até zona eleitoral e local de votação (escola/bairro). Disponível apenas para Campo Grande/MS no dataset atual.
+              <CardDescription className="space-y-1.5">
+                <span className="block"><strong>O que é:</strong> análise rua a rua — zona eleitoral, escola, bairro. Granularidade máxima do TSE.</span>
+                <span className="block"><strong>Para que serve:</strong> decidir <em>onde colocar cabo eleitoral</em>, qual escola priorizar para mutirão, e onde o adversário foi mais frágil. Disponível apenas para Campo Grande/MS no dataset atual.</span>
               </CardDescription>
             </CardHeader>
           </Card>
