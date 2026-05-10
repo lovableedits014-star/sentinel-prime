@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Vote, Map as MapIcon } from "lucide-react";
+import { Vote, Map as MapIcon, Brain } from "lucide-react";
 import RadarParlamentar from "./parlamentar/RadarParlamentar";
 import ContextoTerritorial from "./territorio/ContextoTerritorial";
+import BandeiraAutismoMS from "./bandeira/BandeiraAutismoMS";
 
 export default function PulsoPolitico() {
   const { data: clientId } = useQuery({
@@ -40,12 +41,18 @@ export default function PulsoPolitico() {
         <TabsTrigger value="territorio" className="gap-1.5">
           <MapIcon className="w-3.5 h-3.5" /> Contexto Territorial (IBGE)
         </TabsTrigger>
+        <TabsTrigger value="autismo" className="gap-1.5">
+          <Brain className="w-3.5 h-3.5" /> Bandeira: Autismo · MS
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="radar" className="mt-4">
         <RadarParlamentar clientId={clientId ?? null} />
       </TabsContent>
       <TabsContent value="territorio" className="mt-4">
         <ContextoTerritorial />
+      </TabsContent>
+      <TabsContent value="autismo" className="mt-4">
+        <BandeiraAutismoMS />
       </TabsContent>
     </Tabs>
   );
