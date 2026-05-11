@@ -6,10 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { RefreshCw, Brain, Users, GraduationCap, Heart, AlertTriangle, Info, Search, FileDown, Trophy, Baby, UserCog } from "lucide-react";
+import { RefreshCw, Brain, Users, GraduationCap, Heart, AlertTriangle, Info, Search, FileDown, Baby, UserCog } from "lucide-react";
 import jsPDF from "jspdf";
 
 type TeaRow = any; // schema enriquecido — ver migração
