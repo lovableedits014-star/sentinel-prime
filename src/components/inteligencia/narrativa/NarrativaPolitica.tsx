@@ -134,6 +134,27 @@ function buildDossieMarkdown(dossie: any): string {
     for (const m of c.manchetes_reels) lines.push(`- ${m}`);
     lines.push("");
   }
+  if (Array.isArray(c.posts_redes) && c.posts_redes.length) {
+    lines.push(`## Posts de Redes`);
+    for (const p of c.posts_redes) {
+      lines.push(`### [${p.plataforma}] ${p.tema}`);
+      lines.push(p.texto);
+      if (p.cta) lines.push(`CTA: ${p.cta}`);
+      if (p.hashtags?.length) lines.push(p.hashtags.map((h: string) => "#" + h).join(" "));
+      lines.push("");
+    }
+  }
+  if (Array.isArray(c.plano_de_campo) && c.plano_de_campo.length) {
+    lines.push(`## Plano de Campo (agenda territorial)`);
+    const ordenado = [...c.plano_de_campo].sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0));
+    for (const p of ordenado) {
+      lines.push(`### ${p.ordem}. ${p.bairro}${p.local_sugerido ? " — " + p.local_sugerido : ""}`);
+      lines.push(`- Período: ${p.periodo} | Objetivo: ${p.objetivo} | Dor: ${p.dor_alvo}`);
+      lines.push(`- Mensagem-chave: "${p.mensagem_chave}"`);
+      lines.push(`- Ação sugerida: ${p.acao_sugerida}`);
+      lines.push("");
+    }
+  }
   if (c.briefing_municipio) {
     const b = c.briefing_municipio;
     lines.push("");
