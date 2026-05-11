@@ -255,7 +255,27 @@ REGRAS:
 5. Distribua entre categorias diferentes (não 8 fatos só de história).
 6. Foque em coisas que MOSTRAM RESPEITO PELA CIDADE: pratos típicos, datas comemorativas, personalidades queridas, lendas, conquistas esportivas, marcos arquitetônicos.
 
-Para referência (NÃO use no roteiro): top locais críticos = ${topLocais ? "ver acima" : "(sem dados)"}; dores prioritárias = ${doresPrioritarias || "—"}.
+Para referência (use como base do PLANO DE CAMPO): top locais críticos = ${topLocais || "(sem dados)"}; dores prioritárias = ${doresPrioritarias || "—"}.
+
+========================================
+POSTS DE REDES (obrigatório)
+========================================
+Gere 4-8 posts prontos para publicação. Distribua entre Facebook, Instagram, WhatsApp e Story. Cada post deve:
+1. Citar a CIDADE pelo nome.
+2. Trazer pelo menos 1 dado/local/dor real do dossiê acima.
+3. Linguagem PT-BR coloquial, com emoji estratégico (não exagerar).
+4. Hashtags só para Facebook/Instagram/Story (locais + temáticas).
+5. CTA claro (compartilhar, marcar amigo, ir ao evento).
+
+========================================
+PLANO DE CAMPO (obrigatório)
+========================================
+Monte agenda territorial de 5-10 paradas. REGRAS:
+1. Use SOMENTE bairros que aparecem em "top locais críticos" acima — não invente bairro.
+2. Cada parada amarra a uma DOR específica do mapa de dor (saúde, educação, infra, etc.).
+3. mensagem_chave deve usar número/fato real (ex.: "Aqui em [Bairro X], o pessoal espera [Y meses] por consulta no CAPSi").
+4. acao_sugerida é prática: caminhada, café, live, visita a equipamento, audiência com liderança.
+5. Distribua períodos (manhã/tarde/noite) e objetivos (escuta/denúncia/presença/mobilização/evento) — não repita o mesmo objetivo em mais de 3 paradas.
 
 Gere o pacote completo de munição política para esta cidade.`;
 }
