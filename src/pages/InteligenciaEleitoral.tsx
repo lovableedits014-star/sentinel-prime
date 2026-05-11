@@ -38,6 +38,7 @@ const ETAPAS: { id: EtapaId; numero: number; label: string; icone: any }[] = [
 
 const InteligenciaEleitoralInner = () => {
   const f = useEleitoralFilters();
+  const { data: clientId = null } = useCurrentClientId();
   const [etapa, setEtapa] = useState<EtapaId>("territorio");
 
   const isCampoGrande = f.uf === "MS" && f.municipio === "Campo Grande";
@@ -302,7 +303,7 @@ const InteligenciaEleitoralInner = () => {
             <TabsContent value="comparar" className="mt-4"><CompararCandidatos /></TabsContent>
             <TabsContent value="composicao" className="mt-4"><ComposicaoChapa /></TabsContent>
             <TabsContent value="simulador" className="mt-4"><SimuladorChapa /></TabsContent>
-            <TabsContent value="parlamentar" className="mt-4"><RadarParlamentar /></TabsContent>
+            <TabsContent value="parlamentar" className="mt-4"><RadarParlamentar clientId={clientId} /></TabsContent>
           </Tabs>
         </TabsContent>
 
