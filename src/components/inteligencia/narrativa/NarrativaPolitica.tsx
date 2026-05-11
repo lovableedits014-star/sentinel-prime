@@ -551,6 +551,36 @@ function buildDossiePdf(dossie: any, download = true) {
     }
   }
 
+  // POSTS DE REDES
+  if ((c.posts_redes || []).length > 0) {
+    y += 8;
+    sectionTitle("Posts de Redes (prontos para publicação)", C.primary);
+    const platLabel: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", whatsapp: "WhatsApp", story: "Story/Reels" };
+    for (const p of c.posts_redes) {
+      ensure(60);
+      paragraph(`[${platLabel[p.plataforma] || p.plataforma}] ${p.tema || ""}`, { size: 10, color: C.primary });
+      paragraph(p.texto || "", { size: 9 });
+      if (p.cta) paragraph(`CTA: ${p.cta}`, { size: 9, color: C.success });
+      if (p.hashtags?.length) paragraph(p.hashtags.map((h: string) => "#" + h).join(" "), { size: 8, color: C.muted });
+      y += 4;
+    }
+  }
+
+  // PLANO DE CAMPO
+  if ((c.plano_de_campo || []).length > 0) {
+    y += 8;
+    sectionTitle("Plano de Campo (agenda territorial)", C.success);
+    const ordenado = [...c.plano_de_campo].sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0));
+    for (const p of ordenado) {
+      ensure(70);
+      paragraph(`${p.ordem}. ${p.bairro}${p.local_sugerido ? " — " + p.local_sugerido : ""}`, { size: 10, color: C.primary });
+      paragraph(`Período: ${p.periodo} | Objetivo: ${p.objetivo} | Dor-alvo: ${p.dor_alvo}`, { size: 9, color: C.muted });
+      paragraph(`Mensagem-chave: "${p.mensagem_chave}"`, { size: 9 });
+      paragraph(`Ação sugerida: ${p.acao_sugerida}`, { size: 9 });
+      y += 6;
+    }
+  }
+
   // BRIEFING DO MUNICÍPIO
   const brief: any = c.briefing_municipio;
   if (brief && (brief.visao_geral || brief.ficha_rapida)) {
