@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -36,10 +36,48 @@ const ETAPAS: { id: EtapaId; numero: number; label: string; icone: any }[] = [
   { id: "dossie",      numero: 4, label: "Dossiê",      icone: Megaphone },
 ];
 
+const ETAPA_IDS: EtapaId[] = ["territorio", "adversarios", "bandeira", "dossie"];
+const isEtapaId = (v: unknown): v is EtapaId =>
+  typeof v === "string" && (ETAPA_IDS as string[]).includes(v);
+
+const storageKey = (clientId: string | null) =>
+  `ie:etapa-atual:${clientId || "anon"}`;
+
 const InteligenciaEleitoralInner = () => {
   const f = useEleitoralFilters();
   const { data: clientId = null } = useCurrentClientId();
-  const [etapa, setEtapa] = useState<EtapaId>("territorio");
+
+  // Restaura etapa salva (por client) já no primeiro render para evitar flash.
+  const [etapa, setEtapa] = useState<EtapaId>(() => {
+    if (typeof window === "undefined") return "territorio";
+    try {
+      const v = window.localStorage.getItem(storageKey(clientId));
+      return isEtapaId(v) ? v : "territorio";
+    } catch {
+      return "territorio";
+    }
+  });
+
+  // Quando o client muda (troca de candidato/contexto), recarrega a etapa salva daquele client.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const v = window.localStorage.getItem(storageKey(clientId));
+      setEtapa(isEtapaId(v) ? v : "territorio");
+    } catch {
+      setEtapa("territorio");
+    }
+  }, [clientId]);
+
+  // Persiste a etapa atual sempre que muda.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(storageKey(clientId), etapa);
+    } catch {
+      /* localStorage indisponível — segue sem persistir */
+    }
+  }, [clientId, etapa]);
 
   const isCampoGrande = f.uf === "MS" && f.municipio === "Campo Grande";
 
