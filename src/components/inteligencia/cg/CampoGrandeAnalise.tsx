@@ -102,11 +102,15 @@ const CampoGrandeAnalise = () => {
   }, [cargo, turno]);
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["tse-votacao", cargo, turno],
+    queryKey: ["tse-votacao", cargo, turno, "cg-5002704"],
     queryFn: async () => {
+      // BUG FIX: filtrar por município (Campo Grande/MS = 5002704).
+      // Sem este filtro, a tabela tse_votacao_zona devolvia candidatos de
+      // outras cidades misturados ao ranking de CG.
       const { data, error } = await supabase
         .from("tse_votacao_zona" as any)
         .select("*")
+        .eq("cod_municipio", 5002704)
         .eq("cargo", cargo)
         .eq("turno", Number(turno))
         .order("votos", { ascending: false })
