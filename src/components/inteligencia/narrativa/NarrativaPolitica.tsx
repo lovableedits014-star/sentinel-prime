@@ -134,6 +134,27 @@ function buildDossieMarkdown(dossie: any): string {
     for (const m of c.manchetes_reels) lines.push(`- ${m}`);
     lines.push("");
   }
+  if (Array.isArray(c.posts_redes) && c.posts_redes.length) {
+    lines.push(`## Posts de Redes`);
+    for (const p of c.posts_redes) {
+      lines.push(`### [${p.plataforma}] ${p.tema}`);
+      lines.push(p.texto);
+      if (p.cta) lines.push(`CTA: ${p.cta}`);
+      if (p.hashtags?.length) lines.push(p.hashtags.map((h: string) => "#" + h).join(" "));
+      lines.push("");
+    }
+  }
+  if (Array.isArray(c.plano_de_campo) && c.plano_de_campo.length) {
+    lines.push(`## Plano de Campo (agenda territorial)`);
+    const ordenado = [...c.plano_de_campo].sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0));
+    for (const p of ordenado) {
+      lines.push(`### ${p.ordem}. ${p.bairro}${p.local_sugerido ? " — " + p.local_sugerido : ""}`);
+      lines.push(`- Período: ${p.periodo} | Objetivo: ${p.objetivo} | Dor: ${p.dor_alvo}`);
+      lines.push(`- Mensagem-chave: "${p.mensagem_chave}"`);
+      lines.push(`- Ação sugerida: ${p.acao_sugerida}`);
+      lines.push("");
+    }
+  }
   if (c.briefing_municipio) {
     const b = c.briefing_municipio;
     lines.push("");
@@ -527,6 +548,36 @@ function buildDossiePdf(dossie: any, download = true) {
         y += 14;
       }
       y += 2;
+    }
+  }
+
+  // POSTS DE REDES
+  if ((c.posts_redes || []).length > 0) {
+    y += 8;
+    sectionTitle("Posts de Redes (prontos para publicação)", C.primary);
+    const platLabel: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", whatsapp: "WhatsApp", story: "Story/Reels" };
+    for (const p of c.posts_redes) {
+      ensure(60);
+      paragraph(`[${platLabel[p.plataforma] || p.plataforma}] ${p.tema || ""}`, { size: 10, color: C.primary });
+      paragraph(p.texto || "", { size: 9 });
+      if (p.cta) paragraph(`CTA: ${p.cta}`, { size: 9, color: C.success });
+      if (p.hashtags?.length) paragraph(p.hashtags.map((h: string) => "#" + h).join(" "), { size: 8, color: C.muted });
+      y += 4;
+    }
+  }
+
+  // PLANO DE CAMPO
+  if ((c.plano_de_campo || []).length > 0) {
+    y += 8;
+    sectionTitle("Plano de Campo (agenda territorial)", C.success);
+    const ordenado = [...c.plano_de_campo].sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0));
+    for (const p of ordenado) {
+      ensure(70);
+      paragraph(`${p.ordem}. ${p.bairro}${p.local_sugerido ? " — " + p.local_sugerido : ""}`, { size: 10, color: C.primary });
+      paragraph(`Período: ${p.periodo} | Objetivo: ${p.objetivo} | Dor-alvo: ${p.dor_alvo}`, { size: 9, color: C.muted });
+      paragraph(`Mensagem-chave: "${p.mensagem_chave}"`, { size: 9 });
+      paragraph(`Ação sugerida: ${p.acao_sugerida}`, { size: 9 });
+      y += 6;
     }
   }
 
@@ -1826,53 +1877,168 @@ const DossieView = ({ dossie, clientId }: { dossie: Dossie; clientId: string | n
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="discursos">
-              <TabsList>
-                <TabsTrigger value="discursos">Discursos (3 versões)</TabsTrigger>
-                <TabsTrigger value="ataques">Ataques 3-camadas</TabsTrigger>
-                <TabsTrigger value="reels">Manchetes / Reels</TabsTrigger>
-                <TabsTrigger value="visita">Informações Locais</TabsTrigger>
+              <TabsList className="flex-wrap h-auto">
+                <TabsTrigger value="discursos">📣 Roteiros de Discurso</TabsTrigger>
+                <TabsTrigger value="posts">📱 Posts de Redes</TabsTrigger>
+                <TabsTrigger value="campo">🗺️ Plano de Campo</TabsTrigger>
+                <TabsTrigger value="dossie">📄 Dossiê Executivo (PDF)</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="discursos" className="mt-4 space-y-3">
-                {(["popular", "tecnico", "emocional"] as const).map((k) => (
-                  <Card key={k}>
-                    <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                      <CardTitle className="text-sm capitalize">{k}</CardTitle>
-                      <Button size="sm" variant="ghost" onClick={() => copyText(conteudos.discursos?.[k] || "")}>
-                        <Copy className="w-3 h-3 mr-1" /> Copiar
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm whitespace-pre-wrap">{conteudos.discursos?.[k] || "—"}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </TabsContent>
-
-              <TabsContent value="ataques" className="mt-4 space-y-3">
-                {(conteudos.ataques_3_camadas || []).map((a: any, i: number) => (
-                  <Card key={i}>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-destructive" /> {a.tema}</CardTitle></CardHeader>
-                    <CardContent className="text-sm space-y-2">
-                      <div><b>Falha do gestor:</b> {a.falha_do_gestor}</div>
-                      <div><b>Sua solução:</b> {a.solucao_proposta}</div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </TabsContent>
-
-              <TabsContent value="reels" className="mt-4">
-                <ul className="space-y-2">
-                  {(conteudos.manchetes_reels || []).map((m: string, i: number) => (
-                    <li key={i} className="flex items-center justify-between p-2 border rounded">
-                      <span className="text-sm">{m}</span>
-                      <Button size="sm" variant="ghost" onClick={() => copyText(m)}><Copy className="w-3 h-3" /></Button>
-                    </li>
+              {/* 1) ROTEIROS DE DISCURSO — discursos + ataques + manchetes */}
+              <TabsContent value="discursos" className="mt-4 space-y-4">
+                <div className="text-xs text-muted-foreground">
+                  3 versões do discurso, 3 ataques estratégicos e manchetes prontas para Reels/Stories.
+                </div>
+                <div className="space-y-3">
+                  {(["popular", "tecnico", "emocional"] as const).map((k) => (
+                    <Card key={k}>
+                      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                        <CardTitle className="text-sm capitalize flex items-center gap-2"><Megaphone className="w-4 h-4 text-primary" /> Discurso {k}</CardTitle>
+                        <Button size="sm" variant="ghost" onClick={() => copyText(conteudos.discursos?.[k] || "")}>
+                          <Copy className="w-3 h-3 mr-1" /> Copiar
+                        </Button>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm whitespace-pre-wrap">{conteudos.discursos?.[k] || "—"}</p>
+                      </CardContent>
+                    </Card>
                   ))}
-                </ul>
+                </div>
+                <Separator />
+                <div>
+                  <div className="text-sm font-semibold mb-2 flex items-center gap-2"><Target className="w-4 h-4 text-destructive" /> Ataques 3-camadas</div>
+                  <div className="space-y-2">
+                    {(conteudos.ataques_3_camadas || []).map((a: any, i: number) => (
+                      <Card key={i}>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-destructive" /> {a.tema}</CardTitle></CardHeader>
+                        <CardContent className="text-sm space-y-2">
+                          <div><b>Falha do gestor:</b> {a.falha_do_gestor}</div>
+                          <div><b>Sua solução:</b> {a.solucao_proposta}</div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+                <Separator />
+                <div>
+                  <div className="text-sm font-semibold mb-2 flex items-center gap-2"><Flame className="w-4 h-4 text-primary" /> Manchetes para Reels / Stories</div>
+                  <ul className="space-y-2">
+                    {(conteudos.manchetes_reels || []).map((m: string, i: number) => (
+                      <li key={i} className="flex items-center justify-between p-2 border rounded">
+                        <span className="text-sm">{m}</span>
+                        <Button size="sm" variant="ghost" onClick={() => copyText(m)}><Copy className="w-3 h-3" /></Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </TabsContent>
 
-              <TabsContent value="visita" className="mt-4 space-y-4">
+              {/* 2) POSTS DE REDES */}
+              <TabsContent value="posts" className="mt-4 space-y-3">
+                <div className="text-xs text-muted-foreground">
+                  Posts prontos para colar em Facebook, Instagram, WhatsApp e Stories. Já vêm com hashtags e CTA.
+                </div>
+                {(conteudos.posts_redes || []).length === 0 ? (
+                  <div className="text-sm text-muted-foreground p-4 border rounded text-center">
+                    Nenhum post gerado neste dossiê. Regere o dossiê para incluir posts de redes.
+                  </div>
+                ) : (
+                  (conteudos.posts_redes || []).map((p: any, i: number) => {
+                    const fullText = `${p.texto}\n\n${p.cta || ""}${p.hashtags?.length ? "\n\n" + p.hashtags.map((h: string) => "#" + h).join(" ") : ""}`.trim();
+                    const platLabel: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", whatsapp: "WhatsApp", story: "Story / Reels" };
+                    return (
+                      <Card key={i}>
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{platLabel[p.plataforma] || p.plataforma}</Badge>
+                            <CardTitle className="text-sm">{p.tema}</CardTitle>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={() => copyText(fullText)}>
+                            <Copy className="w-3 h-3 mr-1" /> Copiar
+                          </Button>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <p className="text-sm whitespace-pre-wrap">{p.texto}</p>
+                          {p.cta && <p className="text-sm font-medium text-primary">👉 {p.cta}</p>}
+                          {p.hashtags?.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {p.hashtags.map((h: string, j: number) => (
+                                <Badge key={j} variant="secondary" className="text-xs">#{h}</Badge>
+                              ))}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
+              </TabsContent>
+
+              {/* 3) PLANO DE CAMPO */}
+              <TabsContent value="campo" className="mt-4 space-y-3">
+                <div className="text-xs text-muted-foreground">
+                  Agenda territorial: onde ir, quando ir, e o que falar em cada bairro — amarrado às dores do dossiê.
+                </div>
+                {(conteudos.plano_de_campo || []).length === 0 ? (
+                  <div className="text-sm text-muted-foreground p-4 border rounded text-center">
+                    Nenhum plano de campo neste dossiê. Regere para incluir a agenda territorial.
+                  </div>
+                ) : (
+                  [...(conteudos.plano_de_campo || [])]
+                    .sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0))
+                    .map((p: any, i: number) => {
+                      const objCor: Record<string, string> = {
+                        escuta: "bg-blue-500/10 text-blue-700 border-blue-500/30",
+                        denuncia: "bg-red-500/10 text-red-700 border-red-500/30",
+                        presenca: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+                        mobilizacao: "bg-orange-500/10 text-orange-700 border-orange-500/30",
+                        evento: "bg-purple-500/10 text-purple-700 border-purple-500/30",
+                      };
+                      const periodoLbl: Record<string, string> = { manha: "Manhã", tarde: "Tarde", noite: "Noite" };
+                      return (
+                        <Card key={i}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-start justify-between gap-2 flex-wrap">
+                              <CardTitle className="text-sm flex items-center gap-2">
+                                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs">{p.ordem || i + 1}</span>
+                                <MapPinned className="w-4 h-4 text-primary" /> {p.bairro}
+                                {p.local_sugerido && <span className="text-muted-foreground font-normal">— {p.local_sugerido}</span>}
+                              </CardTitle>
+                              <div className="flex gap-1 flex-wrap">
+                                <Badge variant="outline">{periodoLbl[p.periodo] || p.periodo}</Badge>
+                                <Badge variant="outline" className={objCor[p.objetivo] || ""}>{p.objetivo}</Badge>
+                                {p.dor_alvo && <Badge variant="secondary">{AREA_LABEL[p.dor_alvo] || p.dor_alvo}</Badge>}
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm">
+                            <div className="p-2 bg-muted rounded italic">"{p.mensagem_chave}"</div>
+                            <div><b>Ação sugerida:</b> {p.acao_sugerida}</div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                )}
+              </TabsContent>
+
+              {/* 4) DOSSIÊ EXECUTIVO (PDF) */}
+              <TabsContent value="dossie" className="mt-4 space-y-4">
+                <Card>
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <FileDown className="w-8 h-8 text-primary flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="text-sm font-semibold">PDF Executivo completo</div>
+                      <div className="text-xs text-muted-foreground">
+                        Inclui mapa de dor, oportunidade política, top locais críticos, discursos, ataques, manchetes,
+                        briefing do município e curiosidades culturais. Pronto para entregar em mãos ao candidato.
+                      </div>
+                      <Button size="sm" onClick={() => exportDossiePdf(dossie)}>
+                        <FileDown className="w-4 h-4 mr-2" /> Baixar PDF Executivo
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Separator />
                 <BriefingMunicipioView briefing={conteudos.briefing_municipio} />
                 <CuriosidadesView curiosidades={conteudos.curiosidades_locais || []} />
               </TabsContent>

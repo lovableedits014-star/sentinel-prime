@@ -255,7 +255,27 @@ REGRAS:
 5. Distribua entre categorias diferentes (não 8 fatos só de história).
 6. Foque em coisas que MOSTRAM RESPEITO PELA CIDADE: pratos típicos, datas comemorativas, personalidades queridas, lendas, conquistas esportivas, marcos arquitetônicos.
 
-Para referência (NÃO use no roteiro): top locais críticos = ${topLocais ? "ver acima" : "(sem dados)"}; dores prioritárias = ${doresPrioritarias || "—"}.
+Para referência (use como base do PLANO DE CAMPO): top locais críticos = ${topLocais || "(sem dados)"}; dores prioritárias = ${doresPrioritarias || "—"}.
+
+========================================
+POSTS DE REDES (obrigatório)
+========================================
+Gere 4-8 posts prontos para publicação. Distribua entre Facebook, Instagram, WhatsApp e Story. Cada post deve:
+1. Citar a CIDADE pelo nome.
+2. Trazer pelo menos 1 dado/local/dor real do dossiê acima.
+3. Linguagem PT-BR coloquial, com emoji estratégico (não exagerar).
+4. Hashtags só para Facebook/Instagram/Story (locais + temáticas).
+5. CTA claro (compartilhar, marcar amigo, ir ao evento).
+
+========================================
+PLANO DE CAMPO (obrigatório)
+========================================
+Monte agenda territorial de 5-10 paradas. REGRAS:
+1. Use SOMENTE bairros que aparecem em "top locais críticos" acima — não invente bairro.
+2. Cada parada amarra a uma DOR específica do mapa de dor (saúde, educação, infra, etc.).
+3. mensagem_chave deve usar número/fato real (ex.: "Aqui em [Bairro X], o pessoal espera [Y meses] por consulta no CAPSi").
+4. acao_sugerida é prática: caminhada, café, live, visita a equipamento, audiência com liderança.
+5. Distribua períodos (manhã/tarde/noite) e objetivos (escuta/denúncia/presença/mobilização/evento) — não repita o mesmo objetivo em mais de 3 paradas.
 
 Gere o pacote completo de munição política para esta cidade.`;
 }
@@ -402,8 +422,47 @@ const TOOL_SCHEMA = {
           required: ["visao_geral", "ficha_rapida", "dicas_abordagem"],
           additionalProperties: false,
         },
+        posts_redes: {
+          type: "array",
+          minItems: 4,
+          maxItems: 8,
+          description: "Posts prontos para publicação nas redes sociais. Distribua entre Facebook (texto longo, 200-400 chars com narrativa+CTA), Instagram (caption curta 80-160 chars + hashtags locais), WhatsApp/Status (mensagem direta de mobilização, max 300 chars), Story/Reels (gancho curto + chamada). SEMPRE em PT-BR coloquial, com emoji estratégico, citando dado/local real da cidade.",
+          items: {
+            type: "object",
+            properties: {
+              plataforma: { type: "string", enum: ["facebook", "instagram", "whatsapp", "story"] },
+              tema: { type: "string", description: "Sobre qual dor/proposta o post fala (ex: 'saúde — fila do CAPSi')." },
+              texto: { type: "string", description: "Texto pronto para publicar, já com emojis e quebras." },
+              hashtags: { type: "array", items: { type: "string" }, description: "3-8 hashtags (sem #), locais e temáticas. Vazio para WhatsApp." },
+              cta: { type: "string", description: "Chamada final (ex: 'Compartilhe se você concorda', 'Marca alguém da sua rua')." },
+            },
+            required: ["plataforma", "tema", "texto", "cta"],
+            additionalProperties: false,
+          },
+        },
+        plano_de_campo: {
+          type: "array",
+          minItems: 5,
+          maxItems: 10,
+          description: "Agenda territorial concreta — onde o candidato deve ir, quando, e o que falar. Use SOMENTE os bairros/locais reais que aparecem em 'top locais críticos' do dossiê. Cada parada tem objetivo claro: ouvir, mostrar presença, denunciar uma dor, ou mobilizar.",
+          items: {
+            type: "object",
+            properties: {
+              ordem: { type: "number" },
+              bairro: { type: "string", description: "Nome do bairro real (do top locais críticos)." },
+              local_sugerido: { type: "string", description: "Nome do local âncora (escola, UBS, praça) ou ponto de encontro." },
+              periodo: { type: "string", enum: ["manha", "tarde", "noite"] },
+              objetivo: { type: "string", enum: ["escuta", "denuncia", "presenca", "mobilizacao", "evento"] },
+              mensagem_chave: { type: "string", description: "Frase de 1-2 linhas — o que o candidato deve dizer ali, com dado real da cidade/bairro." },
+              dor_alvo: { type: "string", description: "Qual dor (saúde, educação, infra, etc) puxar nesta parada." },
+              acao_sugerida: { type: "string", description: "O que fazer concretamente (ex: 'caminhada com lideranças', 'café com mães na escola X', 'live de denúncia em frente à UBS fechada')." },
+            },
+            required: ["ordem", "bairro", "periodo", "objetivo", "mensagem_chave", "dor_alvo", "acao_sugerida"],
+            additionalProperties: false,
+          },
+        },
       },
-      required: ["discursos", "ataques_3_camadas", "manchetes_reels", "curiosidades_locais", "briefing_municipio"],
+      required: ["discursos", "ataques_3_camadas", "manchetes_reels", "curiosidades_locais", "briefing_municipio", "posts_redes", "plano_de_campo"],
       additionalProperties: false,
     },
   },
