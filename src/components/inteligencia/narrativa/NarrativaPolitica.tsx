@@ -685,37 +685,116 @@ function buildDossiePdf(dossie: any, download = true) {
 
   // BANDEIRA AUTISMO (TEA) — só MS
   const tea: any = dossie.dados_brutos?.tea;
+  const teaRanking: any = dossie.dados_brutos?.tea_ranking;
+  const teaLeis: any[] = dossie.dados_brutos?.tea_leis || [];
   if (tea && tea.populacao) {
     y += 12;
     sectionTitle("Bandeira do Candidato: Autismo (TEA) no Município", C.warn);
     paragraph(
-      "Estimativas e dados oficiais (IBGE, INEP, CNES/DATASUS) para sustentar a bandeira política do autismo com numeros locais.",
+      "Estimativas e dados oficiais (IBGE, CNES/DATASUS, INEP) com recorte por faixa etaria e genero, mais ranking entre os 79 municipios de MS.",
       { size: 9, color: C.muted },
     );
     y += 4;
     const fmt = (n: any) => (n == null ? "—" : Number(n).toLocaleString("pt-BR"));
-    const linhas: Array<[string, string]> = [
+    const semCapsi = (tea.capsi_qtd || 0) === 0;
+
+    const renderTabela = (titulo: string, linhas: Array<[string, string]>) => {
+      ensure(28);
+      setText(C.text);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+      doc.text(titulo, margin, y); y += 14;
+      for (const [k, v] of linhas) {
+        ensure(18);
+        setFill(C.light);
+        doc.rect(margin, y, contentW, 16, "F");
+        setText(C.text);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+        doc.text(k, margin + 8, y + 11);
+        doc.setFont("helvetica", "bold");
+        doc.text(String(v), pageW - margin - 8, y + 11, { align: "right" });
+        y += 18;
+      }
+      y += 6;
+    };
+
+    renderTabela("Visao geral", [
       [`Populacao (${tea.populacao_ano || ""})`, fmt(tea.populacao)],
       ["Estimativa TEA total (OMS 1:100 -> CDC 1:36)", `${fmt(tea.est_tea_total_min)} a ${fmt(tea.est_tea_total_max)}`],
-      ["Estimativa TEA 0-17 anos", `${fmt(tea.est_tea_0_17_min)} a ${fmt(tea.est_tea_0_17_max)}`],
+    ]);
+
+    renderTabela("Estimativa TEA por faixa etaria", [
+      ["0-5 anos (creche/pre-escola)", `${fmt(tea.est_tea_0_5_min)} a ${fmt(tea.est_tea_0_5_max)}`],
+      ["6-14 anos (fundamental)", `${fmt(tea.est_tea_6_14_min)} a ${fmt(tea.est_tea_6_14_max)}`],
+      ["15-17 anos (medio/transicao)", `${fmt(tea.est_tea_15_17_min)} a ${fmt(tea.est_tea_15_17_max)}`],
+      ["18+ adultos (invisibilizados)", `${fmt(tea.est_tea_adultos_min)} a ${fmt(tea.est_tea_adultos_max)}`],
+    ]);
+
+    renderTabela("Recorte por genero (CDC 4:1 H:M)", [
+      ["Homens com TEA (estim.)", `${fmt(tea.est_tea_homens_min)} a ${fmt(tea.est_tea_homens_max)}`],
+      ["Mulheres com TEA (estim.)", `${fmt(tea.est_tea_mulheres_min)} a ${fmt(tea.est_tea_mulheres_max)}`],
+    ]);
+
+    renderTabela("Educacao", [
       [`Matriculas TEA na rede (INEP ${tea.matriculas_tea_ano || ""})`, fmt(tea.matriculas_tea_inep)],
-      ["Gap escolar estimado (TEA fora da escola)", `${fmt(tea.gap_escolar_min)} a ${fmt(tea.gap_escolar_max)}`],
-      ["CAPS no municipio", fmt(tea.caps_qtd)],
-      ["CAPSi (infanto-juvenil)", `${fmt(tea.capsi_qtd)}${(tea.capsi_qtd || 0) === 0 ? "  [SEM CAPSi]" : ""}`],
-      ["Beneficiarios BPC por deficiencia", fmt(tea.bpc_def_qtd)],
+      ["Cobertura escolar TEA (%)", tea.pct_cobertura_escolar != null ? `${tea.pct_cobertura_escolar}%` : "—"],
+      ["Gap escolar estimado (6-14 fora da rede)", `${fmt(tea.gap_escolar_min)} a ${fmt(tea.gap_escolar_max)}`],
+      ["Escolas com AEE", fmt(tea.escolas_com_aee)],
+      ["Professores AEE", fmt(tea.profs_aee)],
+    ]);
+
+    renderTabela("Saude (CNES detalhado)", [
+      ["CAPS I", fmt(tea.caps_i_qtd)],
+      ["CAPS II", fmt(tea.caps_ii_qtd)],
+      ["CAPS III", fmt(tea.caps_iii_qtd)],
+      ["CAPS AD (alcool/drogas)", fmt(tea.caps_ad_qtd)],
+      ["CAPSi (infanto-juvenil)", `${fmt(tea.capsi_qtd)}${semCapsi ? "  [SEM CAPSi]" : ""}`],
+      ["CAPS total", fmt(tea.caps_qtd)],
+      ["CER (centros de reabilitacao)", fmt(tea.cer_qtd)],
+      ["UBS (capilaridade)", fmt(tea.ubs_qtd)],
       ["Habitantes por CAPS", fmt(tea.hab_por_caps)],
-    ];
-    for (const [k, v] of linhas) {
-      ensure(18);
-      setFill(C.light);
-      doc.rect(margin, y, contentW, 16, "F");
-      setText(C.text);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(k, margin + 8, y + 11);
-      doc.setFont("helvetica", "bold");
-      doc.text(String(v), pageW - margin - 8, y + 11, { align: "right" });
-      y += 18;
+      ["Tempo medio diagnostico estimado", tea.tempo_diag_estimado_meses ? `${tea.tempo_diag_estimado_meses} meses` : "—"],
+    ]);
+
+    renderTabela("Assistencia social", [
+      ["Beneficiarios BPC por deficiencia", fmt(tea.bpc_def_qtd)],
+      ["BPC infantil (0-17)", fmt(tea.bpc_def_0_17)],
+      ["Cobertura BPC sobre TEA estimado", tea.bpc_def_pct_estimado_tea != null ? `${tea.bpc_def_pct_estimado_tea}%` : "—"],
+      ["CRAS / CREAS", `${tea.cras_qtd ?? "—"} / ${tea.creas_qtd ?? "—"}`],
+    ]);
+
+    renderTabela("Politica publica local", [
+      ["Lei municipal CIPTEA", tea.lei_ciptea ? `SIM (${tea.lei_ciptea_numero || "—"})` : "NAO encontrada"],
+      ["Lei fila zero / atendimento prioritario", tea.lei_fila_zero ? "SIM" : "NAO encontrada"],
+      ["Centro de referencia TEA municipal", tea.centro_referencia_tea ? "SIM" : "NAO encontrado"],
+      ["Politica de capacitacao de servidores", tea.politica_capacitacao ? "SIM" : "NAO encontrada"],
+    ]);
+
+    if (teaLeis.length > 0) {
+      ensure(28);
+      setText(C.text); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+      doc.text("Leis municipais TEA mapeadas", margin, y); y += 14;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); setText(C.muted);
+      for (const l of teaLeis) {
+        ensure(14);
+        const txt = `- ${String(l.tipo).toUpperCase()}${l.numero ? " no " + l.numero : ""}${l.ano ? "/" + l.ano : ""}: ${l.ementa || "(sem ementa)"}`;
+        const wrapped = doc.splitTextToSize(txt, contentW);
+        doc.text(wrapped, margin, y); y += wrapped.length * 10;
+      }
+      y += 6;
+    }
+
+    if (teaRanking && teaRanking.total_municipios) {
+      const rk = teaRanking;
+      const tot = rk.total_municipios;
+      const linhas: Array<[string, string]> = [];
+      if (rk.rank_populacao) linhas.push(["Populacao (1o = maior)", `${rk.rank_populacao}o de ${tot}`]);
+      if (rk.rank_tea_estimado) linhas.push(["TEA estimado absoluto (1o = mais)", `${rk.rank_tea_estimado}o de ${tot}`]);
+      if (rk.rank_capsi) linhas.push(["Numero de CAPSi (1o = mais cobertura)", `${rk.rank_capsi}o de ${tot}`]);
+      if (rk.rank_caps) linhas.push(["Numero de CAPS (1o = mais cobertura)", `${rk.rank_caps}o de ${tot}`]);
+      if (rk.rank_habitantes_por_caps) linhas.push(["Habitantes por CAPS (1o = melhor)", `${rk.rank_habitantes_por_caps}o de ${tot}`]);
+      if (rk.rank_cobertura_escolar) linhas.push(["Cobertura escolar TEA (1o = melhor)", `${rk.rank_cobertura_escolar}o de ${tot}`]);
+      if (rk.rank_cobertura_bpc) linhas.push(["Cobertura BPC sobre TEA (1o = melhor)", `${rk.rank_cobertura_bpc}o de ${tot}`]);
+      if (linhas.length) renderTabela("Ranking estadual (entre municipios de MS)", linhas);
     }
   }
 
