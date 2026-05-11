@@ -22,6 +22,7 @@ import MunicipioContextoIBGE from "@/components/ibge/MunicipioContextoIBGE";
 import NarrativaPolitica from "@/components/inteligencia/narrativa/NarrativaPolitica";
 import RadarParlamentar from "@/components/inteligencia/parlamentar/RadarParlamentar";
 import BandeiraAutismoMS from "@/components/inteligencia/bandeira/BandeiraAutismoMS";
+import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 
 type CoverageRow = { ano: number; ufs: number; municipios: number; candidatos: number; votos: number };
 const fmt = (n: number) => n.toLocaleString("pt-BR");
