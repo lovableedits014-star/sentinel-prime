@@ -43,54 +43,57 @@ Deno.serve(async (req) => {
       }
       if (password.length < 6) return json({ error: "Senha mínima de 6 caracteres" }, 400);
 
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const { data: existingPlat } = await admin
+        .from("platform_users")
+        .select("id")
+        .ilike("email", normalizedEmail)
+        .maybeSingle();
+      if (existingPlat) {
+        return json({ error: "Este email já está cadastrado como usuário da plataforma. Edite-o na lista." }, 409);
+      }
+
       let userId: string | null = null;
-      const { data: created, error: createErr } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name: name },
-      });
+      let createdAuthUser = false;
+      let foundAuthUser: any = null;
 
-      if (createErr) {
-        // Email já existe em auth.users — reaproveita
-        const msg = createErr.message?.toLowerCase() || "";
-        const isDup = msg.includes("already") || msg.includes("registered") || (createErr as any).code === "email_exists";
-        if (!isDup) return json({ error: createErr.message }, 400);
-
-        // Já está vinculado em platform_users?
-        const { data: existingPlat } = await admin
-          .from("platform_users")
-          .select("id")
-          .eq("email", email)
-          .maybeSingle();
-        if (existingPlat) {
-          return json({ error: "Este email já está cadastrado como usuário da plataforma. Edite-o na lista." }, 409);
-        }
-
-        // Localiza o user no auth e atualiza senha
-        const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      for (let page = 1; page <= 20; page++) {
+        const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
         if (listErr) return json({ error: listErr.message }, 500);
-        const found = list.users.find((u) => (u.email || "").toLowerCase() === email.toLowerCase());
-        if (!found) return json({ error: "Email já registrado mas usuário não encontrado" }, 500);
-        userId = found.id;
-        await admin.auth.admin.updateUserById(userId, {
+        foundAuthUser = list.users.find((u) => (u.email || "").toLowerCase() === normalizedEmail);
+        if (foundAuthUser || list.users.length < 1000) break;
+      }
+
+      if (foundAuthUser) {
+        userId = foundAuthUser.id;
+        const { error: updateAuthErr } = await admin.auth.admin.updateUserById(userId, {
           password,
-          user_metadata: { ...(found.user_metadata || {}), full_name: name },
+          email_confirm: true,
+          user_metadata: { ...(foundAuthUser.user_metadata || {}), full_name: name },
         });
+        if (updateAuthErr) return json({ error: updateAuthErr.message }, 500);
       } else {
+        const { data: created, error: createErr } = await admin.auth.admin.createUser({
+          email: normalizedEmail,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name: name },
+        });
+        if (createErr) return json({ error: createErr.message }, 400);
         userId = created!.user!.id;
+        createdAuthUser = true;
       }
 
       const { error: insErr } = await admin.from("platform_users").insert({
         user_id: userId,
         name,
-        email,
+        email: normalizedEmail,
         allowed_paths,
         status: "active",
         created_by: caller.id,
       });
       if (insErr) {
-        await admin.auth.admin.deleteUser(userId);
+        if (createdAuthUser) await admin.auth.admin.deleteUser(userId);
         return json({ error: insErr.message }, 500);
       }
 
