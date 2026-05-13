@@ -113,6 +113,7 @@ const DashboardLayout = () => {
   const [user, setUser] = useState<any>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accessProfile, setAccessProfile] = useState<AccessProfile | null>(null);
+  const [platformPaths, setPlatformPaths] = useState<string[] | null>(null); // null = sem restrição granular
   const [isClientOwner, setIsClientOwner] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
