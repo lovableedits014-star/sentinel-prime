@@ -167,7 +167,8 @@ export default function Eleicao() {
     setEditing(null);
     setForm({
       tipo: "coordenador", escopo, regiao: "centro", cidade: "",
-      nome: "", telefone: "", endereco: "", parent_id: "", observacoes: "",
+      nome: "", telefone: "", rua: "", numero: "", bairro: "",
+      parent_id: "", observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
       ...presets,
@@ -177,11 +178,16 @@ export default function Eleicao() {
 
   function openEdit(p: Pessoa) {
     setEditing(p);
+    // Tenta extrair rua/numero/bairro do endereço legado se ainda não foram preenchidos
+    const legado = p.endereco || "";
     setForm({
       tipo: p.tipo, escopo: p.escopo,
       regiao: (p.regiao || "centro") as Regiao,
       cidade: p.cidade || "",
-      nome: p.nome, telefone: p.telefone, endereco: p.endereco,
+      nome: p.nome, telefone: p.telefone,
+      rua: p.rua || legado,
+      numero: p.numero || "",
+      bairro: p.bairro || "",
       parent_id: p.parent_id || "",
       observacoes: p.observacoes || "",
       email: p.email || "",
@@ -193,8 +199,8 @@ export default function Eleicao() {
   }
 
   async function save() {
-    if (!form.nome.trim() || !form.telefone.trim() || !form.endereco.trim()) {
-      toast.error("Nome, telefone e endereço são obrigatórios"); return;
+    if (!form.nome.trim() || !form.telefone.trim() || !form.rua.trim() || !form.bairro.trim()) {
+      toast.error("Nome, telefone, rua e bairro são obrigatórios"); return;
     }
     if (form.escopo === "interior" && !form.cidade.trim()) {
       toast.error("Cidade é obrigatória para Interior"); return;
@@ -205,6 +211,10 @@ export default function Eleicao() {
     if (form.tipo === "coordenador" && !editing && form.send_access && (!form.email.trim() || form.password.length < 6)) {
       toast.error("Para enviar acesso, informe e-mail e senha com no mínimo 6 caracteres"); return;
     }
+    const rua = form.rua.trim();
+    const numero = form.numero.trim();
+    const bairro = form.bairro.trim();
+    const enderecoConcat = [`${rua}${numero ? ", " + numero : ""}`, bairro].filter(Boolean).join(" - ");
     const payload: any = {
       client_id: clientId,
       tipo: form.tipo,
@@ -213,7 +223,8 @@ export default function Eleicao() {
       cidade: form.escopo === "interior" ? form.cidade.trim() : null,
       nome: form.nome.trim(),
       telefone: form.telefone.trim(),
-      endereco: form.endereco.trim(),
+      rua, numero: numero || null, bairro,
+      endereco: enderecoConcat,
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
@@ -224,6 +235,25 @@ export default function Eleicao() {
       : supabase.from("eleicao_pessoas" as any).insert(payload).select().single();
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
+
+    // Disparo automático de notificações ao criar novo líder
+    if (!editing && form.tipo === "lider" && savedPessoa) {
+      supabase.functions.invoke("eleicao-notify-novo-lider", {
+        body: { pessoa_id: (savedPessoa as any).id },
+      }).then(({ data, error }) => {
+        if (error) { toast.warning("Líder cadastrado, mas falhou ao enviar notificações."); return; }
+        if (data?.skipped) { toast.success("Cadastrado!"); return; }
+        const r = data?.results || {};
+        const parts: string[] = [];
+        for (const key of ["coordenador", "secretaria", "lider"] as const) {
+          if (!r[key]) continue;
+          if (r[key].sent) parts.push(`${key} ✓`);
+          else parts.push(`${key} ✗ (${r[key].reason || r[key].error || "falha"})`);
+        }
+        toast.success(`Líder cadastrado. Notificações: ${parts.join(", ")}`);
+      });
+    }
+
     if (!editing && form.tipo === "coordenador" && form.send_access) {
       await sendCredentials(savedPessoa as unknown as Pessoa, "whatsapp", {
         email: form.email.trim(),
