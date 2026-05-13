@@ -78,6 +78,19 @@ const Dashboard = () => {
   const [exportingPdf, setExportingPdf] = useState(false);
   const queryClient = useQueryClient();
 
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setAuthUserId(data.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setAuthUserId(session?.user?.id ?? null);
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, []);
+
   const fetchDashboardData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("No user");
@@ -124,8 +137,9 @@ const Dashboard = () => {
   }, []);
 
   const { data: dashData, isLoading: loading } = useQuery({
-    queryKey: ["dashboard-data"],
+    queryKey: ["dashboard-data", authUserId],
     queryFn: fetchDashboardData,
+    enabled: !!authUserId,
     staleTime: Infinity, // Never auto-refetch — only manual
     gcTime: 1000 * 60 * 30, // Keep in cache 30 min
     refetchOnWindowFocus: false,
