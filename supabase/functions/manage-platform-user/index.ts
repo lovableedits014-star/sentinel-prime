@@ -43,15 +43,44 @@ Deno.serve(async (req) => {
       }
       if (password.length < 6) return json({ error: "Senha mínima de 6 caracteres" }, 400);
 
+      let userId: string | null = null;
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
         user_metadata: { full_name: name },
       });
-      if (createErr || !created.user) return json({ error: createErr?.message || "Falha ao criar" }, 400);
 
-      const userId = created.user.id;
+      if (createErr) {
+        // Email já existe em auth.users — reaproveita
+        const msg = createErr.message?.toLowerCase() || "";
+        const isDup = msg.includes("already") || msg.includes("registered") || (createErr as any).code === "email_exists";
+        if (!isDup) return json({ error: createErr.message }, 400);
+
+        // Já está vinculado em platform_users?
+        const { data: existingPlat } = await admin
+          .from("platform_users")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle();
+        if (existingPlat) {
+          return json({ error: "Este email já está cadastrado como usuário da plataforma. Edite-o na lista." }, 409);
+        }
+
+        // Localiza o user no auth e atualiza senha
+        const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        if (listErr) return json({ error: listErr.message }, 500);
+        const found = list.users.find((u) => (u.email || "").toLowerCase() === email.toLowerCase());
+        if (!found) return json({ error: "Email já registrado mas usuário não encontrado" }, 500);
+        userId = found.id;
+        await admin.auth.admin.updateUserById(userId, {
+          password,
+          user_metadata: { ...(found.user_metadata || {}), full_name: name },
+        });
+      } else {
+        userId = created!.user!.id;
+      }
+
       const { error: insErr } = await admin.from("platform_users").insert({
         user_id: userId,
         name,
