@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { isPathAllowed, getRoleLabels, type AccessProfile } from "@/lib/access-control";
+import { isPathAllowed, getRoleLabels, ALWAYS_ALLOWED_PATHS, type AccessProfile } from "@/lib/access-control";
 
 
 const AUTH_CHECK_TIMEOUT_MS = 12000;
