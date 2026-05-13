@@ -13,6 +13,19 @@ function normalizePhone(p: string) {
   return digits;
 }
 
+function phoneVariants(p: string) {
+  const normalized = normalizePhone(p);
+  if (!normalized) return [];
+  const variants = [normalized];
+  const noCountry = normalized.startsWith("55") ? normalized.slice(2) : normalized;
+  if (noCountry.length === 11 && noCountry[2] === "9") {
+    variants.push(`55${noCountry.slice(0, 2)}${noCountry.slice(3)}`);
+  } else if (noCountry.length === 10) {
+    variants.unshift(`55${noCountry.slice(0, 2)}9${noCountry.slice(2)}`);
+  }
+  return Array.from(new Set(variants.filter((v) => v.length >= 12)));
+}
+
 function fmtPhone(s: string) {
   const d = (s || "").replace(/\D/g, "");
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -34,14 +47,14 @@ async function getBridge(admin: any, clientId: string) {
   if (pickedId) {
     const { data: inst } = await admin.from("whatsapp_instances")
       .select("bridge_url, bridge_api_key").eq("id", pickedId).maybeSingle();
-    if (inst?.bridge_url && inst?.bridge_api_key) return { url: inst.bridge_url, key: inst.bridge_api_key };
+    if (inst?.bridge_url && inst?.bridge_api_key) return { id: pickedId, url: inst.bridge_url, key: inst.bridge_api_key };
   }
   const { data: inst } = await admin.from("whatsapp_instances")
-    .select("bridge_url, bridge_api_key")
+    .select("id, bridge_url, bridge_api_key")
     .eq("client_id", clientId).eq("is_active", true)
     .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
     .order("is_primary", { ascending: false }).limit(1).maybeSingle();
-  if (inst?.bridge_url && inst?.bridge_api_key) return { url: inst.bridge_url, key: inst.bridge_api_key };
+  if (inst?.bridge_url && inst?.bridge_api_key) return { id: inst.id, url: inst.bridge_url, key: inst.bridge_api_key };
   const { data: client } = await admin.from("clients")
     .select("whatsapp_bridge_url, whatsapp_bridge_api_key").eq("id", clientId).maybeSingle();
   if (client?.whatsapp_bridge_url && client?.whatsapp_bridge_api_key) {
