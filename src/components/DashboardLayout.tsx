@@ -369,7 +369,7 @@ const DashboardLayout = () => {
   const SidebarNav = ({ mobile = false }: { mobile?: boolean }) => (
     <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
       {/* Dashboard - always first */}
-      {(isClientOwner || !accessProfile || isPathAllowed(accessProfile, '/dashboard')) && (
+      {canAccess('/dashboard') && (
         <NavItem item={{ icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" }} mobile={mobile} />
       )}
 
