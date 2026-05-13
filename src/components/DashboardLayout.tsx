@@ -171,30 +171,53 @@ const DashboardLayout = () => {
           if (clientData) {
             setIsClientOwner(true);
             setAccessProfile(null); // full access
+            setPlatformPaths(null);
           } else {
-          // Check if user is a team member
-          const { data: teamData, error: teamError } = await withTimeout(
-            supabase
-              .from("team_members")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .eq("status", "active")
-              .limit(1)
-              .maybeSingle(),
-            "Tempo esgotado ao carregar suas permissões"
-          );
-          if (!mounted) return;
-          if (teamError) throw teamError;
+            // NEW: check platform_users (per-tab granular access set by super admin)
+            const { data: platformRow } = await withTimeout(
+              supabase
+                .from("platform_users" as any)
+                .select("allowed_paths, status")
+                .eq("user_id", session.user.id)
+                .maybeSingle(),
+              "Tempo esgotado ao carregar suas permissões"
+            );
+            if (!mounted) return;
 
-          if (teamData) {
-            setAccessProfile(teamData.role as AccessProfile);
-          } else {
-            // No access at all - redirect
-            toast.error("Você não tem permissão para acessar o painel");
-            await supabase.auth.signOut();
-            navigate("/auth", { replace: true });
-            return;
-          }
+            if (platformRow) {
+              const row = platformRow as unknown as { allowed_paths: string[]; status: string };
+              if (row.status === "disabled") {
+                toast.error("Seu acesso foi desativado pelo administrador");
+                await supabase.auth.signOut();
+                navigate("/auth", { replace: true });
+                return;
+              }
+              setPlatformPaths([...(row.allowed_paths || []), ...ALWAYS_ALLOWED_PATHS]);
+              setAccessProfile(null);
+            } else {
+              // Legacy: team_members with fixed profiles
+              const { data: teamData, error: teamError } = await withTimeout(
+                supabase
+                  .from("team_members")
+                  .select("role")
+                  .eq("user_id", session.user.id)
+                  .eq("status", "active")
+                  .limit(1)
+                  .maybeSingle(),
+                "Tempo esgotado ao carregar suas permissões"
+              );
+              if (!mounted) return;
+              if (teamError) throw teamError;
+
+              if (teamData) {
+                setAccessProfile(teamData.role as AccessProfile);
+              } else {
+                toast.error("Você não tem permissão para acessar o painel");
+                await supabase.auth.signOut();
+                navigate("/auth", { replace: true });
+                return;
+              }
+            }
           }
         }
 
