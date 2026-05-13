@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import UazapiConfigPanel from "@/components/superadmin/UazapiConfigPanel";
 import TseSyncPanel from "@/components/superadmin/TseSyncPanel";
+import PlatformUsersPanel from "@/components/superadmin/PlatformUsersPanel";
 
 interface InviteToken {
   id: string;
