@@ -12,17 +12,9 @@ function sleep(ms: number) {
 function cleanPhoneForBridge(raw: string): string {
   const digits = String(raw).replace(/\D/g, "");
   if (!digits) return "";
-  if (digits.length === 13 && digits.startsWith("55")) {
-    const ddd = digits.slice(2, 4);
-    const local = digits.slice(4);
-    return local.length === 9 && local.startsWith("9") ? `55${ddd}${local.slice(1)}` : digits;
-  }
-  if (digits.length === 11) {
-    const ddd = digits.slice(0, 2);
-    const local = digits.slice(2);
-    return local.length === 9 && local.startsWith("9") ? `55${ddd}${local.slice(1)}` : `55${digits}`;
-  }
-  return digits.startsWith("55") ? digits : `55${digits}`;
+  if (digits.startsWith("55")) return digits;
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+  return digits;
 }
 
 const DEFAULT_TEMPLATE = `Olá, {nome}! 👋\n\nNotamos que você não acessou o portal da campanha *{campanha}* há {dias} dias.\n\nO seu acesso diário é muito importante: é nele que você confirma sua presença e recebe as missões para interagir nas redes sociais. 🙌\n\nLembre-se: o registro precisa ser feito *todos os dias*. Conto com você!`;
