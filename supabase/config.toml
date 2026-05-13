@@ -53,3 +53,6 @@ verify_jwt = true
 
 [functions.eleicao-send-credentials]
 verify_jwt = true
+
+[functions.manage-platform-user]
+verify_jwt = true
