@@ -1597,8 +1597,53 @@ export type Database = {
           },
         ]
       }
+      eleicao_notif_config: {
+        Row: {
+          auto_enviar: boolean
+          client_id: string
+          created_at: string
+          grupos_links: Json
+          id: string
+          secretaria_telefone: string | null
+          template_coordenador: string
+          template_lider: string
+          updated_at: string
+        }
+        Insert: {
+          auto_enviar?: boolean
+          client_id: string
+          created_at?: string
+          grupos_links?: Json
+          id?: string
+          secretaria_telefone?: string | null
+          template_coordenador?: string
+          template_lider?: string
+          updated_at?: string
+        }
+        Update: {
+          auto_enviar?: boolean
+          client_id?: string
+          created_at?: string
+          grupos_links?: Json
+          id?: string
+          secretaria_telefone?: string | null
+          template_coordenador?: string
+          template_lider?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_notif_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eleicao_pessoas: {
         Row: {
+          bairro: string | null
           cidade: string | null
           client_id: string
           created_at: string
@@ -1609,9 +1654,11 @@ export type Database = {
           funcionario_id: string | null
           id: string
           nome: string
+          numero: string | null
           observacoes: string | null
           parent_id: string | null
           regiao: Database["public"]["Enums"]["eleicao_regiao"] | null
+          rua: string | null
           telefone: string
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at: string
@@ -1619,6 +1666,7 @@ export type Database = {
           valor_contratacao: number
         }
         Insert: {
+          bairro?: string | null
           cidade?: string | null
           client_id: string
           created_at?: string
@@ -1629,9 +1677,11 @@ export type Database = {
           funcionario_id?: string | null
           id?: string
           nome: string
+          numero?: string | null
           observacoes?: string | null
           parent_id?: string | null
           regiao?: Database["public"]["Enums"]["eleicao_regiao"] | null
+          rua?: string | null
           telefone: string
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at?: string
@@ -1639,6 +1689,7 @@ export type Database = {
           valor_contratacao?: number
         }
         Update: {
+          bairro?: string | null
           cidade?: string | null
           client_id?: string
           created_at?: string
@@ -1649,9 +1700,11 @@ export type Database = {
           funcionario_id?: string | null
           id?: string
           nome?: string
+          numero?: string | null
           observacoes?: string | null
           parent_id?: string | null
           regiao?: Database["public"]["Enums"]["eleicao_regiao"] | null
+          rua?: string | null
           telefone?: string
           tipo?: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at?: string
