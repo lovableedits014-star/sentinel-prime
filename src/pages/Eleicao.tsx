@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
+import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package } from "lucide-react";
 
@@ -84,6 +85,9 @@ interface Pessoa {
   nome: string;
   telefone: string;
   endereco: string;
+  rua: string | null;
+  numero: string | null;
+  bairro: string | null;
   parent_id: string | null;
   observacoes: string | null;
   email: string | null;
@@ -134,7 +138,9 @@ export default function Eleicao() {
     cidade: "",
     nome: "",
     telefone: "",
-    endereco: "",
+    rua: "",
+    numero: "",
+    bairro: "",
     parent_id: "" as string,
     observacoes: "",
     email: "",
@@ -161,7 +167,8 @@ export default function Eleicao() {
     setEditing(null);
     setForm({
       tipo: "coordenador", escopo, regiao: "centro", cidade: "",
-      nome: "", telefone: "", endereco: "", parent_id: "", observacoes: "",
+      nome: "", telefone: "", rua: "", numero: "", bairro: "",
+      parent_id: "", observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
       ...presets,
@@ -171,11 +178,16 @@ export default function Eleicao() {
 
   function openEdit(p: Pessoa) {
     setEditing(p);
+    // Tenta extrair rua/numero/bairro do endereço legado se ainda não foram preenchidos
+    const legado = p.endereco || "";
     setForm({
       tipo: p.tipo, escopo: p.escopo,
       regiao: (p.regiao || "centro") as Regiao,
       cidade: p.cidade || "",
-      nome: p.nome, telefone: p.telefone, endereco: p.endereco,
+      nome: p.nome, telefone: p.telefone,
+      rua: p.rua || legado,
+      numero: p.numero || "",
+      bairro: p.bairro || "",
       parent_id: p.parent_id || "",
       observacoes: p.observacoes || "",
       email: p.email || "",
@@ -187,8 +199,8 @@ export default function Eleicao() {
   }
 
   async function save() {
-    if (!form.nome.trim() || !form.telefone.trim() || !form.endereco.trim()) {
-      toast.error("Nome, telefone e endereço são obrigatórios"); return;
+    if (!form.nome.trim() || !form.telefone.trim() || !form.rua.trim() || !form.bairro.trim()) {
+      toast.error("Nome, telefone, rua e bairro são obrigatórios"); return;
     }
     if (form.escopo === "interior" && !form.cidade.trim()) {
       toast.error("Cidade é obrigatória para Interior"); return;
@@ -199,6 +211,10 @@ export default function Eleicao() {
     if (form.tipo === "coordenador" && !editing && form.send_access && (!form.email.trim() || form.password.length < 6)) {
       toast.error("Para enviar acesso, informe e-mail e senha com no mínimo 6 caracteres"); return;
     }
+    const rua = form.rua.trim();
+    const numero = form.numero.trim();
+    const bairro = form.bairro.trim();
+    const enderecoConcat = [`${rua}${numero ? ", " + numero : ""}`, bairro].filter(Boolean).join(" - ");
     const payload: any = {
       client_id: clientId,
       tipo: form.tipo,
@@ -207,7 +223,8 @@ export default function Eleicao() {
       cidade: form.escopo === "interior" ? form.cidade.trim() : null,
       nome: form.nome.trim(),
       telefone: form.telefone.trim(),
-      endereco: form.endereco.trim(),
+      rua, numero: numero || null, bairro,
+      endereco: enderecoConcat,
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
@@ -218,6 +235,25 @@ export default function Eleicao() {
       : supabase.from("eleicao_pessoas" as any).insert(payload).select().single();
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
+
+    // Disparo automático de notificações ao criar novo líder
+    if (!editing && form.tipo === "lider" && savedPessoa) {
+      supabase.functions.invoke("eleicao-notify-novo-lider", {
+        body: { pessoa_id: (savedPessoa as any).id },
+      }).then(({ data, error }) => {
+        if (error) { toast.warning("Líder cadastrado, mas falhou ao enviar notificações."); return; }
+        if (data?.skipped) { toast.success("Cadastrado!"); return; }
+        const r = data?.results || {};
+        const parts: string[] = [];
+        for (const key of ["coordenador", "secretaria", "lider"] as const) {
+          if (!r[key]) continue;
+          if (r[key].sent) parts.push(`${key} ✓`);
+          else parts.push(`${key} ✗ (${r[key].reason || r[key].error || "falha"})`);
+        }
+        toast.success(`Líder cadastrado. Notificações: ${parts.join(", ")}`);
+      });
+    }
+
     if (!editing && form.tipo === "coordenador" && form.send_access) {
       await sendCredentials(savedPessoa as unknown as Pessoa, "whatsapp", {
         email: form.email.trim(),
@@ -314,7 +350,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "pendentes" | "custos">("cadastros");
+  const [view, setView] = useState<"cadastros" | "pendentes" | "custos" | "config">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
@@ -390,7 +426,7 @@ export default function Eleicao() {
       </div>
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-3 w-full max-w-xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -401,6 +437,7 @@ export default function Eleicao() {
             )}
           </TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
+          <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -408,6 +445,8 @@ export default function Eleicao() {
         <PrevisaoCustos pessoas={pessoas as any} />
       ) : view === "pendentes" ? (
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
+      ) : view === "config" ? (
+        clientId ? <EleicaoConfigPanel clientId={clientId} /> : null
       ) : (
       <Tabs value={escopo} onValueChange={(v) => { setEscopo(v as Escopo); setRegiaoFilter("all"); }}>
         <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
@@ -704,9 +743,19 @@ export default function Eleicao() {
                 )}
               </div>
             )}
+            <div className="grid grid-cols-[1fr_100px] gap-2">
+              <div>
+                <Label>Rua *</Label>
+                <Input value={form.rua} onChange={e => setForm(f => ({ ...f, rua: e.target.value }))} placeholder="Av. Afonso Pena" />
+              </div>
+              <div>
+                <Label>Nº</Label>
+                <Input value={form.numero} onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} placeholder="1234" />
+              </div>
+            </div>
             <div>
-              <Label>Endereço *</Label>
-              <Input value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rua, número, bairro" />
+              <Label>Bairro *</Label>
+              <Input value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: e.target.value }))} placeholder="Centro" />
             </div>
             <div>
               <Label>Observações</Label>
