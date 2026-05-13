@@ -85,6 +85,9 @@ interface Pessoa {
   nome: string;
   telefone: string;
   endereco: string;
+  rua: string | null;
+  numero: string | null;
+  bairro: string | null;
   parent_id: string | null;
   observacoes: string | null;
   email: string | null;
