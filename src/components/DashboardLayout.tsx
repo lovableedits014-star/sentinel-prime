@@ -129,9 +129,8 @@ const DashboardLayout = () => {
         if (hasStoredAuthSession()) {
           const storedUser = getStoredAuthUser();
           if (storedUser) setUser(storedUser);
-          setIsClientOwner(true);
-          setAccessProfile(null);
-          setLoading(false);
+          // NÃO liberar acesso otimista aqui — precisamos checar platform_users
+          // para respeitar permissões granulares. Apenas mantém o loading.
         }
 
         const { data: { session } } = await withTimeout(
@@ -192,6 +191,7 @@ const DashboardLayout = () => {
                 navigate("/auth", { replace: true });
                 return;
               }
+              setIsClientOwner(false);
               setPlatformPaths([...(row.allowed_paths || []), ...ALWAYS_ALLOWED_PATHS]);
               setAccessProfile(null);
             } else {
