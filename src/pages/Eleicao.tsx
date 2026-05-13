@@ -426,7 +426,7 @@ export default function Eleicao() {
       </div>
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-3 w-full max-w-xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -437,6 +437,7 @@ export default function Eleicao() {
             )}
           </TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
+          <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -444,6 +445,8 @@ export default function Eleicao() {
         <PrevisaoCustos pessoas={pessoas as any} />
       ) : view === "pendentes" ? (
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
+      ) : view === "config" ? (
+        clientId ? <EleicaoConfigPanel clientId={clientId} /> : null
       ) : (
       <Tabs value={escopo} onValueChange={(v) => { setEscopo(v as Escopo); setRegiaoFilter("all"); }}>
         <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
