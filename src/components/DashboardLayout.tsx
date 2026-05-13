@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { isPathAllowed, getRoleLabels, type AccessProfile } from "@/lib/access-control";
+import { isPathAllowed, getRoleLabels, ALWAYS_ALLOWED_PATHS, type AccessProfile } from "@/lib/access-control";
 
 
 const AUTH_CHECK_TIMEOUT_MS = 12000;
@@ -113,6 +113,7 @@ const DashboardLayout = () => {
   const [user, setUser] = useState<any>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accessProfile, setAccessProfile] = useState<AccessProfile | null>(null);
+  const [platformPaths, setPlatformPaths] = useState<string[] | null>(null); // null = sem restrição granular
   const [isClientOwner, setIsClientOwner] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
@@ -170,30 +171,53 @@ const DashboardLayout = () => {
           if (clientData) {
             setIsClientOwner(true);
             setAccessProfile(null); // full access
+            setPlatformPaths(null);
           } else {
-          // Check if user is a team member
-          const { data: teamData, error: teamError } = await withTimeout(
-            supabase
-              .from("team_members")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .eq("status", "active")
-              .limit(1)
-              .maybeSingle(),
-            "Tempo esgotado ao carregar suas permissões"
-          );
-          if (!mounted) return;
-          if (teamError) throw teamError;
+            // NEW: check platform_users (per-tab granular access set by super admin)
+            const { data: platformRow } = await withTimeout(
+              supabase
+                .from("platform_users" as any)
+                .select("allowed_paths, status")
+                .eq("user_id", session.user.id)
+                .maybeSingle(),
+              "Tempo esgotado ao carregar suas permissões"
+            );
+            if (!mounted) return;
 
-          if (teamData) {
-            setAccessProfile(teamData.role as AccessProfile);
-          } else {
-            // No access at all - redirect
-            toast.error("Você não tem permissão para acessar o painel");
-            await supabase.auth.signOut();
-            navigate("/auth", { replace: true });
-            return;
-          }
+            if (platformRow) {
+              const row = platformRow as unknown as { allowed_paths: string[]; status: string };
+              if (row.status === "disabled") {
+                toast.error("Seu acesso foi desativado pelo administrador");
+                await supabase.auth.signOut();
+                navigate("/auth", { replace: true });
+                return;
+              }
+              setPlatformPaths([...(row.allowed_paths || []), ...ALWAYS_ALLOWED_PATHS]);
+              setAccessProfile(null);
+            } else {
+              // Legacy: team_members with fixed profiles
+              const { data: teamData, error: teamError } = await withTimeout(
+                supabase
+                  .from("team_members")
+                  .select("role")
+                  .eq("user_id", session.user.id)
+                  .eq("status", "active")
+                  .limit(1)
+                  .maybeSingle(),
+                "Tempo esgotado ao carregar suas permissões"
+              );
+              if (!mounted) return;
+              if (teamError) throw teamError;
+
+              if (teamData) {
+                setAccessProfile(teamData.role as AccessProfile);
+              } else {
+                toast.error("Você não tem permissão para acessar o painel");
+                await supabase.auth.signOut();
+                navigate("/auth", { replace: true });
+                return;
+              }
+            }
           }
         }
 
@@ -246,23 +270,30 @@ const DashboardLayout = () => {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  // Helper: pode acessar um path?
+  const canAccess = useCallback((path: string) => {
+    if (isClientOwner) return true;
+    if (platformPaths) return platformPaths.includes(path);
+    if (accessProfile) return isPathAllowed(accessProfile, path);
+    return true;
+  }, [isClientOwner, platformPaths, accessProfile]);
+
   // Route protection
   useEffect(() => {
-    if (loading || isClientOwner || !accessProfile) return;
+    if (loading || isClientOwner) return;
+    if (!platformPaths && !accessProfile) return;
     const currentPath = location.pathname;
-    if (!isPathAllowed(accessProfile, currentPath)) {
+    if (!canAccess(currentPath)) {
       navigate("/dashboard");
       toast.error("Você não tem acesso a esta página");
     }
-  }, [location.pathname, accessProfile, isClientOwner, loading, navigate]);
+  }, [location.pathname, accessProfile, platformPaths, isClientOwner, loading, navigate, canAccess]);
 
-  // Filter menu items based on access profile (memoized — antes dos returns condicionais para manter ordem de hooks)
+  // Filter menu items (per-tab when platformPaths set, per-profile otherwise)
   const filteredSections = useMemo(() => MENU_SECTIONS.map(section => ({
     ...section,
-    items: section.items.filter(item =>
-      isClientOwner || !accessProfile || isPathAllowed(accessProfile, item.path)
-    ),
-  })).filter(section => section.items.length > 0), [isClientOwner, accessProfile]);
+    items: section.items.filter(item => canAccess(item.path)),
+  })).filter(section => section.items.length > 0), [canAccess]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -338,7 +369,7 @@ const DashboardLayout = () => {
   const SidebarNav = ({ mobile = false }: { mobile?: boolean }) => (
     <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
       {/* Dashboard - always first */}
-      {(isClientOwner || !accessProfile || isPathAllowed(accessProfile, '/dashboard')) && (
+      {canAccess('/dashboard') && (
         <NavItem item={{ icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" }} mobile={mobile} />
       )}
 

@@ -4193,6 +4193,42 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_users: {
+        Row: {
+          allowed_paths: string[]
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allowed_paths?: string[]
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allowed_paths?: string[]
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       portal_missions: {
         Row: {
           client_id: string
