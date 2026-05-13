@@ -58,8 +58,18 @@ async function bridgeSend(url: string, key: string, phone: string, message: stri
       body: JSON.stringify({ action: "send", phone, message }),
     });
     const data = await res.json().catch(() => ({}));
-    const ok = res.ok && data?.success !== false && data?.delivered !== false;
-    return { ok, error: ok ? null : (data?.error || `HTTP ${res.status}`) };
+    const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || data?.data?.id || data?.data?.key?.id || data?.result?.id || data?.result?.key?.id;
+    const ok = res.ok && data?.success !== false && data?.delivered !== false && (data?.delivered === true || Boolean(messageId));
+    const error = !res.ok
+      ? (data?.error || data?.message || `HTTP ${res.status}`)
+      : data?.success === false
+        ? (data?.error || data?.message || "Ponte recusou o envio")
+        : data?.delivered === false
+          ? (data?.error || data?.message || "Mensagem não entregue pelo WhatsApp")
+          : ok
+            ? null
+            : (data?.error || data?.message || "Ponte não confirmou entrega da mensagem");
+    return { ok, error };
   } catch (e: any) {
     return { ok: false, error: e.message || "Erro de rede" };
   }
