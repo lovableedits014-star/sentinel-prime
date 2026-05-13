@@ -740,9 +740,19 @@ export default function Eleicao() {
                 )}
               </div>
             )}
+            <div className="grid grid-cols-[1fr_100px] gap-2">
+              <div>
+                <Label>Rua *</Label>
+                <Input value={form.rua} onChange={e => setForm(f => ({ ...f, rua: e.target.value }))} placeholder="Av. Afonso Pena" />
+              </div>
+              <div>
+                <Label>Nº</Label>
+                <Input value={form.numero} onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} placeholder="1234" />
+              </div>
+            </div>
             <div>
-              <Label>Endereço *</Label>
-              <Input value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rua, número, bairro" />
+              <Label>Bairro *</Label>
+              <Input value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: e.target.value }))} placeholder="Centro" />
             </div>
             <div>
               <Label>Observações</Label>
