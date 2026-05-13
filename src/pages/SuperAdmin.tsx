@@ -296,6 +296,9 @@ export default function SuperAdmin() {
 
         {/* Sincronização TSE */}
         <TseSyncPanel />
+
+        {/* Usuários da plataforma com acesso por aba */}
+        <PlatformUsersPanel />
       </div>
     </div>
   );
