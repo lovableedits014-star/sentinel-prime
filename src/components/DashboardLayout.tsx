@@ -270,23 +270,30 @@ const DashboardLayout = () => {
     setMobileOpen(false);
   }, [location.pathname]);
 
+  // Helper: pode acessar um path?
+  const canAccess = useCallback((path: string) => {
+    if (isClientOwner) return true;
+    if (platformPaths) return platformPaths.includes(path);
+    if (accessProfile) return isPathAllowed(accessProfile, path);
+    return true;
+  }, [isClientOwner, platformPaths, accessProfile]);
+
   // Route protection
   useEffect(() => {
-    if (loading || isClientOwner || !accessProfile) return;
+    if (loading || isClientOwner) return;
+    if (!platformPaths && !accessProfile) return;
     const currentPath = location.pathname;
-    if (!isPathAllowed(accessProfile, currentPath)) {
+    if (!canAccess(currentPath)) {
       navigate("/dashboard");
       toast.error("Você não tem acesso a esta página");
     }
-  }, [location.pathname, accessProfile, isClientOwner, loading, navigate]);
+  }, [location.pathname, accessProfile, platformPaths, isClientOwner, loading, navigate, canAccess]);
 
-  // Filter menu items based on access profile (memoized — antes dos returns condicionais para manter ordem de hooks)
+  // Filter menu items (per-tab when platformPaths set, per-profile otherwise)
   const filteredSections = useMemo(() => MENU_SECTIONS.map(section => ({
     ...section,
-    items: section.items.filter(item =>
-      isClientOwner || !accessProfile || isPathAllowed(accessProfile, item.path)
-    ),
-  })).filter(section => section.items.length > 0), [isClientOwner, accessProfile]);
+    items: section.items.filter(item => canAccess(item.path)),
+  })).filter(section => section.items.length > 0), [canAccess]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
