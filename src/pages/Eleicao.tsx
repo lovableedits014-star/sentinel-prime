@@ -237,12 +237,15 @@ export default function Eleicao() {
     if (error) { toast.error(error.message); return; }
 
     // Disparo automático de notificações ao criar novo líder
+    let notificationToastShown = false;
     if (!editing && form.tipo === "lider" && savedPessoa) {
-      supabase.functions.invoke("eleicao-notify-novo-lider", {
+      const { data, error } = await supabase.functions.invoke("eleicao-notify-novo-lider", {
         body: { pessoa_id: (savedPessoa as any).id },
-      }).then(({ data, error }) => {
-        if (error) { toast.warning("Líder cadastrado, mas falhou ao enviar notificações."); return; }
-        if (data?.skipped) { toast.success("Cadastrado!"); return; }
+      });
+      if (error) {
+        toast.warning(`Líder cadastrado, mas falhou ao enviar notificações: ${error.message}`);
+        notificationToastShown = true;
+      } else if (!data?.skipped) {
         const r = data?.results || {};
         const parts: string[] = [];
         for (const key of ["coordenador", "secretaria", "lider"] as const) {
@@ -250,8 +253,9 @@ export default function Eleicao() {
           if (r[key].sent) parts.push(`${key} ✓`);
           else parts.push(`${key} ✗ (${r[key].reason || r[key].error || "falha"})`);
         }
-        toast.success(`Líder cadastrado. Notificações: ${parts.join(", ")}`);
-      });
+        toast[parts.every(p => p.includes("✓")) ? "success" : "warning"](`Líder cadastrado. Notificações: ${parts.join(", ")}`);
+        notificationToastShown = true;
+      }
     }
 
     if (!editing && form.tipo === "coordenador" && form.send_access) {
@@ -262,7 +266,7 @@ export default function Eleicao() {
       });
       return;
     }
-    toast.success(editing ? "Atualizado!" : "Cadastrado!");
+    if (!notificationToastShown) toast.success(editing ? "Atualizado!" : "Cadastrado!");
     setDialogOpen(false);
     load();
   }

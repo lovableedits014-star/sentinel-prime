@@ -13,6 +13,19 @@ function normalizePhone(p: string) {
   return digits;
 }
 
+function phoneVariants(p: string) {
+  const normalized = normalizePhone(p);
+  if (!normalized) return [];
+  const variants = [normalized];
+  const noCountry = normalized.startsWith("55") ? normalized.slice(2) : normalized;
+  if (noCountry.length === 11 && noCountry[2] === "9") {
+    variants.push(`55${noCountry.slice(0, 2)}${noCountry.slice(3)}`);
+  } else if (noCountry.length === 10) {
+    variants.unshift(`55${noCountry.slice(0, 2)}9${noCountry.slice(2)}`);
+  }
+  return Array.from(new Set(variants.filter((v) => v.length >= 12)));
+}
+
 function fmtPhone(s: string) {
   const d = (s || "").replace(/\D/g, "");
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
@@ -34,14 +47,14 @@ async function getBridge(admin: any, clientId: string) {
   if (pickedId) {
     const { data: inst } = await admin.from("whatsapp_instances")
       .select("bridge_url, bridge_api_key").eq("id", pickedId).maybeSingle();
-    if (inst?.bridge_url && inst?.bridge_api_key) return { url: inst.bridge_url, key: inst.bridge_api_key };
+    if (inst?.bridge_url && inst?.bridge_api_key) return { id: pickedId, url: inst.bridge_url, key: inst.bridge_api_key };
   }
   const { data: inst } = await admin.from("whatsapp_instances")
-    .select("bridge_url, bridge_api_key")
+    .select("id, bridge_url, bridge_api_key")
     .eq("client_id", clientId).eq("is_active", true)
     .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
     .order("is_primary", { ascending: false }).limit(1).maybeSingle();
-  if (inst?.bridge_url && inst?.bridge_api_key) return { url: inst.bridge_url, key: inst.bridge_api_key };
+  if (inst?.bridge_url && inst?.bridge_api_key) return { id: inst.id, url: inst.bridge_url, key: inst.bridge_api_key };
   const { data: client } = await admin.from("clients")
     .select("whatsapp_bridge_url, whatsapp_bridge_api_key").eq("id", clientId).maybeSingle();
   if (client?.whatsapp_bridge_url && client?.whatsapp_bridge_api_key) {
@@ -51,25 +64,31 @@ async function getBridge(admin: any, clientId: string) {
 }
 
 async function bridgeSend(url: string, key: string, phone: string, message: string) {
+  let lastError = "";
+  const variants = phoneVariants(phone);
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": key },
-      body: JSON.stringify({ action: "send", phone, message }),
-    });
-    const data = await res.json().catch(() => ({}));
-    const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || data?.data?.id || data?.data?.key?.id || data?.result?.id || data?.result?.key?.id;
-    const ok = res.ok && data?.success !== false && data?.delivered !== false && (data?.delivered === true || Boolean(messageId));
-    const error = !res.ok
-      ? (data?.error || data?.message || `HTTP ${res.status}`)
-      : data?.success === false
-        ? (data?.error || data?.message || "Ponte recusou o envio")
-        : data?.delivered === false
-          ? (data?.error || data?.message || "Mensagem não entregue pelo WhatsApp")
-          : ok
-            ? null
-            : (data?.error || data?.message || "Ponte não confirmou entrega da mensagem");
-    return { ok, error };
+    for (const variant of variants) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": key },
+        body: JSON.stringify({ action: "send", phone: variant, message }),
+      });
+      const data = await res.json().catch(() => ({}));
+      const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || data?.data?.id || data?.data?.key?.id || data?.result?.id || data?.result?.key?.id;
+      const ok = res.ok && data?.success !== false && data?.delivered !== false && (data?.delivered === true || Boolean(messageId));
+      const error = !res.ok
+        ? (data?.error || data?.message || `HTTP ${res.status}`)
+        : data?.success === false
+          ? (data?.error || data?.message || "Ponte recusou o envio")
+          : data?.delivered === false
+            ? (data?.error || data?.message || "Mensagem não entregue pelo WhatsApp")
+            : ok
+              ? null
+              : (data?.error || data?.message || "Ponte não confirmou entrega da mensagem");
+      if (ok) return { ok, error: null, phone: variant, messageId };
+      lastError = error || "Falha desconhecida";
+    }
+    return { ok: false, error: lastError || "Telefone inválido ou sem confirmação da ponte" };
   } catch (e: any) {
     return { ok: false, error: e.message || "Erro de rede" };
   }
