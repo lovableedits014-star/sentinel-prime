@@ -191,6 +191,7 @@ const DashboardLayout = () => {
                 navigate("/auth", { replace: true });
                 return;
               }
+              setIsClientOwner(false);
               setPlatformPaths([...(row.allowed_paths || []), ...ALWAYS_ALLOWED_PATHS]);
               setAccessProfile(null);
             } else {
