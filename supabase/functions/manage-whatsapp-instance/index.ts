@@ -83,20 +83,9 @@ const deriveIsAdminFromParticipants = (group: any, ownJids: Set<string>) => {
 function normalizeBrazilPhoneForBridge(raw: string): string {
   const digits = String(raw).replace(/\D/g, "");
   if (!digits) return "";
-
-  if (digits.length === 13 && digits.startsWith("55")) {
-    const ddd = digits.slice(2, 4);
-    const local = digits.slice(4);
-    return local.length === 9 && local.startsWith("9") ? `55${ddd}${local.slice(1)}` : digits;
-  }
-
-  if (digits.length === 11) {
-    const ddd = digits.slice(0, 2);
-    const local = digits.slice(2);
-    return local.length === 9 && local.startsWith("9") ? `55${ddd}${local.slice(1)}` : `55${digits}`;
-  }
-
-  return digits.startsWith("55") ? digits : `55${digits}`;
+  if (digits.startsWith("55")) return digits;
+  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+  return digits;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -963,11 +952,7 @@ Deno.serve(async (req) => {
     }
 
     // Proxy all other actions to bridge with X-Api-Key
-    // IMPORTANT: a ponte WhatsApp usada aqui (formato Brasil) só aceita
-    // o número SEM o 9º dígito (ex.: 556792248348). O frontend envia o
-    // número humano completo (5567992248348) — então normalizamos AQUI
-    // antes de chamar a bridge. Sem isso, mensagens são "aceitas" mas
-    // nunca chegam ao destinatário.
+    // Normaliza telefone brasileiro para E.164: 55 + DDD + número.
     const proxyBody: any = { action };
     const normalizedPhone = phone ? normalizeBrazilPhoneForBridge(String(phone)) : "";
     if (normalizedPhone) proxyBody.phone = normalizedPhone;
