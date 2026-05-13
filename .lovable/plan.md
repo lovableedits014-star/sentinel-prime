@@ -1,90 +1,82 @@
 ## Objetivo
 
-Permitir que o Super Admin (`lovableedits014@gmail.com`) cadastre usuários da plataforma diretamente (email + senha, já ativos) e libere/bloqueie **uma aba por vez, individualmente**, sem amarrar por seção inteira.
+Quando um novo **Líder** for cadastrado na aba Eleição, disparar 3 mensagens automáticas via WhatsApp e melhorar o cadastro do endereço.
 
-## O que muda para o usuário
+---
 
-Dentro da aba **Super Admin**, abaixo dos blocos atuais (Convites / Clientes / UAZAPI / TSE), aparece um novo cartão **"Usuários da plataforma"** com:
+## 1. Endereço estruturado (rua / número / bairro)
 
-1. **Botão "Novo usuário"** → abre um diálogo com:
-   - Nome, Email, Senha (com botão visível/ocultar)
-   - **Lista de TODAS as abas individualmente, cada uma com seu próprio checkbox**. As seções (Redes Sociais, Base Política, Mobilização, Operacional, Sistema) servem apenas como **rótulo visual de agrupamento** — não há checkbox de seção. Exemplo de como o usuário verá:
+No formulário "Novo cadastro", substituir o campo único `Endereço *` por 3 campos:
 
-     ```text
-     REDES SOCIAIS
-       ☐ Comentários
-       ☐ Militância Digital
-       ☑ Engajamento              ← liberado individualmente
-       ☐ Inteligência de Conteúdo
+```text
+[ Rua *               ] [ Nº       ]
+[ Bairro *                         ]
+```
 
-     MOBILIZAÇÃO
-       ☑ Missões IA               ← liberado individualmente
-       ☑ Funcionários             ← liberado individualmente
-       ☐ Controle de Presença
-       ☐ Calendário Político
-     ```
+- Banco: adicionar colunas `rua`, `numero`, `bairro` na tabela `eleicao_pessoas` (mantém `endereco` para compatibilidade — preenchido automaticamente concatenando "Rua, Nº – Bairro").
+- Cadastros antigos continuam funcionando (campos novos ficam vazios; o `endereco` legado segue exibido).
+- Pequenos ajustes em telas que mostram endereço para usar bairro/rua quando disponíveis.
 
-   - Atalhos opcionais ao lado de cada rótulo de seção: `[liberar todas desta seção]` / `[limpar desta seção]` — e no topo `[liberar tudo]` / `[limpar tudo]`. São apenas atalhos; o estado real continua sendo aba-por-aba.
-   - Ao salvar: o usuário é criado já confirmado/ativo, com acesso somente às abas marcadas.
+---
 
-2. **Lista de usuários cadastrados** com:
-   - Nome, email, e um resumo "X de Y abas liberadas" + tooltip com a lista
-   - Ações: **Editar acessos** (reabre o mesmo diálogo de checkboxes individuais), **Resetar senha**, **Desativar/Reativar**, **Excluir**
+## 2. Nova aba "Configurações" dentro de Eleição
 
-## O que muda no acesso
+Adicionar 4ª aba ao lado de Cadastros / Pendentes / Custos:
 
-- O menu lateral (`DashboardLayout`) e o guard de rota leem a **lista explícita de paths permitidos** (granular, item a item). Itens não permitidos são ocultados; URL direta a uma aba bloqueada redireciona para a primeira aba liberada.
-- Super Admin: acesso total automático.
-- Dono de cliente (`clients.user_id`): acesso total automático.
-- `team_members` antigos com perfis fixos continuam funcionando (perfil → conjunto de paths apenas em leitura, sem migração destrutiva).
+**Configurações de notificações**
+- Telefone da **Secretaria** (recebe cópia de todo cadastro de líder)
+- **Mensagem para o líder cadastrado** (texto editável, com placeholders `{nome}`, `{regiao}`, `{link_grupo}`)
+- **Mensagem para coordenador/secretaria** (texto editável, com placeholders `{nome}`, `{regiao}`, `{telefone}`, `{rua}`, `{bairro}`)
+- Toggle "Disparar automaticamente ao cadastrar líder" (liga/desliga o fluxo)
+
+**Links dos grupos por região** (uma linha por região de Campo Grande):
+
+```text
+Centro          [ https://chat.whatsapp.com/...  ]
+Segredo         [ https://chat.whatsapp.com/...  ]
+Prosa           [ https://chat.whatsapp.com/...  ]
+Bandeira        [ ...                            ]
+Anhanduizinho   [ ...                            ]
+Lagoa           [ ...                            ]
+Imbirussu       [ ...                            ]
+Moreninha       [ ...                            ]
+```
+
+Banco: nova tabela `eleicao_notif_config` (1 linha por client) com `secretaria_telefone`, `auto_enviar`, `template_coordenador`, `template_lider`, `grupos_links jsonb` (mapa região→link). RLS por client_id, igual às outras.
+
+---
+
+## 3. Disparo automático ao cadastrar Líder
+
+Após `INSERT` bem-sucedido com `tipo = 'lider'` e `auto_enviar = true`, dispara em background (sem travar o "Cadastrado!"):
+
+1. **Para o Coordenador da região** (busca o coordenador com mesma `regiao` no escopo Campo Grande — usa o `parent_id` se existir, senão o primeiro coordenador da região):
+   > Foi adicionado novo líder na região: **Centro**
+   > Nome: João da Silva
+   > Telefone: (67) 99999-0000
+   > Rua: Av. Afonso Pena, 1234
+   > Bairro: Centro
+
+2. **Para a Secretaria** (telefone configurado): mesma mensagem acima.
+
+3. **Para o Líder cadastrado**:
+   > Olá João! Você foi cadastrado como líder na região **Centro**.
+   > Entre no grupo da região: https://chat.whatsapp.com/xxxx
+
+Mostra um toast no fim: "Notificações enviadas: coordenador ✓, secretaria ✓, líder ✓" (ou avisa quem falhou — ex.: região sem coordenador, sem link de grupo, sem telefone de secretaria).
+
+---
 
 ## Detalhes técnicos
 
-### Banco — tabela nova
+- Reusa o mesmo mecanismo de envio do `eleicao-send-credentials` (UAZAPI/WhatsApp já configurado por client). Cria uma server function `eleicao-notify-novo-lider` (ou estende a existente) que recebe `pessoa_id` e dispara as 3 mensagens server-side, usando os templates da `eleicao_notif_config`.
+- Idempotência: chamada feita apenas no caminho de criação (não em edição).
+- Validações: se faltar config, ainda salva o cadastro e mostra aviso "configure as notificações em Configurações".
+- Migração de dados antigos: `endereco` continua válido; novos campos só preenchidos para cadastros novos/editados.
 
-```text
-platform_users
-├─ id uuid pk
-├─ user_id uuid → auth.users (unique)
-├─ name text
-├─ email text
-├─ allowed_paths text[]      -- ex: ['/engagement','/missoes-ia','/funcionarios']
-├─ status text                -- 'active' | 'disabled'
-├─ created_by uuid
-├─ created_at / updated_at
-```
+---
 
-- RLS: SELECT/INSERT/UPDATE/DELETE só para `is_super_admin()`; o próprio usuário pode SELECT só sua linha.
-- Enum `app_role` ganha `'platform_user'` (registrado em `user_roles`).
+## Escopo desta entrega
 
-### Edge functions (apenas o que precisa de `auth.admin`)
-
-- `create-platform-user` — valida `is_super_admin()`, cria auth user com `email_confirm: true`, insere em `platform_users` + `user_roles`. Rollback em falha.
-- `update-platform-user` — atualiza `allowed_paths`, `status`, nome; opcionalmente reseta senha.
-- `delete-platform-user` — remove de `platform_users`, `user_roles` e `auth.users`.
-
-### Frontend
-
-- **`src/lib/access-control.ts`**: novo `ALL_APP_TABS` — array tipado `[{ section, label, path }]` que é a fonte única de verdade tanto para o menu lateral quanto para a UI de checkboxes (assim, ao adicionar uma nova rota no menu ela já aparece nas opções).
-- **`useCurrentUserAccess()`** (novo hook React Query): resolve em uma chamada se o usuário é super admin / dono de client / linha em `platform_users`, devolve `{ allowedPaths, isOwner, isSuperAdmin }`.
-- **`DashboardLayout.tsx`**: passa a usar esse hook em vez do mapeamento por perfil; oculta itens fora de `allowedPaths`.
-- **Novo** `src/components/superadmin/PlatformUsersPanel.tsx`: lista + diálogo de criação/edição com a árvore de **checkboxes por aba individual** (seções são só agrupamento visual).
-- **`src/pages/SuperAdmin.tsx`**: monta `PlatformUsersPanel` abaixo dos painéis existentes.
-
-### Catálogo inicial de abas (cada item = 1 checkbox)
-
-```text
-Redes Sociais  → /comments, /militancia, /engagement, /inteligencia-conteudo
-Base Política  → /pessoas
-Mobilização    → /missoes-ia, /funcionarios, /presenca, /calendario-politico
-Operacional    → /disparos, /eleicao, /territorial, /inteligencia-eleitoral, /midia
-Sistema        → /status-whatsapp, /settings
-```
-
-`/dashboard` é sempre liberado (página inicial pós-login) — checkbox vem marcado e desabilitado, fora da contagem.
-
-## Pontos abertos para confirmar antes da implementação
-
-1. O usuário criado pelo super admin enxerga dados de **qual cliente**? (a) nenhum em específico — vê o sistema "global/vazio"; (b) vinculado a um `client_id` escolhido no cadastro. Qual dos dois?
-2. O super admin deve poder **trocar a senha** desses usuários a qualquer momento, ou só disparar reset por email?
-3. Usuários antigos em `team_members` (perfis fixos) devem ser migrados automaticamente para `platform_users` (convertendo perfil → lista de abas individuais), ou ficam como estão?
+- ✅ Apenas para `tipo = 'lider'` (não dispara para coordenador/cabo).
+- ✅ Apenas Campo Grande (regiões). Para Interior (cidade), o disparo fica desativado nesta fase — pode ser estendido depois se quiser.
