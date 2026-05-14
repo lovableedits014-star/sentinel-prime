@@ -1,50 +1,56 @@
-## Objetivo
+Diagnóstico encontrado:
+- A tela mostrou “Pronto!” porque a função recebeu HTTP 200 e `messageId` da ponte.
+- No banco, o último teste registrou 3 envios como sucesso, mas todos foram para o mesmo número: coordenador, secretaria e líder estão resolvendo para `5567992422198`.
+- A função da Eleição usa um fluxo próprio, diferente do fluxo mais maduro dos Disparos/Credenciais, então ela pode marcar “enviado” sem a mesma robustez de status, reconexão, atualização da instância e fallback.
 
-Ao cadastrar um novo líder, exibir um painel visual mostrando, em tempo real, o status do envio de mensagem para cada destinatário (Coordenador → Secretaria → Líder), com botões de **Tentar novamente** e **Ignorar** por etapa em caso de erro.
+Plano de correção:
 
-## Mudanças
+1. Unificar a lógica de envio da Eleição com o fluxo que já funciona
+- Substituir o envio interno da `eleicao-notify-novo-lider` pela mesma lógica usada em `eleicao-send-credentials`/`send-whatsapp-dispatch`:
+  - seleção de instância ativa/favoritada;
+  - preflight real;
+  - atualização de status da instância;
+  - retry em falha “Instance not connected”;
+  - tratamento de falhas transitórias;
+  - `log_whatsapp_send` consistente.
 
-### 1. Edge Function `eleicao-notify-novo-lider` — modo single-target
+2. Melhorar a escolha da instância sem quebrar sua regra
+- Priorizar a instância favoritada/primária quando estiver ativa e com credenciais.
+- Se ela responder desconectada ou falhar no envio, marcar status corretamente e tentar reconectar antes de dizer que falhou.
+- Só usar fallback se a favoritada realmente não puder enviar.
 
-Adicionar suporte ao parâmetro opcional `target` no body (`"coordenador" | "secretaria" | "lider"`). Quando enviado, a função executa **apenas a etapa solicitada** e retorna `{ success, result, preflight }`. Sem `target`, mantém o comportamento atual (envia tudo).
+3. Parar de considerar sucesso “fraco” como envio confirmado
+- Guardar no log a resposta bruta resumida da ponte quando possível.
+- Só mostrar “Pronto! Enviado” quando a ponte retornar sinal confiável (`delivered`, `messageId`, `id` ou `key.id`) sem erro.
+- Se a ponte devolver 200 mas sem confirmação confiável, mostrar erro com botão “Tentar novamente”.
 
-Isso permite ao frontend disparar cada etapa individualmente e oferecer retry/ignorar granular sem reescrever o fluxo do servidor.
+4. Mostrar destinatários reais no modal
+- Em vez de “Enviado para Coordenador”, exibir algo como:
+  - “Enviando para Coordenador: Leiliane — 5567992422198”
+  - “Pronto! Enviado para Secretaria — 5567992422198”
+  - “Enviando mensagem para Líder: MAYER… — 5567992422198”
+- Se dois ou três destinos tiverem o mesmo número, o modal deixa isso claro para não parecer que foi para pessoas diferentes.
 
-### 2. Novo componente `NotifyProgressDialog` (frontend)
+5. Corrigir resposta por etapa
+- Cada chamada com `target` retornará:
+  - destinatário resolvido;
+  - telefone limpo;
+  - instância usada;
+  - status do preflight;
+  - resultado real do bridge;
+  - erro detalhado quando falhar.
+- O botão “Tentar novamente” repetirá a mesma etapa com os dados atualizados.
+- O botão “Ignorar” continuará apenas pulando a etapa no cliente.
 
-`src/components/eleicao/NotifyProgressDialog.tsx` — dialog modal exibido logo após salvar o líder. Contém:
+6. Validar depois da alteração
+- Redeploy da função `eleicao-notify-novo-lider`.
+- Testar com a função publicada usando a sessão autenticada.
+- Conferir logs da Edge Function e tabelas `eleicao_notif_log` e `whatsapp_instance_send_log`.
+- Confirmar que a tela não mostra sucesso falso quando não houver confirmação confiável.
 
-- Lista de 3 etapas: Coordenador, Secretaria, Líder cadastrado
-- Cada etapa mostra ícone de estado:
-  - ⏳ pendente (cinza)
-  - 🔄 enviando (spinner animado, "Enviando para Coordenador…")
-  - ✓ sucesso (verde, "Enviado para Coordenador")
-  - ✗ erro (vermelho, com mensagem)
-  - ⊘ ignorada (cinza riscado)
-- Em caso de erro: botões **Tentar novamente** e **Ignorar** ao lado da etapa
-- Botão geral **Fechar** (habilitado quando todas as etapas terminam: success/skipped/ignored)
-- Execução sequencial automática: dispara coordenador → aguarda → secretaria → líder. Se uma etapa falha, **pausa** o fluxo até o usuário escolher retry ou ignorar (depois continua para a próxima).
+Arquivos previstos:
+- `supabase/functions/eleicao-notify-novo-lider/index.ts`
+- `src/components/eleicao/NotifyProgressDialog.tsx`
+- `src/pages/Eleicao.tsx` somente se precisar ajustar os dados passados para o modal.
 
-### 3. Integração em `src/pages/Eleicao.tsx`
-
-Substituir o bloco atual de notificação automática (linhas ~241-291 da `save()`):
-- Remover a chamada única ao endpoint que retorna tudo agregado
-- Após inserir o líder, abrir o `NotifyProgressDialog` com `pessoaId`
-- O dialog gerencia o ciclo de vida do envio chamando o endpoint com `target` para cada etapa
-- Toast final consolidado quando o usuário fechar (apenas se houver falhas residuais)
-
-Mantém o fluxo de coordenador + send_access intacto (não usa este dialog).
-
-## Detalhes técnicos
-
-- O endpoint usa o mesmo fetch direto autenticado (sessão Supabase) que já existe hoje
-- Retry chama o mesmo endpoint com o mesmo `target` — sem mudança de estado do lado do servidor além do log normal de envio
-- "Ignorar" é puramente client-side (marca a etapa como skipped e segue) — não chama o servidor
-- Sem alterações de schema; não envolve migrations
-- Usa tokens semânticos do design system (`--primary`, `--destructive`, `--muted`) e componentes shadcn já presentes (Dialog, Button, ícones lucide)
-
-## Arquivos afetados
-
-- `supabase/functions/eleicao-notify-novo-lider/index.ts` — adicionar branch `target`
-- `src/components/eleicao/NotifyProgressDialog.tsx` — novo
-- `src/pages/Eleicao.tsx` — substituir bloco de notificação por abertura do dialog
+Não pretendo mexer no cadastro de pessoas nem em outras abas de disparo.
