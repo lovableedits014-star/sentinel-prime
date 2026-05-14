@@ -310,9 +310,9 @@ async function sendTo(params: {
   await logSend(admin, bridge, clientId, r.ok, r.ok ? undefined : (r.error || undefined), preflightStatus, preflightReconnected);
 
   if (r.ok) {
-    return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status };
+    return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status, bridgeRaw: r.raw };
   }
-  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status };
+  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status, bridgeRaw: r.raw };
 }
 
 Deno.serve(async (req) => {
