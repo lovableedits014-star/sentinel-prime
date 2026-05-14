@@ -55,18 +55,26 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = BRID
 }
 
 async function getBridge(admin: any, clientId: string) {
-  const { data: pickedId } = await admin.rpc("pick_healthy_whatsapp_instance", { p_client_id: clientId });
-  if (pickedId) {
-    const { data: inst } = await admin.from("whatsapp_instances")
-      .select("id, apelido, bridge_url, bridge_api_key, phone_number")
-      .eq("id", pickedId).maybeSingle();
-    if (inst?.bridge_url && inst?.bridge_api_key) return inst;
+  // A aba de Eleição deve respeitar explicitamente a instância favoritada no sistema.
+  // Antes estava chamando o balanceador `pick_healthy_whatsapp_instance`, que podia
+  // escolher outra instância por score/falhas. Aqui a ordem correta é:
+  // 1) favoritada/primária ativa; 2) qualquer ativa como fallback.
+  const { data: primary } = await admin.from("whatsapp_instances")
+    .select("id, apelido, bridge_url, bridge_api_key, phone_number")
+    .eq("client_id", clientId).eq("is_active", true)
+    .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
+    .eq("is_primary", true)
+    .limit(1).maybeSingle();
+  if (primary?.bridge_url && primary?.bridge_api_key) {
+    console.log("[eleicao-notify-novo-lider] usando instância favoritada", { id: primary.id, apelido: primary.apelido });
+    return primary;
   }
+
   const { data: inst } = await admin.from("whatsapp_instances")
     .select("id, apelido, bridge_url, bridge_api_key, phone_number")
     .eq("client_id", clientId).eq("is_active", true)
     .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
-    .order("is_primary", { ascending: false }).limit(1).maybeSingle();
+    .order("created_at", { ascending: true }).limit(1).maybeSingle();
   if (inst?.bridge_url && inst?.bridge_api_key) return inst;
   return null;
 }
