@@ -875,6 +875,8 @@ Deno.serve(async (req) => {
         total_chats: allChats.length,
         total_groups: rawGroups.length,
         inactive_marked: inactiveMarked,
+        restored_favorites: restoredFavorites,
+        phone_number: phoneDigits || null,
         synced_at: now,
       });
     }
