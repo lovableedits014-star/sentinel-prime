@@ -834,6 +834,12 @@ export default function Eleicao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <NotifyProgressDialog
+        open={notifyOpen}
+        pessoaId={notifyPessoaId}
+        onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); }}
+      />
     </div>
   );
 }
