@@ -17,6 +17,10 @@ interface Step {
   status: StepStatus;
   error?: string;
   reason?: string;
+  destinatario?: string | null;
+  telefone?: string | null;
+  instancia?: string | null;
+  messageId?: string | null;
 }
 
 const INITIAL_STEPS: Step[] = [
