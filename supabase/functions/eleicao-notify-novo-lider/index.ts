@@ -320,52 +320,72 @@ Deno.serve(async (req) => {
 
     const results: Record<string, SendOutcome> = {};
 
-    // 1) Coordenador da região (parent_id ou fallback por região)
-    let coordPhone: string | null = null;
-    let coordNome: string | null = null;
-    if (pessoa.parent_id) {
-      const { data: parent } = await admin.from("eleicao_pessoas")
-        .select("nome, telefone, tipo").eq("id", pessoa.parent_id).maybeSingle();
-      if (parent?.tipo === "coordenador" && parent.telefone) {
-        coordPhone = parent.telefone;
-        coordNome = parent.nome;
+    // Helper para resolver telefone do coordenador (parent_id ou fallback por região)
+    async function resolveCoord(): Promise<{ phone: string | null; nome: string | null }> {
+      let coordPhone: string | null = null;
+      let coordNome: string | null = null;
+      if (pessoa.parent_id) {
+        const { data: parent } = await admin.from("eleicao_pessoas")
+          .select("nome, telefone, tipo").eq("id", pessoa.parent_id).maybeSingle();
+        if (parent?.tipo === "coordenador" && parent.telefone) {
+          coordPhone = parent.telefone;
+          coordNome = parent.nome;
+        }
       }
-    }
-    if (!coordPhone && pessoa.regiao && pessoa.escopo === "campo_grande") {
-      const { data: coord } = await admin.from("eleicao_pessoas")
-        .select("nome, telefone")
-        .eq("client_id", pessoa.client_id).eq("tipo", "coordenador")
-        .eq("escopo", "campo_grande").eq("regiao", pessoa.regiao)
-        .order("created_at", { ascending: true }).limit(1).maybeSingle();
-      if (coord?.telefone) { coordPhone = coord.telefone; coordNome = coord.nome; }
-    }
-    results.coordenador = await sendTo({
-      admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
-      destinatarioTipo: "coordenador", destinatarioNome: coordNome,
-      destinatarioTelefone: coordPhone, message: msgInterno,
-    });
-    if (!coordPhone) results.coordenador = { sent: false, reason: "Sem coordenador na região" };
-
-    await sleep(800); // pequeno respiro entre envios
-
-    // 2) Secretaria
-    results.secretaria = await sendTo({
-      admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
-      destinatarioTipo: "secretaria", destinatarioNome: "Secretaria",
-      destinatarioTelefone: cfg.secretaria_telefone || null, message: msgInterno,
-    });
-    if (!cfg.secretaria_telefone) {
-      results.secretaria = { sent: false, reason: "Telefone da secretaria não configurado" };
+      if (!coordPhone && pessoa.regiao && pessoa.escopo === "campo_grande") {
+        const { data: coord } = await admin.from("eleicao_pessoas")
+          .select("nome, telefone")
+          .eq("client_id", pessoa.client_id).eq("tipo", "coordenador")
+          .eq("escopo", "campo_grande").eq("regiao", pessoa.regiao)
+          .order("created_at", { ascending: true }).limit(1).maybeSingle();
+        if (coord?.telefone) { coordPhone = coord.telefone; coordNome = coord.nome; }
+      }
+      return { phone: coordPhone, nome: coordNome };
     }
 
+    async function runCoordenador() {
+      const { phone, nome } = await resolveCoord();
+      const out = await sendTo({
+        admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+        destinatarioTipo: "coordenador", destinatarioNome: nome,
+        destinatarioTelefone: phone, message: msgInterno,
+      });
+      results.coordenador = phone ? out : { sent: false, reason: "Sem coordenador na região" };
+    }
+
+    async function runSecretaria() {
+      const out = await sendTo({
+        admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+        destinatarioTipo: "secretaria", destinatarioNome: "Secretaria",
+        destinatarioTelefone: cfg.secretaria_telefone || null, message: msgInterno,
+      });
+      results.secretaria = cfg.secretaria_telefone ? out : { sent: false, reason: "Telefone da secretaria não configurado" };
+    }
+
+    async function runLider() {
+      results.lider = await sendTo({
+        admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+        destinatarioTipo: "lider", destinatarioNome: pessoa.nome,
+        destinatarioTelefone: pessoa.telefone, message: msgLider,
+      });
+    }
+
+    if (target) {
+      if (target === "coordenador") await runCoordenador();
+      else if (target === "secretaria") await runSecretaria();
+      else if (target === "lider") await runLider();
+      return new Response(
+        JSON.stringify({ success: true, preflight: pre, target, result: results[target] }),
+        { headers: { ...cors, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Fluxo completo (sequencial, com pequena pausa entre envios)
+    await runCoordenador();
     await sleep(800);
-
-    // 3) Líder cadastrado
-    results.lider = await sendTo({
-      admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
-      destinatarioTipo: "lider", destinatarioNome: pessoa.nome,
-      destinatarioTelefone: pessoa.telefone, message: msgLider,
-    });
+    await runSecretaria();
+    await sleep(800);
+    await runLider();
 
     return new Response(JSON.stringify({ success: true, preflight: pre, results }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (err: any) {
