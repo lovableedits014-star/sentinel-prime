@@ -16,12 +16,16 @@ function normalizePhone(p: string) {
 function phoneVariants(p: string) {
   const normalized = normalizePhone(p);
   if (!normalized) return [];
-  const variants = [normalized];
+  const variants: string[] = [];
   const noCountry = normalized.startsWith("55") ? normalized.slice(2) : normalized;
   if (noCountry.length === 11 && noCountry[2] === "9") {
-    variants.push(`55${noCountry.slice(0, 2)}${noCountry.slice(3)}`);
+    // WhatsApp/Baileys frequentemente endereça números BR pelo JID antigo (sem o 9).
+    // Se enviarmos primeiro com o 9, algumas bridges retornam sucesso mas a mensagem não chega.
+    variants.push(`55${noCountry.slice(0, 2)}${noCountry.slice(3)}`, normalized);
   } else if (noCountry.length === 10) {
-    variants.unshift(`55${noCountry.slice(0, 2)}9${noCountry.slice(2)}`);
+    variants.push(normalized, `55${noCountry.slice(0, 2)}9${noCountry.slice(2)}`);
+  } else {
+    variants.push(normalized);
   }
   return Array.from(new Set(variants.filter((v) => v.length >= 12)));
 }
@@ -65,6 +69,7 @@ async function getBridge(admin: any, clientId: string) {
 
 async function bridgeSend(url: string, key: string, phone: string, message: string) {
   let lastError = "";
+  let lastPhone = "";
   const variants = phoneVariants(phone);
   try {
     for (const variant of variants) {
@@ -85,13 +90,28 @@ async function bridgeSend(url: string, key: string, phone: string, message: stri
             : ok
               ? null
               : (data?.error || data?.message || "Ponte não confirmou entrega da mensagem");
+      console.log("[eleicao-notify-novo-lider] tentativa", { phone: variant, status: res.status, ok, messageId: messageId || null, error });
       if (ok) return { ok, error: null, phone: variant, messageId };
+      lastPhone = variant;
       lastError = error || "Falha desconhecida";
     }
-    return { ok: false, error: lastError || "Telefone inválido ou sem confirmação da ponte" };
+    return { ok: false, error: lastError || "Telefone inválido ou sem confirmação da ponte", phone: lastPhone };
   } catch (e: any) {
-    return { ok: false, error: e.message || "Erro de rede" };
+    return { ok: false, error: e.message || "Erro de rede", phone: lastPhone };
   }
+}
+
+async function logSend(admin: any, bridge: any, clientId: string, sent: boolean, error?: string) {
+  if (!bridge?.id) return;
+  await admin.rpc("log_whatsapp_send", {
+    p_instance_id: bridge.id,
+    p_client_id: clientId,
+    p_dispatch_id: null,
+    p_success: sent,
+    p_error_message: error || null,
+    p_preflight_status: "connected",
+    p_preflight_reconnected: false,
+  });
 }
 
 Deno.serve(async (req) => {
