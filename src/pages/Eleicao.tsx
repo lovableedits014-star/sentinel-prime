@@ -154,6 +154,14 @@ export default function Eleicao() {
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
 
+  // Reload disparado por componentes filhos (ex.: toggle de favorito)
+  useEffect(() => {
+    const handler = () => { if (clientId) load(); };
+    window.addEventListener("eleicao:reload-pessoas", handler);
+    return () => window.removeEventListener("eleicao:reload-pessoas", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
   async function load() {
     setLoading(true);
     const { data, error } = await supabase
