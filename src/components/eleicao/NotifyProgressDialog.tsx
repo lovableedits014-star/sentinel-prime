@@ -102,7 +102,7 @@ export function NotifyProgressDialog({ open, pessoaId, onClose }: Props) {
         instancia: result?.instance?.apelido ?? null,
         messageId: result?.messageId ?? null,
       };
-      if (result?.sent) {
+      if (result?.sent && result?.delivery_confirmed) {
         updateStep(idx, { status: "success", ...meta });
         await sleep(400);
         if (idx + 1 < INITIAL_STEPS.length) {
@@ -118,7 +118,11 @@ export function NotifyProgressDialog({ open, pessoaId, onClose }: Props) {
             await runStep(idx + 1);
           }
         } else {
-          updateStep(idx, { status: "error", error: error || reason || "Falha desconhecida", ...meta });
+          updateStep(idx, {
+            status: "error",
+            error: error || reason || "Falha desconhecida",
+            ...meta,
+          });
           setPaused(true);
         }
       }
