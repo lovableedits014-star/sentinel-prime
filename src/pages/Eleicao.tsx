@@ -21,6 +21,7 @@ import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTempla
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package } from "lucide-react";
+import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -130,6 +131,8 @@ export default function Eleicao() {
 
   // dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyPessoaId, setNotifyPessoaId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Pessoa | null>(null);
   const [form, setForm] = useState({
     tipo: "coordenador" as Tipo,
@@ -237,57 +240,14 @@ export default function Eleicao() {
     if (error) { toast.error(error.message); return; }
 
     // Disparo automático de notificações ao criar novo líder.
-    // Usa fetch direto com o token da sessão para evitar problemas de auth do invoke.
-    let notificationToastShown = false;
+    // Abre o dialog visual de progresso por etapa (Coordenador → Secretaria → Líder).
     if (!editing && form.tipo === "lider" && savedPessoa) {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token;
-        if (!accessToken) throw new Error("Sessão expirada — faça login novamente");
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/eleicao-notify-novo-lider`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({ pessoa_id: (savedPessoa as any).id }),
-          },
-        );
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok || data?.error) {
-          throw new Error(data?.error || `Falha (status ${resp.status})`);
-        }
-        if (data?.skipped) {
-          toast.warning(`Líder cadastrado. Notificação automática pulada: ${data.skipped}`);
-        } else {
-          const r = data?.results || {};
-          const labels: Record<string, string> = { coordenador: "Coordenador", secretaria: "Secretaria", lider: "Líder" };
-          const linhas: string[] = [];
-          let temFalha = false;
-          for (const key of ["coordenador", "secretaria", "lider"] as const) {
-            const item = r[key];
-            if (!item) continue;
-            if (item.sent) linhas.push(`✓ ${labels[key]} enviado`);
-            else { temFalha = true; linhas.push(`✗ ${labels[key]}: ${item.reason || item.error || "falha"}`); }
-          }
-          const detalhes = linhas.join("\n");
-          if (temFalha) {
-            toast.warning("Líder cadastrado, mas algumas notificações falharam", { description: detalhes, duration: 12000 });
-          } else {
-            toast.success("Líder cadastrado e notificações enviadas", { description: detalhes, duration: 6000 });
-          }
-        }
-        notificationToastShown = true;
-      } catch (e: any) {
-        toast.error("Líder cadastrado, mas o envio automático falhou", {
-          description: e?.message || "Erro desconhecido",
-          duration: 12000,
-        });
-        notificationToastShown = true;
-      }
+      toast.success("Líder cadastrado!");
+      setDialogOpen(false);
+      setNotifyPessoaId((savedPessoa as any).id);
+      setNotifyOpen(true);
+      load();
+      return;
     }
 
     if (!editing && form.tipo === "coordenador" && form.send_access) {
@@ -298,7 +258,7 @@ export default function Eleicao() {
       });
       return;
     }
-    if (!notificationToastShown) toast.success(editing ? "Atualizado!" : "Cadastrado!");
+    toast.success(editing ? "Atualizado!" : "Cadastrado!");
     setDialogOpen(false);
     load();
   }
@@ -874,6 +834,12 @@ export default function Eleicao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <NotifyProgressDialog
+        open={notifyOpen}
+        pessoaId={notifyPessoaId}
+        onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); }}
+      />
     </div>
   );
 }

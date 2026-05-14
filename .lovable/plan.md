@@ -1,65 +1,50 @@
-Plano de correção urgente para os envios automáticos da aba Eleição
+## Objetivo
 
-O que encontrei na investigação
-- Os cadastros estão salvando no banco e o telefone está sendo padronizado corretamente.
-- A função `eleicao-notify-novo-lider` foi chamada nos cadastros recentes e respondeu `200` com `success: true`.
-- Os logs mostram `messageId` para os envios, mas o sistema hoje considera isso como “entregue”, sem validar melhor a saúde da instância antes do envio e sem registrar destinatário/erro detalhado por tipo de notificação.
-- A função de líder está menos robusta que o fluxo de disparos gerais, que já possui pré-checagem da instância, tentativa de reconexão e tratamento mais forte de falhas.
-- O frontend usa `supabase.functions.invoke`; isso já funcionou agora, mas é frágil para autenticação e erros detalhados. Já tivemos 401 antes por causa disso.
+Ao cadastrar um novo líder, exibir um painel visual mostrando, em tempo real, o status do envio de mensagem para cada destinatário (Coordenador → Secretaria → Líder), com botões de **Tentar novamente** e **Ignorar** por etapa em caso de erro.
 
-Correção que vou implementar
+## Mudanças
 
-1. Fortalecer a chamada automática no frontend
-- Trocar a chamada de `supabase.functions.invoke("eleicao-notify-novo-lider")` por `fetch` explícito com token atual da sessão.
-- Parsear corretamente o corpo de erro da função.
-- Mostrar no toast o resultado real por destinatário: coordenador, secretaria e líder.
-- Não exibir sucesso genérico quando algum envio falhar ou for pulado.
+### 1. Edge Function `eleicao-notify-novo-lider` — modo single-target
 
-2. Corrigir a função `eleicao-notify-novo-lider` na raiz
-- Adicionar pré-checagem da instância WhatsApp antes dos envios:
-  - consultar `instance_status`;
-  - se estiver desconectada, tentar `reconnect`;
-  - se continuar desconectada, retornar erro real e não sucesso falso.
-- Usar a mesma lógica robusta do sistema de disparos que já funciona.
-- Melhorar o tratamento da resposta da bridge:
-  - `success:false` vira falha;
-  - `delivered:false` vira falha;
-  - ausência de confirmação clara vira aviso/falha controlada;
-  - timeout/rede/502/503/504 terão retry curto.
-- Logar cada envio com telefone, tipo de destinatário, status, erro e `messageId`.
+Adicionar suporte ao parâmetro opcional `target` no body (`"coordenador" | "secretaria" | "lider"`). Quando enviado, a função executa **apenas a etapa solicitada** e retorna `{ success, result, preflight }`. Sem `target`, mantém o comportamento atual (envia tudo).
 
-3. Criar auditoria específica para a aba Eleição
-- Criar uma tabela de log dos envios automáticos de eleição para rastrear:
-  - pessoa cadastrada;
-  - destinatário: coordenador, secretaria ou líder;
-  - telefone enviado;
-  - mensagem enviada;
-  - sucesso/falha;
-  - erro retornado;
-  - `messageId`;
-  - data/hora.
-- Isso resolve o problema de hoje: o app diz “enviou”, mas não há uma tela/log claro dizendo exatamente para quem foi, qual mensagem e qual retorno.
+Isso permite ao frontend disparar cada etapa individualmente e oferecer retry/ignorar granular sem reescrever o fluxo do servidor.
 
-4. Ajustar casos de vínculo do líder
-- Quando o líder for cadastrado sem coordenador vinculado (`parent_id` vazio), manter o fallback por região, mas registrar claramente que foi usado fallback.
-- Se não houver coordenador real na região, o sistema deve marcar `coordenador` como falha/pulado e não esconder isso.
+### 2. Novo componente `NotifyProgressDialog` (frontend)
 
-5. Revisar também `eleicao-send-credentials`
-- Padronizar a autenticação no frontend para envio de credenciais do coordenador.
-- Garantir que erro da função apareça completo na tela.
-- Manter o fluxo de criação de usuário e WhatsApp, mas com retorno mais transparente.
+`src/components/eleicao/NotifyProgressDialog.tsx` — dialog modal exibido logo após salvar o líder. Contém:
 
-6. Teste final após correção
-- Cadastrar um novo coordenador.
-- Cadastrar dois líderes com telefones diferentes.
-- Confirmar no banco:
-  - telefones normalizados;
-  - registros de log por destinatário;
-  - status real de cada envio.
-- Confirmar nos logs da função se houve preflight, tentativa de envio, `messageId` e resultado final.
+- Lista de 3 etapas: Coordenador, Secretaria, Líder cadastrado
+- Cada etapa mostra ícone de estado:
+  - ⏳ pendente (cinza)
+  - 🔄 enviando (spinner animado, "Enviando para Coordenador…")
+  - ✓ sucesso (verde, "Enviado para Coordenador")
+  - ✗ erro (vermelho, com mensagem)
+  - ⊘ ignorada (cinza riscado)
+- Em caso de erro: botões **Tentar novamente** e **Ignorar** ao lado da etapa
+- Botão geral **Fechar** (habilitado quando todas as etapas terminam: success/skipped/ignored)
+- Execução sequencial automática: dispara coordenador → aguarda → secretaria → líder. Se uma etapa falha, **pausa** o fluxo até o usuário escolher retry ou ignorar (depois continua para a próxima).
 
-Resultado esperado
-- Se o WhatsApp realmente enviar, a aba vai mostrar sucesso por destinatário.
-- Se a bridge aceitar mas não confirmar, a aba vai avisar corretamente.
-- Se a instância estiver desconectada, o sistema tentará reconectar e mostrará o erro real.
-- Não teremos mais “sucesso falso” nem envio automático sem rastreabilidade.
+### 3. Integração em `src/pages/Eleicao.tsx`
+
+Substituir o bloco atual de notificação automática (linhas ~241-291 da `save()`):
+- Remover a chamada única ao endpoint que retorna tudo agregado
+- Após inserir o líder, abrir o `NotifyProgressDialog` com `pessoaId`
+- O dialog gerencia o ciclo de vida do envio chamando o endpoint com `target` para cada etapa
+- Toast final consolidado quando o usuário fechar (apenas se houver falhas residuais)
+
+Mantém o fluxo de coordenador + send_access intacto (não usa este dialog).
+
+## Detalhes técnicos
+
+- O endpoint usa o mesmo fetch direto autenticado (sessão Supabase) que já existe hoje
+- Retry chama o mesmo endpoint com o mesmo `target` — sem mudança de estado do lado do servidor além do log normal de envio
+- "Ignorar" é puramente client-side (marca a etapa como skipped e segue) — não chama o servidor
+- Sem alterações de schema; não envolve migrations
+- Usa tokens semânticos do design system (`--primary`, `--destructive`, `--muted`) e componentes shadcn já presentes (Dialog, Button, ícones lucide)
+
+## Arquivos afetados
+
+- `supabase/functions/eleicao-notify-novo-lider/index.ts` — adicionar branch `target`
+- `src/components/eleicao/NotifyProgressDialog.tsx` — novo
+- `src/pages/Eleicao.tsx` — substituir bloco de notificação por abertura do dialog
