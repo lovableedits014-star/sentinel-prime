@@ -6,6 +6,7 @@ const cors = {
 };
 
 const BRIDGE_TIMEOUT_MS = 15000;
+const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function cleanPhoneForBridge(raw: string): string {
@@ -32,35 +33,110 @@ const REGIAO_LABELS: Record<string, string> = {
   anhanduizinho: "Anhanduizinho", lagoa: "Lagoa", imbirussu: "Imbirussu", moreninha: "Moreninha",
 };
 
-// Compara dois telefones ignorando o "9" extra (para detectar quando o destinatário
-// é o próprio número da instância — WhatsApp não entrega mensagens para si mesmo).
 function samePhone(a: string, b: string) {
   const da = String(a || "").replace(/\D/g, "");
   const db = String(b || "").replace(/\D/g, "");
   if (!da || !db) return false;
   if (da === db) return true;
-  // Tolerância de 1 dígito para o "9" extra (ex.: 556792773931 vs 5567992773931)
   const last = (s: string, n: number) => s.slice(-n);
   return last(da, 8) === last(db, 8);
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = BRIDGE_TIMEOUT_MS) {
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(tid);
+function isConnectedStatus(s: unknown) {
+  const v = String(s || "").toLowerCase();
+  return v === "connected" || v === "open";
+}
+function isExplicitOfflineStatus(s: unknown) {
+  const v = String(s || "").toLowerCase();
+  return ["disconnected", "offline", "closed", "logged_out", "logout", "banned"].includes(v);
+}
+function bridgeStatusOf(data: any) {
+  return String(data?.status || data?.instance?.status || "").toLowerCase();
+}
+
+async function bridgeAction(bridgeUrl: string, bridgeKey: string, body: Record<string, unknown>, retries = 0) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), BRIDGE_TIMEOUT_MS);
+    try {
+      const res = await fetch(bridgeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": bridgeKey },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+      if (TRANSIENT_BRIDGE_STATUSES.has(res.status) && attempt < retries) {
+        clearTimeout(tid);
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      clearTimeout(tid);
+      return { res, data };
+    } catch (err) {
+      clearTimeout(tid);
+      const aborted = (err as Error)?.name === "AbortError";
+      if (attempt < retries) { await sleep(1000 * (attempt + 1)); continue; }
+      const fakeRes = new Response(null, { status: aborted ? 504 : 502 });
+      return { res: fakeRes, data: { error: aborted ? `Timeout após ${BRIDGE_TIMEOUT_MS}ms na ponte WhatsApp` : `Falha de rede: ${(err as Error).message}` } };
+    }
   }
+  throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
+}
+
+function sendFailure(res: Response, data: any): string | null {
+  if (!res.ok) return data?.error || `Erro na ponte WhatsApp (status ${res.status})`;
+  if (data?.success === false) return data?.error || "Ponte recusou o envio";
+  if (data?.delivered === false) return data?.error || "Mensagem não entregue pelo WhatsApp";
+  const confirmed = data?.delivered === true || Boolean(data?.messageId || data?.message_id || data?.id || data?.key?.id);
+  return confirmed ? null : (data?.error || "Ponte não confirmou o envio da mensagem");
+}
+
+function isInstanceDisconnectedFailure(res: Response, data: any, failure: string) {
+  if (res.status === 401 || res.status === 409) return true;
+  const msg = String(data?.error || data?.message || failure || "").toLowerCase();
+  return msg.includes("instance") && (msg.includes("disconnect") || msg.includes("not connected") || msg.includes("offline"))
+    || /not connected|desconect|sem conex/i.test(msg);
+}
+
+async function updateInstanceStatus(admin: any, instId: string, status: "connected" | "connecting" | "disconnected") {
+  if (!instId) return;
+  const updates: any = { status, last_health_check_at: new Date().toISOString() };
+  if (status === "connected") updates.connected_since = new Date().toISOString();
+  if (status === "disconnected") {
+    updates.connected_since = null;
+    updates.last_disconnected_at = new Date().toISOString();
+  }
+  await admin.from("whatsapp_instances").update(updates).eq("id", instId);
+}
+
+async function preflightInstance(admin: any, bridge: any) {
+  // Status atual
+  try {
+    const { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key, { action: "instance_status" }, 1);
+    const raw = bridgeStatusOf(data);
+    if (isConnectedStatus(raw)) {
+      await updateInstanceStatus(admin, bridge.id, "connected");
+      return { status: "connected", reconnected: false, detail: raw };
+    }
+    if (isExplicitOfflineStatus(raw) || res.status === 401) {
+      await updateInstanceStatus(admin, bridge.id, "disconnected");
+    }
+  } catch (e) {
+    console.warn("[eleicao-notify-novo-lider] preflight status falhou:", (e as Error).message);
+  }
+  // Tenta reconectar
+  const { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key, { action: "reconnect" }, 1);
+  const raw = bridgeStatusOf(data);
+  const status = isConnectedStatus(raw) ? "connected" : (isExplicitOfflineStatus(raw) || res.status === 401 ? "disconnected" : "connecting");
+  await updateInstanceStatus(admin, bridge.id, status as any);
+  return { status, reconnected: status === "connected", detail: raw || data?.error || data?.message || "sem status" };
 }
 
 async function getBridge(admin: any, clientId: string) {
-  // A aba de Eleição deve respeitar explicitamente a instância favoritada no sistema.
-  // Antes estava chamando o balanceador `pick_healthy_whatsapp_instance`, que podia
-  // escolher outra instância por score/falhas. Aqui a ordem correta é:
-  // 1) favoritada/primária ativa; 2) qualquer ativa como fallback.
+  // 1) favoritada/primária ativa com credenciais
   const { data: primary } = await admin.from("whatsapp_instances")
-    .select("id, apelido, bridge_url, bridge_api_key, phone_number")
+    .select("id, apelido, bridge_url, bridge_api_key, phone_number, connected_since, status")
     .eq("client_id", clientId).eq("is_active", true)
     .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
     .eq("is_primary", true)
@@ -69,9 +145,9 @@ async function getBridge(admin: any, clientId: string) {
     console.log("[eleicao-notify-novo-lider] usando instância favoritada", { id: primary.id, apelido: primary.apelido });
     return primary;
   }
-
+  // 2) qualquer ativa
   const { data: inst } = await admin.from("whatsapp_instances")
-    .select("id, apelido, bridge_url, bridge_api_key, phone_number")
+    .select("id, apelido, bridge_url, bridge_api_key, phone_number, connected_since, status")
     .eq("client_id", clientId).eq("is_active", true)
     .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
     .order("created_at", { ascending: true }).limit(1).maybeSingle();
@@ -79,99 +155,42 @@ async function getBridge(admin: any, clientId: string) {
   return null;
 }
 
-// Pré-checa a instância: status_instance e tenta reconectar se necessário.
-async function preflightInstance(bridge: any) {
-  try {
-    const res = await fetchWithTimeout(bridge.bridge_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
-      body: JSON.stringify({ action: "instance_status" }),
-    });
-    const data = await res.json().catch(() => ({}));
-    const raw = String(data?.status || data?.instance?.status || "").toLowerCase();
-    if (raw === "connected" || raw === "open") {
-      return { status: "connected", reconnected: false };
-    }
-    // Tenta reconectar
-    const rec = await fetchWithTimeout(bridge.bridge_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
-      body: JSON.stringify({ action: "reconnect" }),
-    });
-    const recData = await rec.json().catch(() => ({}));
-    const newStatus = String(recData?.status || recData?.instance?.status || "").toLowerCase();
-    if (newStatus === "connected" || newStatus === "open") {
-      return { status: "reconnected", reconnected: true };
-    }
-    return { status: "disconnected", reconnected: false, detail: newStatus || raw || "sem status" };
-  } catch (e: any) {
-    return { status: "error", reconnected: false, detail: e?.message || "preflight falhou" };
-  }
-}
-
-async function bridgeSendOnce(bridge: any, cleaned: string, message: string) {
-  try {
-    const res = await fetchWithTimeout(bridge.bridge_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
-      body: JSON.stringify({ action: "send", phone: cleaned, message }),
-    });
-    const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
-    const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || null;
-    const hasDeliverySignal = data?.delivered === true || Boolean(messageId);
-    let error: string | null = null;
-    if (!res.ok) error = data?.error || `Erro na ponte WhatsApp (status ${res.status})`;
-    else if (data?.success === false) error = data?.error || "Ponte recusou o envio";
-    else if (data?.delivered === false) error = data?.error || "Mensagem não entregue pelo WhatsApp";
-    else if (!hasDeliverySignal) error = data?.error || "Ponte não confirmou entrega da mensagem";
-    return { ok: !error, error, phone: cleaned, status: res.status, messageId };
-  } catch (e: any) {
-    return { ok: false, error: e?.message || "Erro de rede", phone: cleaned, status: 0, messageId: null as string | null };
-  }
-}
-
-async function bridgeSend(bridge: any, phone: string, message: string) {
+async function bridgeSend(admin: any, bridge: any, phone: string, message: string) {
   const cleaned = cleanPhoneForBridge(phone);
-  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null };
+  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null as string | null, raw: null as any };
 
-  let r = await bridgeSendOnce(bridge, cleaned, message);
+  // Envia (com retry transiente)
+  let { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key,
+    { action: "send", phone: cleaned, message }, 2);
+  let failure = sendFailure(res, data);
 
-  // Retry automático: se a ponte respondeu "Instance not connected" (409 ou erro relacionado),
-  // tenta reconectar e enviar novamente. Cobre o caso de instância oscilando entre o preflight e o envio.
-  const looksDisconnected = (
-    r.status === 409 ||
-    /not connected|disconnected|desconect|sem conex/i.test(r.error || "")
-  );
-  if (!r.ok && looksDisconnected) {
-    console.warn("[eleicao-notify-novo-lider] retry após 'not connected' — tentando reconectar", { phone: cleaned, status: r.status, error: r.error });
-    try {
-      await fetchWithTimeout(bridge.bridge_url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
-        body: JSON.stringify({ action: "reconnect" }),
-      });
-    } catch {}
-    // Espera a ponte estabilizar
-    await sleep(2500);
-    // Confirma status
-    try {
-      const sres = await fetchWithTimeout(bridge.bridge_url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
-        body: JSON.stringify({ action: "instance_status" }),
-      });
-      const sdata = await sres.json().catch(() => ({}));
-      const st = String(sdata?.status || sdata?.instance?.status || "").toLowerCase();
-      console.log("[eleicao-notify-novo-lider] status pós-reconnect:", st);
-    } catch {}
-    r = await bridgeSendOnce(bridge, cleaned, message);
-    console.log("[eleicao-notify-novo-lider] retry resultado:", { phone: cleaned, status: r.status, ok: r.ok, messageId: r.messageId, error: r.error });
+  // Se falhou por desconexão, tenta reconectar e reenviar
+  if (failure && isInstanceDisconnectedFailure(res, data, failure)) {
+    console.warn("[eleicao-notify-novo-lider] retry após desconexão", { phone: cleaned, status: res.status, error: failure });
+    const reconnect = await preflightInstance(admin, bridge);
+    if (reconnect.status === "connected") {
+      await sleep(1500);
+      const r2 = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key,
+        { action: "send", phone: cleaned, message }, 1);
+      res = r2.res; data = r2.data;
+      failure = sendFailure(res, data);
+    } else {
+      await updateInstanceStatus(admin, bridge.id, "disconnected");
+    }
   }
 
-  return r;
+  const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || null;
+  return {
+    ok: !failure,
+    error: failure,
+    phone: cleaned,
+    status: res.status,
+    messageId,
+    raw: data,
+  };
 }
 
-async function logSend(admin: any, bridge: any, clientId: string, sent: boolean, error?: string) {
+async function logSend(admin: any, bridge: any, clientId: string, sent: boolean, error: string | undefined, preflightStatus: string, preflightReconnected: boolean) {
   if (!bridge?.id) return;
   await admin.rpc("log_whatsapp_send", {
     p_instance_id: bridge.id,
@@ -179,8 +198,8 @@ async function logSend(admin: any, bridge: any, clientId: string, sent: boolean,
     p_dispatch_id: null,
     p_success: sent,
     p_error_message: error || null,
-    p_preflight_status: "connected",
-    p_preflight_reconnected: false,
+    p_preflight_status: preflightStatus,
+    p_preflight_reconnected: preflightReconnected,
   });
 }
 
@@ -192,12 +211,24 @@ async function auditLog(admin: any, row: Record<string, any>) {
   }
 }
 
-type SendOutcome = { sent: boolean; reason?: string; error?: string; messageId?: string | null };
+type SendOutcome = {
+  sent: boolean;
+  reason?: string;
+  error?: string;
+  messageId?: string | null;
+  destinatario_nome?: string | null;
+  destinatario_telefone?: string | null;
+  destinatario_telefone_fmt?: string | null;
+  instance?: { id: string; apelido: string | null } | null;
+  preflight_status?: string;
+  bridge_status?: number;
+};
 
 async function sendTo(params: {
   admin: any;
   bridge: any;
   preflightStatus: string;
+  preflightReconnected: boolean;
   clientId: string;
   pessoaId: string;
   destinatarioTipo: string;
@@ -205,7 +236,16 @@ async function sendTo(params: {
   destinatarioTelefone: string | null;
   message: string;
 }): Promise<SendOutcome> {
-  const { admin, bridge, preflightStatus, clientId, pessoaId, destinatarioTipo, destinatarioNome, destinatarioTelefone, message } = params;
+  const { admin, bridge, preflightStatus, preflightReconnected, clientId, pessoaId, destinatarioTipo, destinatarioNome, destinatarioTelefone, message } = params;
+
+  const baseInstance = bridge ? { id: bridge.id, apelido: bridge.apelido || null } : null;
+  const baseInfo = {
+    destinatario_nome: destinatarioNome,
+    destinatario_telefone: destinatarioTelefone,
+    destinatario_telefone_fmt: destinatarioTelefone ? fmtPhone(destinatarioTelefone) : null,
+    instance: baseInstance,
+    preflight_status: preflightStatus,
+  };
 
   if (!destinatarioTelefone) {
     const reason = "Sem telefone";
@@ -214,23 +254,26 @@ async function sendTo(params: {
       destinatario_nome: destinatarioNome, destinatario_telefone: null, mensagem: message,
       success: false, skipped_reason: reason, preflight_status: preflightStatus,
     });
-    return { sent: false, reason };
+    return { sent: false, reason, ...baseInfo };
   }
 
-  // Bloqueia envio para o próprio número da instância (WhatsApp não entrega para si mesmo).
   if (bridge?.phone_number && samePhone(destinatarioTelefone, bridge.phone_number)) {
-    const reason = "Destinatário é o próprio número da instância WhatsApp — não é possível enviar para si mesmo. Use um número diferente.";
+    const reason = "Destinatário é o próprio número da instância WhatsApp — use um número diferente.";
     console.warn("[eleicao-notify-novo-lider] self-send bloqueado", { destinatarioTipo, destinatarioTelefone, instance: bridge.phone_number });
     await auditLog(admin, {
       client_id: clientId, pessoa_id: pessoaId, destinatario_tipo: destinatarioTipo,
       destinatario_nome: destinatarioNome, destinatario_telefone: destinatarioTelefone, mensagem: message,
       success: false, skipped_reason: reason, preflight_status: preflightStatus,
     });
-    return { sent: false, reason };
+    return { sent: false, reason, ...baseInfo };
   }
 
-  const r = await bridgeSend(bridge, destinatarioTelefone, message);
-  console.log("[eleicao-notify-novo-lider]", { destinatarioTipo, phone: r.phone, status: r.status, ok: r.ok, messageId: r.messageId, error: r.error });
+  const r = await bridgeSend(admin, bridge, destinatarioTelefone, message);
+  console.log("[eleicao-notify-novo-lider]", {
+    destinatarioTipo, destinatarioNome, phone: r.phone, status: r.status,
+    ok: r.ok, messageId: r.messageId, error: r.error,
+    raw: r.raw && { delivered: r.raw.delivered, success: r.raw.success, error: r.raw.error },
+  });
 
   await auditLog(admin, {
     client_id: clientId, pessoa_id: pessoaId, destinatario_tipo: destinatarioTipo,
@@ -238,10 +281,10 @@ async function sendTo(params: {
     success: r.ok, error_message: r.ok ? null : r.error, message_id: r.messageId,
     preflight_status: preflightStatus, bridge_status: r.status,
   });
-  await logSend(admin, bridge, clientId, r.ok, r.error || undefined);
+  await logSend(admin, bridge, clientId, r.ok, r.error || undefined, preflightStatus, preflightReconnected);
 
-  if (r.ok) return { sent: true, messageId: r.messageId };
-  return { sent: false, error: r.error || "Falha desconhecida" };
+  if (r.ok) return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status };
+  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status };
 }
 
 Deno.serve(async (req) => {
@@ -249,7 +292,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const pessoa_id = body?.pessoa_id;
-    const target = (body?.target as string | undefined)?.toLowerCase(); // "coordenador" | "secretaria" | "lider" | undefined
+    const target = (body?.target as string | undefined)?.toLowerCase();
     if (!pessoa_id) throw new Error("pessoa_id obrigatório");
     if (target && !["coordenador", "secretaria", "lider"].includes(target)) {
       throw new Error("target inválido");
@@ -295,13 +338,17 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error: "Sem instância WhatsApp configurada" }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
-    // Pré-checagem da instância antes de enviar
-    const pre = await preflightInstance(bridge);
-    if (pre.status === "disconnected" || pre.status === "error") {
-      const msg = `Instância WhatsApp indisponível (${pre.status}${pre.detail ? ": " + pre.detail : ""}). Reconecte em Status WhatsApp e tente novamente.`;
+    const pre = await preflightInstance(admin, bridge);
+    if (pre.status === "disconnected") {
+      const msg = `Instância WhatsApp desconectada (${pre.detail || "sem status"}). Reconecte em Status WhatsApp.`;
       console.warn("[eleicao-notify-novo-lider] preflight falhou:", msg);
-      return new Response(JSON.stringify({ success: false, error: msg }), { headers: { ...cors, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({
+        success: false, error: msg,
+        instance: { id: bridge.id, apelido: bridge.apelido || null },
+        preflight: pre,
+      }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
+    if (pre.reconnected) await sleep(1500);
 
     const regiaoLabel = pessoa.regiao ? (REGIAO_LABELS[pessoa.regiao] || pessoa.regiao) : "—";
     const linkGrupo = (cfg.grupos_links && pessoa.regiao) ? (cfg.grupos_links[pessoa.regiao] || "") : "";
@@ -320,7 +367,6 @@ Deno.serve(async (req) => {
 
     const results: Record<string, SendOutcome> = {};
 
-    // Helper para resolver telefone do coordenador (parent_id ou fallback por região)
     async function resolveCoord(): Promise<{ phone: string | null; nome: string | null }> {
       let coordPhone: string | null = null;
       let coordNome: string | null = null;
@@ -343,28 +389,49 @@ Deno.serve(async (req) => {
       return { phone: coordPhone, nome: coordNome };
     }
 
+    const baseSendCtx = {
+      admin, bridge, preflightStatus: pre.status, preflightReconnected: pre.reconnected,
+      clientId: pessoa.client_id, pessoaId: pessoa.id,
+    };
+
     async function runCoordenador() {
       const { phone, nome } = await resolveCoord();
-      const out = await sendTo({
-        admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+      if (!phone) {
+        results.coordenador = {
+          sent: false, reason: "Sem coordenador na região",
+          destinatario_nome: nome, destinatario_telefone: null, destinatario_telefone_fmt: null,
+          instance: { id: bridge.id, apelido: bridge.apelido || null },
+          preflight_status: pre.status,
+        };
+        return;
+      }
+      results.coordenador = await sendTo({
+        ...baseSendCtx,
         destinatarioTipo: "coordenador", destinatarioNome: nome,
         destinatarioTelefone: phone, message: msgInterno,
       });
-      results.coordenador = phone ? out : { sent: false, reason: "Sem coordenador na região" };
     }
 
     async function runSecretaria() {
-      const out = await sendTo({
-        admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+      if (!cfg.secretaria_telefone) {
+        results.secretaria = {
+          sent: false, reason: "Telefone da secretaria não configurado",
+          destinatario_nome: "Secretaria", destinatario_telefone: null, destinatario_telefone_fmt: null,
+          instance: { id: bridge.id, apelido: bridge.apelido || null },
+          preflight_status: pre.status,
+        };
+        return;
+      }
+      results.secretaria = await sendTo({
+        ...baseSendCtx,
         destinatarioTipo: "secretaria", destinatarioNome: "Secretaria",
-        destinatarioTelefone: cfg.secretaria_telefone || null, message: msgInterno,
+        destinatarioTelefone: cfg.secretaria_telefone, message: msgInterno,
       });
-      results.secretaria = cfg.secretaria_telefone ? out : { sent: false, reason: "Telefone da secretaria não configurado" };
     }
 
     async function runLider() {
       results.lider = await sendTo({
-        admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+        ...baseSendCtx,
         destinatarioTipo: "lider", destinatarioNome: pessoa.nome,
         destinatarioTelefone: pessoa.telefone, message: msgLider,
       });
@@ -380,7 +447,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fluxo completo (sequencial, com pequena pausa entre envios)
     await runCoordenador();
     await sleep(800);
     await runSecretaria();
