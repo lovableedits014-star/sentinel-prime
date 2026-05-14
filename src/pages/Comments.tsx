@@ -18,7 +18,7 @@ import { CommentItem, type CommentData } from "@/components/CommentItem";
 import { useMilitantsMap, type MilitantRow } from "@/hooks/useMilitants";
 import { AuthorHistoryDrawer } from "@/components/comments/AuthorHistoryDrawer";
 import { AlertTriangle } from "lucide-react";
-import { syncCooldownRemaining, markSyncDone, formatCooldown } from "@/lib/sync-throttle";
+// sync-throttle removido
 import { BordoesBairrosWidget } from "@/components/memoria-widgets/BordoesBairrosWidget";
 
 type Comment = CommentData;
@@ -334,7 +334,7 @@ const Comments = () => {
 
       if (data.success) {
         toast.success(data.message);
-        markSyncDone(cid);
+        
         if (data.warnings && data.warnings.length > 0) {
           data.warnings.forEach((w: string) => {
             if (w.startsWith('⚠️')) {
