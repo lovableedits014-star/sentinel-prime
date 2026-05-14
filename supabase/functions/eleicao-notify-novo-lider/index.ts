@@ -5,7 +5,9 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Padronizado com send-whatsapp-dispatch (sistema de missões que funciona).
+const BRIDGE_TIMEOUT_MS = 15000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 function cleanPhoneForBridge(raw: string): string {
   const digits = String(raw || "").replace(/\D/g, "");
   if (!digits) return "";
@@ -30,49 +32,95 @@ const REGIAO_LABELS: Record<string, string> = {
   anhanduizinho: "Anhanduizinho", lagoa: "Lagoa", imbirussu: "Imbirussu", moreninha: "Moreninha",
 };
 
+// Compara dois telefones ignorando o "9" extra (para detectar quando o destinatário
+// é o próprio número da instância — WhatsApp não entrega mensagens para si mesmo).
+function samePhone(a: string, b: string) {
+  const da = String(a || "").replace(/\D/g, "");
+  const db = String(b || "").replace(/\D/g, "");
+  if (!da || !db) return false;
+  if (da === db) return true;
+  // Tolerância de 1 dígito para o "9" extra (ex.: 556792773931 vs 5567992773931)
+  const last = (s: string, n: number) => s.slice(-n);
+  return last(da, 8) === last(db, 8);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = BRIDGE_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(tid);
+  }
+}
+
 async function getBridge(admin: any, clientId: string) {
   const { data: pickedId } = await admin.rpc("pick_healthy_whatsapp_instance", { p_client_id: clientId });
   if (pickedId) {
     const { data: inst } = await admin.from("whatsapp_instances")
-      .select("bridge_url, bridge_api_key").eq("id", pickedId).maybeSingle();
-    if (inst?.bridge_url && inst?.bridge_api_key) return { id: pickedId, url: inst.bridge_url, key: inst.bridge_api_key };
+      .select("id, apelido, bridge_url, bridge_api_key, phone_number")
+      .eq("id", pickedId).maybeSingle();
+    if (inst?.bridge_url && inst?.bridge_api_key) return inst;
   }
   const { data: inst } = await admin.from("whatsapp_instances")
-    .select("id, bridge_url, bridge_api_key")
+    .select("id, apelido, bridge_url, bridge_api_key, phone_number")
     .eq("client_id", clientId).eq("is_active", true)
     .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
     .order("is_primary", { ascending: false }).limit(1).maybeSingle();
-  if (inst?.bridge_url && inst?.bridge_api_key) return { id: inst.id, url: inst.bridge_url, key: inst.bridge_api_key };
-  const { data: client } = await admin.from("clients")
-    .select("whatsapp_bridge_url, whatsapp_bridge_api_key").eq("id", clientId).maybeSingle();
-  if (client?.whatsapp_bridge_url && client?.whatsapp_bridge_api_key) {
-    return { url: client.whatsapp_bridge_url, key: client.whatsapp_bridge_api_key };
-  }
+  if (inst?.bridge_url && inst?.bridge_api_key) return inst;
   return null;
 }
 
-async function bridgeSend(url: string, key: string, phone: string, message: string) {
-  const cleaned = cleanPhoneForBridge(phone);
-  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "" };
+// Pré-checa a instância: status_instance e tenta reconectar se necessário.
+async function preflightInstance(bridge: any) {
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(bridge.bridge_url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": key },
+      headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
+      body: JSON.stringify({ action: "instance_status" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    const raw = String(data?.status || data?.instance?.status || "").toLowerCase();
+    if (raw === "connected" || raw === "open") {
+      return { status: "connected", reconnected: false };
+    }
+    // Tenta reconectar
+    const rec = await fetchWithTimeout(bridge.bridge_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
+      body: JSON.stringify({ action: "reconnect" }),
+    });
+    const recData = await rec.json().catch(() => ({}));
+    const newStatus = String(recData?.status || recData?.instance?.status || "").toLowerCase();
+    if (newStatus === "connected" || newStatus === "open") {
+      return { status: "reconnected", reconnected: true };
+    }
+    return { status: "disconnected", reconnected: false, detail: newStatus || raw || "sem status" };
+  } catch (e: any) {
+    return { status: "error", reconnected: false, detail: e?.message || "preflight falhou" };
+  }
+}
+
+async function bridgeSend(bridge: any, phone: string, message: string) {
+  const cleaned = cleanPhoneForBridge(phone);
+  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null };
+  try {
+    const res = await fetchWithTimeout(bridge.bridge_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
       body: JSON.stringify({ action: "send", phone: cleaned, message }),
     });
     const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
-    const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id;
+    const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || null;
     const hasDeliverySignal = data?.delivered === true || Boolean(messageId);
     let error: string | null = null;
     if (!res.ok) error = data?.error || `Erro na ponte WhatsApp (status ${res.status})`;
     else if (data?.success === false) error = data?.error || "Ponte recusou o envio";
     else if (data?.delivered === false) error = data?.error || "Mensagem não entregue pelo WhatsApp";
     else if (!hasDeliverySignal) error = data?.error || "Ponte não confirmou entrega da mensagem";
-    const ok = !error;
-    console.log("[eleicao-notify-novo-lider]", { phone: cleaned, status: res.status, ok, messageId: messageId || null, error });
-    return { ok, error, phone: cleaned, messageId };
+    return { ok: !error, error, phone: cleaned, status: res.status, messageId };
   } catch (e: any) {
-    return { ok: false, error: e.message || "Erro de rede", phone: cleaned };
+    return { ok: false, error: e?.message || "Erro de rede", phone: cleaned, status: 0, messageId: null };
   }
 }
 
@@ -87,6 +135,66 @@ async function logSend(admin: any, bridge: any, clientId: string, sent: boolean,
     p_preflight_status: "connected",
     p_preflight_reconnected: false,
   });
+}
+
+async function auditLog(admin: any, row: Record<string, any>) {
+  try {
+    await admin.from("eleicao_notif_log").insert(row);
+  } catch (e) {
+    console.error("[eleicao-notify-novo-lider] audit log falhou:", (e as Error).message);
+  }
+}
+
+type SendOutcome = { sent: boolean; reason?: string; error?: string; messageId?: string | null };
+
+async function sendTo(params: {
+  admin: any;
+  bridge: any;
+  preflightStatus: string;
+  clientId: string;
+  pessoaId: string;
+  destinatarioTipo: string;
+  destinatarioNome: string | null;
+  destinatarioTelefone: string | null;
+  message: string;
+}): Promise<SendOutcome> {
+  const { admin, bridge, preflightStatus, clientId, pessoaId, destinatarioTipo, destinatarioNome, destinatarioTelefone, message } = params;
+
+  if (!destinatarioTelefone) {
+    const reason = "Sem telefone";
+    await auditLog(admin, {
+      client_id: clientId, pessoa_id: pessoaId, destinatario_tipo: destinatarioTipo,
+      destinatario_nome: destinatarioNome, destinatario_telefone: null, mensagem: message,
+      success: false, skipped_reason: reason, preflight_status: preflightStatus,
+    });
+    return { sent: false, reason };
+  }
+
+  // Bloqueia envio para o próprio número da instância (WhatsApp não entrega para si mesmo).
+  if (bridge?.phone_number && samePhone(destinatarioTelefone, bridge.phone_number)) {
+    const reason = "Destinatário é o próprio número da instância WhatsApp — não é possível enviar para si mesmo. Use um número diferente.";
+    console.warn("[eleicao-notify-novo-lider] self-send bloqueado", { destinatarioTipo, destinatarioTelefone, instance: bridge.phone_number });
+    await auditLog(admin, {
+      client_id: clientId, pessoa_id: pessoaId, destinatario_tipo: destinatarioTipo,
+      destinatario_nome: destinatarioNome, destinatario_telefone: destinatarioTelefone, mensagem: message,
+      success: false, skipped_reason: reason, preflight_status: preflightStatus,
+    });
+    return { sent: false, reason };
+  }
+
+  const r = await bridgeSend(bridge, destinatarioTelefone, message);
+  console.log("[eleicao-notify-novo-lider]", { destinatarioTipo, phone: r.phone, status: r.status, ok: r.ok, messageId: r.messageId, error: r.error });
+
+  await auditLog(admin, {
+    client_id: clientId, pessoa_id: pessoaId, destinatario_tipo: destinatarioTipo,
+    destinatario_nome: destinatarioNome, destinatario_telefone: destinatarioTelefone, mensagem: message,
+    success: r.ok, error_message: r.ok ? null : r.error, message_id: r.messageId,
+    preflight_status: preflightStatus, bridge_status: r.status,
+  });
+  await logSend(admin, bridge, clientId, r.ok, r.error || undefined);
+
+  if (r.ok) return { sent: true, messageId: r.messageId };
+  return { sent: false, error: r.error || "Falha desconhecida" };
 }
 
 Deno.serve(async (req) => {
@@ -135,6 +243,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error: "Sem instância WhatsApp configurada" }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
+    // Pré-checagem da instância antes de enviar
+    const pre = await preflightInstance(bridge);
+    if (pre.status === "disconnected" || pre.status === "error") {
+      const msg = `Instância WhatsApp indisponível (${pre.status}${pre.detail ? ": " + pre.detail : ""}). Reconecte em Status WhatsApp e tente novamente.`;
+      console.warn("[eleicao-notify-novo-lider] preflight falhou:", msg);
+      return new Response(JSON.stringify({ success: false, error: msg }), { headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
     const regiaoLabel = pessoa.regiao ? (REGIAO_LABELS[pessoa.regiao] || pessoa.regiao) : "—";
     const linkGrupo = (cfg.grupos_links && pessoa.regiao) ? (cfg.grupos_links[pessoa.regiao] || "") : "";
     const vars = {
@@ -150,55 +266,58 @@ Deno.serve(async (req) => {
     const msgInterno = applyTemplate(cfg.template_coordenador, vars);
     const msgLider = applyTemplate(cfg.template_lider, vars);
 
-    const results: Record<string, { sent: boolean; error?: string; reason?: string }> = {};
+    const results: Record<string, SendOutcome> = {};
 
-    // 1) Coordenador da região
+    // 1) Coordenador da região (parent_id ou fallback por região)
     let coordPhone: string | null = null;
+    let coordNome: string | null = null;
     if (pessoa.parent_id) {
       const { data: parent } = await admin.from("eleicao_pessoas")
-        .select("telefone, tipo").eq("id", pessoa.parent_id).maybeSingle();
-      if (parent?.tipo === "coordenador" && parent.telefone) coordPhone = parent.telefone;
+        .select("nome, telefone, tipo").eq("id", pessoa.parent_id).maybeSingle();
+      if (parent?.tipo === "coordenador" && parent.telefone) {
+        coordPhone = parent.telefone;
+        coordNome = parent.nome;
+      }
     }
     if (!coordPhone && pessoa.regiao && pessoa.escopo === "campo_grande") {
       const { data: coord } = await admin.from("eleicao_pessoas")
-        .select("telefone")
-        .eq("client_id", pessoa.client_id)
-        .eq("tipo", "coordenador")
-        .eq("escopo", "campo_grande")
-        .eq("regiao", pessoa.regiao)
-        .order("created_at", { ascending: true })
-        .limit(1).maybeSingle();
-      if (coord?.telefone) coordPhone = coord.telefone;
+        .select("nome, telefone")
+        .eq("client_id", pessoa.client_id).eq("tipo", "coordenador")
+        .eq("escopo", "campo_grande").eq("regiao", pessoa.regiao)
+        .order("created_at", { ascending: true }).limit(1).maybeSingle();
+      if (coord?.telefone) { coordPhone = coord.telefone; coordNome = coord.nome; }
     }
-    if (coordPhone) {
-      const r = await bridgeSend(bridge.url, bridge.key, coordPhone, msgInterno);
-      results.coordenador = { sent: r.ok, error: r.error || undefined };
-      await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
-    } else {
-      results.coordenador = { sent: false, reason: "Sem coordenador na região" };
-    }
+    results.coordenador = await sendTo({
+      admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+      destinatarioTipo: "coordenador", destinatarioNome: coordNome,
+      destinatarioTelefone: coordPhone, message: msgInterno,
+    });
+    if (!coordPhone) results.coordenador = { sent: false, reason: "Sem coordenador na região" };
+
+    await sleep(800); // pequeno respiro entre envios
 
     // 2) Secretaria
-    if (cfg.secretaria_telefone) {
-      const r = await bridgeSend(bridge.url, bridge.key, cfg.secretaria_telefone, msgInterno);
-      results.secretaria = { sent: r.ok, error: r.error || undefined };
-      await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
-    } else {
+    results.secretaria = await sendTo({
+      admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+      destinatarioTipo: "secretaria", destinatarioNome: "Secretaria",
+      destinatarioTelefone: cfg.secretaria_telefone || null, message: msgInterno,
+    });
+    if (!cfg.secretaria_telefone) {
       results.secretaria = { sent: false, reason: "Telefone da secretaria não configurado" };
     }
 
-    // 3) Líder cadastrado
-    if (pessoa.telefone) {
-      const r = await bridgeSend(bridge.url, bridge.key, pessoa.telefone, msgLider);
-      results.lider = { sent: r.ok, error: r.error || undefined };
-      await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
-    } else {
-      results.lider = { sent: false, reason: "Sem telefone" };
-    }
+    await sleep(800);
 
-    return new Response(JSON.stringify({ success: true, results }), { headers: { ...cors, "Content-Type": "application/json" } });
+    // 3) Líder cadastrado
+    results.lider = await sendTo({
+      admin, bridge, preflightStatus: pre.status, clientId: pessoa.client_id, pessoaId: pessoa.id,
+      destinatarioTipo: "lider", destinatarioNome: pessoa.nome,
+      destinatarioTelefone: pessoa.telefone, message: msgLider,
+    });
+
+    return new Response(JSON.stringify({ success: true, preflight: pre, results }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (err: any) {
-    console.error(err);
+    console.error("[eleicao-notify-novo-lider] erro:", err);
     return new Response(JSON.stringify({ error: err.message || String(err) }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } });
   }
 });

@@ -236,24 +236,56 @@ export default function Eleicao() {
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
 
-    // Disparo automático de notificações ao criar novo líder
+    // Disparo automático de notificações ao criar novo líder.
+    // Usa fetch direto com o token da sessão para evitar problemas de auth do invoke.
     let notificationToastShown = false;
     if (!editing && form.tipo === "lider" && savedPessoa) {
-      const { data, error } = await supabase.functions.invoke("eleicao-notify-novo-lider", {
-        body: { pessoa_id: (savedPessoa as any).id },
-      });
-      if (error) {
-        toast.warning(`Líder cadastrado, mas falhou ao enviar notificações: ${error.message}`);
-        notificationToastShown = true;
-      } else if (!data?.skipped) {
-        const r = data?.results || {};
-        const parts: string[] = [];
-        for (const key of ["coordenador", "secretaria", "lider"] as const) {
-          if (!r[key]) continue;
-          if (r[key].sent) parts.push(`${key} ✓`);
-          else parts.push(`${key} ✗ (${r[key].reason || r[key].error || "falha"})`);
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+        if (!accessToken) throw new Error("Sessão expirada — faça login novamente");
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/eleicao-notify-novo-lider`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({ pessoa_id: (savedPessoa as any).id }),
+          },
+        );
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data?.error) {
+          throw new Error(data?.error || `Falha (status ${resp.status})`);
         }
-        toast[parts.every(p => p.includes("✓")) ? "success" : "warning"](`Líder cadastrado. Notificações: ${parts.join(", ")}`);
+        if (data?.skipped) {
+          toast.warning(`Líder cadastrado. Notificação automática pulada: ${data.skipped}`);
+        } else {
+          const r = data?.results || {};
+          const labels: Record<string, string> = { coordenador: "Coordenador", secretaria: "Secretaria", lider: "Líder" };
+          const linhas: string[] = [];
+          let temFalha = false;
+          for (const key of ["coordenador", "secretaria", "lider"] as const) {
+            const item = r[key];
+            if (!item) continue;
+            if (item.sent) linhas.push(`✓ ${labels[key]} enviado`);
+            else { temFalha = true; linhas.push(`✗ ${labels[key]}: ${item.reason || item.error || "falha"}`); }
+          }
+          const detalhes = linhas.join("\n");
+          if (temFalha) {
+            toast.warning("Líder cadastrado, mas algumas notificações falharam", { description: detalhes, duration: 12000 });
+          } else {
+            toast.success("Líder cadastrado e notificações enviadas", { description: detalhes, duration: 6000 });
+          }
+        }
+        notificationToastShown = true;
+      } catch (e: any) {
+        toast.error("Líder cadastrado, mas o envio automático falhou", {
+          description: e?.message || "Erro desconhecido",
+          duration: 12000,
+        });
         notificationToastShown = true;
       }
     }
