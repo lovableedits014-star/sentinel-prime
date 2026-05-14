@@ -12,9 +12,26 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function cleanPhoneForBridge(raw: string): string {
   const digits = String(raw || "").replace(/\D/g, "");
   if (!digits) return "";
-  if (digits.startsWith("55")) return digits;
-  if (digits.length === 10 || digits.length === 11) return `55${digits}`;
-  return digits;
+  const e164 = digits.startsWith("55")
+    ? digits
+    : (digits.length === 10 || digits.length === 11 ? `55${digits}` : digits);
+
+  // A VPS/WhatsHub usa Baileys e os JIDs brasileiros aparecem sem o nono dígito
+  // depois do DDD (ex.: teste OK em 556792773931@s.whatsapp.net). Enviar como
+  // 556799... pode gerar messageId, mas a mensagem não chega no WhatsApp real.
+  if (/^55\d{2}9\d{8}$/.test(e164)) {
+    return `${e164.slice(0, 4)}${e164.slice(5)}`;
+  }
+  return e164;
+}
+
+function phoneDebug(raw: string) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  const e164 = digits.startsWith("55")
+    ? digits
+    : (digits.length === 10 || digits.length === 11 ? `55${digits}` : digits);
+  const bridgePhone = cleanPhoneForBridge(raw);
+  return { original: digits, e164, bridgePhone, strippedNinthDigit: e164 !== bridgePhone };
 }
 
 function fmtPhone(s: string) {
@@ -279,6 +296,7 @@ async function sendTo(params: {
   console.log("[eleicao-notify-novo-lider] envio →", {
     destinatarioTipo, destinatarioNome,
     phone: cleanPhoneForBridge(destinatarioTelefone),
+    phoneDebug: phoneDebug(destinatarioTelefone),
     instance: baseInstance,
     msgLen: message.length,
   });
