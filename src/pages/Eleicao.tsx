@@ -94,6 +94,7 @@ interface Pessoa {
   email: string | null;
   user_id: string | null;
   valor_contratacao: number | null;
+  is_favorito_regiao?: boolean | null;
   created_at: string;
 }
 
