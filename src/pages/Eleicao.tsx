@@ -1029,6 +1029,74 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
   );
 }
 
+function FavoritoToggle({ pessoa }: { pessoa: Pessoa }) {
+  const [busy, setBusy] = useState(false);
+  const isFav = !!pessoa.is_favorito_regiao;
+  const regiaoLabel = REGIOES.find(r => r.value === pessoa.regiao)?.label || pessoa.regiao || "";
+
+  async function toggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (busy) return;
+    if (isFav) {
+      if (!confirm(`Remover ${pessoa.nome} como coordenador favorito da região ${regiaoLabel}?\n\nSem favorito, novos líderes notificarão o coordenador mais antigo da região.`)) return;
+    } else {
+      if (!confirm(`Definir ${pessoa.nome} como coordenador favorito da região ${regiaoLabel}?\n\nEle passará a receber as notificações de novos líderes cadastrados nesta região (substituindo o atual favorito, se houver).`)) return;
+    }
+    setBusy(true);
+    try {
+      if (isFav) {
+        const { error } = await supabase
+          .from("eleicao_pessoas" as any)
+          .update({ is_favorito_regiao: false })
+          .eq("id", pessoa.id);
+        if (error) throw error;
+        toast.success("Favorito removido");
+      } else {
+        // Desmarca os outros favoritos da mesma região e marca este (em duas etapas — o índice único garante consistência).
+        const { error: e1 } = await supabase
+          .from("eleicao_pessoas" as any)
+          .update({ is_favorito_regiao: false })
+          .eq("client_id", pessoa.client_id)
+          .eq("tipo", "coordenador")
+          .eq("escopo", pessoa.escopo)
+          .eq("regiao", pessoa.regiao as any)
+          .eq("is_favorito_regiao", true);
+        if (e1) throw e1;
+        const { error: e2 } = await supabase
+          .from("eleicao_pessoas" as any)
+          .update({ is_favorito_regiao: true })
+          .eq("id", pessoa.id);
+        if (e2) throw e2;
+        toast.success(`${pessoa.nome} é o novo favorito de ${regiaoLabel}`);
+      }
+      window.dispatchEvent(new Event("eleicao:reload-pessoas"));
+    } catch (err: any) {
+      toast.error("Falha ao atualizar favorito: " + (err?.message || "erro desconhecido"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={busy}
+      className={cn(
+        "shrink-0 inline-flex items-center justify-center rounded p-0.5 transition-colors",
+        isFav ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground/40 hover:text-amber-500",
+        busy && "opacity-50 cursor-wait",
+      )}
+      title={isFav
+        ? `Favorito da região ${regiaoLabel} — recebe notificações de novos líderes. Clique para remover.`
+        : `Definir como favorito da região ${regiaoLabel} (recebe notificações de novos líderes).`}
+      aria-label={isFav ? "Remover como favorito da região" : "Definir como favorito da região"}
+    >
+      <Star className={cn("w-3.5 h-3.5", isFav && "fill-current")} />
+    </button>
+  );
+}
+
 function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
