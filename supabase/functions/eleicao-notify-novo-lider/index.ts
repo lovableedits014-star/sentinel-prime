@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
       if (coord?.telefone) coordPhone = coord.telefone;
     }
     if (coordPhone) {
-      const r = await bridgeSend(bridge.url, bridge.key, normalizePhone(coordPhone), msgInterno);
+      const r = await bridgeSend(bridge.url, bridge.key, coordPhone, msgInterno);
       results.coordenador = { sent: r.ok, error: r.error || undefined };
       await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
     } else {
@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
 
     // 2) Secretaria
     if (cfg.secretaria_telefone) {
-      const r = await bridgeSend(bridge.url, bridge.key, normalizePhone(cfg.secretaria_telefone), msgInterno);
+      const r = await bridgeSend(bridge.url, bridge.key, cfg.secretaria_telefone, msgInterno);
       results.secretaria = { sent: r.ok, error: r.error || undefined };
       await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
     } else {
@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
 
     // 3) Líder cadastrado
     if (pessoa.telefone) {
-      const r = await bridgeSend(bridge.url, bridge.key, normalizePhone(pessoa.telefone), msgLider);
+      const r = await bridgeSend(bridge.url, bridge.key, pessoa.telefone, msgLider);
       results.lider = { sent: r.ok, error: r.error || undefined };
       await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
     } else {
