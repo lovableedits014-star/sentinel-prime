@@ -20,7 +20,7 @@ import {
   ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { syncCooldownRemaining, markSyncDone, formatCooldown } from "@/lib/sync-throttle";
+// sync-throttle removido: atualização de missões não tem mais cooldown
 
 interface Mission {
   id: string;
