@@ -1641,6 +1641,72 @@ export type Database = {
           },
         ]
       }
+      eleicao_notif_log: {
+        Row: {
+          bridge_status: number | null
+          client_id: string
+          created_at: string
+          destinatario_nome: string | null
+          destinatario_telefone: string | null
+          destinatario_tipo: string
+          error_message: string | null
+          id: string
+          mensagem: string | null
+          message_id: string | null
+          pessoa_id: string | null
+          preflight_status: string | null
+          skipped_reason: string | null
+          success: boolean
+        }
+        Insert: {
+          bridge_status?: number | null
+          client_id: string
+          created_at?: string
+          destinatario_nome?: string | null
+          destinatario_telefone?: string | null
+          destinatario_tipo: string
+          error_message?: string | null
+          id?: string
+          mensagem?: string | null
+          message_id?: string | null
+          pessoa_id?: string | null
+          preflight_status?: string | null
+          skipped_reason?: string | null
+          success?: boolean
+        }
+        Update: {
+          bridge_status?: number | null
+          client_id?: string
+          created_at?: string
+          destinatario_nome?: string | null
+          destinatario_telefone?: string | null
+          destinatario_tipo?: string
+          error_message?: string | null
+          id?: string
+          mensagem?: string | null
+          message_id?: string | null
+          pessoa_id?: string | null
+          preflight_status?: string | null
+          skipped_reason?: string | null
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_notif_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_notif_log_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eleicao_pessoas: {
         Row: {
           bairro: string | null
