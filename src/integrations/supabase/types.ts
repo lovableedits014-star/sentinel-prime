@@ -6108,6 +6108,38 @@ export type Database = {
           },
         ]
       }
+      whatsapp_group_favorites: {
+        Row: {
+          client_id: string
+          favorited_at: string
+          group_jid: string
+          group_name: string | null
+          phone_number: string
+        }
+        Insert: {
+          client_id: string
+          favorited_at?: string
+          group_jid: string
+          group_name?: string | null
+          phone_number: string
+        }
+        Update: {
+          client_id?: string
+          favorited_at?: string
+          group_jid?: string
+          group_name?: string | null
+          phone_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_group_favorites_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_groups: {
         Row: {
           client_id: string
