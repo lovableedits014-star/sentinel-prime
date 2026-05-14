@@ -52,36 +52,27 @@ async function getBridge(admin: any, clientId: string) {
 }
 
 async function bridgeSend(url: string, key: string, phone: string, message: string) {
-  let lastError = "";
-  let lastPhone = "";
-  const variants = phoneVariants(phone);
+  const cleaned = cleanPhoneForBridge(phone);
+  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "" };
   try {
-    for (const variant of variants) {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": key },
-        body: JSON.stringify({ action: "send", phone: variant, message }),
-      });
-      const data = await res.json().catch(() => ({}));
-      const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || data?.data?.id || data?.data?.key?.id || data?.result?.id || data?.result?.key?.id;
-      const ok = res.ok && data?.success !== false && data?.delivered !== false && (data?.delivered === true || Boolean(messageId));
-      const error = !res.ok
-        ? (data?.error || data?.message || `HTTP ${res.status}`)
-        : data?.success === false
-          ? (data?.error || data?.message || "Ponte recusou o envio")
-          : data?.delivered === false
-            ? (data?.error || data?.message || "Mensagem não entregue pelo WhatsApp")
-            : ok
-              ? null
-              : (data?.error || data?.message || "Ponte não confirmou entrega da mensagem");
-      console.log("[eleicao-notify-novo-lider] tentativa", { phone: variant, status: res.status, ok, messageId: messageId || null, error });
-      if (ok) return { ok, error: null, phone: variant, messageId };
-      lastPhone = variant;
-      lastError = error || "Falha desconhecida";
-    }
-    return { ok: false, error: lastError || "Telefone inválido ou sem confirmação da ponte", phone: lastPhone };
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": key },
+      body: JSON.stringify({ action: "send", phone: cleaned, message }),
+    });
+    const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
+    const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id;
+    const hasDeliverySignal = data?.delivered === true || Boolean(messageId);
+    let error: string | null = null;
+    if (!res.ok) error = data?.error || `Erro na ponte WhatsApp (status ${res.status})`;
+    else if (data?.success === false) error = data?.error || "Ponte recusou o envio";
+    else if (data?.delivered === false) error = data?.error || "Mensagem não entregue pelo WhatsApp";
+    else if (!hasDeliverySignal) error = data?.error || "Ponte não confirmou entrega da mensagem";
+    const ok = !error;
+    console.log("[eleicao-notify-novo-lider]", { phone: cleaned, status: res.status, ok, messageId: messageId || null, error });
+    return { ok, error, phone: cleaned, messageId };
   } catch (e: any) {
-    return { ok: false, error: e.message || "Erro de rede", phone: lastPhone };
+    return { ok: false, error: e.message || "Erro de rede", phone: cleaned };
   }
 }
 
