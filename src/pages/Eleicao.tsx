@@ -21,6 +21,7 @@ import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTempla
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package } from "lucide-react";
+import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
