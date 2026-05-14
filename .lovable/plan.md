@@ -1,47 +1,86 @@
-## Diagnóstico
+## Objetivo
 
-Pelo print da VPS e pelos logs do Supabase, a função `eleicao-notify-novo-lider` está chegando na ponte e a ponte devolve `status 200`, `delivered: true` e `messageId`. Ou seja: o app está chamando a VPS.
+Hoje, quando um novo líder é cadastrado, o sistema escolhe o **coordenador mais antigo** da região como destinatário da mensagem (`order created_at asc limit 1`). Como cada região vai passar a ter vários coordenadores, isso é frágil.
 
-O ponto suspeito não é mais “não chamou a VPS”; é que este fluxo da aba Eleição usa uma implementação própria, diferente dos fluxos que funcionam. Ela faz seleção/preflight/verificação por um caminho separado e depois marca sucesso com base no retorno imediato da ponte.
+A proposta é permitir marcar **um coordenador favorito por região**. Esse é o único que recebe a notificação de novos líderes daquela região. Os demais continuam cadastrados normalmente, com todos os outros recursos (contrato, link de acesso, gestão de equipe, disparos genéricos, etc.) — só não recebem essa notificação específica.
 
-Também identifiquei que:
-- A instância usada é `Mayer Celular`, status `connected`.
-- Os envios recentes foram gravados como sucesso para coordenador, secretaria e líder.
-- A VPS mostra envio no log, mas isso pode ser apenas aceite/enfileiramento do Baileys, não garantia de chegada no WhatsApp.
-- Os fluxos `send-whatsapp-dispatch` e `eleicao-send-credentials` usam padrões mais estáveis de seleção/preflight/envio.
+## O que muda
 
-## Plano de correção
+### 1. Banco
+- Nova coluna em `eleicao_pessoas`:
+  - `is_favorito_regiao boolean default false`
+- **Índice único parcial** garantindo no máximo 1 favorito por região, por cliente:
+  - `unique (client_id, escopo, regiao) where tipo = 'coordenador' and is_favorito_regiao = true`
+- **Auto-favorito**: trigger `before insert` em coordenador — se for o primeiro coordenador da região (nenhum outro existe), marca automaticamente como favorito. Assim, regiões com 1 só coordenador continuam funcionando sem clique manual.
 
-1. **Unificar o motor da Eleição com o fluxo que já funciona**
-   - Ajustar `eleicao-notify-novo-lider` para selecionar a instância usando `pick_healthy_whatsapp_instance`, igual ao sistema de Disparos/Credenciais.
-   - Manter fallback para instância ativa, mas remover decisões divergentes que podem escolher uma instância errada ou recém-reconectada.
+### 2. Edge function `eleicao-notify-novo-lider`
+A função `resolveCoord` passa a usar esta ordem de prioridade:
+1. `parent_id` do líder, **se** for coordenador (mantém comportamento atual quando o cadastro define explicitamente o coordenador pai).
+2. Coordenador da região com `is_favorito_regiao = true`.
+3. Fallback: coordenador mais antigo da região (comportamento atual) — só usado se ninguém estiver marcado como favorito.
 
-2. **Remover a verificação falsa que não existe na VPS**
-   - Tirar a tentativa de `message_status/check_message/get_message_status`, porque essa VPS não suporta esse endpoint.
-   - Voltar a tratar `messageId` como aceite da ponte, igual aos outros envios que funcionam, sem inventar confirmação inexistente.
+Os demais coordenadores **não recebem** essa mensagem específica (é justamente o que o favorito resolve), mas continuam aparecendo em qualquer outro disparo, listagem, etc.
 
-3. **Enviar com o mesmo payload dos fluxos funcionais**
-   - Usar exatamente `{ action: "send", phone, message }` para contatos individuais.
-   - Logar o corpo essencial antes do envio: destinatário, telefone normalizado, instância e tamanho da mensagem.
-   - Não expor chave/API key nos logs.
+### 3. UI — página Eleição (`src/pages/Eleicao.tsx`)
+No card/linha de cada coordenador na árvore:
+- Um **botão de estrela** (`Star` lucide-icon) ao lado do nome:
+  - **Vazia** → coordenador comum. Clicar pergunta "Definir como favorito da região *Centro*?" e marca.
+  - **Preenchida (amarela)** → favorito atual. Clicar desmarca (com confirmação).
+- Ao marcar um novo favorito, o anterior da mesma região é desmarcado automaticamente (a UI faz `update ... is_favorito_regiao=false` no antigo e `true` no novo, em uma transação simples — o índice único garante consistência).
+- Badge sutil "★ Favorito da região" no nome quando ativo, para ficar visível na árvore.
 
-4. **Corrigir o registro de sucesso/falha**
-   - Marcar como enviado somente quando a ponte devolver sinal aceito (`delivered: true` ou `messageId`).
-   - Se a ponte aceitar, mas o usuário não receber, a investigação passa a ser do lado da VPS/WhatsApp Web, com log claro mostrando telefone, instância e messageId.
+### 4. Tooltip explicativo
+Pequeno texto/info-icon perto do filtro de coordenadores ou no painel de configurações de notificação:
+> "O coordenador favorito de cada região é quem recebe a notificação automática quando um novo líder é cadastrado naquela região. Os demais coordenadores seguem ativos no sistema normalmente."
 
-5. **Adicionar diagnóstico direto no retorno do modal**
-   - O modal vai mostrar a instância usada, telefone final e `messageId`.
-   - Em caso de erro real, vai mostrar o erro exato da ponte.
+## Detalhes técnicos
 
-6. **Deploy e validação**
-   - Redeploy da edge function `eleicao-notify-novo-lider`.
-   - Verificar logs após o deploy para confirmar que a Eleição está usando o mesmo padrão dos fluxos que já funcionam.
+```sql
+-- migration
+alter table public.eleicao_pessoas
+  add column if not exists is_favorito_regiao boolean not null default false;
 
-## Arquivos que serão alterados
+create unique index if not exists eleicao_pessoas_um_favorito_por_regiao
+  on public.eleicao_pessoas (client_id, escopo, regiao)
+  where tipo = 'coordenador' and is_favorito_regiao = true;
 
-- `supabase/functions/eleicao-notify-novo-lider/index.ts`
-- Possivelmente `src/components/eleicao/NotifyProgressDialog.tsx` apenas para melhorar a mensagem exibida, sem mexer no cadastro.
+-- trigger: 1º coordenador da região vira favorito automaticamente
+create or replace function public.eleicao_auto_favorito_coord()
+returns trigger language plpgsql as $$
+begin
+  if NEW.tipo = 'coordenador' and NEW.is_favorito_regiao = false then
+    if not exists (
+      select 1 from public.eleicao_pessoas
+      where client_id = NEW.client_id and tipo = 'coordenador'
+        and escopo = NEW.escopo and regiao is not distinct from NEW.regiao
+    ) then
+      NEW.is_favorito_regiao := true;
+    end if;
+  end if;
+  return NEW;
+end$$;
 
-## Resultado esperado
+drop trigger if exists trg_eleicao_auto_favorito_coord on public.eleicao_pessoas;
+create trigger trg_eleicao_auto_favorito_coord
+  before insert on public.eleicao_pessoas
+  for each row execute function public.eleicao_auto_favorito_coord();
+```
 
-Depois disso, a aba Eleição deixa de usar um caminho separado e passa a enviar pelo mesmo padrão dos envios que já funcionam. Se a VPS ainda mostrar “enviado” e o WhatsApp não entregar, teremos prova limpa de que o app entregou corretamente para a ponte e o problema está na sessão/fila/envio real da VPS.
+Backfill (executado uma vez na migration): para cada `(client_id, escopo, regiao)` com coordenadores existentes e nenhum favorito, marca o coordenador mais antigo como favorito — assim o comportamento permanece idêntico ao atual no dia em que o recurso entrar.
+
+Edge function — substituir o segundo bloco do `resolveCoord` por:
+```ts
+// 2. tenta favorito
+const { data: fav } = await admin.from("eleicao_pessoas")
+  .select("nome, telefone")
+  .eq("client_id", pessoa.client_id).eq("tipo", "coordenador")
+  .eq("escopo", pessoa.escopo).eq("regiao", pessoa.regiao)
+  .eq("is_favorito_regiao", true).maybeSingle();
+if (fav?.telefone) return { phone: fav.telefone, nome: fav.nome };
+
+// 3. fallback: mais antigo (comportamento legado)
+```
+
+## Confirmação de escopo
+
+Interpretei a sua frase "os outros não devem ser ignorados no envio" como: **os coordenadores não-favoritos continuam ativos no sistema** (cadastro, contrato, equipe, disparos gerais), só não recebem essa notificação automática específica de novo líder. Se a intenção for diferente — por exemplo, mandar a mensagem para todos mas destacar o favorito — me avise antes de implementar.
