@@ -1,53 +1,47 @@
-## O que encontrei
+## Diagnóstico
 
-- A função da aba Eleição está chamando a instância favoritada correta: `Whats Mayer Sentinelle`.
-- Os três números agora estão diferentes e foram gravados corretamente nos logs.
-- A VPS/bridge respondeu `200`, `success: true`, `delivered: true` e `messageId`, mas você não recebeu nada. Isso indica que o problema não é mais número repetido nem escolha da instância: é o endpoint da ponte aceitando o envio sem garantia real de entrega no WhatsApp.
-- Isso é um caso conhecido em bridges baseadas em WhatsApp Web/Baileys: `messageId` pode significar “aceito/enfileirado”, não necessariamente “entregue no celular”.
+Pelo print da VPS e pelos logs do Supabase, a função `eleicao-notify-novo-lider` está chegando na ponte e a ponte devolve `status 200`, `delivered: true` e `messageId`. Ou seja: o app está chamando a VPS.
+
+O ponto suspeito não é mais “não chamou a VPS”; é que este fluxo da aba Eleição usa uma implementação própria, diferente dos fluxos que funcionam. Ela faz seleção/preflight/verificação por um caminho separado e depois marca sucesso com base no retorno imediato da ponte.
+
+Também identifiquei que:
+- A instância usada é `Mayer Celular`, status `connected`.
+- Os envios recentes foram gravados como sucesso para coordenador, secretaria e líder.
+- A VPS mostra envio no log, mas isso pode ser apenas aceite/enfileiramento do Baileys, não garantia de chegada no WhatsApp.
+- Os fluxos `send-whatsapp-dispatch` e `eleicao-send-credentials` usam padrões mais estáveis de seleção/preflight/envio.
 
 ## Plano de correção
 
-1. **Parar de confiar só no retorno imediato da VPS**
-   - A tela não vai mais mostrar “Pronto! Enviado” apenas porque recebeu `messageId`/`delivered` no retorno imediato.
-   - O envio passará por uma etapa adicional de verificação depois do `send`.
+1. **Unificar o motor da Eleição com o fluxo que já funciona**
+   - Ajustar `eleicao-notify-novo-lider` para selecionar a instância usando `pick_healthy_whatsapp_instance`, igual ao sistema de Disparos/Credenciais.
+   - Manter fallback para instância ativa, mas remover decisões divergentes que podem escolher uma instância errada ou recém-reconectada.
 
-2. **Adicionar confirmação pós-envio na função da Eleição**
-   - Após enviar para coordenador, secretaria e líder, a função vai tentar consultar a ponte novamente usando o `messageId` retornado.
-   - Vou suportar formatos comuns de bridge, por exemplo ações como `message_status`, `check_message`, `get_message_status` ou equivalente seguro, com fallback controlado.
-   - Se a VPS não tiver endpoint de consulta de status, a resposta será marcada como “aceita pela VPS, mas não confirmada no WhatsApp”, não como entregue.
+2. **Remover a verificação falsa que não existe na VPS**
+   - Tirar a tentativa de `message_status/check_message/get_message_status`, porque essa VPS não suporta esse endpoint.
+   - Voltar a tratar `messageId` como aceite da ponte, igual aos outros envios que funcionam, sem inventar confirmação inexistente.
 
-3. **Atualizar o modal para mostrar a verdade do fluxo**
-   - Estados novos por etapa:
-     - `Enviando...`
-     - `Aceito pela VPS, verificando entrega...`
-     - `Confirmado no WhatsApp`
-     - `Não confirmado — tentar novamente ou ignorar`
-   - Assim não teremos mais “sucesso falso”.
+3. **Enviar com o mesmo payload dos fluxos funcionais**
+   - Usar exatamente `{ action: "send", phone, message }` para contatos individuais.
+   - Logar o corpo essencial antes do envio: destinatário, telefone normalizado, instância e tamanho da mensagem.
+   - Não expor chave/API key nos logs.
 
-4. **Criar log detalhado para diagnóstico**
-   - Gravar no log da Eleição:
-     - telefone final enviado;
-     - instância usada;
-     - `messageId`;
-     - resposta bruta resumida do envio;
-     - resultado da verificação pós-envio;
-     - motivo quando não confirmar.
-   - Como a tabela atual não tem colunas para tudo isso, vou guardar o resumo dentro de campos já existentes quando possível para evitar migração agora. Se precisar de colunas novas depois, faço um plano separado.
+4. **Corrigir o registro de sucesso/falha**
+   - Marcar como enviado somente quando a ponte devolver sinal aceito (`delivered: true` ou `messageId`).
+   - Se a ponte aceitar, mas o usuário não receber, a investigação passa a ser do lado da VPS/WhatsApp Web, com log claro mostrando telefone, instância e messageId.
 
-5. **Comparar com envio manual/teste da instância**
-   - Ajustar o payload da Eleição para ficar o mais próximo possível do envio direto usado em `manage-whatsapp-instance` e dos Disparos.
-   - Se a ponte exigir outro campo além de `phone`/`message`, a função vai retornar esse detalhe no erro em vez de marcar como enviado.
+5. **Adicionar diagnóstico direto no retorno do modal**
+   - O modal vai mostrar a instância usada, telefone final e `messageId`.
+   - Em caso de erro real, vai mostrar o erro exato da ponte.
 
-6. **Validar com chamada real da Edge Function**
-   - Redeploy da `eleicao-notify-novo-lider`.
-   - Testar a função publicada.
-   - Conferir logs da Edge Function e as tabelas `eleicao_notif_log` e `whatsapp_instance_send_log`.
+6. **Deploy e validação**
+   - Redeploy da edge function `eleicao-notify-novo-lider`.
+   - Verificar logs após o deploy para confirmar que a Eleição está usando o mesmo padrão dos fluxos que já funcionam.
 
-## Arquivos que vou alterar
+## Arquivos que serão alterados
 
 - `supabase/functions/eleicao-notify-novo-lider/index.ts`
-- `src/components/eleicao/NotifyProgressDialog.tsx`
+- Possivelmente `src/components/eleicao/NotifyProgressDialog.tsx` apenas para melhorar a mensagem exibida, sem mexer no cadastro.
 
 ## Resultado esperado
 
-A aba Eleição só mostrará envio confirmado quando houver confirmação real após o envio. Se a VPS aceitar mas o WhatsApp não entregar, o sistema vai parar na etapa com erro claro e botão para tentar novamente, em vez de dizer que enviou.
+Depois disso, a aba Eleição deixa de usar um caminho separado e passa a enviar pelo mesmo padrão dos envios que já funcionam. Se a VPS ainda mostrar “enviado” e o WhatsApp não entregar, teremos prova limpa de que o app entregou corretamente para a ponte e o problema está na sessão/fila/envio real da VPS.

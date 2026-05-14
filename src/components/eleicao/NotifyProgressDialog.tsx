@@ -102,7 +102,7 @@ export function NotifyProgressDialog({ open, pessoaId, onClose }: Props) {
         instancia: result?.instance?.apelido ?? null,
         messageId: result?.messageId ?? null,
       };
-      if (result?.sent && result?.delivery_confirmed) {
+      if (result?.sent) {
         updateStep(idx, { status: "success", ...meta });
         await sleep(400);
         if (idx + 1 < INITIAL_STEPS.length) {
