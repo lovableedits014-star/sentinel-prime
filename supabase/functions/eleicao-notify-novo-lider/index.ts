@@ -198,6 +198,7 @@ Deno.serve(async (req) => {
     if (coordPhone) {
       const r = await bridgeSend(bridge.url, bridge.key, normalizePhone(coordPhone), msgInterno);
       results.coordenador = { sent: r.ok, error: r.error || undefined };
+      await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
     } else {
       results.coordenador = { sent: false, reason: "Sem coordenador na região" };
     }
@@ -206,6 +207,7 @@ Deno.serve(async (req) => {
     if (cfg.secretaria_telefone) {
       const r = await bridgeSend(bridge.url, bridge.key, normalizePhone(cfg.secretaria_telefone), msgInterno);
       results.secretaria = { sent: r.ok, error: r.error || undefined };
+      await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
     } else {
       results.secretaria = { sent: false, reason: "Telefone da secretaria não configurado" };
     }
@@ -214,6 +216,7 @@ Deno.serve(async (req) => {
     if (pessoa.telefone) {
       const r = await bridgeSend(bridge.url, bridge.key, normalizePhone(pessoa.telefone), msgLider);
       results.lider = { sent: r.ok, error: r.error || undefined };
+      await logSend(admin, bridge, pessoa.client_id, r.ok, r.error || undefined);
     } else {
       results.lider = { sent: false, reason: "Sem telefone" };
     }
