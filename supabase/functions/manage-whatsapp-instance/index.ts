@@ -826,6 +826,30 @@ Deno.serve(async (req) => {
         }
       }
 
+      // === RESTAURA FAVORITOS pelo número de telefone do chip ===
+      // Favoritos vivem em whatsapp_group_favorites (chave: client_id + phone_number + group_jid)
+      // e sobrevivem à exclusão/recriação da instância. Aqui aplicamos esses favoritos
+      // de volta na coluna whatsapp_groups.is_favorite para a instância recém-sincronizada.
+      let restoredFavorites = 0;
+      const phoneDigits = String(activeInstanceRow.phone_number || "").replace(/\D/g, "");
+      if (phoneDigits && upserts.length > 0) {
+        const { data: favRows } = await adminClient
+          .from("whatsapp_group_favorites")
+          .select("group_jid")
+          .eq("client_id", resolvedClientId)
+          .eq("phone_number", phoneDigits);
+        const favJids = (favRows || []).map((r: any) => r.group_jid).filter(Boolean);
+        if (favJids.length > 0) {
+          const { count } = await adminClient
+            .from("whatsapp_groups")
+            .update({ is_favorite: true, updated_at: now }, { count: "exact" })
+            .eq("instance_id", instance_id)
+            .in("group_jid", favJids)
+            .eq("is_favorite", false);
+          restoredFavorites = count || 0;
+        }
+      }
+
       // Marca grupos que sumiram como inativos
       let inactiveMarked = 0;
       if (seenJids.length > 0) {
