@@ -294,10 +294,11 @@ async function sendTo(params: {
   });
 
   const r = await bridgeSend(admin, bridge, destinatarioTelefone, message);
-  console.log("[eleicao-notify-novo-lider] ←", {
-    destinatarioTipo, phone: r.phone, status: r.status,
-    ok: r.ok, messageId: r.messageId, error: r.error,
-    raw: r.raw && { delivered: r.raw.delivered, success: r.raw.success, error: r.raw.error },
+  // Log COMPLETO do body que o Bridge devolveu (sem reduzir campos),
+  // pra capturar os novos campos: queued, vps_status, message_id, ack, warning, raw, etc.
+  console.log("[eleicao-notify-novo-lider] ← bridgeRawFull", {
+    destinatarioTipo, phone: r.phone, status: r.status, ok: r.ok,
+    bridgeRaw: JSON.stringify(r.raw),
   });
 
   await auditLog(admin, {
@@ -309,9 +310,9 @@ async function sendTo(params: {
   await logSend(admin, bridge, clientId, r.ok, r.ok ? undefined : (r.error || undefined), preflightStatus, preflightReconnected);
 
   if (r.ok) {
-    return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status };
+    return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status, bridgeRaw: r.raw };
   }
-  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status };
+  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status, bridgeRaw: r.raw };
 }
 
 Deno.serve(async (req) => {
