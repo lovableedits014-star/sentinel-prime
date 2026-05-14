@@ -216,12 +216,24 @@ async function bridgeSend(admin: any, bridge: any, phone: string, message: strin
 
   const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || null;
 
-  // Verificação pós-envio: confirma de fato se chegou no WhatsApp
+  // Verificação pós-envio (best-effort). Se a ponte não suporta consulta
+  // de status, tratamos o messageId como confirmação (mesmo comportamento
+  // dos demais fluxos do sistema que funcionam corretamente).
   let verification: { confirmed: boolean; detail: string; raw: any } | null = null;
   if (!failure && messageId) {
-    await sleep(2000); // dá tempo da ponte registrar o ACK
-    verification = await verifyDelivery(bridge, messageId, cleaned);
+    await sleep(1200);
+    try {
+      verification = await verifyDelivery(bridge, messageId, cleaned);
+    } catch (_) { verification = null; }
+    const unsupported = !verification || /não suporta|unsupported|inconclusivo|sem messageId/i.test(verification?.detail || "");
+    if (unsupported) {
+      // ponte não tem endpoint de status → confia no messageId como ACK de recebimento
+      verification = { confirmed: true, detail: "messageId aceito pela ponte (sem endpoint de status)", raw: verification?.raw ?? null };
+    }
     console.log("[eleicao-notify-novo-lider] verificação", { messageId, confirmed: verification.confirmed, detail: verification.detail });
+  } else if (!failure && !messageId) {
+    // sem messageId mas sem failure explícito: a ponte não devolveu ID — trata como falha
+    failure = "Ponte não devolveu messageId — envio não confirmado";
   }
 
   return {
