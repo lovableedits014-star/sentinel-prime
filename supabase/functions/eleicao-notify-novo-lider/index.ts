@@ -267,6 +267,8 @@ type SendOutcome = {
   instance?: { id: string; apelido: string | null } | null;
   preflight_status?: string;
   bridge_status?: number;
+  delivery_confirmed?: boolean;
+  delivery_detail?: string;
 };
 
 async function sendTo(params: {
@@ -318,18 +320,38 @@ async function sendTo(params: {
     destinatarioTipo, destinatarioNome, phone: r.phone, status: r.status,
     ok: r.ok, messageId: r.messageId, error: r.error,
     raw: r.raw && { delivered: r.raw.delivered, success: r.raw.success, error: r.raw.error },
+    verification: r.verification,
   });
+
+  const confirmed = !!r.verification?.confirmed;
+  const verifDetail = r.verification?.detail || "";
+  const errorMsg = r.ok
+    ? (confirmed ? null : `Aceito pela ponte mas não confirmado pelo WhatsApp (${verifDetail || "sem confirmação"})`)
+    : r.error;
 
   await auditLog(admin, {
     client_id: clientId, pessoa_id: pessoaId, destinatario_tipo: destinatarioTipo,
     destinatario_nome: destinatarioNome, destinatario_telefone: destinatarioTelefone, mensagem: message,
-    success: r.ok, error_message: r.ok ? null : r.error, message_id: r.messageId,
+    success: r.ok && confirmed, error_message: errorMsg, message_id: r.messageId,
     preflight_status: preflightStatus, bridge_status: r.status,
   });
-  await logSend(admin, bridge, clientId, r.ok, r.error || undefined, preflightStatus, preflightReconnected);
+  await logSend(admin, bridge, clientId, r.ok && confirmed, errorMsg || undefined, preflightStatus, preflightReconnected);
 
-  if (r.ok) return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status };
-  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status };
+  if (r.ok && confirmed) {
+    return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status, delivery_confirmed: true, delivery_detail: verifDetail };
+  }
+  if (r.ok && !confirmed) {
+    return {
+      sent: false,
+      error: `Aceito pela ponte mas não confirmado pelo WhatsApp${verifDetail ? ` (${verifDetail})` : ""}. Tente novamente ou verifique a VPS.`,
+      messageId: r.messageId,
+      ...baseInfo,
+      bridge_status: r.status,
+      delivery_confirmed: false,
+      delivery_detail: verifDetail,
+    };
+  }
+  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status, delivery_confirmed: false };
 }
 
 Deno.serve(async (req) => {
