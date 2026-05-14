@@ -247,8 +247,13 @@ async function sendTo(params: {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
-    const { pessoa_id } = await req.json();
+    const body = await req.json();
+    const pessoa_id = body?.pessoa_id;
+    const target = (body?.target as string | undefined)?.toLowerCase(); // "coordenador" | "secretaria" | "lider" | undefined
     if (!pessoa_id) throw new Error("pessoa_id obrigatório");
+    if (target && !["coordenador", "secretaria", "lider"].includes(target)) {
+      throw new Error("target inválido");
+    }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
