@@ -25,7 +25,7 @@ function fmtPhone(s: string) {
 }
 
 function applyTemplate(tpl: string, vars: Record<string, string>) {
-  return tpl.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+  return (tpl || "").replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 }
 
 const REGIAO_LABELS: Record<string, string> = {
@@ -84,6 +84,7 @@ async function bridgeAction(bridgeUrl: string, bridgeKey: string, body: Record<s
   throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
 }
 
+// Mesma lógica do send-whatsapp-dispatch e eleicao-send-credentials.
 function sendFailure(res: Response, data: any): string | null {
   if (!res.ok) return data?.error || `Erro na ponte WhatsApp (status ${res.status})`;
   if (data?.success === false) return data?.error || "Ponte recusou o envio";
@@ -95,7 +96,7 @@ function sendFailure(res: Response, data: any): string | null {
 function isInstanceDisconnectedFailure(res: Response, data: any, failure: string) {
   if (res.status === 401 || res.status === 409) return true;
   const msg = String(data?.error || data?.message || failure || "").toLowerCase();
-  return msg.includes("instance") && (msg.includes("disconnect") || msg.includes("not connected") || msg.includes("offline"))
+  return (msg.includes("instance") && (msg.includes("disconnect") || msg.includes("not connected") || msg.includes("offline")))
     || /not connected|desconect|sem conex/i.test(msg);
 }
 
@@ -111,7 +112,6 @@ async function updateInstanceStatus(admin: any, instId: string, status: "connect
 }
 
 async function preflightInstance(admin: any, bridge: any) {
-  // Status atual
   try {
     const { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key, { action: "instance_status" }, 1);
     const raw = bridgeStatusOf(data);
@@ -125,7 +125,6 @@ async function preflightInstance(admin: any, bridge: any) {
   } catch (e) {
     console.warn("[eleicao-notify-novo-lider] preflight status falhou:", (e as Error).message);
   }
-  // Tenta reconectar
   const { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key, { action: "reconnect" }, 1);
   const raw = bridgeStatusOf(data);
   const status = isConnectedStatus(raw) ? "connected" : (isExplicitOfflineStatus(raw) || res.status === 401 ? "disconnected" : "connecting");
@@ -133,73 +132,46 @@ async function preflightInstance(admin: any, bridge: any) {
   return { status, reconnected: status === "connected", detail: raw || data?.error || data?.message || "sem status" };
 }
 
+// Seleção de instância idêntica ao eleicao-send-credentials/send-whatsapp-dispatch:
+// 1) pick_healthy_whatsapp_instance (RPC)  2) qualquer ativa  3) bridge legada do client.
 async function getBridge(admin: any, clientId: string) {
-  // 1) favoritada/primária ativa com credenciais
-  const { data: primary } = await admin.from("whatsapp_instances")
-    .select("id, apelido, bridge_url, bridge_api_key, phone_number, connected_since, status")
-    .eq("client_id", clientId).eq("is_active", true)
-    .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
-    .eq("is_primary", true)
-    .limit(1).maybeSingle();
-  if (primary?.bridge_url && primary?.bridge_api_key) {
-    console.log("[eleicao-notify-novo-lider] usando instância favoritada", { id: primary.id, apelido: primary.apelido });
-    return primary;
+  const { data: pickedId } = await admin.rpc("pick_healthy_whatsapp_instance", { p_client_id: clientId });
+  if (pickedId) {
+    const { data: inst } = await admin.from("whatsapp_instances")
+      .select("id, apelido, bridge_url, bridge_api_key, phone_number, connected_since, status")
+      .eq("id", pickedId).maybeSingle();
+    if (inst?.bridge_url && inst?.bridge_api_key) {
+      console.log("[eleicao-notify-novo-lider] instância via pick_healthy", { id: inst.id, apelido: inst.apelido, status: inst.status });
+      return inst;
+    }
   }
-  // 2) qualquer ativa
-  const { data: inst } = await admin.from("whatsapp_instances")
-    .select("id, apelido, bridge_url, bridge_api_key, phone_number, connected_since, status")
-    .eq("client_id", clientId).eq("is_active", true)
-    .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
-    .order("created_at", { ascending: true }).limit(1).maybeSingle();
-  if (inst?.bridge_url && inst?.bridge_api_key) return inst;
-  return null;
-}
 
-// Verifica se a mensagem realmente foi entregue/aceita pelo WhatsApp.
-// A ponte aceita o "send" e devolve messageId imediatamente, mas isso pode
-// significar apenas "enfileirado" — sem entrega real (caso conhecido em
-// bridges Baileys / WhatsApp Web). Aqui tentamos confirmar de fato.
-async function verifyDelivery(bridge: any, messageId: string | null, phone: string): Promise<{ confirmed: boolean; detail: string; raw: any }> {
-  if (!messageId) return { confirmed: false, detail: "sem messageId", raw: null };
-  const candidates: Array<Record<string, unknown>> = [
-    { action: "message_status", messageId, message_id: messageId, id: messageId, phone },
-    { action: "check_message", messageId, id: messageId, phone },
-    { action: "get_message_status", messageId, id: messageId, phone },
-  ];
-  for (const body of candidates) {
-    try {
-      const { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key, body, 0);
-      // ação não suportada → tenta a próxima
-      const errMsg = String(data?.error || "").toLowerCase();
-      if (!res.ok && (errMsg.includes("unsupported") || errMsg.includes("available:") || errMsg.includes("not found") || res.status === 404 || res.status === 400)) {
-        continue;
-      }
-      const status = String(data?.status || data?.message_status || data?.delivery_status || data?.ack || "").toLowerCase();
-      const ack = Number(data?.ack ?? data?.ackCode ?? -1);
-      // ack: 1=server,2=delivered,3=read em Baileys
-      if (data?.delivered === true || ["delivered", "read", "received", "ack", "ack_device", "played"].includes(status) || ack >= 2) {
-        return { confirmed: true, detail: status || `ack=${ack}` || "delivered", raw: data };
-      }
-      if (data?.delivered === false || ["pending", "queued", "sent_to_server", "server_ack"].includes(status) || ack === 1) {
-        return { confirmed: false, detail: status || `ack=${ack}` || "pending", raw: data };
-      }
-      // resposta válida mas inconclusiva — ainda assim conta como inconclusivo
-      return { confirmed: false, detail: status || "inconclusivo", raw: data };
-    } catch (_) { /* tenta a próxima */ }
+  const { data: anyActive } = await admin.from("whatsapp_instances")
+    .select("id, apelido, bridge_url, bridge_api_key, phone_number, connected_since, status, is_primary")
+    .eq("client_id", clientId).eq("is_active", true)
+    .not("bridge_url", "is", null).not("bridge_api_key", "is", null)
+    .order("is_primary", { ascending: false })
+    .order("status", { ascending: true })
+    .order("last_send_at", { ascending: true, nullsFirst: true })
+    .limit(1).maybeSingle();
+  if (anyActive?.bridge_url && anyActive?.bridge_api_key) {
+    console.log("[eleicao-notify-novo-lider] instância via fallback ativo", { id: anyActive.id, apelido: anyActive.apelido, status: anyActive.status });
+    return anyActive;
   }
-  return { confirmed: false, detail: "ponte não suporta consulta de status", raw: null };
+
+  return null;
 }
 
 async function bridgeSend(admin: any, bridge: any, phone: string, message: string) {
   const cleaned = cleanPhoneForBridge(phone);
-  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null as string | null, raw: null as any, verification: null as any };
+  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null as string | null, raw: null as any };
 
-  // Envia (com retry transiente)
+  // Mesmo payload simples do send-whatsapp-dispatch / eleicao-send-credentials.
   let { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key,
     { action: "send", phone: cleaned, message }, 2);
   let failure = sendFailure(res, data);
 
-  // Se falhou por desconexão, tenta reconectar e reenviar
+  // Se a ponte indicou que a instância caiu, tenta reconectar e reenviar uma vez.
   if (failure && isInstanceDisconnectedFailure(res, data, failure)) {
     console.warn("[eleicao-notify-novo-lider] retry após desconexão", { phone: cleaned, status: res.status, error: failure });
     const reconnect = await preflightInstance(admin, bridge);
@@ -216,26 +188,6 @@ async function bridgeSend(admin: any, bridge: any, phone: string, message: strin
 
   const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || null;
 
-  // Verificação pós-envio (best-effort). Se a ponte não suporta consulta
-  // de status, tratamos o messageId como confirmação (mesmo comportamento
-  // dos demais fluxos do sistema que funcionam corretamente).
-  let verification: { confirmed: boolean; detail: string; raw: any } | null = null;
-  if (!failure && messageId) {
-    await sleep(1200);
-    try {
-      verification = await verifyDelivery(bridge, messageId, cleaned);
-    } catch (_) { verification = null; }
-    const unsupported = !verification || /não suporta|unsupported|inconclusivo|sem messageId/i.test(verification?.detail || "");
-    if (unsupported) {
-      // ponte não tem endpoint de status → confia no messageId como ACK de recebimento
-      verification = { confirmed: true, detail: "messageId aceito pela ponte (sem endpoint de status)", raw: verification?.raw ?? null };
-    }
-    console.log("[eleicao-notify-novo-lider] verificação", { messageId, confirmed: verification.confirmed, detail: verification.detail });
-  } else if (!failure && !messageId) {
-    // sem messageId mas sem failure explícito: a ponte não devolveu ID — trata como falha
-    failure = "Ponte não devolveu messageId — envio não confirmado";
-  }
-
   return {
     ok: !failure,
     error: failure,
@@ -243,7 +195,6 @@ async function bridgeSend(admin: any, bridge: any, phone: string, message: strin
     status: res.status,
     messageId,
     raw: data,
-    verification,
   };
 }
 
@@ -279,8 +230,6 @@ type SendOutcome = {
   instance?: { id: string; apelido: string | null } | null;
   preflight_status?: string;
   bridge_status?: number;
-  delivery_confirmed?: boolean;
-  delivery_detail?: string;
 };
 
 async function sendTo(params: {
@@ -327,43 +276,32 @@ async function sendTo(params: {
     return { sent: false, reason, ...baseInfo };
   }
 
-  const r = await bridgeSend(admin, bridge, destinatarioTelefone, message);
-  console.log("[eleicao-notify-novo-lider]", {
-    destinatarioTipo, destinatarioNome, phone: r.phone, status: r.status,
-    ok: r.ok, messageId: r.messageId, error: r.error,
-    raw: r.raw && { delivered: r.raw.delivered, success: r.raw.success, error: r.raw.error },
-    verification: r.verification,
+  console.log("[eleicao-notify-novo-lider] envio →", {
+    destinatarioTipo, destinatarioNome,
+    phone: cleanPhoneForBridge(destinatarioTelefone),
+    instance: baseInstance,
+    msgLen: message.length,
   });
 
-  const confirmed = !!r.verification?.confirmed;
-  const verifDetail = r.verification?.detail || "";
-  const errorMsg = r.ok
-    ? (confirmed ? null : `Aceito pela ponte mas não confirmado pelo WhatsApp (${verifDetail || "sem confirmação"})`)
-    : r.error;
+  const r = await bridgeSend(admin, bridge, destinatarioTelefone, message);
+  console.log("[eleicao-notify-novo-lider] ←", {
+    destinatarioTipo, phone: r.phone, status: r.status,
+    ok: r.ok, messageId: r.messageId, error: r.error,
+    raw: r.raw && { delivered: r.raw.delivered, success: r.raw.success, error: r.raw.error },
+  });
 
   await auditLog(admin, {
     client_id: clientId, pessoa_id: pessoaId, destinatario_tipo: destinatarioTipo,
     destinatario_nome: destinatarioNome, destinatario_telefone: destinatarioTelefone, mensagem: message,
-    success: r.ok && confirmed, error_message: errorMsg, message_id: r.messageId,
+    success: r.ok, error_message: r.ok ? null : r.error, message_id: r.messageId,
     preflight_status: preflightStatus, bridge_status: r.status,
   });
-  await logSend(admin, bridge, clientId, r.ok && confirmed, errorMsg || undefined, preflightStatus, preflightReconnected);
+  await logSend(admin, bridge, clientId, r.ok, r.ok ? undefined : (r.error || undefined), preflightStatus, preflightReconnected);
 
-  if (r.ok && confirmed) {
-    return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status, delivery_confirmed: true, delivery_detail: verifDetail };
+  if (r.ok) {
+    return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status };
   }
-  if (r.ok && !confirmed) {
-    return {
-      sent: false,
-      error: `Aceito pela ponte mas não confirmado pelo WhatsApp${verifDetail ? ` (${verifDetail})` : ""}. Tente novamente ou verifique a VPS.`,
-      messageId: r.messageId,
-      ...baseInfo,
-      bridge_status: r.status,
-      delivery_confirmed: false,
-      delivery_detail: verifDetail,
-    };
-  }
-  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status, delivery_confirmed: false };
+  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status };
 }
 
 Deno.serve(async (req) => {
