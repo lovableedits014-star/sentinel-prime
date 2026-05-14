@@ -172,12 +172,19 @@ export function useWhatsAppGroups(clientId: string | undefined) {
         const totalGroups = Number(data?.total_groups ?? data?.total ?? 0);
         const upserted = Number(data?.total ?? 0);
         const inactiveMarked = Number(data?.inactive_marked ?? 0);
+        const restoredFavorites = Number(data?.restored_favorites ?? 0);
         const filtered = Math.max(0, totalChats - totalGroups);
         if (totalChats > 0) {
           pushLog("info", `[${instLabel}] ${totalChats} chat(s) — ${totalGroups} grupo(s), ${filtered} conversa(s) descartada(s).`);
         }
         if (inactiveMarked > 0) {
           pushLog("info", `[${instLabel}] ${inactiveMarked} grupo(s) marcado(s) como inativo(s).`);
+        }
+        if (restoredFavorites > 0) {
+          pushLog("success", `⭐ [${instLabel}] ${restoredFavorites} favorito(s) restaurado(s) automaticamente pelo número.`);
+          toast.success(`⭐ ${restoredFavorites} favorito(s) restaurado(s)`, {
+            description: "Reconhecemos os grupos favoritados deste número anteriormente.",
+          });
         }
         await queryClient.refetchQueries({ queryKey: ["whatsapp-groups", clientId], type: "active" });
         await queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", clientId] });
@@ -257,21 +264,65 @@ export function useWhatsAppGroups(clientId: string | undefined) {
   const toggleFavorite = useCallback(
     async (groupId: string, next: boolean) => {
       if (!clientId) return;
-      // Optimistic update
+      // Localiza o grupo e a instância dona (para resolver o telefone, que é a chave persistente)
+      const allRaw = (queryClient.getQueryData<WhatsAppGroup[]>(["whatsapp-groups", clientId]) || []);
+      const target = allRaw.find((g) => g.id === groupId);
+      const instList = (queryClient.getQueryData<WhatsAppInstanceLite[]>(["whatsapp-instances", clientId]) || []);
+      const ownerInst = target ? instList.find((i) => i.id === target.instance_id) : null;
+      const phoneDigits = String(ownerInst?.phone_number || "").replace(/\D/g, "");
+
+      // Optimistic update — todas as linhas do mesmo group_jid (várias instâncias podem enxergar)
       queryClient.setQueryData<WhatsAppGroup[]>(["whatsapp-groups", clientId], (prev) =>
-        (prev || []).map((g) => (g.id === groupId ? { ...g, is_favorite: next } : g))
+        (prev || []).map((g) =>
+          (g.id === groupId || (target && g.group_jid === target.group_jid))
+            ? { ...g, is_favorite: next }
+            : g
+        )
       );
-      const { error } = await supabase
+
+      // 1) atualiza whatsapp_groups (todas as linhas com mesmo group_jid no client)
+      const updateQuery = supabase
         .from("whatsapp_groups" as any)
         .update({ is_favorite: next })
-        .eq("id", groupId)
         .eq("client_id", clientId);
+      const { error } = target
+        ? await updateQuery.eq("group_jid", target.group_jid)
+        : await updateQuery.eq("id", groupId);
+
       if (error) {
         // rollback
         queryClient.setQueryData<WhatsAppGroup[]>(["whatsapp-groups", clientId], (prev) =>
-          (prev || []).map((g) => (g.id === groupId ? { ...g, is_favorite: !next } : g))
+          (prev || []).map((g) =>
+            (g.id === groupId || (target && g.group_jid === target.group_jid))
+              ? { ...g, is_favorite: !next }
+              : g
+          )
         );
         toast.error("Não foi possível atualizar favorito", { description: error.message });
+        return;
+      }
+
+      // 2) persiste em whatsapp_group_favorites (chave: client_id + phone_number + group_jid)
+      // Sobrevive à exclusão/recriação da instância — ao re-sincronizar com o mesmo número, é restaurado.
+      if (target && phoneDigits) {
+        if (next) {
+          await supabase.from("whatsapp_group_favorites" as any).upsert(
+            {
+              client_id: clientId,
+              phone_number: phoneDigits,
+              group_jid: target.group_jid,
+              group_name: target.name,
+            },
+            { onConflict: "client_id,phone_number,group_jid" }
+          );
+        } else {
+          await supabase
+            .from("whatsapp_group_favorites" as any)
+            .delete()
+            .eq("client_id", clientId)
+            .eq("phone_number", phoneDigits)
+            .eq("group_jid", target.group_jid);
+        }
       }
     },
     [clientId, queryClient]
