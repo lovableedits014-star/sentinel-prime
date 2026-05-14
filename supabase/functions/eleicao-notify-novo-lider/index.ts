@@ -5,29 +5,13 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function normalizePhone(p: string) {
-  const digits = (p || "").replace(/\D/g, "");
+// Padronizado com send-whatsapp-dispatch (sistema de missões que funciona).
+function cleanPhoneForBridge(raw: string): string {
+  const digits = String(raw || "").replace(/\D/g, "");
   if (!digits) return "";
   if (digits.startsWith("55")) return digits;
   if (digits.length === 10 || digits.length === 11) return `55${digits}`;
   return digits;
-}
-
-function phoneVariants(p: string) {
-  const normalized = normalizePhone(p);
-  if (!normalized) return [];
-  const variants: string[] = [];
-  const noCountry = normalized.startsWith("55") ? normalized.slice(2) : normalized;
-  if (noCountry.length === 11 && noCountry[2] === "9") {
-    // WhatsApp/Baileys frequentemente endereça números BR pelo JID antigo (sem o 9).
-    // Se enviarmos primeiro com o 9, algumas bridges retornam sucesso mas a mensagem não chega.
-    variants.push(`55${noCountry.slice(0, 2)}${noCountry.slice(3)}`, normalized);
-  } else if (noCountry.length === 10) {
-    variants.push(normalized, `55${noCountry.slice(0, 2)}9${noCountry.slice(2)}`);
-  } else {
-    variants.push(normalized);
-  }
-  return Array.from(new Set(variants.filter((v) => v.length >= 12)));
 }
 
 function fmtPhone(s: string) {
