@@ -203,6 +203,16 @@ export function NotifyProgressDialog({ open, pessoaId, onClose }: Props) {
                     {step.status === "skipped" && `${step.label} — ignorado`}
                     {step.status === "pending" && `Aguardando: ${step.label}`}
                   </div>
+                  {(step.destinatario || step.telefone) && step.status !== "pending" && (
+                    <div className="text-xs text-muted-foreground mt-0.5 break-words">
+                      {step.destinatario || "—"}
+                      {step.telefone ? ` · ${step.telefone}` : ""}
+                      {step.instancia && step.status === "success" ? ` · via ${step.instancia}` : ""}
+                    </div>
+                  )}
+                  {step.status === "success" && step.messageId && (
+                    <div className="text-[10px] text-muted-foreground/70 mt-0.5 font-mono">id: {step.messageId}</div>
+                  )}
                   {step.status === "error" && step.error && (
                     <div className="text-xs text-destructive mt-1 break-words">{step.error}</div>
                   )}
