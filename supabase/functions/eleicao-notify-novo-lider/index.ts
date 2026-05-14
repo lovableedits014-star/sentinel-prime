@@ -155,9 +155,44 @@ async function getBridge(admin: any, clientId: string) {
   return null;
 }
 
+// Verifica se a mensagem realmente foi entregue/aceita pelo WhatsApp.
+// A ponte aceita o "send" e devolve messageId imediatamente, mas isso pode
+// significar apenas "enfileirado" — sem entrega real (caso conhecido em
+// bridges Baileys / WhatsApp Web). Aqui tentamos confirmar de fato.
+async function verifyDelivery(bridge: any, messageId: string | null, phone: string): Promise<{ confirmed: boolean; detail: string; raw: any }> {
+  if (!messageId) return { confirmed: false, detail: "sem messageId", raw: null };
+  const candidates: Array<Record<string, unknown>> = [
+    { action: "message_status", messageId, message_id: messageId, id: messageId, phone },
+    { action: "check_message", messageId, id: messageId, phone },
+    { action: "get_message_status", messageId, id: messageId, phone },
+  ];
+  for (const body of candidates) {
+    try {
+      const { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key, body, 0);
+      // ação não suportada → tenta a próxima
+      const errMsg = String(data?.error || "").toLowerCase();
+      if (!res.ok && (errMsg.includes("unsupported") || errMsg.includes("available:") || errMsg.includes("not found") || res.status === 404 || res.status === 400)) {
+        continue;
+      }
+      const status = String(data?.status || data?.message_status || data?.delivery_status || data?.ack || "").toLowerCase();
+      const ack = Number(data?.ack ?? data?.ackCode ?? -1);
+      // ack: 1=server,2=delivered,3=read em Baileys
+      if (data?.delivered === true || ["delivered", "read", "received", "ack", "ack_device", "played"].includes(status) || ack >= 2) {
+        return { confirmed: true, detail: status || `ack=${ack}` || "delivered", raw: data };
+      }
+      if (data?.delivered === false || ["pending", "queued", "sent_to_server", "server_ack"].includes(status) || ack === 1) {
+        return { confirmed: false, detail: status || `ack=${ack}` || "pending", raw: data };
+      }
+      // resposta válida mas inconclusiva — ainda assim conta como inconclusivo
+      return { confirmed: false, detail: status || "inconclusivo", raw: data };
+    } catch (_) { /* tenta a próxima */ }
+  }
+  return { confirmed: false, detail: "ponte não suporta consulta de status", raw: null };
+}
+
 async function bridgeSend(admin: any, bridge: any, phone: string, message: string) {
   const cleaned = cleanPhoneForBridge(phone);
-  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null as string | null, raw: null as any };
+  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null as string | null, raw: null as any, verification: null as any };
 
   // Envia (com retry transiente)
   let { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key,
@@ -180,6 +215,15 @@ async function bridgeSend(admin: any, bridge: any, phone: string, message: strin
   }
 
   const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || null;
+
+  // Verificação pós-envio: confirma de fato se chegou no WhatsApp
+  let verification: { confirmed: boolean; detail: string; raw: any } | null = null;
+  if (!failure && messageId) {
+    await sleep(2000); // dá tempo da ponte registrar o ACK
+    verification = await verifyDelivery(bridge, messageId, cleaned);
+    console.log("[eleicao-notify-novo-lider] verificação", { messageId, confirmed: verification.confirmed, detail: verification.detail });
+  }
+
   return {
     ok: !failure,
     error: failure,
@@ -187,6 +231,7 @@ async function bridgeSend(admin: any, bridge: any, phone: string, message: strin
     status: res.status,
     messageId,
     raw: data,
+    verification,
   };
 }
 
@@ -222,6 +267,8 @@ type SendOutcome = {
   instance?: { id: string; apelido: string | null } | null;
   preflight_status?: string;
   bridge_status?: number;
+  delivery_confirmed?: boolean;
+  delivery_detail?: string;
 };
 
 async function sendTo(params: {
@@ -273,18 +320,38 @@ async function sendTo(params: {
     destinatarioTipo, destinatarioNome, phone: r.phone, status: r.status,
     ok: r.ok, messageId: r.messageId, error: r.error,
     raw: r.raw && { delivered: r.raw.delivered, success: r.raw.success, error: r.raw.error },
+    verification: r.verification,
   });
+
+  const confirmed = !!r.verification?.confirmed;
+  const verifDetail = r.verification?.detail || "";
+  const errorMsg = r.ok
+    ? (confirmed ? null : `Aceito pela ponte mas não confirmado pelo WhatsApp (${verifDetail || "sem confirmação"})`)
+    : r.error;
 
   await auditLog(admin, {
     client_id: clientId, pessoa_id: pessoaId, destinatario_tipo: destinatarioTipo,
     destinatario_nome: destinatarioNome, destinatario_telefone: destinatarioTelefone, mensagem: message,
-    success: r.ok, error_message: r.ok ? null : r.error, message_id: r.messageId,
+    success: r.ok && confirmed, error_message: errorMsg, message_id: r.messageId,
     preflight_status: preflightStatus, bridge_status: r.status,
   });
-  await logSend(admin, bridge, clientId, r.ok, r.error || undefined, preflightStatus, preflightReconnected);
+  await logSend(admin, bridge, clientId, r.ok && confirmed, errorMsg || undefined, preflightStatus, preflightReconnected);
 
-  if (r.ok) return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status };
-  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status };
+  if (r.ok && confirmed) {
+    return { sent: true, messageId: r.messageId, ...baseInfo, bridge_status: r.status, delivery_confirmed: true, delivery_detail: verifDetail };
+  }
+  if (r.ok && !confirmed) {
+    return {
+      sent: false,
+      error: `Aceito pela ponte mas não confirmado pelo WhatsApp${verifDetail ? ` (${verifDetail})` : ""}. Tente novamente ou verifique a VPS.`,
+      messageId: r.messageId,
+      ...baseInfo,
+      bridge_status: r.status,
+      delivery_confirmed: false,
+      delivery_detail: verifDetail,
+    };
+  }
+  return { sent: false, error: r.error || "Falha desconhecida", ...baseInfo, bridge_status: r.status, delivery_confirmed: false };
 }
 
 Deno.serve(async (req) => {
