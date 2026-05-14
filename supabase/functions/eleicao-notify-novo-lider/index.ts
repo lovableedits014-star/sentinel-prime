@@ -407,12 +407,25 @@ Deno.serve(async (req) => {
         }
       }
       if (!coordPhone && pessoa.regiao && pessoa.escopo === "campo_grande") {
-        const { data: coord } = await admin.from("eleicao_pessoas")
+        // 2. Tenta o coordenador FAVORITO da região (novo comportamento)
+        const { data: fav } = await admin.from("eleicao_pessoas")
           .select("nome, telefone")
           .eq("client_id", pessoa.client_id).eq("tipo", "coordenador")
           .eq("escopo", "campo_grande").eq("regiao", pessoa.regiao)
-          .order("created_at", { ascending: true }).limit(1).maybeSingle();
-        if (coord?.telefone) { coordPhone = coord.telefone; coordNome = coord.nome; }
+          .eq("is_favorito_regiao", true)
+          .maybeSingle();
+        if (fav?.telefone) {
+          coordPhone = fav.telefone;
+          coordNome = fav.nome;
+        } else {
+          // 3. Fallback legado: coordenador mais antigo da região
+          const { data: coord } = await admin.from("eleicao_pessoas")
+            .select("nome, telefone")
+            .eq("client_id", pessoa.client_id).eq("tipo", "coordenador")
+            .eq("escopo", "campo_grande").eq("regiao", pessoa.regiao)
+            .order("created_at", { ascending: true }).limit(1).maybeSingle();
+          if (coord?.telefone) { coordPhone = coord.telefone; coordNome = coord.nome; }
+        }
       }
       return { phone: coordPhone, nome: coordNome };
     }

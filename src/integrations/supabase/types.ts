@@ -1719,6 +1719,7 @@ export type Database = {
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id: string | null
           id: string
+          is_favorito_regiao: boolean
           nome: string
           numero: string | null
           observacoes: string | null
@@ -1742,6 +1743,7 @@ export type Database = {
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id?: string | null
           id?: string
+          is_favorito_regiao?: boolean
           nome: string
           numero?: string | null
           observacoes?: string | null
@@ -1765,6 +1767,7 @@ export type Database = {
           escopo?: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id?: string | null
           id?: string
+          is_favorito_regiao?: boolean
           nome?: string
           numero?: string | null
           observacoes?: string | null
