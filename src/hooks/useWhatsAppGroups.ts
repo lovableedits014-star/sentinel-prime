@@ -172,12 +172,19 @@ export function useWhatsAppGroups(clientId: string | undefined) {
         const totalGroups = Number(data?.total_groups ?? data?.total ?? 0);
         const upserted = Number(data?.total ?? 0);
         const inactiveMarked = Number(data?.inactive_marked ?? 0);
+        const restoredFavorites = Number(data?.restored_favorites ?? 0);
         const filtered = Math.max(0, totalChats - totalGroups);
         if (totalChats > 0) {
           pushLog("info", `[${instLabel}] ${totalChats} chat(s) — ${totalGroups} grupo(s), ${filtered} conversa(s) descartada(s).`);
         }
         if (inactiveMarked > 0) {
           pushLog("info", `[${instLabel}] ${inactiveMarked} grupo(s) marcado(s) como inativo(s).`);
+        }
+        if (restoredFavorites > 0) {
+          pushLog("success", `⭐ [${instLabel}] ${restoredFavorites} favorito(s) restaurado(s) automaticamente pelo número.`);
+          toast.success(`⭐ ${restoredFavorites} favorito(s) restaurado(s)`, {
+            description: "Reconhecemos os grupos favoritados deste número anteriormente.",
+          });
         }
         await queryClient.refetchQueries({ queryKey: ["whatsapp-groups", clientId], type: "active" });
         await queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", clientId] });
