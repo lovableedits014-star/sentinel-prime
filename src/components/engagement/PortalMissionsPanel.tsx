@@ -20,7 +20,7 @@ import {
   ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { syncCooldownRemaining, markSyncDone, formatCooldown } from "@/lib/sync-throttle";
+// sync-throttle removido: atualização de missões não tem mais cooldown
 
 interface Mission {
   id: string;
@@ -155,12 +155,6 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const syncAndRefetch = async () => {
     if (!clientId || isSyncing) return;
-    const remaining = syncCooldownRemaining(clientId);
-    if (remaining > 0) {
-      toast.info(`Aguarde ${formatCooldown(remaining)} antes de sincronizar (limite anti-custo).`);
-      await refetchPosts();
-      return;
-    }
     setIsSyncing(true);
     try {
       const { error } = await supabase.functions.invoke("fetch-meta-comments", {
@@ -168,7 +162,6 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       });
       if (error) throw error;
       await refetchPosts();
-      markSyncDone(clientId);
       toast.success("Publicações sincronizadas!");
     } catch (err: any) {
       // Even if sync fails, still refetch so user sees what's already in DB
