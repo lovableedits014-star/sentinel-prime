@@ -101,9 +101,7 @@ async function preflightInstance(bridge: any) {
   }
 }
 
-async function bridgeSend(bridge: any, phone: string, message: string) {
-  const cleaned = cleanPhoneForBridge(phone);
-  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null };
+async function bridgeSendOnce(bridge: any, cleaned: string, message: string) {
   try {
     const res = await fetchWithTimeout(bridge.bridge_url, {
       method: "POST",
@@ -120,8 +118,49 @@ async function bridgeSend(bridge: any, phone: string, message: string) {
     else if (!hasDeliverySignal) error = data?.error || "Ponte não confirmou entrega da mensagem";
     return { ok: !error, error, phone: cleaned, status: res.status, messageId };
   } catch (e: any) {
-    return { ok: false, error: e?.message || "Erro de rede", phone: cleaned, status: 0, messageId: null };
+    return { ok: false, error: e?.message || "Erro de rede", phone: cleaned, status: 0, messageId: null as string | null };
   }
+}
+
+async function bridgeSend(bridge: any, phone: string, message: string) {
+  const cleaned = cleanPhoneForBridge(phone);
+  if (!cleaned) return { ok: false, error: "Telefone inválido", phone: "", status: 0, messageId: null };
+
+  let r = await bridgeSendOnce(bridge, cleaned, message);
+
+  // Retry automático: se a ponte respondeu "Instance not connected" (409 ou erro relacionado),
+  // tenta reconectar e enviar novamente. Cobre o caso de instância oscilando entre o preflight e o envio.
+  const looksDisconnected = (
+    r.status === 409 ||
+    /not connected|disconnected|desconect|sem conex/i.test(r.error || "")
+  );
+  if (!r.ok && looksDisconnected) {
+    console.warn("[eleicao-notify-novo-lider] retry após 'not connected' — tentando reconectar", { phone: cleaned, status: r.status, error: r.error });
+    try {
+      await fetchWithTimeout(bridge.bridge_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
+        body: JSON.stringify({ action: "reconnect" }),
+      });
+    } catch {}
+    // Espera a ponte estabilizar
+    await sleep(2500);
+    // Confirma status
+    try {
+      const sres = await fetchWithTimeout(bridge.bridge_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Api-Key": bridge.bridge_api_key },
+        body: JSON.stringify({ action: "instance_status" }),
+      });
+      const sdata = await sres.json().catch(() => ({}));
+      const st = String(sdata?.status || sdata?.instance?.status || "").toLowerCase();
+      console.log("[eleicao-notify-novo-lider] status pós-reconnect:", st);
+    } catch {}
+    r = await bridgeSendOnce(bridge, cleaned, message);
+    console.log("[eleicao-notify-novo-lider] retry resultado:", { phone: cleaned, status: r.status, ok: r.ok, messageId: r.messageId, error: r.error });
+  }
+
+  return r;
 }
 
 async function logSend(admin: any, bridge: any, clientId: string, sent: boolean, error?: string) {
