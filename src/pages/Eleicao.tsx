@@ -1094,6 +1094,9 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={cn("text-sm truncate", indent === 0 ? "font-semibold" : "font-medium")}>{p.nome}</span>
+          {p.tipo === "coordenador" && p.escopo === "campo_grande" && p.regiao && (
+            <FavoritoToggle pessoa={p} />
+          )}
           {p.tipo === "coordenador" && p.user_id && (
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
           )}
