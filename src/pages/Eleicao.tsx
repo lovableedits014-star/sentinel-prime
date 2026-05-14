@@ -708,20 +708,12 @@ export default function Eleicao() {
               <Label>Nome *</Label>
               <Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Telefone *</Label>
-                <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" />
-              </div>
-              <div>
-                <Label>Valor de contratação (R$)</Label>
-                <Input
-                  inputMode="decimal"
-                  value={form.valor_contratacao}
-                  onChange={e => setForm(f => ({ ...f, valor_contratacao: e.target.value.replace(/[^0-9.,]/g, "") }))}
-                  placeholder="0,00 (deixe em branco se não recebe)"
-                />
-              </div>
+            <div>
+              <Label>Telefone *</Label>
+              <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                O valor de contratação é definido na aba <strong>Pendentes de valor</strong>.
+              </p>
             </div>
             {form.tipo === "coordenador" && (
               <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
