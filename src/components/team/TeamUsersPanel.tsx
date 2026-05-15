@@ -1,265 +1,311 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { UserPlus, Eye, EyeOff, Loader2, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ACCESS_PROFILES, parseRoles, type AccessProfile } from "@/lib/access-control";
+import { UserPlus, Users, Loader2, Trash2, Pencil, Eye, EyeOff, KeyRound, Power, Crown } from "lucide-react";
+import { ALL_APP_TABS, SECTION_ORDER, tabsBySection } from "@/lib/access-control";
 
-interface TeamMember {
+interface TeamUser {
   id: string;
+  user_id: string;
+  client_id: string;
   name: string;
   email: string;
-  role: string;
+  allowed_paths: string[];
+  is_manager: boolean;
   status: string;
   created_at: string;
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  gestor_social: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  gestor_campanha: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  operacional: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-};
-
-const profileOptions = Object.entries(ACCESS_PROFILES).filter(([key]) => key !== "admin");
+const TOTAL_TABS = ALL_APP_TABS.length;
 
 export default function TeamUsersPanel({ clientId }: { clientId: string }) {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [editing, setEditing] = useState<TeamUser | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(["gestor_social"]);
+  const [showPwd, setShowPwd] = useState(false);
+  const [paths, setPaths] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  const { data: members = [], isLoading } = useQuery({
-    queryKey: ["team-members", clientId],
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ["team-users", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("team_members")
-        .select("id, name, email, role, status, created_at")
+        .select("id, user_id, client_id, name, email, allowed_paths, is_manager, status, created_at")
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data || []) as TeamMember[];
+      return (data || []) as unknown as TeamUser[];
     },
     enabled: !!clientId,
   });
 
-  const toggleRole = (role: string) => {
-    setSelectedRoles(prev =>
-      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
-    );
+  const reset = () => {
+    setEditing(null);
+    setForm({ name: "", email: "", password: "" });
+    setPaths([]);
+    setShowPwd(false);
   };
 
-  const handleCreate = async () => {
-    if (!form.name || !form.email || !form.password) {
-      toast.error("Preencha todos os campos");
-      return;
-    }
-    if (form.password.length < 6) {
-      toast.error("A senha deve ter no mínimo 6 caracteres");
-      return;
-    }
-    if (selectedRoles.length === 0) {
-      toast.error("Selecione ao menos um perfil de acesso");
-      return;
-    }
+  const openCreate = () => { reset(); setOpen(true); };
 
-    setCreating(true);
-    try {
-      const role = selectedRoles.join(",");
-      const { data, error } = await supabase.functions.invoke("create-team-user", {
-        body: { name: form.name, email: form.email, password: form.password, role },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast.success(`Usuário ${form.name} criado com sucesso!`);
-      setForm({ name: "", email: "", password: "" });
-      setSelectedRoles(["gestor_social"]);
-      setOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["team-members"] });
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao criar usuário");
-    } finally {
-      setCreating(false);
-    }
+  const openEdit = (u: TeamUser) => {
+    setEditing(u);
+    setForm({ name: u.name, email: u.email, password: "" });
+    setPaths(u.allowed_paths || []);
+    setOpen(true);
   };
 
-  const handleToggleStatus = async (member: TeamMember) => {
-    const newStatus = member.status === "active" ? "inactive" : "active";
-    const { error } = await supabase
-      .from("team_members")
-      .update({ status: newStatus })
-      .eq("id", member.id);
-
-    if (error) {
-      toast.error("Erro ao atualizar status");
-    } else {
-      toast.success(newStatus === "active" ? "Usuário ativado" : "Usuário desativado");
-      queryClient.invalidateQueries({ queryKey: ["team-members"] });
-    }
-  };
-
-  const renderRoleBadges = (roleStr: string) => {
-    const roles = parseRoles(roleStr);
-    return roles.map(role => {
-      const profile = ACCESS_PROFILES[role as AccessProfile];
-      return (
-        <Badge key={role} variant="outline" className={ROLE_COLORS[role] || ""}>
-          {profile?.label || role}
-        </Badge>
-      );
+  const togglePath = (p: string) =>
+    setPaths((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  const toggleSection = (section: string, on: boolean) => {
+    const inSection = ALL_APP_TABS.filter((t) => t.section === section).map((t) => t.path);
+    setPaths((prev) => {
+      const filtered = prev.filter((p) => !inSection.includes(p));
+      return on ? [...filtered, ...inSection] : filtered;
     });
   };
+  const setAll = (on: boolean) => setPaths(on ? ALL_APP_TABS.map((t) => t.path) : []);
+
+  const handleSave = async () => {
+    if (!form.name || !form.email) return toast.error("Nome e email são obrigatórios");
+    if (!editing && !form.password) return toast.error("Senha é obrigatória");
+    if (form.password && form.password.length < 6) return toast.error("Senha mínima de 6 caracteres");
+    if (paths.length === 0) return toast.error("Marque pelo menos uma aba");
+
+    setSaving(true);
+    try {
+      const body: any = editing
+        ? {
+            action: "update",
+            id: editing.id,
+            name: form.name,
+            allowed_paths: paths,
+            is_manager: false,
+            password: form.password || undefined,
+          }
+        : {
+            action: "create",
+            client_id: clientId,
+            name: form.name,
+            email: form.email,
+            password: form.password,
+            allowed_paths: paths,
+            is_manager: false,
+          };
+
+      const { data, error } = await supabase.functions.invoke("manage-platform-user", { body });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      toast.success(editing ? "Acessos atualizados" : "Usuário criado");
+      setOpen(false);
+      reset();
+      qc.invalidateQueries({ queryKey: ["team-users", clientId] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleStatus = async (u: TeamUser) => {
+    const next = u.status === "active" ? "disabled" : "active";
+    try {
+      const { error } = await supabase.functions.invoke("manage-platform-user", {
+        body: { action: "update", id: u.id, status: next },
+      });
+      if (error) throw error;
+      toast.success(next === "active" ? "Usuário reativado" : "Usuário desativado");
+      qc.invalidateQueries({ queryKey: ["team-users", clientId] });
+    } catch (err: any) { toast.error(err.message || "Erro"); }
+  };
+
+  const handleDelete = async (u: TeamUser) => {
+    if (!confirm(`Excluir ${u.name}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      const { error } = await supabase.functions.invoke("manage-platform-user", {
+        body: { action: "delete", id: u.id },
+      });
+      if (error) throw error;
+      toast.success("Usuário removido");
+      qc.invalidateQueries({ queryKey: ["team-users", clientId] });
+    } catch (err: any) { toast.error(err.message || "Erro"); }
+  };
+
+  const grouped = tabsBySection();
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-primary" />
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="w-4 h-4" /> Usuários da Equipe
+          </CardTitle>
+          <CardDescription>
+            Cadastre usuários e escolha exatamente quais abas do sistema cada um pode acessar.
+          </CardDescription>
+        </div>
+        <Button onClick={openCreate} className="shrink-0">
+          <UserPlus className="w-4 h-4 mr-1" /> Novo usuário
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : users.length === 0 ? (
+          <p className="text-muted-foreground text-sm text-center py-4">Nenhum usuário cadastrado.</p>
+        ) : (
+          users.map((u) => {
+            const count = (u.allowed_paths || []).length;
+            return (
+              <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center shrink-0">
+                  <span className="text-primary text-sm font-bold">{u.name.charAt(0).toUpperCase()}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium truncate">{u.name}</p>
+                    {u.is_manager && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        <Crown className="w-3 h-3 mr-1 inline" />Gerente
+                      </Badge>
+                    )}
+                    {u.status === "disabled" && (
+                      <Badge variant="destructive" className="text-[10px]">Desativado</Badge>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground text-xs truncate">{u.email}</p>
+                  <p className="text-muted-foreground text-[11px] mt-0.5">
+                    {u.is_manager ? "acesso total" : `${count} de ${TOTAL_TABS} abas liberadas`}
+                  </p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {!u.is_manager && (
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u)} title="Editar acessos">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleToggleStatus(u)} title={u.status === "active" ? "Desativar" : "Reativar"}>
+                    <Power className="w-3.5 h-3.5" />
+                  </Button>
+                  {!u.is_manager && (
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(u)} title="Excluir">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </CardContent>
+
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar usuário" : "Novo usuário"}</DialogTitle>
+            <DialogDescription>
+              Marque exatamente quais abas do sistema este usuário poderá acessar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Nome</Label>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div>
+                <Label className="text-xs">Email</Label>
+                <Input type="email" value={form.email} disabled={!!editing} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+              <div className="md:col-span-2">
+                <Label className="text-xs flex items-center gap-1">
+                  <KeyRound className="w-3 h-3" />
+                  {editing ? "Nova senha (opcional)" : "Senha"}
+                </Label>
+                <div className="relative">
+                  <Input
+                    type={showPwd ? "text" : "password"}
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder={editing ? "Deixe em branco para manter a senha atual" : "Mínimo 6 caracteres"}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPwd((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  >
+                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
             </div>
-            <div>
-              <CardTitle>Equipe & Acessos</CardTitle>
-              <CardDescription>Crie usuários com acesso limitado a módulos específicos</CardDescription>
+
+            <div className="border-t pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-semibold">Acesso por aba</Label>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAll(true)}>Liberar tudo</Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setAll(false)}>Limpar tudo</Button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2 rounded bg-muted/50">
+                  <Checkbox checked disabled />
+                  <span className="text-sm">Dashboard <span className="text-xs text-muted-foreground">(sempre liberado)</span></span>
+                </div>
+
+                {SECTION_ORDER.map((section) => {
+                  const items = grouped[section] || [];
+                  if (items.length === 0) return null;
+                  const allOn = items.every((i) => paths.includes(i.path));
+                  return (
+                    <div key={section} className="border rounded-md p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{section}</p>
+                        <Button type="button" size="sm" variant="ghost" className="h-6 text-[11px] px-2" onClick={() => toggleSection(section, !allOn)}>
+                          {allOn ? "Limpar seção" : "Liberar seção"}
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                        {items.map((tab) => {
+                          const checked = paths.includes(tab.path);
+                          return (
+                            <label key={tab.path} className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer">
+                              <Checkbox checked={checked} onCheckedChange={() => togglePath(tab.path)} />
+                              <span className="text-sm">{tab.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Novo Usuário
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Criar Usuário</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Input
-                    placeholder="Nome completo"
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>E-mail</Label>
-                  <Input
-                    type="email"
-                    placeholder="usuario@email.com"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Senha</Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Mínimo 6 caracteres"
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      className="pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <Label>Perfis de Acesso</Label>
-                  <p className="text-xs text-muted-foreground">Selecione um ou mais perfis. Os acessos serão combinados.</p>
-                  <div className="space-y-2">
-                    {profileOptions.map(([key, config]) => (
-                      <label
-                        key={key}
-                        className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                          selectedRoles.includes(key) ? "border-primary bg-primary/5" : "hover:bg-muted/50"
-                        }`}
-                      >
-                        <Checkbox
-                          checked={selectedRoles.includes(key)}
-                          onCheckedChange={() => toggleRole(key)}
-                          className="mt-0.5"
-                        />
-                        <div>
-                          <p className="text-sm font-medium">{config.label}</p>
-                          <p className="text-xs text-muted-foreground">{config.description}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <Button className="w-full" onClick={handleCreate} disabled={creating}>
-                  {creating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {creating ? "Criando..." : "Criar Usuário"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />)}
-          </div>
-        ) : members.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p>Nenhum usuário da equipe criado ainda.</p>
-            <p className="text-xs mt-1">Clique em "Novo Usuário" para adicionar membros com acesso limitado.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between gap-3 border rounded-lg p-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-primary">
-                      {member.name[0]?.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{member.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                  {renderRoleBadges(member.role)}
-                  <Badge variant={member.status === "active" ? "default" : "secondary"} className="text-[10px]">
-                    {member.status === "active" ? "Ativo" : "Inativo"}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleToggleStatus(member)}
-                    className="text-xs"
-                  >
-                    {member.status === "active" ? "Desativar" : "Ativar"}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              {editing ? "Salvar alterações" : "Criar usuário"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
