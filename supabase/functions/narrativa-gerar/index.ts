@@ -490,6 +490,66 @@ const TOOL_SCHEMA = {
   },
 };
 
+function normalizeStringArray(value: any, min = 0): string[] {
+  const arr = Array.isArray(value) ? value : [];
+  const cleaned = arr.map((v) => String(v || "").trim()).filter(Boolean);
+  while (cleaned.length < min) cleaned.push("—");
+  return cleaned;
+}
+
+function normalizeConteudos(raw: any): any {
+  const obj = raw && typeof raw === "object" ? raw : {};
+  const discursos = obj.discursos && typeof obj.discursos === "object" ? obj.discursos : {};
+  const briefing = obj.briefing_municipio && typeof obj.briefing_municipio === "object" ? obj.briefing_municipio : {};
+  return {
+    discursos: {
+      popular: String(discursos.popular || ""),
+      tecnico: String(discursos.tecnico || ""),
+      emocional: String(discursos.emocional || ""),
+    },
+    ataques_3_camadas: (Array.isArray(obj.ataques_3_camadas) ? obj.ataques_3_camadas : []).slice(0, 3).map((a: any) => ({
+      tema: String(a?.tema || ""),
+      falha_do_gestor: String(a?.falha_do_gestor || ""),
+      solucao_proposta: String(a?.solucao_proposta || ""),
+    })),
+    manchetes_reels: normalizeStringArray(obj.manchetes_reels, 3).slice(0, 5),
+    curiosidades_locais: (Array.isArray(obj.curiosidades_locais) ? obj.curiosidades_locais : []).slice(0, 10).map((c: any) => ({
+      categoria: String(c?.categoria || "curiosidade"),
+      titulo: String(c?.titulo || ""),
+      fato: String(c?.fato || ""),
+      uso_politico: String(c?.uso_politico || ""),
+    })),
+    briefing_municipio: {
+      ...briefing,
+      ficha_rapida: briefing.ficha_rapida && typeof briefing.ficha_rapida === "object" ? briefing.ficha_rapida : {},
+      municipios_vizinhos: normalizeStringArray(briefing.municipios_vizinhos).slice(0, 12),
+      distritos_bairros: normalizeStringArray(briefing.distritos_bairros).slice(0, 15),
+      personalidades_notaveis: Array.isArray(briefing.personalidades_notaveis) ? briefing.personalidades_notaveis.slice(0, 8) : [],
+      pontos_turisticos: normalizeStringArray(briefing.pontos_turisticos).slice(0, 8),
+      festas_eventos: normalizeStringArray(briefing.festas_eventos).slice(0, 8),
+      dicas_abordagem: normalizeStringArray(briefing.dicas_abordagem, 3).slice(0, 6),
+      evitar: normalizeStringArray(briefing.evitar).slice(0, 5),
+    },
+    posts_redes: (Array.isArray(obj.posts_redes) ? obj.posts_redes : []).slice(0, 8).map((p: any) => ({
+      plataforma: String(p?.plataforma || "facebook"),
+      tema: String(p?.tema || ""),
+      texto: String(p?.texto || ""),
+      hashtags: normalizeStringArray(p?.hashtags).slice(0, 8),
+      cta: String(p?.cta || ""),
+    })),
+    plano_de_campo: (Array.isArray(obj.plano_de_campo) ? obj.plano_de_campo : []).slice(0, 10).map((p: any, i: number) => ({
+      ordem: Number(p?.ordem || i + 1),
+      bairro: String(p?.bairro || ""),
+      local_sugerido: String(p?.local_sugerido || ""),
+      periodo: String(p?.periodo || "manha"),
+      objetivo: String(p?.objetivo || "escuta"),
+      mensagem_chave: String(p?.mensagem_chave || ""),
+      dor_alvo: String(p?.dor_alvo || ""),
+      acao_sugerida: String(p?.acao_sugerida || ""),
+    })),
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
