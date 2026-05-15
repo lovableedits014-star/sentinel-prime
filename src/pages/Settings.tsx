@@ -21,21 +21,11 @@ const Settings = () => {
   const { isSuperAdmin } = useIsSuperAdmin();
 
   useEffect(() => {
-    const fetchClient = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("clients")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setClientId(data.id);
-      }
+    (async () => {
+      const id = await resolveClientId();
+      if (id) setClientId(id);
       setLoading(false);
-    };
-    fetchClient();
+    })();
   }, []);
 
   return (
