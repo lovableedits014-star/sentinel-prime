@@ -41,15 +41,11 @@ Deno.serve(async (req) => {
     const body = RequestSchema.parse(await req.json());
     const { clientId } = body;
 
-    // Verify ownership
-    const { data: client } = await supabase
-      .from('clients')
-      .select('id')
-      .eq('id', clientId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (!client) {
+    // Verify access (owner OR active team member)
+    const { data: hasAccess } = await supabase.rpc('user_has_client_access', {
+      _client_id: clientId, _user_id: user.id,
+    });
+    if (!hasAccess) {
       return new Response(
         JSON.stringify({ success: false, error: 'Acesso não autorizado' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

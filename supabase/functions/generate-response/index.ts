@@ -45,20 +45,18 @@ Deno.serve(async (req) => {
     const body = RequestSchema.parse(await req.json());
     const { commentId, clientId, userGuidance } = body;
 
-    // Verify user owns this client
-    const { data: client, error: clientError } = await supabaseClient
-      .from('clients')
-      .select('id, name, cargo')
-      .eq('id', clientId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (clientError || !client) {
+    // Verify user has access (owner OR active team member)
+    const { data: hasAccess } = await supabaseClient.rpc('user_has_client_access', {
+      _client_id: clientId, _user_id: user.id,
+    });
+    if (!hasAccess) {
       return new Response(
         JSON.stringify({ success: false, error: 'Acesso não autorizado a este cliente' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    const { data: client } = await supabaseClient
+      .from('clients').select('id, name, cargo').eq('id', clientId).single();
 
     // Get comment (verify it belongs to this client)
     const { data: comment, error: commentError } = await supabaseClient

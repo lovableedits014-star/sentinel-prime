@@ -518,15 +518,11 @@ Deno.serve(async (req) => {
     const postsLimit = body.postsLimit ?? 30;
     clientIdVar = clientId;
 
-    // Verify user owns this client
-    const { data: clientOwner, error: clientOwnerError } = await supabaseClient
-      .from('clients')
-      .select('id')
-      .eq('id', clientId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (clientOwnerError || !clientOwner) {
+    // Verify user has access (owner OR active team member)
+    const { data: hasAccess } = await supabaseClient.rpc('user_has_client_access', {
+      _client_id: clientId, _user_id: user.id,
+    });
+    if (!hasAccess) {
       return new Response(JSON.stringify({ success: false, error: 'Acesso não autorizado a este cliente' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
