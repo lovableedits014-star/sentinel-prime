@@ -5561,10 +5561,12 @@ export type Database = {
       }
       team_members: {
         Row: {
+          allowed_paths: string[]
           client_id: string
           created_at: string | null
           email: string
           id: string
+          is_manager: boolean
           name: string
           permissions: Json | null
           role: string
@@ -5573,10 +5575,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allowed_paths?: string[]
           client_id: string
           created_at?: string | null
           email: string
           id?: string
+          is_manager?: boolean
           name: string
           permissions?: Json | null
           role?: string
@@ -5585,10 +5589,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allowed_paths?: string[]
           client_id?: string
           created_at?: string | null
           email?: string
           id?: string
+          is_manager?: boolean
           name?: string
           permissions?: Json | null
           role?: string
@@ -6784,6 +6790,7 @@ export type Database = {
         Returns: Json
       }
       unaccent: { Args: { "": string }; Returns: string }
+      user_allowed_paths: { Args: { _client_id: string }; Returns: string[] }
       user_can_access_client: { Args: { _client_id: string }; Returns: boolean }
       user_has_client_access: {
         Args: { _client_id: string; _user_id: string }
