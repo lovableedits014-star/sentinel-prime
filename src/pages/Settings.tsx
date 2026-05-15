@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { resolveClientId } from "@/lib/resolveClientId";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings as SettingsIcon } from "lucide-react";
 import TeamUsersPanel from "@/components/team/TeamUsersPanel";
@@ -21,21 +21,11 @@ const Settings = () => {
   const { isSuperAdmin } = useIsSuperAdmin();
 
   useEffect(() => {
-    const fetchClient = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("clients")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      if (data) {
-        setClientId(data.id);
-      }
+    (async () => {
+      const id = await resolveClientId();
+      if (id) setClientId(id);
       setLoading(false);
-    };
-    fetchClient();
+    })();
   }, []);
 
   return (

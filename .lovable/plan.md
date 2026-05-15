@@ -1,70 +1,51 @@
 ## Diagnóstico
 
-O cliente **Junior Coringa** existe e tem Meta configurado: página, Instagram e token estão presentes. Também já existem **1809 comentários** salvos para esse cliente.
+O **gerente** (registro em `team_members` com `is_manager = true`) já está com acesso liberado à navegação para `/settings` — o `DashboardLayout` trata `is_manager` como acesso total. O problema está dentro da própria página `src/pages/Settings.tsx`:
 
-O problema principal é de autorização/escopo:
-- O gerente atual está em `team_members` do Junior Coringa, mas várias partes do app e das Edge Functions ainda aceitam apenas o dono em `clients.user_id`.
-- A sincronização Meta falha com `403: Acesso não autorizado a este cliente` porque `fetch-meta-comments` verifica só `clients.user_id = usuário logado`.
-- Algumas páginas ainda procuram cliente somente por `clients.user_id`, então para gerente aparecem vazias ou sem ações.
-- As políticas RLS de tabelas importantes como `comments` e `integrations` também estão focadas no dono, o que pode fazer leitura/ações falharem para equipe.
+```ts
+// Settings.tsx (atual)
+const { data } = await supabase
+  .from("clients")
+  .select("id, name")
+  .eq("user_id", user.id)   // ← só encontra o DONO do cliente
+  .limit(1).maybeSingle();
+if (data) setClientId(data.id);
+```
 
-## Plano de correção
+Como o gerente não é dono do cliente (apenas membro da equipe), `clientId` fica vazio e **todos os cards são renderizados condicionalmente com `{clientId && ...}`**, então a aba de Configurações aparece em branco para ele — inclusive o `TeamUsersPanel`, que é exatamente onde ele cadastraria os usuários do sistema dele.
 
-1. **Criar uma função central de acesso ao cliente no banco**
-   - Criar/usar uma função segura tipo `public.user_has_client_access(user_id, client_id)`.
-   - Ela deve retornar verdadeiro quando o usuário for:
-     - dono do cliente em `clients.user_id`, ou
-     - membro ativo em `team_members`.
-   - Usar `SECURITY DEFINER` para evitar recursão de RLS.
+Esse mesmo bug já foi corrigido em `Comments.tsx` e `Integrations.tsx` usando o helper `resolveClientId()` (que faz fallback de `clients` → `team_members`). O `Settings.tsx` ficou de fora.
 
-2. **Corrigir RLS das tabelas usadas no dashboard/Meta**
-   - Atualizar políticas de `comments`, `integrations`, `supporters`, `supporter_profiles` e tabelas de apoio usadas no dashboard para permitir acesso também a membros ativos do cliente.
-   - Manter dono e admin funcionando como antes.
-   - Não abrir dados publicamente.
+## Onde o gerente cadastra os usuários
 
-3. **Corrigir as Edge Functions de Meta e comentários**
-   - Trocar verificações rígidas de dono por acesso via dono ou `team_members` em:
-     - `fetch-meta-comments`
-     - `test-meta-connection`
-     - `generate-response`
-     - `respond-to-comment`
-     - `manage-comment`
-     - `react-to-comment`
-     - `batch-analyze-sentiments`
-     - `analyze-sentiment`
-     - `renew-meta-token`
-   - Reaproveitar o guard compartilhado já existente (`_shared/auth-guard.ts`) onde fizer sentido.
-   - Isso resolve o 403 da sincronização e das ações nos comentários para gerentes.
+O cadastro existe e está correto: é o componente `TeamUsersPanel` (botão "Adicionar usuário" → chama a edge function `create-team-user`). Ele aparece dentro de `/settings`, logo abaixo das outras configurações. O motivo de "não encontrar" é o mesmo bug acima — o painel não está sendo montado porque `clientId` está vazio para o gerente.
 
-4. **Corrigir telas que ainda “puxam” só cliente do dono**
-   - Aplicar fallback dono → membro ativo em páginas críticas:
-     - `Comments.tsx`
-     - `Integrations.tsx`
-     - `StatusWhatsApp.tsx`
-     - `Disparos.tsx`
-     - `Territorial.tsx`
-     - `Militancia.tsx`
-     - `Midia.tsx`
-     - `CalendarioPolitico.tsx`
-     - componentes de IA/engajamento que ainda usam só `clients.user_id`
-   - O `Dashboard.tsx` já começou a ser corrigido, mas precisa funcionar junto com RLS e Edge Functions.
+## Correção
 
-5. **Adicionar um utilitário único de resolução de cliente no frontend**
-   - Criar uma função/hook compartilhado para obter o cliente atual:
-     - primeiro dono em `clients`,
-     - depois vínculo ativo em `team_members`.
-   - Substituir consultas duplicadas para evitar esse bug voltar em novas telas.
+Trocar a resolução de `clientId` no `Settings.tsx` para usar `resolveClientId()`:
 
-6. **Validar com dados reais do Junior Coringa**
-   - Confirmar que o gerente `wellington.advogado2013@gmail.com` acessa o client_id `6879803f-fd2e-4a43-8d0d-4417e1b1fe15`.
-   - Testar a Edge Function `fetch-meta-comments` com o token da sessão atual.
-   - Validar que o dashboard lista os comentários existentes e que a sincronização não retorna mais 403.
+```ts
+import { resolveClientId } from "@/lib/resolveClientId";
 
-## Resultado esperado
+useEffect(() => {
+  (async () => {
+    const id = await resolveClientId();
+    if (id) setClientId(id);
+    setLoading(false);
+  })();
+}, []);
+```
 
-Depois da correção, gerente e novos usuários ativos em `team_members` vão conseguir:
-- abrir dashboard com dados do cliente correto;
-- sincronizar Meta do Junior Coringa;
-- ver comentários já salvos;
-- analisar sentimentos e executar ações em comentários;
-- acessar as páginas liberadas sem depender de serem donos em `clients.user_id`.
+Resultado: para o gerente, `resolveClientId` cai no fallback de `team_members` (status `active`), retorna o `client_id` ao qual ele pertence, e todos os cards de Configurações passam a renderizar — incluindo o **TeamUsersPanel**, onde ele cria os usuários da equipe dele.
+
+## Escopo
+
+- **1 arquivo alterado:** `src/pages/Settings.tsx` (somente o `useEffect` de resolução de cliente).
+- Sem mudanças no banco, sem mudanças em edge functions, sem mudanças no menu/layout.
+- Não mexe em business logic — apenas corrige a fonte do `clientId` que já é usada por todos os cards da página.
+
+## Verificação
+
+Após a alteração, logado como gerente em `/settings`:
+1. Os cards (WhatsApp, Identidade, Integrações, **Equipe / Usuários**) devem aparecer.
+2. No card "Usuários da Equipe", o botão "Adicionar usuário" abre o diálogo e o cadastro deve funcionar (a edge `create-team-user` já está deployada e usa o mesmo `client_id`).
