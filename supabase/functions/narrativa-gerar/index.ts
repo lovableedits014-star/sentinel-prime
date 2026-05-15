@@ -797,18 +797,28 @@ USE estes números para amarrar a bandeira do candidato (autismo) à realidade l
 `;
     })();
 
-    const userPrompt = votosBlock + teaBlock + buildUserPrompt(dossie, rankingMap, contextoWeb);
+    const userPrompt = votosBlock + teaBlock + buildUserPrompt(dossie, rankingMap, contextoWeb) + buildJsonOutputInstructions();
 
-    let aiJson: any;
+    let conteudos: any;
     try {
-      aiJson = await callLLMRaw(llmConfig, {
-        messages: [
-          { role: "system", content: buildSystemPrompt(perfil) },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [TOOL_SCHEMA],
-        tool_choice: { type: "function", function: { name: "gerar_pacote_narrativa" } },
-      });
+      const messages = [
+        { role: "system" as const, content: buildSystemPrompt(perfil) },
+        { role: "user" as const, content: userPrompt },
+      ];
+
+      if (llmConfig.provider === "groq") {
+        const aiText = await callLLM(llmConfig, { messages, maxTokens: 7000, temperature: 0.4 });
+        conteudos = normalizeConteudos(parseLooseJson(aiText.content));
+      } else {
+        const aiJson = await callLLMRaw(llmConfig, {
+          messages,
+          tools: [TOOL_SCHEMA],
+          tool_choice: { type: "function", function: { name: "gerar_pacote_narrativa" } },
+        });
+        const tcArgs = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+        if (!tcArgs) throw new Error("IA não retornou tool_call estruturada");
+        conteudos = normalizeConteudos(JSON.parse(tcArgs));
+      }
     } catch (e: any) {
       const status = e?.status || 500;
       if (status === 429) {
@@ -827,10 +837,6 @@ USE estes números para amarrar a bandeira do candidato (autismo) à realidade l
       await supa.from("narrativa_dossies").update({ status: "erro", erro_msg: msg }).eq("id", dossie_id);
       throw e;
     }
-
-    const tcArgs = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!tcArgs) throw new Error("IA não retornou tool_call estruturada");
-    const conteudos = JSON.parse(tcArgs);
 
     // Persiste enriquecimentos no dados_brutos para o PDF poder renderizar
     // sem depender do que a IA gerou.
