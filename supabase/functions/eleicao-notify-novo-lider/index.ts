@@ -378,7 +378,18 @@ Deno.serve(async (req) => {
     }
     if (pre.reconnected) await sleep(1500);
 
-    const regiaoLabel = pessoa.regiao ? (REGIAO_LABELS[pessoa.regiao] || pessoa.regiao) : "—";
+    let regiaoLabel = "—";
+    if (pessoa.regiao) {
+      const { data: regRow } = await admin
+        .from("eleicao_regioes")
+        .select("label")
+        .eq("client_id", clientId)
+        .eq("value", pessoa.regiao)
+        .maybeSingle();
+      regiaoLabel = (regRow as any)?.label
+        || REGIAO_LABELS[pessoa.regiao]
+        || pessoa.regiao.charAt(0).toUpperCase() + pessoa.regiao.slice(1);
+    }
     const linkGrupo = (cfg.grupos_links && pessoa.regiao) ? (cfg.grupos_links[pessoa.regiao] || "") : "";
     const vars = {
       nome: pessoa.nome,
