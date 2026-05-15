@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { callLLMRaw, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { callLLM, callLLMRaw, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { parseLooseJson } from "../_shared/ic-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,7 +125,28 @@ REGRAS OBRIGATÓRIAS:
 - Quando citar uma dor, conecte-a EMOCIONALMENTE com a vida cotidiana do morador.
 - O candidato é alguém que VEM DE BAIXO, conhece a realidade, fala direto.
 - Nunca seja genérico. Sempre mencione o NOME da cidade.
-- Saída deve ser estritamente um JSON válido seguindo o schema do tool.`;
+    - Saída deve ser estritamente um JSON válido no formato solicitado.`;
+}
+
+function buildJsonOutputInstructions() {
+  return `
+
+FORMATO DE SAÍDA OBRIGATÓRIO:
+Retorne APENAS JSON puro, sem markdown, sem comentários e sem texto antes/depois.
+O JSON deve ter exatamente estas chaves principais:
+{
+  "discursos": { "popular": "...", "tecnico": "...", "emocional": "..." },
+  "ataques_3_camadas": [{ "tema": "...", "falha_do_gestor": "...", "solucao_proposta": "..." }],
+  "manchetes_reels": ["..."],
+  "curiosidades_locais": [{ "categoria": "historia|cultura|economia|geografia|personalidades|gastronomia|religiao|esporte|curiosidade|etimologia", "titulo": "...", "fato": "...", "uso_politico": "..." }],
+  "briefing_municipio": {
+    "visao_geral": "...",
+    "ficha_rapida": { "gentilico": "", "fundacao": "", "aniversario": "", "area_km2": "", "altitude": "", "clima": "", "populacao": "", "regiao": "", "padroeiro": "", "lema": "", "site_oficial": "" },
+    "simbolos": "", "geografia_clima": "", "municipios_vizinhos": [], "distritos_bairros": [], "economia_resumo": "", "infraestrutura": "", "politica_local": "", "personalidades_notaveis": [], "pontos_turisticos": [], "festas_eventos": [], "dicas_abordagem": [], "evitar": []
+  },
+  "posts_redes": [{ "plataforma": "facebook|instagram|whatsapp|story", "tema": "...", "texto": "...", "hashtags": [], "cta": "..." }],
+  "plano_de_campo": [{ "ordem": 1, "bairro": "...", "local_sugerido": "...", "periodo": "manha|tarde|noite", "objetivo": "escuta|denuncia|presenca|mobilizacao|evento", "mensagem_chave": "...", "dor_alvo": "...", "acao_sugerida": "..." }]
+}`;
 }
 
 function buildUserPrompt(dossie: any, ranking?: Record<string, any>, contextoWeb?: any) {
@@ -468,6 +490,66 @@ const TOOL_SCHEMA = {
   },
 };
 
+function normalizeStringArray(value: any, min = 0): string[] {
+  const arr = Array.isArray(value) ? value : [];
+  const cleaned = arr.map((v) => String(v || "").trim()).filter(Boolean);
+  while (cleaned.length < min) cleaned.push("—");
+  return cleaned;
+}
+
+function normalizeConteudos(raw: any): any {
+  const obj = raw && typeof raw === "object" ? raw : {};
+  const discursos = obj.discursos && typeof obj.discursos === "object" ? obj.discursos : {};
+  const briefing = obj.briefing_municipio && typeof obj.briefing_municipio === "object" ? obj.briefing_municipio : {};
+  return {
+    discursos: {
+      popular: String(discursos.popular || ""),
+      tecnico: String(discursos.tecnico || ""),
+      emocional: String(discursos.emocional || ""),
+    },
+    ataques_3_camadas: (Array.isArray(obj.ataques_3_camadas) ? obj.ataques_3_camadas : []).slice(0, 3).map((a: any) => ({
+      tema: String(a?.tema || ""),
+      falha_do_gestor: String(a?.falha_do_gestor || ""),
+      solucao_proposta: String(a?.solucao_proposta || ""),
+    })),
+    manchetes_reels: normalizeStringArray(obj.manchetes_reels, 3).slice(0, 5),
+    curiosidades_locais: (Array.isArray(obj.curiosidades_locais) ? obj.curiosidades_locais : []).slice(0, 10).map((c: any) => ({
+      categoria: String(c?.categoria || "curiosidade"),
+      titulo: String(c?.titulo || ""),
+      fato: String(c?.fato || ""),
+      uso_politico: String(c?.uso_politico || ""),
+    })),
+    briefing_municipio: {
+      ...briefing,
+      ficha_rapida: briefing.ficha_rapida && typeof briefing.ficha_rapida === "object" ? briefing.ficha_rapida : {},
+      municipios_vizinhos: normalizeStringArray(briefing.municipios_vizinhos).slice(0, 12),
+      distritos_bairros: normalizeStringArray(briefing.distritos_bairros).slice(0, 15),
+      personalidades_notaveis: Array.isArray(briefing.personalidades_notaveis) ? briefing.personalidades_notaveis.slice(0, 8) : [],
+      pontos_turisticos: normalizeStringArray(briefing.pontos_turisticos).slice(0, 8),
+      festas_eventos: normalizeStringArray(briefing.festas_eventos).slice(0, 8),
+      dicas_abordagem: normalizeStringArray(briefing.dicas_abordagem, 3).slice(0, 6),
+      evitar: normalizeStringArray(briefing.evitar).slice(0, 5),
+    },
+    posts_redes: (Array.isArray(obj.posts_redes) ? obj.posts_redes : []).slice(0, 8).map((p: any) => ({
+      plataforma: String(p?.plataforma || "facebook"),
+      tema: String(p?.tema || ""),
+      texto: String(p?.texto || ""),
+      hashtags: normalizeStringArray(p?.hashtags).slice(0, 8),
+      cta: String(p?.cta || ""),
+    })),
+    plano_de_campo: (Array.isArray(obj.plano_de_campo) ? obj.plano_de_campo : []).slice(0, 10).map((p: any, i: number) => ({
+      ordem: Number(p?.ordem || i + 1),
+      bairro: String(p?.bairro || ""),
+      local_sugerido: String(p?.local_sugerido || ""),
+      periodo: String(p?.periodo || "manha"),
+      objetivo: String(p?.objetivo || "escuta"),
+      mensagem_chave: String(p?.mensagem_chave || ""),
+      dor_alvo: String(p?.dor_alvo || ""),
+      acao_sugerida: String(p?.acao_sugerida || ""),
+    })),
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -715,18 +797,28 @@ USE estes números para amarrar a bandeira do candidato (autismo) à realidade l
 `;
     })();
 
-    const userPrompt = votosBlock + teaBlock + buildUserPrompt(dossie, rankingMap, contextoWeb);
+    const userPrompt = votosBlock + teaBlock + buildUserPrompt(dossie, rankingMap, contextoWeb) + buildJsonOutputInstructions();
 
-    let aiJson: any;
+    let conteudos: any;
     try {
-      aiJson = await callLLMRaw(llmConfig, {
-        messages: [
-          { role: "system", content: buildSystemPrompt(perfil) },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [TOOL_SCHEMA],
-        tool_choice: { type: "function", function: { name: "gerar_pacote_narrativa" } },
-      });
+      const messages = [
+        { role: "system" as const, content: buildSystemPrompt(perfil) },
+        { role: "user" as const, content: userPrompt },
+      ];
+
+      if (llmConfig.provider === "groq") {
+        const aiText = await callLLM(llmConfig, { messages, maxTokens: 7000, temperature: 0.4 });
+        conteudos = normalizeConteudos(parseLooseJson(aiText.content));
+      } else {
+        const aiJson = await callLLMRaw(llmConfig, {
+          messages,
+          tools: [TOOL_SCHEMA],
+          tool_choice: { type: "function", function: { name: "gerar_pacote_narrativa" } },
+        });
+        const tcArgs = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+        if (!tcArgs) throw new Error("IA não retornou tool_call estruturada");
+        conteudos = normalizeConteudos(JSON.parse(tcArgs));
+      }
     } catch (e: any) {
       const status = e?.status || 500;
       if (status === 429) {
@@ -745,10 +837,6 @@ USE estes números para amarrar a bandeira do candidato (autismo) à realidade l
       await supa.from("narrativa_dossies").update({ status: "erro", erro_msg: msg }).eq("id", dossie_id);
       throw e;
     }
-
-    const tcArgs = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!tcArgs) throw new Error("IA não retornou tool_call estruturada");
-    const conteudos = JSON.parse(tcArgs);
 
     // Persiste enriquecimentos no dados_brutos para o PDF poder renderizar
     // sem depender do que a IA gerou.
