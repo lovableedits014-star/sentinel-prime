@@ -74,7 +74,7 @@ async function gerarContratosLote(
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
-type Regiao = "centro" | "segredo" | "prosa" | "bandeira" | "anhanduizinho" | "lagoa" | "moreninha" | "imbirussu";
+type Regiao = string;
 
 interface Pessoa {
   id: string;
@@ -97,17 +97,6 @@ interface Pessoa {
   is_favorito_regiao?: boolean | null;
   created_at: string;
 }
-
-const REGIOES: { value: Regiao; label: string }[] = [
-  { value: "centro", label: "Centro" },
-  { value: "segredo", label: "Segredo" },
-  { value: "prosa", label: "Prosa" },
-  { value: "bandeira", label: "Bandeira" },
-  { value: "anhanduizinho", label: "Anhanduizinho" },
-  { value: "lagoa", label: "Lagoa" },
-  { value: "imbirussu", label: "Imbirussu" },
-  { value: "moreninha", label: "Moreninha" },
-];
 
 const TIPO_META: Record<Tipo, { label: string; color: string; icon: any }> = {
   coordenador: { label: "Coordenador", color: "bg-red-500/10 text-red-600 border-red-500/30", icon: Crown },
