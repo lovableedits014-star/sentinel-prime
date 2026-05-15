@@ -119,6 +119,7 @@ export default function Eleicao() {
   const [search, setSearch] = useState("");
   const [escopo, setEscopo] = useState<Escopo>("campo_grande");
   const [regiaoFilter, setRegiaoFilter] = useState<Regiao | "all">("all");
+  const { regioes: REGIOES } = useRegioesEleicao(clientId);
 
   // dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
