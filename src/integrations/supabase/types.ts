@@ -6627,6 +6627,10 @@ export type Database = {
         Returns: boolean
       }
       ic_trigger_monthly_drift: { Args: never; Returns: undefined }
+      is_client_manager: {
+        Args: { _client_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_client_member: { Args: { _client_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       is_valid_cpf: { Args: { cpf: string }; Returns: boolean }
