@@ -6,19 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, MessageSquare, Phone, Link as LinkIcon } from "lucide-react";
+import { Loader2, Save, MessageSquare, Phone, Link as LinkIcon, Plus, X } from "lucide-react";
 import { toast } from "sonner";
-
-const REGIOES = [
-  { value: "centro", label: "Centro" },
-  { value: "segredo", label: "Segredo" },
-  { value: "prosa", label: "Prosa" },
-  { value: "bandeira", label: "Bandeira" },
-  { value: "anhanduizinho", label: "Anhanduizinho" },
-  { value: "lagoa", label: "Lagoa" },
-  { value: "imbirussu", label: "Imbirussu" },
-  { value: "moreninha", label: "Moreninha" },
-];
+import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 
 const DEFAULT_TPL_COORD =
   "Foi adicionado novo líder na região: *{regiao}*\n\nNome: {nome}\nTelefone: {telefone}\nRua: {rua}, {numero}\nBairro: {bairro}";
@@ -38,6 +28,9 @@ interface Cfg {
 export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { regioes, add, isAdding, remove, isRemoving } = useRegioesEleicao(clientId);
+  const [novaRegiao, setNovaRegiao] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
   const [cfg, setCfg] = useState<Cfg>({
     client_id: clientId,
     secretaria_telefone: "",
@@ -91,6 +84,16 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     load();
   }
 
+  async function handleAddRegiao() {
+    const label = novaRegiao.trim();
+    if (!label) return;
+    try {
+      await add({ label });
+      setNovaRegiao("");
+      setShowAdd(false);
+    } catch { /* toast já exibido */ }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-10"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
@@ -123,17 +126,65 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       </Card>
 
       <Card className="p-4 space-y-3">
-        <div className="flex items-center gap-2 font-medium text-sm"><LinkIcon className="w-4 h-4" />Links dos grupos por região (Campo Grande)</div>
-        <p className="text-xs text-muted-foreground">Será enviado ao líder cadastrado na respectiva região.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center gap-2 font-medium text-sm">
+            <LinkIcon className="w-4 h-4" />Regiões e links de grupos (Campo Grande)
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => setShowAdd(v => !v)}
+          >
+            <Plus className="w-4 h-4 mr-1" /> Nova região
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Adicione regiões personalizadas. O link configurado é enviado ao líder cadastrado naquela região.
+        </p>
+
+        {showAdd && (
+          <div className="flex flex-col sm:flex-row gap-2 p-3 rounded-md bg-muted/40 border">
+            <Input
+              autoFocus
+              placeholder="Nome da nova região (ex: Novo Horizonte)"
+              value={novaRegiao}
+              onChange={e => setNovaRegiao(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddRegiao(); } }}
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleAddRegiao} disabled={isAdding || !novaRegiao.trim()} className="flex-1 sm:flex-none">
+                {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : "Adicionar"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowAdd(false); setNovaRegiao(""); }}>Cancelar</Button>
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-2">
-          {REGIOES.map(r => (
-            <div key={r.value} className="grid grid-cols-[140px_1fr] gap-2 items-center">
-              <Label className="text-xs">{r.label}</Label>
+          {regioes.length === 0 && (
+            <p className="text-xs text-muted-foreground italic">Nenhuma região cadastrada. Clique em "Nova região" para começar.</p>
+          )}
+          {regioes.map(r => (
+            <div key={r.id} className="flex flex-col sm:grid sm:grid-cols-[160px_1fr_auto] gap-2 sm:items-center">
+              <Label className="text-xs sm:text-sm font-medium truncate">{r.label}</Label>
               <Input
                 placeholder="https://chat.whatsapp.com/..."
                 value={cfg.grupos_links[r.value] || ""}
                 onChange={e => setCfg(c => ({ ...c, grupos_links: { ...c.grupos_links, [r.value]: e.target.value } }))}
               />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 self-end sm:self-auto text-muted-foreground hover:text-destructive"
+                onClick={() => remove({ id: r.id, value: r.value })}
+                disabled={isRemoving}
+                title="Remover região"
+              >
+                <X className="w-4 h-4" />
+              </Button>
             </div>
           ))}
         </div>
@@ -142,7 +193,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       <Card className="p-4 space-y-3">
         <div className="font-medium text-sm">Mensagem para coordenador / secretaria</div>
         <p className="text-xs text-muted-foreground">
-          Placeholders: <code className="bg-muted px-1 rounded">{"{nome} {regiao} {telefone} {rua} {numero} {bairro}"}</code>
+          Placeholders: <code className="bg-muted px-1 rounded text-[10px] sm:text-xs">{"{nome} {regiao} {telefone} {rua} {numero} {bairro}"}</code>
         </p>
         <Textarea rows={7} className="font-mono text-xs"
           value={cfg.template_coordenador}
@@ -152,7 +203,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       <Card className="p-4 space-y-3">
         <div className="font-medium text-sm">Mensagem para o líder cadastrado</div>
         <p className="text-xs text-muted-foreground">
-          Placeholders: <code className="bg-muted px-1 rounded">{"{nome} {regiao} {link_grupo}"}</code>
+          Placeholders: <code className="bg-muted px-1 rounded text-[10px] sm:text-xs">{"{nome} {regiao} {link_grupo}"}</code>
         </p>
         <Textarea rows={6} className="font-mono text-xs"
           value={cfg.template_lider}
@@ -160,7 +211,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={save} disabled={saving}>
+        <Button onClick={save} disabled={saving} className="w-full sm:w-auto">
           {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
           Salvar configurações
         </Button>
