@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { isPathAllowed, getRoleLabels, ALWAYS_ALLOWED_PATHS, type AccessProfile } from "@/lib/access-control";
+import SuperAdminClientSwitcher from "@/components/SuperAdminClientSwitcher";
 
 
 const AUTH_CHECK_TIMEOUT_MS = 12000;
@@ -430,6 +431,11 @@ const DashboardLayout = () => {
           <div className="flex h-40 items-center justify-center border-b border-sidebar-border px-6 py-3">
             <img src="/sentinelle-logo.png" alt="Sentinelle" className="h-32 w-auto object-contain" />
           </div>
+          {isSuperAdmin && (
+            <div className="px-3 pt-3">
+              <SuperAdminClientSwitcher />
+            </div>
+          )}
           <SidebarNav />
           <UserSection />
         </div>
@@ -447,6 +453,11 @@ const DashboardLayout = () => {
         <div className="flex items-center justify-center flex-1">
           <img src="/sentinelle-logo.png" alt="Sentinelle" className="h-16 w-auto object-contain" />
         </div>
+        {isSuperAdmin && (
+          <div className="w-44">
+            <SuperAdminClientSwitcher />
+          </div>
+        )}
       </header>
 
       {/* ── MOBILE drawer ── */}
