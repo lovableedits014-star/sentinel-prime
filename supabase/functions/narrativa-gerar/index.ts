@@ -807,7 +807,13 @@ USE estes números para amarrar a bandeira do candidato (autismo) à realidade l
       ];
 
       if (llmConfig.provider === "groq") {
-        const aiText = await callLLM(llmConfig, { messages, maxTokens: 7000, temperature: 0.4 });
+        // llama-3.1-8b-instant tem TPM baixo (6k) e estoura nesse prompt.
+        // Usa modelo versátil maior (TPM bem mais alto) para a geração do dossiê.
+        const groqCfg = {
+          ...llmConfig,
+          model: /8b|mixtral/i.test(llmConfig.model) ? "llama-3.3-70b-versatile" : llmConfig.model,
+        };
+        const aiText = await callLLM(groqCfg, { messages, maxTokens: 7000, temperature: 0.4 });
         conteudos = normalizeConteudos(parseLooseJson(aiText.content));
       } else {
         const aiJson = await callLLMRaw(llmConfig, {
