@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { resolveClientId } from "@/lib/resolveClientId";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings as SettingsIcon } from "lucide-react";
 import TeamUsersPanel from "@/components/team/TeamUsersPanel";
