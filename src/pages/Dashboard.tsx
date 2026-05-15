@@ -95,14 +95,27 @@ const Dashboard = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("No user");
 
-    const { data: clients } = await supabase
+    // Resolve client_id: owner first, then team_member fallback (manager/funcionário)
+    let cId: string | null = null;
+    const { data: ownedClients } = await supabase
       .from("clients")
       .select("id")
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .limit(1);
+    if (ownedClients && ownedClients.length > 0) {
+      cId = ownedClients[0].id;
+    } else {
+      const { data: teamRow } = await supabase
+        .from("team_members")
+        .select("client_id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      cId = (teamRow?.client_id as string) || null;
+    }
 
-    if (!clients || clients.length === 0) return { allComments: [] as DashboardComment[], supportersCount: 0, clientId: "" };
-
-    const cId = clients[0].id;
+    if (!cId) return { allComments: [] as DashboardComment[], supportersCount: 0, clientId: "" };
 
     // Fetch ALL comments (paginated)
     const PAGE_SIZE = 1000;
