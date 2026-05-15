@@ -64,15 +64,10 @@ const Comments = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("No user");
 
-    const { data: clients } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("user_id", user.id);
-
-    if (!clients || clients.length === 0) return { comments: [] as Comment[], clientId: "" };
-
-    const clientIds = clients.map(c => c.id);
-    const cId = clientIds[0];
+    const { resolveClientId } = await import("@/lib/resolveClientId");
+    const cId = await resolveClientId();
+    if (!cId) return { comments: [] as Comment[], clientId: "" };
+    const clientIds = [cId];
 
     // Step 1: Find the N most recent distinct post_ids
     const { data: stubs } = await supabase
@@ -233,14 +228,10 @@ const Comments = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("No user");
 
-    const { data: clients } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("user_id", user.id);
-
-    if (!clients || clients.length === 0) return [] as Comment[];
-
-    const clientIds = clients.map(c => c.id);
+    const { resolveClientId } = await import("@/lib/resolveClientId");
+    const cId = await resolveClientId();
+    if (!cId) return [] as Comment[];
+    const clientIds = [cId];
     const PAGE_SIZE = 1000;
     const MAX_COMMENTS = 3000;
     let allComments: Comment[] = [];
