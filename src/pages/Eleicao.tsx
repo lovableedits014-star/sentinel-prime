@@ -22,6 +22,7 @@ import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package } from "lucide-react";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
+import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -74,7 +75,7 @@ async function gerarContratosLote(
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
-type Regiao = "centro" | "segredo" | "prosa" | "bandeira" | "anhanduizinho" | "lagoa" | "moreninha" | "imbirussu";
+type Regiao = string;
 
 interface Pessoa {
   id: string;
@@ -98,17 +99,6 @@ interface Pessoa {
   created_at: string;
 }
 
-const REGIOES: { value: Regiao; label: string }[] = [
-  { value: "centro", label: "Centro" },
-  { value: "segredo", label: "Segredo" },
-  { value: "prosa", label: "Prosa" },
-  { value: "bandeira", label: "Bandeira" },
-  { value: "anhanduizinho", label: "Anhanduizinho" },
-  { value: "lagoa", label: "Lagoa" },
-  { value: "imbirussu", label: "Imbirussu" },
-  { value: "moreninha", label: "Moreninha" },
-];
-
 const TIPO_META: Record<Tipo, { label: string; color: string; icon: any }> = {
   coordenador: { label: "Coordenador", color: "bg-red-500/10 text-red-600 border-red-500/30", icon: Crown },
   lider: { label: "Líder", color: "bg-blue-500/10 text-blue-600 border-blue-500/30", icon: Users },
@@ -129,6 +119,7 @@ export default function Eleicao() {
   const [search, setSearch] = useState("");
   const [escopo, setEscopo] = useState<Escopo>("campo_grande");
   const [regiaoFilter, setRegiaoFilter] = useState<Regiao | "all">("all");
+  const { regioes: REGIOES } = useRegioesEleicao(clientId || undefined);
 
   // dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1024,7 +1015,7 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
 function FavoritoToggle({ pessoa }: { pessoa: Pessoa }) {
   const [busy, setBusy] = useState(false);
   const isFav = !!pessoa.is_favorito_regiao;
-  const regiaoLabel = REGIOES.find(r => r.value === pessoa.regiao)?.label || pessoa.regiao || "";
+  const regiaoLabel = pessoa.regiao || "";
 
   async function toggle(e: React.MouseEvent) {
     e.stopPropagation();

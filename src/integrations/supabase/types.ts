@@ -1804,6 +1804,47 @@ export type Database = {
           },
         ]
       }
+      eleicao_regioes: {
+        Row: {
+          ativo: boolean
+          client_id: string
+          created_at: string
+          id: string
+          label: string
+          ordem: number
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          ativo?: boolean
+          client_id: string
+          created_at?: string
+          id?: string
+          label: string
+          ordem?: number
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          ativo?: boolean
+          client_id?: string
+          created_at?: string
+          id?: string
+          label?: string
+          ordem?: number
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_regioes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engagement_actions: {
         Row: {
           action_date: string
