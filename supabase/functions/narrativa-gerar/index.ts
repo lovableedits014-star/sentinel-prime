@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { callLLMRaw, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { callLLM, callLLMRaw, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { parseLooseJson } from "../_shared/ic-utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,7 +125,28 @@ REGRAS OBRIGATÓRIAS:
 - Quando citar uma dor, conecte-a EMOCIONALMENTE com a vida cotidiana do morador.
 - O candidato é alguém que VEM DE BAIXO, conhece a realidade, fala direto.
 - Nunca seja genérico. Sempre mencione o NOME da cidade.
-- Saída deve ser estritamente um JSON válido seguindo o schema do tool.`;
+    - Saída deve ser estritamente um JSON válido no formato solicitado.`;
+}
+
+function buildJsonOutputInstructions() {
+  return `
+
+FORMATO DE SAÍDA OBRIGATÓRIO:
+Retorne APENAS JSON puro, sem markdown, sem comentários e sem texto antes/depois.
+O JSON deve ter exatamente estas chaves principais:
+{
+  "discursos": { "popular": "...", "tecnico": "...", "emocional": "..." },
+  "ataques_3_camadas": [{ "tema": "...", "falha_do_gestor": "...", "solucao_proposta": "..." }],
+  "manchetes_reels": ["..."],
+  "curiosidades_locais": [{ "categoria": "historia|cultura|economia|geografia|personalidades|gastronomia|religiao|esporte|curiosidade|etimologia", "titulo": "...", "fato": "...", "uso_politico": "..." }],
+  "briefing_municipio": {
+    "visao_geral": "...",
+    "ficha_rapida": { "gentilico": "", "fundacao": "", "aniversario": "", "area_km2": "", "altitude": "", "clima": "", "populacao": "", "regiao": "", "padroeiro": "", "lema": "", "site_oficial": "" },
+    "simbolos": "", "geografia_clima": "", "municipios_vizinhos": [], "distritos_bairros": [], "economia_resumo": "", "infraestrutura": "", "politica_local": "", "personalidades_notaveis": [], "pontos_turisticos": [], "festas_eventos": [], "dicas_abordagem": [], "evitar": []
+  },
+  "posts_redes": [{ "plataforma": "facebook|instagram|whatsapp|story", "tema": "...", "texto": "...", "hashtags": [], "cta": "..." }],
+  "plano_de_campo": [{ "ordem": 1, "bairro": "...", "local_sugerido": "...", "periodo": "manha|tarde|noite", "objetivo": "escuta|denuncia|presenca|mobilizacao|evento", "mensagem_chave": "...", "dor_alvo": "...", "acao_sugerida": "..." }]
+}`;
 }
 
 function buildUserPrompt(dossie: any, ranking?: Record<string, any>, contextoWeb?: any) {
