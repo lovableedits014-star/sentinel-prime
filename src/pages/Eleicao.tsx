@@ -1015,7 +1015,7 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
 function FavoritoToggle({ pessoa }: { pessoa: Pessoa }) {
   const [busy, setBusy] = useState(false);
   const isFav = !!pessoa.is_favorito_regiao;
-  const regiaoLabel = REGIOES.find(r => r.value === pessoa.regiao)?.label || pessoa.regiao || "";
+  const regiaoLabel = pessoa.regiao || "";
 
   async function toggle(e: React.MouseEvent) {
     e.stopPropagation();
