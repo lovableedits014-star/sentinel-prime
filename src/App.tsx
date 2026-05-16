@@ -13,6 +13,7 @@ import {
 } from "react-router-dom";
 import { createBrowserHistory, type BrowserHistory } from "history";
 import DashboardLayout from "./components/DashboardLayout";
+import RequireRole from "./components/RequireRole";
 
 // Lazy-load all pages so each route loads only its own chunk on demand.
 const Index = lazy(() => import("./pages/Index"));
@@ -98,7 +99,14 @@ const AppRouter = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/signup/:token" element={<Signup />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/super-admin" element={<SuperAdmin />} />
+            <Route
+              path="/super-admin"
+              element={
+                <RequireRole role="super_admin">
+                  <SuperAdmin />
+                </RequireRole>
+              }
+            />
             <Route path="/cadastro/:clientId" element={<CadastroUnificado />} />
             <Route path="/cadastro-lider/:token" element={<CadastroLiderConvite />} />
             {/* Redirects de rotas antigas de cadastro (mantém compatibilidade com links já compartilhados) */}
