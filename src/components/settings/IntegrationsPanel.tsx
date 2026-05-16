@@ -158,10 +158,14 @@ const invokeFunctionWithTimeout = async <T,>(functionName: string, body: Record<
   if (!supabaseUrl || !anonKey) throw new Error('Configuração Supabase indisponível no navegador.');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const requestPromise = (async () => {
+    const sessionData = await withTimeout(
+      supabase.auth.getSession(),
+      5000,
+      'Timeout ao obter sessão do usuário',
+    );
+    const accessToken = sessionData.data.session?.access_token;
     const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
       method: 'POST',
       headers: {
@@ -178,11 +182,23 @@ const invokeFunctionWithTimeout = async <T,>(functionName: string, body: Record<
       throw new Error(payload?.error || payload?.message || `Erro HTTP ${response.status}`);
     }
     return payload as T;
+  })();
+
+  try {
+    return await Promise.race([
+      requestPromise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          controller.abort();
+          reject(new Error('Timeout ao testar provider'));
+        }, timeoutMs);
+      }),
+    ]);
   } catch (error: any) {
     if (error?.name === 'AbortError') throw new Error('Timeout ao testar provider');
     throw error;
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
   }
 };
 
