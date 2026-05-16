@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Facebook, Brain, Save, AlertCircle, Zap, Check, Loader2, ShieldCheck, ShieldAlert, RefreshCw, Instagram, MessageSquareText } from "lucide-react";
+import { Facebook, Brain, Save, AlertCircle, Zap, Check, Loader2, ShieldCheck, ShieldAlert, RefreshCw, Instagram, MessageSquareText, Rocket, Layers, Sparkles, Gauge } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -42,6 +43,19 @@ const REQUIRED_PERMISSIONS = [
   { name: 'instagram_manage_comments', label: 'Gerenciar comentários IG', required: true, platform: 'instagram' },
   { name: 'public_profile', label: 'Perfil público', required: false, platform: 'general' },
 ];
+
+type TierKey = 'fast' | 'classify' | 'reasoning' | 'deep';
+
+const TIERS: { key: TierKey; label: string; description: string; icon: any }[] = [
+  { key: 'fast',      label: 'FAST',      description: 'Tarefas rápidas e de alto volume (classificação leve, respostas curtas)', icon: Rocket },
+  { key: 'classify',  label: 'CLASSIFY',  description: 'Classificação estruturada (sentimento, tags, intenções)',                  icon: Gauge },
+  { key: 'reasoning', label: 'REASONING', description: 'Raciocínio multi-passo, análises e síntese',                                icon: Layers },
+  { key: 'deep',      label: 'DEEP',      description: 'Conteúdos longos, geração editorial e contextos densos',                    icon: Sparkles },
+];
+
+type TierConfig = { provider: LLMProvider | 'lovable'; apiKey: string; model: string; isConfigured: boolean };
+
+const emptyTier = (): TierConfig => ({ provider: 'lovable', apiKey: '', model: '', isConfigured: false });
 
 interface IntegrationsPanelProps {
   clientId: string;
@@ -80,6 +94,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     isConfigured: false,
   });
 
+  const [mode, setMode] = useState<'simple' | 'hybrid'>('simple');
+  const [tiers, setTiers] = useState<Record<TierKey, TierConfig>>({
+    fast: emptyTier(), classify: emptyTier(), reasoning: emptyTier(), deep: emptyTier(),
+  });
+
   const [customPrompt, setCustomPrompt] = useState("");
 
   useEffect(() => {
@@ -90,7 +109,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     try {
       const { data: integration } = await supabase
         .from("integrations")
-        .select("meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt")
+        .select("meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep")
         .eq("client_id", clientId)
         .maybeSingle();
 
@@ -109,7 +128,36 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           isConfigured: !!integration.llm_provider,
         });
 
-        setCustomPrompt((integration as any).ai_custom_prompt || "");
+        const integAny = integration as any;
+        setMode(integAny.llm_mode === 'hybrid' ? 'hybrid' : 'simple');
+        setTiers({
+          fast: {
+            provider: (integAny.llm_provider_fast as LLMProvider) || 'lovable',
+            apiKey: '',
+            model: integAny.llm_model_fast || '',
+            isConfigured: !!integAny.llm_api_key_fast || !!integAny.llm_provider_fast,
+          },
+          classify: {
+            provider: (integAny.llm_provider_classify as LLMProvider) || 'lovable',
+            apiKey: '',
+            model: integAny.llm_model_classify || '',
+            isConfigured: !!integAny.llm_api_key_classify || !!integAny.llm_provider_classify,
+          },
+          reasoning: {
+            provider: (integAny.llm_provider_reasoning as LLMProvider) || 'lovable',
+            apiKey: '',
+            model: integAny.llm_model_reasoning || '',
+            isConfigured: !!integAny.llm_api_key_reasoning || !!integAny.llm_provider_reasoning,
+          },
+          deep: {
+            provider: (integAny.llm_provider_deep as LLMProvider) || 'lovable',
+            apiKey: '',
+            model: integAny.llm_model_deep || '',
+            isConfigured: !!integAny.llm_api_key_deep || !!integAny.llm_provider_deep,
+          },
+        });
+
+        setCustomPrompt(integAny.ai_custom_prompt || "");
 
         const expiresAt = (integration as any).meta_token_expires_at;
         const tType = (integration as any).meta_token_type;
@@ -150,6 +198,24 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       model: defaultModel,
       apiKey: provider === 'lovable' ? '' : prev.apiKey
     }));
+  };
+
+  const handleTierProviderChange = (tier: TierKey, value: string) => {
+    const provider = value as LLMProvider | 'lovable';
+    const defaultModel = DEFAULT_MODELS[provider]?.default || '';
+    setTiers(prev => ({
+      ...prev,
+      [tier]: {
+        ...prev[tier],
+        provider,
+        model: defaultModel,
+        apiKey: provider === 'lovable' ? '' : prev[tier].apiKey,
+      },
+    }));
+  };
+
+  const updateTier = (tier: TierKey, patch: Partial<TierConfig>) => {
+    setTiers(prev => ({ ...prev, [tier]: { ...prev[tier], ...patch } }));
   };
 
   const handleCheckPermissions = async () => {
@@ -281,6 +347,25 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         updateData.llm_model = llmData.model;
       }
 
+      // Hybrid mode: persist llm_mode + tier columns
+      updateData.llm_mode = mode;
+      if (mode === 'hybrid') {
+        for (const t of TIERS) {
+          const cfg = tiers[t.key];
+          if (cfg.provider === 'lovable') {
+            updateData[`llm_provider_${t.key}`] = null;
+            updateData[`llm_api_key_${t.key}`] = null;
+            updateData[`llm_model_${t.key}`] = null;
+          } else {
+            updateData[`llm_provider_${t.key}`] = cfg.provider;
+            updateData[`llm_model_${t.key}`] = cfg.model || null;
+            if (cfg.apiKey && cfg.apiKey.trim() !== "") {
+              updateData[`llm_api_key_${t.key}`] = cfg.apiKey;
+            }
+          }
+        }
+      }
+
       updateData.ai_custom_prompt = customPrompt || null;
 
       const { error } = await supabase.from("integrations").upsert(updateData, { onConflict: 'client_id' });
@@ -289,6 +374,17 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       toast.success("Integrações salvas com sucesso!");
       setMetaData(prev => ({ ...prev, accessToken: "" }));
       setLlmData(prev => ({ ...prev, apiKey: "", isConfigured: prev.provider !== 'lovable' }));
+      setTiers(prev => {
+        const next = { ...prev };
+        for (const t of TIERS) {
+          next[t.key] = {
+            ...prev[t.key],
+            apiKey: "",
+            isConfigured: prev[t.key].provider !== 'lovable',
+          };
+        }
+        return next;
+      });
 
       if (metaData.accessToken && metaData.accessToken.trim() !== "") {
         setTokenStatus(prev => ({ ...prev, isExpired: false, isExpiringSoon: false }));
@@ -330,75 +426,173 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Brain className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="flex-1">
               <CardTitle className="flex items-center gap-2">
                 Provedor de IA
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Multi-LLM</span>
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                  {mode === 'hybrid' ? 'Híbrido' : 'Multi-LLM'}
+                </span>
               </CardTitle>
-              <CardDescription>Escolha o provedor de IA para análise e respostas</CardDescription>
+              <CardDescription>
+                {mode === 'hybrid'
+                  ? 'Configure um provedor por tier (FAST / CLASSIFY / REASONING / DEEP)'
+                  : 'Escolha o provedor de IA para análise e respostas'}
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Provedor de IA</Label>
-            <Select value={llmData.provider} onValueChange={handleProviderChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um provedor" />
-              </SelectTrigger>
-              <SelectContent>
-                {LLM_PROVIDERS.map((provider) => (
-                  <SelectItem key={provider.value} value={provider.value}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{provider.label}</span>
-                      <span className="text-xs text-muted-foreground">{provider.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Mode toggle */}
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Modo Híbrido</Label>
+              <p className="text-xs text-muted-foreground">
+                Quando ativo, cada tier (FAST / CLASSIFY / REASONING / DEEP) pode usar um provedor diferente.
+                A arquitetura já está implementada no backend — este toggle apenas expõe a configuração.
+              </p>
+            </div>
+            <Switch
+              checked={mode === 'hybrid'}
+              onCheckedChange={(checked) => setMode(checked ? 'hybrid' : 'simple')}
+            />
           </div>
 
-          {llmData.provider === 'lovable' ? (
-            <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <Check className="w-5 h-5 text-primary mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium mb-1">Lovable AI Ativo ✓</p>
-                <p className="text-muted-foreground">
-                  Usando Google Gemini 2.5 Flash automaticamente. Não precisa de API key -
-                  funciona imediatamente para análise de sentimento e geração de respostas.
-                </p>
-              </div>
-            </div>
-          ) : (
+          {mode === 'simple' ? (
             <>
               <div className="space-y-2">
-                <Label>Modelo</Label>
-                <Select value={llmData.model} onValueChange={(v) => setLlmData(prev => ({ ...prev, model: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione um modelo" /></SelectTrigger>
+                <Label>Provedor de IA</Label>
+                <Select value={llmData.provider} onValueChange={handleProviderChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um provedor" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {selectedProviderModels.map((model) => (
-                      <SelectItem key={model} value={model}>{model}</SelectItem>
+                    {LLM_PROVIDERS.map((provider) => (
+                      <SelectItem key={provider.value} value={provider.value}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{provider.label}</span>
+                          <span className="text-xs text-muted-foreground">{provider.description}</span>
+                        </div>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="llm-api-key">API Key</Label>
-                <Input
-                  id="llm-api-key" type="password"
-                  placeholder={llmData.isConfigured ? "••••••••••••• (configurada)" : "Insira sua API key"}
-                  value={llmData.apiKey}
-                  onChange={(e) => setLlmData(prev => ({ ...prev, apiKey: e.target.value }))}
-                />
-                {llmData.isConfigured && (
-                  <p className="text-xs text-muted-foreground">✓ API key configurada. Deixe em branco para manter a atual.</p>
-                )}
-              </div>
-              <Button onClick={handleTestLLMConnection} disabled={testingLLM || !llmData.apiKey} variant="outline" className="w-full">
-                {testingLLM ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testando...</> : <><Zap className="w-4 h-4 mr-2" />Testar Conexão</>}
-              </Button>
+
+              {llmData.provider === 'lovable' ? (
+                <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <Check className="w-5 h-5 text-primary mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium mb-1">Lovable AI Ativo ✓</p>
+                    <p className="text-muted-foreground">
+                      Usando Google Gemini 2.5 Flash automaticamente. Não precisa de API key -
+                      funciona imediatamente para análise de sentimento e geração de respostas.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>Modelo</Label>
+                    <Select value={llmData.model} onValueChange={(v) => setLlmData(prev => ({ ...prev, model: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Selecione um modelo" /></SelectTrigger>
+                      <SelectContent>
+                        {selectedProviderModels.map((model) => (
+                          <SelectItem key={model} value={model}>{model}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="llm-api-key">API Key</Label>
+                    <Input
+                      id="llm-api-key" type="password"
+                      placeholder={llmData.isConfigured ? "••••••••••••• (configurada)" : "Insira sua API key"}
+                      value={llmData.apiKey}
+                      onChange={(e) => setLlmData(prev => ({ ...prev, apiKey: e.target.value }))}
+                    />
+                    {llmData.isConfigured && (
+                      <p className="text-xs text-muted-foreground">✓ API key configurada. Deixe em branco para manter a atual.</p>
+                    )}
+                  </div>
+                  <Button onClick={handleTestLLMConnection} disabled={testingLLM || !llmData.apiKey} variant="outline" className="w-full">
+                    {testingLLM ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testando...</> : <><Zap className="w-4 h-4 mr-2" />Testar Conexão</>}
+                  </Button>
+                </>
+              )}
             </>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground p-3 rounded-md bg-primary/5 border border-primary/10">
+                Cada tier consulta suas próprias colunas no banco (<code>llm_provider_*</code>, <code>llm_api_key_*</code>, <code>llm_model_*</code>).
+                Se um tier ficar em "Lovable AI", o router faz fallback automático para o provider Lovable nesse tier.
+              </div>
+              {TIERS.map((tierDef) => {
+                const cfg = tiers[tierDef.key];
+                const Icon = tierDef.icon;
+                const models = DEFAULT_MODELS[cfg.provider]?.models || [];
+                return (
+                  <div key={tierDef.key} className="rounded-lg border p-4 space-y-3 bg-card">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm">{tierDef.label}</span>
+                          {cfg.provider !== 'lovable' && (
+                            <Badge variant="outline" className="text-[10px]">{cfg.provider}</Badge>
+                          )}
+                          {cfg.provider === 'lovable' && (
+                            <Badge variant="secondary" className="text-[10px]">Lovable AI (padrão)</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{tierDef.description}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Provider</Label>
+                        <Select value={cfg.provider} onValueChange={(v) => handleTierProviderChange(tierDef.key, v)}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {LLM_PROVIDERS.map((p) => (
+                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Modelo</Label>
+                        <Select
+                          value={cfg.model}
+                          onValueChange={(v) => updateTier(tierDef.key, { model: v })}
+                          disabled={cfg.provider === 'lovable'}
+                        >
+                          <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>
+                            {models.map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">API Key</Label>
+                        <Input
+                          type="password"
+                          className="h-9"
+                          disabled={cfg.provider === 'lovable'}
+                          placeholder={cfg.isConfigured ? "••••••••• (configurada)" : "API key"}
+                          value={cfg.apiKey}
+                          onChange={(e) => updateTier(tierDef.key, { apiKey: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>
