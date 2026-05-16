@@ -590,7 +590,12 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       const { error } = await supabase.from("integrations").upsert(updateData, { onConflict: 'client_id' });
       if (error) throw error;
 
-      toast.success("Integrações salvas com sucesso!");
+      // Capture cards with freshly-entered keys before we clear them — we'll auto-test these
+      const cardsToTest = mode === 'hybrid'
+        ? providerCards.filter(c => c.apiKey && c.apiKey.trim() !== '').map(c => c.id)
+        : [];
+
+      toast.success("Configuração salva com sucesso");
       setMetaData(prev => ({ ...prev, accessToken: "" }));
       setLlmData(prev => ({ ...prev, apiKey: "", isConfigured: prev.provider !== 'lovable' }));
       setTiers(prev => {
@@ -604,6 +609,19 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         }
         return next;
       });
+      // Keep apiKey in state momentarily so auto-test can run, then clear
+      if (cardsToTest.length > 0) {
+        toast.info(`Validando ${cardsToTest.length} provider${cardsToTest.length > 1 ? 's' : ''}...`);
+        const results = await Promise.all(cardsToTest.map(id => testCard(id)));
+        const okCount = results.filter(Boolean).length;
+        if (okCount === results.length) {
+          toast.success(`Todos os providers validados (${okCount}/${results.length})`);
+        } else if (okCount > 0) {
+          toast.warning(`${okCount}/${results.length} providers OK — verifique os demais`);
+        } else {
+          toast.error(`Falha ao validar providers — veja detalhes em cada card`);
+        }
+      }
       setProviderCards(prev => prev.map(c => ({
         ...c,
         apiKey: "",
