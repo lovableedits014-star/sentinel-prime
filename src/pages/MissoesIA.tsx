@@ -8,17 +8,11 @@ import { Sparkles, Target, AlertCircle } from "lucide-react";
 
 export default function MissoesIA() {
   const { data: client, isLoading: clientLoading } = useQuery({
-    queryKey: ["client"],
+    queryKey: ["client-active", "missoes"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data: owned } = await supabase
-        .from("clients").select("id").eq("user_id", user.id).maybeSingle();
-      if (owned) return owned;
-      const { data: tm } = await supabase
-        .from("team_members").select("client_id")
-        .eq("user_id", user.id).eq("status", "active").maybeSingle();
-      return tm?.client_id ? { id: tm.client_id } : null;
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const cId = await resolveClientId();
+      return cId ? { id: cId } : null;
     },
   });
 
