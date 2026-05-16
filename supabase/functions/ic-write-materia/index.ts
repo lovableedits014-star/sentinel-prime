@@ -278,7 +278,7 @@ ${postsTxt || "(nenhum)"}`;
       ? {
           provider: providerOverride,
           model: modelOverride || undefined,
-          apiKey: apiKeyOverride || baseConfig.apiKey,
+          apiKey: baseConfig.apiKey,
         }
       : { ...baseConfig, model: modelOverride || baseConfig.model };
     if (!llmConfig.model) llmConfig.model = baseConfig.model;
