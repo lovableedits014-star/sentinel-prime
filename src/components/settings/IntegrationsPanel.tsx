@@ -1153,7 +1153,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         </CardContent>
       </Card>
 
-      {/* Custom AI Prompt */}
+      {/* Custom AI Prompt — estruturado por blocos */}
       <Card className="border-primary/20">
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -1162,26 +1162,52 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
             </div>
             <div>
               <CardTitle>Prompt de Resposta</CardTitle>
-              <CardDescription>Defina as instruções que a IA deve seguir ao gerar respostas para comentários</CardDescription>
+              <CardDescription>
+                Defina as instruções da IA em blocos organizados. Todos os blocos são opcionais e podem ser editados livremente.
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="custom-prompt">Instruções para a IA</Label>
+        <CardContent className="space-y-5">
+          {customPrompt && PROMPT_BLOCKS.every(b => !(promptBlocks[b.key] || '').trim()) && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              Detectamos seu prompt atual em <strong>Instruções complementares</strong> (abaixo). Para melhor organização,
+              distribua-o nos blocos acima — o comportamento da IA permanece idêntico até você salvar.
+            </div>
+          )}
+
+          {PROMPT_BLOCKS.map((block) => (
+            <div key={block.key} className="space-y-2">
+              <Label htmlFor={`prompt-${block.key}`}>{block.label}</Label>
+              <Textarea
+                id={`prompt-${block.key}`}
+                placeholder={block.placeholder}
+                value={promptBlocks[block.key]}
+                onChange={(e) =>
+                  setPromptBlocks((prev) => ({ ...prev, [block.key]: e.target.value }))
+                }
+                className="min-h-[90px]"
+              />
+              <p className="text-xs text-muted-foreground">{block.hint}</p>
+            </div>
+          ))}
+
+          <div className="space-y-2 pt-2 border-t">
+            <Label htmlFor="custom-prompt">Instruções complementares (livre)</Label>
             <Textarea
               id="custom-prompt"
-              placeholder="Ex: Responda sempre em nome do Deputado João Silva. Use tom formal e empático..."
+              placeholder="Qualquer instrução extra que não se encaixe nos blocos acima."
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
-              className="min-h-[120px]"
+              className="min-h-[100px]"
             />
             <p className="text-xs text-muted-foreground">
-              Este prompt será usado como base para todas as respostas geradas pela IA. Deixe em branco para usar o comportamento padrão.
+              Campo livre — preserva qualquer prompt antigo já salvo. Deixe em branco para usar apenas os blocos estruturados.
             </p>
           </div>
         </CardContent>
       </Card>
+
 
       {/* Meta Graph API */}
       <Card>
