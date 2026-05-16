@@ -682,19 +682,24 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
             updateData[`llm_api_key_${t.key}`] = null;
             updateData[`llm_model_${t.key}`] = null;
           } else {
+            const keyToPersist = (card.apiKey || card.savedApiKey || '').trim();
             updateData[`llm_provider_${t.key}`] = card.provider;
             updateData[`llm_model_${t.key}`] = card.model || null;
-            if (card.apiKey && card.apiKey.trim() !== "") {
-              updateData[`llm_api_key_${t.key}`] = card.apiKey;
-            }
+            updateData[`llm_api_key_${t.key}`] = keyToPersist || null;
           }
         }
       }
 
       updateData.ai_custom_prompt = customPrompt || null;
 
-      const { error } = await supabase.from("integrations").upsert(updateData, { onConflict: 'client_id' });
+      console.info('[IntegrationsPanel] saving integrations payload', redactIntegrationForLog(updateData));
+      const { data: savedIntegration, error } = await withTimeout(supabase
+        .from("integrations")
+        .upsert(updateData, { onConflict: 'client_id' })
+        .select(INTEGRATIONS_SELECT)
+        .maybeSingle(), INTEGRATIONS_QUERY_TIMEOUT_MS, 'Timeout ao salvar integrações');
       if (error) throw error;
+      console.info('[IntegrationsPanel] saved integrations returned', redactIntegrationForLog(savedIntegration));
 
       // Capture cards with freshly-entered keys before we clear them — we'll auto-test these
       const cardsToTest = mode === 'hybrid'
@@ -730,9 +735,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       }
       setProviderCards(prev => prev.map(c => ({
         ...c,
+        savedApiKey: c.apiKey || c.savedApiKey,
         apiKey: "",
         isConfigured: c.isConfigured || !!c.apiKey,
       })));
+      await fetchIntegrations();
 
       if (metaData.accessToken && metaData.accessToken.trim() !== "") {
         setTokenStatus(prev => ({ ...prev, isExpired: false, isExpiringSoon: false }));
