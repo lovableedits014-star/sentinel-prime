@@ -188,15 +188,15 @@ Deno.serve(async (req) => {
     if (!comment.sentiment) {
       try {
         const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
-    const telemetryCtx: TelemetryContext = {
-      admin: supabaseClient,
-      clientId: clientId,
-      userId: user?.id ?? null,
-      functionName: 'respond-to-comment',
-      correlationId: getCorrelationId(req),
-      requestId: getRequestId(req),
-    };
-        const sentiment = await analyzeSentiment(llmConfig, comment.text);
+        const telemetryCtx: TelemetryContext = {
+          admin: supabaseClient,
+          clientId: clientId,
+          userId: user?.id ?? null,
+          functionName: 'respond-to-comment',
+          correlationId: getCorrelationId(req),
+          requestId: getRequestId(req),
+        };
+        const sentiment = await analyzeSentiment(llmConfig, comment.text, telemetryCtx);
         updateData.sentiment = sentiment;
         console.log(`🎯 Auto-classified sentiment: ${sentiment}`);
       } catch (e) {
@@ -244,7 +244,8 @@ Deno.serve(async (req) => {
 
 async function analyzeSentiment(
   llmConfig: { provider: string; apiKey: string; model: string },
-  text: string
+  text: string,
+  telemetryCtx?: TelemetryContext
 ): Promise<string> {
   const messages: LLMMessage[] = [
     {
