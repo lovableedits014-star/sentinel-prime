@@ -1,87 +1,79 @@
-## Contexto da auditoria (já levantado)
+## Contexto
 
-- **Sem pagamentos:** não há Stripe/Mercado Pago. A seção "Blindagem de Pagamentos" do material **não se aplica** — ignorar para não introduzir risco desnecessário.
-- **Roles OK:** `user_roles` + `app_role` enum + `has_role()` + `is_super_admin()` SECURITY DEFINER já seguem o padrão recomendado. **Não vamos refatorar.**
-- **Gate Super Admin OK:** `SuperAdmin.tsx` já valida via `supabase.rpc("is_super_admin")` no servidor.
-- **Sem segredos em VITE_:** apenas URL/PUBLISHABLE_KEY/PROJECT_ID.
-- **RLS:** padrão `is_super_admin() OR user_can_access_client(client_id)` já adotado nas migrations recentes.
-- **`dangerouslySetInnerHTML`:** só em `ui/chart.tsx` (shadcn, seguro).
+Hoje a Timeline (`Memória → Timeline`) só lê `ic_knowledge_documents`, alimentada por transcrições, PDFs, URLs e notas manuais. Posts e comentários do Facebook/Instagram passam pelo extrator em "modo fato" (geram propostas, promessas, bordões em `ic_facts`), mas **não viram documentos** — por isso não aparecem ali.
 
-O que precisa endurecer de verdade:
-1. **77 Edge Functions** sem garantia uniforme de auth + validação Zod.
-2. Rotas autenticadas dependem só do `DashboardLayout` (sem `ProtectedRoute` explícito).
-3. Tabelas que o linter pode acusar de RLS frouxa/ausente.
-4. Falta telemetria de eventos sensíveis (mudança de role, acesso negado).
+Não existe tabela `posts` separada: cada post vive desnormalizado dentro de `public.comments` (`post_id`, `post_message`, `post_permalink_url`, `post_full_picture`, `post_media_type`, `platform`, `comment_created_time`). Posts são reconstruídos agrupando comentários por `post_id`.
 
-## Princípio inegociável: zero quebra
-
-- Toda onda é **aditiva** (adiciona guardas, não remove).
-- Antes de cada commit: `bun run test` + `bun run test:coverage` precisam continuar verdes.
-- Mudanças em RLS: **uma tabela por migration**, com rollback SQL no comentário.
-- Edge Functions: novo Zod entra em **modo warn-only** por 48h antes de virar 400 bloqueante.
-- Nada de renomear env var, deletar tabela ou mudar contrato de Edge Function existente.
+Você escolheu **as duas coisas**, com escopo **todos os posts do sistema**.
 
 ---
 
-## Onda 1 — Auditoria (zero risco, somente leitura)
+## Parte A — Mesclar posts na Timeline (UI, rápido)
 
-Gerar em `docs/security/`:
-- `security-baseline.md` — saída de `supabase--run_security_scan` + `supabase--linter` + `get_table_schema`, com cada tabela classificada (owner-scoped / multi-tenant / pública intencional).
-- `edge-functions-audit.csv` — uma linha por função em `supabase/functions/*`: `auth_required`, `validates_input`, `uses_service_role`, `returns_pii`, `risco`.
-- `routes-audit.md` — cada rota em `src/App.tsx` classificada (pública / autenticada / admin / portal-por-token) e qual gate a protege hoje.
+Objetivo: ver posts publicados ao lado de documentos da memória, sem mexer na estrutura da memória.
 
-Saída: nenhum arquivo do app é alterado. Resultado é a lista priorizada para as ondas seguintes.
+1. **Hook novo `usePostsTimeline(clientId)`** em `src/components/inteligencia-conteudo/`:
+   - Lê `comments` agrupando por `post_id + platform`.
+   - Para cada post: pega `post_message`, `post_permalink_url`, `post_full_picture`, `post_media_type`, `platform`, data = `min(comment_created_time)` como aproximação da publicação, e contadores (nº comentários, sentimentos agregados).
+   - Limite ~500 posts mais recentes do cliente.
 
-## Onda 2 — Defesa em profundidade nas rotas (frontend, aditivo)
+2. **`DocumentsTimeline` em `MemoriaPanel.tsx`**:
+   - Mescla `ic_knowledge_documents` + posts em uma única lista ordenada por data desc.
+   - Cada item carrega `kind: "doc" | "post"`.
+   - Posts renderizam com card distinto: ícone Instagram/Facebook, thumb do `post_full_picture`, trecho do `post_message`, badges (nº comentários, sentimento dominante), botão "Ver original" (link externo) e "Promover a documento" (chama Parte B sob demanda).
+   - Novo chip de filtro **"Posts"** ao lado de Todas / Propostas / Promessas / Bandeiras / Bordões. Filtros existentes continuam aplicando-se só a documentos.
 
-- Criar `src/components/AuthGate.tsx` e `src/components/RequireRole.tsx` (novos, não removem nada).
-- Envolver `/super-admin` com `<RequireRole role="admin">` **em paralelo** ao gate existente.
-- Ocultar o item de menu `/super-admin` no `DashboardLayout` via consulta a `is_super_admin` reaproveitando `useActiveClientId.isSuperAdmin` (sem novo RPC).
-- Validar: suíte Vitest + troca manual de perfil no preview.
-
-Risco: baixíssimo (só reforça).
-
-## Onda 3 — Padronizar Edge Functions
-
-1. Em `supabase/functions/_shared/`: adicionar `validate.ts` (Zod helper que devolve 400 genérico) e `auth.ts` (`requireAuth(req)` validando JWT via `supabaseAdmin.auth.getUser(token)`). Reaproveitar o que já existir em `_shared/`.
-2. Aplicar em **lotes de 5 funções**, priorizadas pelo CSV da Onda 1 (maior risco primeiro: `manage-platform-user`, `create-team-user`, `eleicao-create-account`, `manage-whatsapp-instance`, `register-*`).
-3. **Modo warn-only por 48h** em cada lote: schema valida e loga `console.warn`, não bloqueia. Após 48h sem warns → ativar 400.
-4. Funções intencionalmente públicas (portais por `clientId`, `whatsapp-inbound-webhook`) recebem comentário no topo marcando como pública e validação de assinatura/HMAC quando aplicável.
-
-Risco: médio, mitigado pelo warn-only e lotes pequenos.
-
-## Onda 4 — RLS hardening dirigido pelo linter
-
-- Rodar `supabase--linter` + reler `security-baseline.md`.
-- Cada finding **error** → migration nominada via `supabase--migration` (uma tabela por migration).
-- Tabelas sem RLS que deveriam ter → habilitar RLS + policy padrão `is_super_admin() OR user_can_access_client(client_id)`.
-- Tabelas intencionalmente públicas → manter + registrar em `security--update_memory` para o scanner parar de acusar.
-- Antes de cada migration: SELECT representativo no preview + suíte E2E Playwright (já criada) como sanity check.
-
-Risco: este é o ponto mais sensível. Mitigação: uma tabela por vez + rollback SQL incluso.
-
-## Onda 5 — Telemetria e segredos
-
-- Tabela `security_events` (insert-only, RLS deny-all exceto service role) com `event_type`, `user_id`, `metadata`, `at`. Funções sensíveis gravam `role_changed`, `permission_denied`, `admin_action`.
-- Hook `useSecurityLog` (complemento client-side, não substitui auditoria server-side).
-- `fetch_secrets` para confirmar que nenhuma chave privada está prefixada `VITE_`. Se encontrar, migrar para segredo runtime **antes** de remover do client.
-
-## Critérios de aceitação
-
-- `bun run test` continua verde (27/27 atuais + novos testes de role/gate).
-- `bun run test:coverage` ≥ thresholds atuais.
-- `supabase--linter` retorna **0 errors**.
-- Nenhuma rota autenticada renderiza sem checagem server-side.
-- 100% das Edge Functions com Zod + auth explícita (ou marcação "público intencional" com verificação de assinatura).
-- `docs/security/security-baseline.md` versionado.
-
-## O que **não** vamos fazer
-
-- Não vamos adicionar checkout/Stripe (sistema não tem cobrança).
-- Não vamos trocar `react-router-dom` por TanStack Router só por segurança.
-- Não vamos refatorar `user_roles`/`is_super_admin` (já correto).
-- Não vamos esconder rotas via code-splitting "para esconder do navegador" (segurança por obscuridade — o gate server-side é o controle real).
+3. **Sem mudança de schema, sem novo endpoint** nesta parte.
 
 ---
 
-**Plano de execução proposto:** começar pela Onda 1 (zero risco) para gerar a baseline. Cada onda seguinte só inicia após sua revisão da anterior.
+## Parte B — Promover posts a documentos da memória
+
+Objetivo: posts viram entradas em `ic_knowledge_documents` (com resumo, propostas, promessas, bandeiras, bordões, embeddings) e passam a aparecer no DNA, Livro de Campanha, busca, widgets, drift, contradições.
+
+1. **Extender `ic-extract-knowledge`** (edge function existente):
+   - Adicionar `"post"` ao `DOC_MODE_TYPES` e ao `TIPO_DOCUMENTO_MAP` (`post → "post_social"`).
+   - Passar `sourceId = post_id`, `sourceType = "post"`, `sourceUrl = post_permalink_url`, `sourceDate = comment_created_time` mais antigo do post, `text = post_message` (+ opcionalmente top N comentários para contexto), `documentTitleHint` = primeiros ~80 chars da legenda.
+   - Reuso completo da pipeline (LLM → resumo → propostas/promessas/bandeiras → embedding).
+
+2. **Nova edge function `ic-import-posts`** (orquestrador):
+   - Input: `{ clientId, limit?, sinceDate?, postIds? }`.
+   - Lista posts distintos de `comments` (todos os posts do sistema para esse cliente, conforme escolhido).
+   - Pula posts já importados (checa `ic_knowledge_documents.tipo_documento='post_social' AND source_ref=post_id`).
+   - Pula posts sem `post_message` (vídeo/imagem sem legenda) — fica visível só na Parte A.
+   - Chama `ic-extract-knowledge` em lote com throttling (1–2 por segundo) para evitar limite de LLM/custo.
+   - Retorna `{ processed, skipped, failed }`.
+
+3. **UI em `MemoriaPanel`**:
+   - Botão **"Importar posts para memória"** no header, ao lado de "Adicionar documento", com dialog mostrando: total de posts elegíveis, quantos já importados, opção de janela temporal (últimos 30/90/365 dias / tudo) e barra de progresso.
+   - Botão por linha "Promover a documento" no card de post da Timeline (atalho 1-a-1).
+
+4. **Cron opcional (sugerido, mas opt-in)**:
+   - Schedule diário no `cron` Supabase chamando `ic-import-posts` com `sinceDate = now() - 1 day`. Fica como toggle em Settings da Inteligência de Conteúdo, **não ligado por padrão** (custo de LLM).
+
+---
+
+## Detalhes técnicos
+
+- **Sem migração obrigatória.** `ic_knowledge_documents.source_ref` (text) e `tipo_documento` (text) já suportam o novo tipo.
+- **Dedupe**: `delete where client_id=? and source_ref=post_id and tipo_documento='post_social'` antes de inserir (mesmo padrão de transcrições).
+- **Custo**: cada post = 1 chamada LLM. Por isso a Parte B é manual/opt-in, não automática.
+- **Auth**: `ic-import-posts` recebe `Authorization: Bearer <user>` e usa `requireSupabaseAuth` (segue padrão do projeto). Internamente usa service role para escrita.
+- **Performance da Parte A**: query única `select distinct on (post_id, platform) ... from comments where client_id=? order by post_id, comment_created_time asc` + segunda query agregando contagens. Cache via TanStack Query (`staleTime: 60s`).
+
+---
+
+## Entregáveis
+
+```text
+Parte A (UI)
+├── src/components/inteligencia-conteudo/usePostsTimeline.ts   (novo)
+└── src/components/inteligencia-conteudo/MemoriaPanel.tsx      (DocumentsTimeline + chip "Posts")
+
+Parte B (memória)
+├── supabase/functions/ic-extract-knowledge/index.ts           (aceita sourceType="post")
+├── supabase/functions/ic-import-posts/index.ts                (novo, orquestrador)
+└── src/components/inteligencia-conteudo/ImportPostsDialog.tsx (novo, botão no header)
+```
+
+Sem mudanças em schema, RLS, ou outras telas. Outras superfícies que já leem `ic_knowledge_documents` (DNA, Livro de Campanha, Cobertura, Drift, Contradições, widgets) passam a incluir posts automaticamente.

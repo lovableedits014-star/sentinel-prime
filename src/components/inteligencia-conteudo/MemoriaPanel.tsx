@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Brain, Trash2, ExternalLink, Loader2, Search, Sparkles, FileText,
   MapPin, Users, Megaphone, Quote, Hash, Flag, Calendar, FileAudio, BookOpen,
-  AlertTriangle, RefreshCw,
+  AlertTriangle, RefreshCw, Instagram, Facebook, MessageSquare, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
@@ -21,6 +21,8 @@ import { InsightsCard } from "./InsightsCard";
 import { CoberturaPanel } from "./CoberturaPanel";
 import { DriftPanel } from "./DriftPanel";
 import { IngestDocumentDialog } from "./IngestDocumentDialog";
+import { ImportPostsDialog } from "./ImportPostsDialog";
+import { usePostsTimeline, type PostTimelineItem } from "./usePostsTimeline";
 import { findBestSegment, formatTime, type AudioSegment } from "./audioMatch";
 import { useRef, useEffect, createContext, useContext } from "react";
 import { Play } from "lucide-react";
@@ -76,6 +78,7 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
             </div>
             <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
               <IngestDocumentDialog clientId={clientId!} />
+              <ImportPostsDialog clientId={clientId!} />
               <Button size="sm" variant="outline" onClick={handleExport} disabled={exporting}>
                 {exporting ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <BookOpen className="w-4 h-4 mr-1.5" />}
                 Livro de campanha
@@ -791,16 +794,37 @@ function FactsList({ clientId }: { clientId: string }) {
  * TIMELINE
  * ========================================================================= */
 
-function DocumentsTimeline({ clientId }: { clientId: string }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"todas" | "propostas" | "promessas" | "bandeiras" | "bordoes">("todas");
+type TimelineItem =
+  | { kind: "doc"; date: string; id: string; doc: any }
+  | { kind: "post"; date: string; id: string; post: PostTimelineItem };
 
-  const { data, isLoading } = useQuery({
+function platformIcon(platform: string) {
+  if (platform === "instagram") return <Instagram className="w-3.5 h-3.5 text-pink-500" />;
+  if (platform === "facebook") return <Facebook className="w-3.5 h-3.5 text-blue-600" />;
+  return <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />;
+}
+
+function isVideoLike(url: string | null, mediaType: string | null) {
+  if (mediaType && /video/i.test(mediaType)) return true;
+  if (!url) return false;
+  return /\.(mp4|mov|avi|webm|m3u8)/i.test(url) || url.includes("/v/t2/");
+}
+
+function DocumentsTimeline({ clientId }: { clientId: string }) {
+  const qc = useQueryClient();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<
+    "todas" | "propostas" | "promessas" | "bandeiras" | "bordoes" | "posts"
+  >("todas");
+
+  const { data: docs, isLoading: docsLoading } = useQuery({
     queryKey: ["ic-knowledge-documents-timeline", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ic_knowledge_documents" as any)
-        .select("id, titulo, resumo_executivo, data_evento, created_at, propostas, promessas, bandeiras, bordoes, bairros_citados, pessoas_citadas, tom_emocional, local")
+        .select(
+          "id, titulo, resumo_executivo, data_evento, created_at, propostas, promessas, bandeiras, bordoes, bairros_citados, pessoas_citadas, tom_emocional, local, tipo_documento, source_ref"
+        )
         .eq("client_id", clientId)
         .order("data_evento", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
@@ -811,23 +835,81 @@ function DocumentsTimeline({ clientId }: { clientId: string }) {
     staleTime: 30_000,
   });
 
-  // Agrupa por mês/ano
+  const { data: posts, isLoading: postsLoading } = usePostsTimeline(clientId);
+
+  // post_ids já promovidos a documento — para evitar duplicar na timeline
+  const promotedPostIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const d of docs ?? []) {
+      if (d?.tipo_documento === "post_social" && d?.source_ref) s.add(d.source_ref);
+    }
+    return s;
+  }, [docs]);
+
+  const promoteOne = useMutation({
+    mutationFn: async (postId: string) => {
+      const { data, error } = await supabase.functions.invoke("ic-import-posts", {
+        body: { clientId, postIds: [postId], limit: 1 },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Post enviado à memória.");
+      qc.invalidateQueries({ queryKey: ["ic-knowledge-documents-timeline", clientId] });
+      qc.invalidateQueries({ queryKey: ["ic-knowledge-documents", clientId] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Falha ao promover post."),
+  });
+
+  // Mescla + filtro + agrupa por mês
   const grouped = useMemo(() => {
-    const list = data ?? [];
-    const filtered = list.filter((d) => {
-      if (filter === "todas") return true;
-      const arr = (d as any)[filter];
-      return Array.isArray(arr) && arr.length > 0;
-    });
-    const groups = new Map<string, any[]>();
-    for (const d of filtered) {
-      const dt = new Date(d.data_evento || d.created_at);
+    const items: TimelineItem[] = [];
+
+    // documentos
+    if (filter !== "posts") {
+      for (const d of docs ?? []) {
+        // se o filtro for um campo específico, exige array não vazio
+        if (filter !== "todas") {
+          const arr = (d as any)[filter];
+          if (!Array.isArray(arr) || arr.length === 0) continue;
+        }
+        items.push({
+          kind: "doc",
+          id: `doc-${d.id}`,
+          date: d.data_evento || d.created_at,
+          doc: d,
+        });
+      }
+    }
+
+    // posts (apenas em "todas" ou "posts"), e ocultando os já promovidos
+    if (filter === "todas" || filter === "posts") {
+      for (const p of posts ?? []) {
+        if (promotedPostIds.has(p.post_id)) continue;
+        if (!p.published_at) continue;
+        items.push({
+          kind: "post",
+          id: `post-${p.post_id}-${p.platform}`,
+          date: p.published_at,
+          post: p,
+        });
+      }
+    }
+
+    items.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+    const groups = new Map<string, TimelineItem[]>();
+    for (const it of items) {
+      const dt = new Date(it.date);
       const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
       if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(d);
+      groups.get(key)!.push(it);
     }
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [data, filter]);
+  }, [docs, posts, filter, promotedPostIds]);
+
+  const totalItems = grouped.reduce((acc, [, arr]) => acc + arr.length, 0);
 
   const monthLabel = (key: string) => {
     const [y, m] = key.split("-");
@@ -837,13 +919,14 @@ function DocumentsTimeline({ clientId }: { clientId: string }) {
 
   const filterChips: Array<{ id: typeof filter; label: string; icon: React.ReactNode }> = [
     { id: "todas", label: "Todas", icon: <FileText className="w-3 h-3" /> },
+    { id: "posts", label: "Posts", icon: <Instagram className="w-3 h-3" /> },
     { id: "propostas", label: "Propostas", icon: <Megaphone className="w-3 h-3" /> },
     { id: "promessas", label: "Promessas", icon: <Flag className="w-3 h-3" /> },
     { id: "bandeiras", label: "Bandeiras", icon: <Hash className="w-3 h-3" /> },
     { id: "bordoes", label: "Bordões", icon: <Quote className="w-3 h-3" /> },
   ];
 
-  if (isLoading) {
+  if (docsLoading || postsLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground p-6">
         <Loader2 className="w-4 h-4 animate-spin" /> Carregando timeline...
@@ -851,12 +934,16 @@ function DocumentsTimeline({ clientId }: { clientId: string }) {
     );
   }
 
-  if (!data?.length) {
+  if (totalItems === 0) {
     return (
       <Card>
         <CardContent className="p-8 text-center text-sm text-muted-foreground space-y-2">
           <Calendar className="w-8 h-8 mx-auto text-muted-foreground/50" />
-          <p>Sem documentos ainda — a timeline aparece quando a memória tiver conteúdo.</p>
+          <p>
+            {filter === "posts"
+              ? "Nenhum post agregado ainda — posts vêm de comentários que o sistema coleta no Facebook/Instagram."
+              : "Sem itens nesse filtro."}
+          </p>
         </CardContent>
       </Card>
     );
@@ -879,60 +966,71 @@ function DocumentsTimeline({ clientId }: { clientId: string }) {
       </div>
 
       <div className="relative pl-6">
-        {/* Linha vertical */}
         <div className="absolute left-2 top-2 bottom-2 w-px bg-border" />
 
-        {grouped.map(([monthKey, docs]) => (
+        {grouped.map(([monthKey, items]) => (
           <div key={monthKey} className="mb-6">
             <div className="sticky top-0 z-10 -ml-6 mb-3 flex items-center gap-2 bg-background/95 backdrop-blur py-1.5">
               <div className="w-4 h-4 rounded-full bg-primary border-2 border-background shadow-sm" />
               <h3 className="text-sm font-semibold capitalize">{monthLabel(monthKey)}</h3>
-              <Badge variant="secondary" className="text-[10px]">{docs.length}</Badge>
+              <Badge variant="secondary" className="text-[10px]">{items.length}</Badge>
             </div>
 
             <div className="space-y-3">
-              {docs.map((d) => {
-                const dt = new Date(d.data_evento || d.created_at);
+              {items.map((it) => {
+                const dt = new Date(it.date);
                 const day = dt.getDate();
                 return (
-                  <div key={d.id} className="relative flex gap-4">
-                    {/* Bolinha do dia */}
-                    <div className="absolute -left-[18px] top-3 w-2.5 h-2.5 rounded-full bg-primary/60 border-2 border-background" />
+                  <div key={it.id} className="relative flex gap-4">
+                    <div
+                      className={`absolute -left-[18px] top-3 w-2.5 h-2.5 rounded-full border-2 border-background ${
+                        it.kind === "post" ? "bg-pink-500/70" : "bg-primary/60"
+                      }`}
+                    />
                     <div className="w-12 flex-shrink-0 text-right">
                       <div className="text-xl font-bold leading-none">{day}</div>
                       <div className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">
                         {dt.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
                       </div>
                     </div>
-                    <Card
-                      className="flex-1 cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => setOpenId(d.id)}
-                    >
-                      <CardContent className="p-3 space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <h4 className="font-medium text-sm leading-snug flex-1">{d.titulo}</h4>
-                          {d.tom_emocional && (
-                            <Badge variant="outline" className="text-[10px] flex-shrink-0">{d.tom_emocional}</Badge>
-                          )}
-                        </div>
-                        {d.local && (
-                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <MapPin className="w-3 h-3" /> {d.local}
+
+                    {it.kind === "doc" ? (
+                      <Card
+                        className="flex-1 cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => setOpenId(it.doc.id)}
+                      >
+                        <CardContent className="p-3 space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <h4 className="font-medium text-sm leading-snug flex-1">{it.doc.titulo}</h4>
+                            {it.doc.tom_emocional && (
+                              <Badge variant="outline" className="text-[10px] flex-shrink-0">{it.doc.tom_emocional}</Badge>
+                            )}
                           </div>
-                        )}
-                        {d.resumo_executivo && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">{d.resumo_executivo}</p>
-                        )}
-                        <div className="flex flex-wrap gap-1">
-                          <CountBadge icon={<Megaphone className="w-3 h-3" />} n={d.propostas?.length} label="prop." />
-                          <CountBadge icon={<Flag className="w-3 h-3" />} n={d.promessas?.length} label="prom." />
-                          <CountBadge icon={<Hash className="w-3 h-3" />} n={d.bandeiras?.length} label="band." />
-                          <CountBadge icon={<Quote className="w-3 h-3" />} n={d.bordoes?.length} label="bord." />
-                          <CountBadge icon={<MapPin className="w-3 h-3" />} n={d.bairros_citados?.length} label="bairros" />
-                          <CountBadge icon={<Users className="w-3 h-3" />} n={d.pessoas_citadas?.length} label="pessoas" />
-                        </div>
-                      </CardContent>
-                    </Card>
+                          {it.doc.local && (
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <MapPin className="w-3 h-3" /> {it.doc.local}
+                            </div>
+                          )}
+                          {it.doc.resumo_executivo && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">{it.doc.resumo_executivo}</p>
+                          )}
+                          <div className="flex flex-wrap gap-1">
+                            <CountBadge icon={<Megaphone className="w-3 h-3" />} n={it.doc.propostas?.length} label="prop." />
+                            <CountBadge icon={<Flag className="w-3 h-3" />} n={it.doc.promessas?.length} label="prom." />
+                            <CountBadge icon={<Hash className="w-3 h-3" />} n={it.doc.bandeiras?.length} label="band." />
+                            <CountBadge icon={<Quote className="w-3 h-3" />} n={it.doc.bordoes?.length} label="bord." />
+                            <CountBadge icon={<MapPin className="w-3 h-3" />} n={it.doc.bairros_citados?.length} label="bairros" />
+                            <CountBadge icon={<Users className="w-3 h-3" />} n={it.doc.pessoas_citadas?.length} label="pessoas" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <PostTimelineCard
+                        post={it.post}
+                        promoting={promoteOne.isPending && promoteOne.variables === it.post.post_id}
+                        onPromote={() => promoteOne.mutate(it.post.post_id)}
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -943,6 +1041,115 @@ function DocumentsTimeline({ clientId }: { clientId: string }) {
 
       <DocumentDrawer openId={openId} onClose={() => setOpenId(null)} />
     </div>
+  );
+}
+
+function PostTimelineCard({
+  post,
+  promoting,
+  onPromote,
+}: {
+  post: PostTimelineItem;
+  promoting: boolean;
+  onPromote: () => void;
+}) {
+  const isVideo = isVideoLike(post.post_full_picture, post.post_media_type);
+  return (
+    <Card className="flex-1 border-pink-500/20 bg-pink-500/[0.02]">
+      <CardContent className="p-3">
+        <div className="flex gap-3">
+          {post.post_full_picture && (
+            <div className="w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-muted relative">
+              {isVideo ? (
+                <video
+                  src={post.post_full_picture}
+                  className="w-full h-full object-cover"
+                  muted
+                  preload="metadata"
+                  onLoadedData={(e) => {
+                    e.currentTarget.currentTime = 1;
+                  }}
+                />
+              ) : (
+                <img
+                  src={post.post_full_picture}
+                  alt="Post"
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              )}
+              <div className="absolute top-1 left-1 bg-white/90 rounded-full p-0.5 shadow-sm">
+                {platformIcon(post.platform)}
+              </div>
+            </div>
+          )}
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {!post.post_full_picture && platformIcon(post.platform)}
+                <Badge variant="outline" className="text-[10px] capitalize">
+                  Post {post.platform}
+                </Badge>
+              </div>
+              {post.post_permalink_url && (
+                <a
+                  href={post.post_permalink_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-primary hover:underline flex items-center gap-0.5"
+                >
+                  <ExternalLink className="w-3 h-3" /> abrir
+                </a>
+              )}
+            </div>
+            {post.post_message ? (
+              <p className="text-xs text-foreground line-clamp-3 leading-snug">{post.post_message}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Sem legenda</p>
+            )}
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <MessageSquare className="w-3 h-3" /> {post.comments_count}
+              </span>
+              {post.sentiment_counts.positive > 0 && (
+                <span className="flex items-center gap-0.5 text-green-600">
+                  <TrendingUp className="w-3 h-3" /> {post.sentiment_counts.positive}
+                </span>
+              )}
+              {post.sentiment_counts.neutral > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <Minus className="w-3 h-3" /> {post.sentiment_counts.neutral}
+                </span>
+              )}
+              {post.sentiment_counts.negative > 0 && (
+                <span className="flex items-center gap-0.5 text-red-600">
+                  <TrendingDown className="w-3 h-3" /> {post.sentiment_counts.negative}
+                </span>
+              )}
+              {post.post_message && post.post_message.trim().length >= 30 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[11px] ml-auto"
+                  onClick={onPromote}
+                  disabled={promoting}
+                >
+                  {promoting ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Promovendo…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 mr-1" /> Promover à memória
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
