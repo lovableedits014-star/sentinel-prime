@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { resolveClientId, getImpersonatedClientId } from "@/lib/resolveClientId";
+import { logTelemetry } from "@/lib/client-telemetry";
 
 export const ACTIVE_CLIENT_QUERY_KEY = ["active-client-id"] as const;
 
@@ -12,18 +13,35 @@ export interface ActiveClientInfo {
 }
 
 async function fetchActive(): Promise<ActiveClientInfo> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { clientId: null, isSuperAdmin: false, isImpersonating: false };
-
-  let isSuperAdmin = false;
+  const started = performance.now();
+  logTelemetry("resolve_started");
   try {
-    const { data } = await supabase.rpc("is_super_admin");
-    isSuperAdmin = data === true;
-  } catch {}
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      logTelemetry("resolve_finished", { clientId: null, reason: "no-user", ms: Math.round(performance.now() - started) });
+      return { clientId: null, isSuperAdmin: false, isImpersonating: false };
+    }
 
-  const clientId = await resolveClientId();
-  const isImpersonating = isSuperAdmin && !!getImpersonatedClientId() && !!clientId;
-  return { clientId, isSuperAdmin, isImpersonating };
+    let isSuperAdmin = false;
+    try {
+      const { data } = await supabase.rpc("is_super_admin");
+      isSuperAdmin = data === true;
+    } catch {}
+
+    const clientId = await resolveClientId();
+    const isImpersonating = isSuperAdmin && !!getImpersonatedClientId() && !!clientId;
+    logTelemetry("resolve_finished", {
+      clientId,
+      isSuperAdmin,
+      isImpersonating,
+      userId: user.id,
+      ms: Math.round(performance.now() - started),
+    });
+    return { clientId, isSuperAdmin, isImpersonating };
+  } catch (e: any) {
+    logTelemetry("resolve_error", { message: e?.message ?? String(e) });
+    throw e;
+  }
 }
 
 /**
@@ -48,9 +66,10 @@ export function useActiveClientId() {
   // Re-fetch when the auth user changes (login/logout/swap account).
   useEffect(() => {
     let lastUserId: string | null = null;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const uid = session?.user?.id ?? null;
       if (uid !== lastUserId) {
+        logTelemetry("queries_invalidated", { reason: "auth_state_change", event, userId: uid });
         lastUserId = uid;
         qc.invalidateQueries({ queryKey: ACTIVE_CLIENT_QUERY_KEY });
       }
@@ -59,9 +78,26 @@ export function useActiveClientId() {
   }, [qc]);
 
   const info = query.data;
+  const clientId = info?.clientId ?? null;
+
+  // Track clientId transitions (mount + any change) for debugging.
+  const prevClientIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (query.isLoading) return;
+    if (prevClientIdRef.current !== clientId) {
+      logTelemetry("client_id_changed", {
+        from: prevClientIdRef.current ?? null,
+        to: clientId,
+        isSuperAdmin: info?.isSuperAdmin ?? false,
+        isImpersonating: info?.isImpersonating ?? false,
+      });
+      prevClientIdRef.current = clientId;
+    }
+  }, [clientId, info?.isSuperAdmin, info?.isImpersonating, query.isLoading]);
+
   return {
     ...query,
-    clientId: info?.clientId ?? null,
+    clientId,
     isSuperAdmin: info?.isSuperAdmin ?? false,
     isImpersonating: info?.isImpersonating ?? false,
     needsClientSelection: !!info?.isSuperAdmin && !info?.clientId,
