@@ -22,35 +22,13 @@ interface PessoaRow {
 export default function Recrutamento() {
   const [pessoas, setPessoas] = useState<PessoaRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [clientId, setClientId] = useState<string | null>(null);
+  const { clientId } = useActiveClientId();
 
   useEffect(() => {
     const load = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      // Get client
-      let cId: string | null = null;
-      const { data: client } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
-
-      if (client) {
-        cId = client.id;
-      } else {
-        const { data: tm } = await supabase
-          .from("team_members")
-          .select("client_id")
-          .eq("user_id", session.user.id)
-          .eq("status", "active")
-          .maybeSingle();
-        if (tm) cId = tm.client_id;
-      }
-
-      if (!cId) { setLoading(false); return; }
-      setClientId(cId);
+      if (!clientId) { setLoading(false); return; }
+      setLoading(true);
+      const cId = clientId;
 
       // Fetch all pessoas for this client
       const allPessoas: PessoaRow[] = [];
