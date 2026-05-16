@@ -109,7 +109,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     try {
       const { data: integration } = await supabase
         .from("integrations")
-        .select("meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt")
+        .select("meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep")
         .eq("client_id", clientId)
         .maybeSingle();
 
