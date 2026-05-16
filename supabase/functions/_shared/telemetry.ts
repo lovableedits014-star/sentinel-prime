@@ -30,6 +30,27 @@ export function tracingHeaders(correlationId: string, requestId?: string): Recor
   return h;
 }
 
+/**
+ * Extrai (ou gera) correlation/request IDs a partir do Request original.
+ * Use em handlers Deno.serve para obter headers prontos para propagação downstream.
+ * Cobertura Lote C2: nenhuma chamada interna sem x-correlation-id / x-request-id.
+ */
+export function tracingHeadersFromReq(req: Request): Record<string, string> {
+  const corr = req.headers.get(CORR_HEADER) || crypto.randomUUID();
+  const reqId = req.headers.get(REQ_HEADER) || crypto.randomUUID();
+  return { [CORR_HEADER]: corr, [REQ_HEADER]: reqId };
+}
+
+/** Wrapper de fetch que injeta automaticamente tracing headers. */
+export async function tracedFetch(
+  url: string,
+  init: RequestInit & { headers?: Record<string, string> },
+  trace: Record<string, string>,
+): Promise<Response> {
+  const headers = { ...(init.headers || {}), ...trace };
+  return fetch(url, { ...init, headers });
+}
+
 // ─────────────────────────────────────────────────────────────
 // Estimativa de custo (USD por 1k tokens, prompt/completion)
 // Tabela conservadora — atualizar conforme preços oficiais mudam.
