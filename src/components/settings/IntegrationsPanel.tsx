@@ -131,6 +131,9 @@ const humanizeLLMError = (raw: string): string => {
   if (msg.includes('aborted') || msg.includes('aborterror') || msg.includes('timeout') || msg.includes('tempo limite')) {
     return 'Timeout — o provider demorou a responder.';
   }
+  if (msg.includes('sessão') || msg.includes('session') || msg.includes('forbidden') || msg.includes('sem acesso')) {
+    return 'Sessão expirada ou sem acesso ao cliente. Recarregue a página e tente novamente.';
+  }
   if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key') || msg.includes('api key')) {
     return 'API key inválida ou sem permissão.';
   }
@@ -158,10 +161,14 @@ const invokeFunctionWithTimeout = async <T,>(functionName: string, body: Record<
   if (!supabaseUrl || !anonKey) throw new Error('Configuração Supabase indisponível no navegador.');
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const requestPromise = (async () => {
+    const sessionData = await withTimeout(
+      supabase.auth.getSession(),
+      5000,
+      'Timeout ao obter sessão do usuário',
+    );
+    const accessToken = sessionData.data.session?.access_token;
     const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
       method: 'POST',
       headers: {
@@ -175,14 +182,29 @@ const invokeFunctionWithTimeout = async <T,>(functionName: string, body: Record<
     const text = await response.text();
     const payload = text ? JSON.parse(text) : null;
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Sessão expirada ou sem acesso ao cliente');
+      }
       throw new Error(payload?.error || payload?.message || `Erro HTTP ${response.status}`);
     }
     return payload as T;
+  })();
+
+  try {
+    return await Promise.race([
+      requestPromise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          controller.abort();
+          reject(new Error('Timeout ao testar provider'));
+        }, timeoutMs);
+      }),
+    ]);
   } catch (error: any) {
     if (error?.name === 'AbortError') throw new Error('Timeout ao testar provider');
     throw error;
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
   }
 };
 
@@ -526,6 +548,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     } catch (e: any) {
       const friendly = humanizeLLMError(e?.message || String(e));
       updateCard(id, { status: 'error', statusMessage: friendly, testedAt: Date.now() });
+      toast.error(friendly);
       return false;
     }
   };
