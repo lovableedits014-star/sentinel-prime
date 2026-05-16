@@ -18,10 +18,20 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const { isCronCaller, requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const cron = isCronCaller(req);
+
     let clientIds: string[] = [];
     if (body.clientId) {
+      // Chamada manual por usuário: exige acesso explícito ao client
+      const guard = await requireClientAccess(req, body.clientId);
+      if (!guard.ok) return guard.response;
       clientIds = [body.clientId];
     } else {
+      // Iteração de todos os clients só é permitida via CRON_SECRET
+      if (!cron) {
+        return errorResponse("forbidden: cron token required for batch run", 403);
+      }
       const { data: clients } = await supabase.from("clients").select("id");
       clientIds = (clients ?? []).map((c: any) => c.id);
     }
