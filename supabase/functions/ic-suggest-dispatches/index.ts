@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/ic-utils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -26,6 +27,14 @@ async function generateMessage(
 ): Promise<string> {
   try {
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-suggest-dispatches',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     // Puxa DNA p/ tom/voz
     const { data: dna } = await supabase
@@ -61,7 +70,7 @@ Escreva APENAS a mensagem, sem aspas, sem rótulos.`;
       ],
       maxTokens: 350,
       temperature: 0.7,
-    });
+    }, telemetryCtx);
     return resp.content.trim().slice(0, 800);
   } catch (e) {
     console.error("[ic-suggest-dispatches] generateMessage failed:", e);

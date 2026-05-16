@@ -11,10 +11,11 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 import { z } from 'npm:zod@3.23.8';
 import { getClientLLMConfig, callLLM, type LLMMessage } from '../_shared/llm-router.ts';
+import { getCorrelationId, getRequestId, type TelemetryContext } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-correlation-id, x-request-id',
 };
 
 const RequestSchema = z.object({
@@ -856,6 +857,14 @@ Deno.serve(async (req) => {
       syncLog.push('--- SENTIMENT ANALYSIS ---');
       try {
         const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabaseClient,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'fetch-meta-comments',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
         syncLog.push(`LLM: ${llmConfig.provider}/${llmConfig.model}`);
 
         const { data: unanalyzed } = await supabaseClient
@@ -884,7 +893,7 @@ Deno.serve(async (req) => {
             }];
 
             try {
-              const response = await callLLM(llmConfig, { messages, maxTokens: 400, temperature: 0 });
+              const response = await callLLM(llmConfig, { messages, maxTokens: 400, temperature: 0 }, telemetryCtx);
               const lines = response.content.trim().split('\n');
 
               for (const line of lines) {

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { getTranscribeConfig, transcribeAudio } from "../_shared/transcribe-router.ts";
 
 const corsHeaders = {
@@ -111,6 +112,14 @@ Deno.serve(async (req) => {
     if (inserted?.full_text && inserted.full_text.length > 30) {
       try {
         const llmConfig = await getClientLLMConfig(admin, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: admin,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-transcribe',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
         const titleResp = await callLLM(llmConfig, {
           messages: [
             {

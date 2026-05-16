@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse, parseLooseJson } from "../_shared/ic-utils.ts";
 
 serve(async (req) => {
@@ -54,6 +55,14 @@ serve(async (req) => {
       .join("\n");
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-dna-analyzer',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const systemPrompt = `Você é um analista de comunicação política. A partir dos posts próprios do candidato, extraia o "DNA editorial".
 Retorne APENAS JSON válido, sem markdown:
@@ -78,7 +87,7 @@ Responda APENAS com o JSON.`;
       ],
       maxTokens: 1500,
       temperature: 0.3,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<any>(resp.content);
 

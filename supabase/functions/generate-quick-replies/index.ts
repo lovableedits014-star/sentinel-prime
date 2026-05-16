@@ -1,11 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 import { z } from 'npm:zod@3.23.8';
 import { getClientLLMConfig, callLLM, type LLMMessage } from '../_shared/llm-router.ts';
+import { getCorrelationId, getRequestId, type TelemetryContext } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-correlation-id, x-request-id',
 };
 
 const RequestSchema = z.object({
@@ -80,6 +81,14 @@ Deno.serve(async (req) => {
     }
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'generate-quick-replies',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const avoidBlock = currentReplies && currentReplies.length > 0
       ? `\n\nEvite repetir estas frases que já foram usadas:\n${currentReplies.map((r) => `- ${r}`).join('\n')}`
@@ -113,7 +122,7 @@ Sem texto antes ou depois, sem markdown, sem code fences.`;
         messages,
         maxTokens: 800,
         temperature: 0.95,
-      });
+      }, telemetryCtx);
       const raw = llmResp.content.trim();
       // Try to extract JSON object
       const jsonMatch = raw.match(/\{[\s\S]*\}/);

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +39,14 @@ serve(async (req) => {
     );
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'suggest-missions',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const themeSummary = themes
       .map((t: any) => `- ${t.label}: ${t.total} menções, crescimento ${t.growthPct ?? 0}%`)
@@ -92,7 +101,7 @@ Crie missões de engajamento relevantes para esses temas. Responda APENAS com o 
       ],
       maxTokens: 1500,
       temperature: 0.7,
-    });
+    }, telemetryCtx);
 
     // Parse JSON from response (handle markdown code fences if present)
     let parsed: { suggestions?: any[] } = {};

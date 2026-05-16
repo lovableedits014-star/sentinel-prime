@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/ic-utils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -274,6 +275,14 @@ ${transcrTxt || "(nenhuma)"}
 ${postsTxt || "(nenhum)"}`;
 
     const baseConfig = await getClientLLMConfig(admin, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: admin,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-write-materia',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     const llmConfig: any = providerOverride
       ? {
           provider: providerOverride,
@@ -295,7 +304,7 @@ ${postsTxt || "(nenhum)"}`;
       ],
       maxTokens: hasAnyTranscription ? 4500 : 2800,
       temperature: 0.5,
-    });
+    }, telemetryCtx);
 
     let parsed: any;
     try {

@@ -1,11 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.76.1';
 import { z } from 'npm:zod@3.23.8';
 import { getClientLLMConfig, callLLM, type LLMMessage } from '../_shared/llm-router.ts';
+import { getCorrelationId, getRequestId, type TelemetryContext } from '../_shared/telemetry.ts';
 import { applyHeuristicGuard } from '../_shared/sentiment-heuristics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-correlation-id, x-request-id',
 };
 
 const RequestSchema = z.object({
@@ -60,6 +61,14 @@ Deno.serve(async (req) => {
 
     // Get LLM config
     const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabaseClient,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'batch-analyze-sentiments',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     console.log(`📡 Using LLM provider: ${llmConfig.provider} for batch sentiment analysis`);
 
     // Get political context (candidate name + role) for smarter analysis
@@ -313,7 +322,7 @@ Resposta:`
     messages,
     maxTokens: comments.length * 15,
     temperature: 0,
-  });
+  }, telemetryCtx);
 
   // Parse response - try multiple formats the LLM might use
   const responseText = response.content.trim();
@@ -424,7 +433,7 @@ Responda APENAS com uma palavra: positive, negative ou neutral.`,
     messages,
     maxTokens: 10,
     temperature: 0,
-  });
+  }, telemetryCtx);
 
   const result = response.content.toLowerCase().trim().replace(/[^a-z]/g, '');
   if (['positive', 'negative', 'neutral'].includes(result)) {
@@ -488,7 +497,7 @@ Responda APENAS uma palavra: positive, negative ou neutral.`,
     messages,
     maxTokens: 10,
     temperature: 0,
-  });
+  }, telemetryCtx);
 
   const result = response.content.toLowerCase().trim().replace(/[^a-z]/g, '');
   if (['positive', 'negative', 'neutral'].includes(result)) return applyHeuristicGuard(result as 'positive' | 'negative' | 'neutral', text, postMessage);

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/ic-utils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -348,6 +349,14 @@ ${acoesTxt || "(nenhuma ação registrada)"}
 ${visitasTxt || "(nenhuma visita registrada)"}`;
 
     const baseConfig = await getClientLLMConfig(admin, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: admin,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-write-boletim',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     const llmConfig: any = providerOverride
       ? { provider: providerOverride, model: modelOverride || undefined, apiKey: baseConfig.apiKey }
       : { ...baseConfig, model: modelOverride || baseConfig.model };
@@ -365,7 +374,7 @@ ${visitasTxt || "(nenhuma visita registrada)"}`;
       ],
       maxTokens: 5000,
       temperature: 0.45,
-    });
+    }, telemetryCtx);
 
     // Parse defensivo
     let parsed: any;

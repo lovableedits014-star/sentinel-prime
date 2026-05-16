@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse, parseLooseJson, sample } from "../_shared/ic-utils.ts";
 
 // ===== Helpers para Radar++ =====
@@ -159,6 +160,14 @@ serve(async (req) => {
     const posVar = variation(currStats.pos, prevStats.pos);
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-radar',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     // === LLM: extrai temas e narrativas (mesmo prompt anterior, ligeiramente expandido) ===
     const systemPrompt = `Você é um analista político brasileiro especializado em escutar redes sociais.
@@ -196,7 +205,7 @@ Responda APENAS com o JSON.`;
       ],
       maxTokens: deep ? 2200 : 1700,
       temperature: 0.4,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<any>(resp.content);
 

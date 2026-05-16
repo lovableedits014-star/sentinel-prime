@@ -1,11 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.76.1';
 import { z } from 'npm:zod@3.23.8';
 import { getClientLLMConfig, callLLM, type LLMMessage } from '../_shared/llm-router.ts';
+import { getCorrelationId, getRequestId, type TelemetryContext } from '../_shared/telemetry.ts';
 import { applyHeuristicGuard } from '../_shared/sentiment-heuristics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-correlation-id, x-request-id',
 };
 
 const RequestSchema = z.object({
@@ -73,6 +74,14 @@ Deno.serve(async (req) => {
 
     // Get LLM config for this client
     const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabaseClient,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'analyze-sentiment',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     console.log(`📡 Using LLM provider: ${llmConfig.provider} for sentiment analysis`);
 
     // Get political context
@@ -203,7 +212,7 @@ COMENTÁRIO: "${text}"`,
       messages,
       maxTokens: 40,
       temperature: 0,
-    });
+    }, telemetryCtx);
 
     const raw = response.content.trim();
     // Try parsing JSON first
@@ -264,7 +273,7 @@ Responda APENAS: positive, negative ou neutral.`,
   ];
 
   try {
-    const response = await callLLM(llmConfig as any, { messages, maxTokens: 10, temperature: 0 });
+    const response = await callLLM(llmConfig as any, { messages, maxTokens: 10, temperature: 0 }, telemetryCtx);
     const result = response.content.toLowerCase().trim().replace(/[^a-z]/g, '');
     if (['positive', 'negative', 'neutral'].includes(result)) return applyHeuristicGuard(result as 'positive' | 'negative' | 'neutral', text, postMessage);
     if (result.includes('positive')) return applyHeuristicGuard('positive', text, postMessage);

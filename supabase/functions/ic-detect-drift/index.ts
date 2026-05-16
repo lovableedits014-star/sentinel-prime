@@ -5,6 +5,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse, parseLooseJson } from "../_shared/ic-utils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -193,7 +194,7 @@ Deno.serve(async (req) => {
           ],
           temperature: 0.3,
           maxTokens: 800,
-        });
+        }, telemetryCtx);
         const parsed = parseLooseJson<any>(resp.content);
         if (!parsed?.mudou || parsed?.tipo === "estavel") continue;
 

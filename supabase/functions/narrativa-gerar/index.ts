@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, callLLMRaw, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { parseLooseJson } from "../_shared/ic-utils.ts";
 
 const corsHeaders = {
@@ -818,14 +819,14 @@ USE estes números para amarrar a bandeira do candidato (autismo) à realidade l
           ...llmConfig,
           model: /8b|mixtral/i.test(llmConfig.model) ? "llama-3.3-70b-versatile" : llmConfig.model,
         };
-        const aiText = await callLLM(groqCfg, { messages, maxTokens: 7000, temperature: 0.4 });
+        const aiText = await callLLM(groqCfg, { messages, maxTokens: 7000, temperature: 0.4 }, telemetryCtx);
         conteudos = normalizeConteudos(parseLooseJson(aiText.content));
       } else {
         const aiJson = await callLLMRaw(llmConfig, {
           messages,
           tools: [TOOL_SCHEMA],
           tool_choice: { type: "function", function: { name: "gerar_pacote_narrativa" } },
-        });
+        }, telemetryCtx);
         const tcArgs = aiJson?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
         if (!tcArgs) throw new Error("IA não retornou tool_call estruturada");
         conteudos = normalizeConteudos(JSON.parse(tcArgs));

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse, parseLooseJson } from "../_shared/ic-utils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -76,6 +77,14 @@ Deno.serve(async (req) => {
     }
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-detect-contradictions',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     const resp = await callLLM(llmConfig, {
       messages: [
         { role: "system", content: SYSTEM },
@@ -83,7 +92,7 @@ Deno.serve(async (req) => {
       ],
       maxTokens: 4000,
       temperature: 0.2,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<{ contradicoes: any[] }>(resp.content);
     const valid = (parsed.contradicoes || []).filter((c) =>
