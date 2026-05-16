@@ -206,6 +206,14 @@ Deno.serve(async (req) => {
         await admin.auth.admin.updateUserById(target.user_id, { ban_duration: "none" }).catch(() => {});
       }
 
+      await logSecurityEvent(admin, {
+        event_type: "team_member_updated",
+        user_id: caller.id,
+        target_user_id: target.user_id,
+        client_id: target.client_id,
+        metadata: { patch_keys: Object.keys(patch), password_changed: typeof password === "string" && password.length > 0, status_change: status ?? null },
+        ...extractRequestMeta(req),
+      });
       return json({ success: true });
     }
 
