@@ -57,6 +57,8 @@ type TierConfig = { provider: LLMProvider | 'lovable'; apiKey: string; model: st
 
 const emptyTier = (): TierConfig => ({ provider: 'lovable', apiKey: '', model: '', isConfigured: false });
 
+type ProviderCardStatus = 'untested' | 'testing' | 'ok' | 'error';
+
 type ProviderCard = {
   id: string;
   provider: LLMProvider; // never 'lovable' here — lovable is the implicit fallback
@@ -64,6 +66,9 @@ type ProviderCard = {
   apiKey: string;
   isConfigured: boolean;
   tiers: Record<TierKey, boolean>;
+  status: ProviderCardStatus;
+  statusMessage: string;
+  testedAt: number | null;
 };
 
 const emptyTierFlags = (): Record<TierKey, boolean> => ({
@@ -78,6 +83,30 @@ const mergeTierFlags = (a: Record<TierKey, boolean>, b: Record<TierKey, boolean>
   reasoning: a.reasoning || b.reasoning,
   deep: a.deep || b.deep,
 });
+
+// Map raw provider errors → friendly Portuguese messages
+const humanizeLLMError = (raw: string): string => {
+  const msg = (raw || '').toLowerCase();
+  if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key') || msg.includes('api key')) {
+    return 'API key inválida ou sem permissão.';
+  }
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('quota')) {
+    return 'Limite de requisições excedido — tente novamente em alguns segundos.';
+  }
+  if (msg.includes('402') || msg.includes('credit') || msg.includes('billing')) {
+    return 'Créditos esgotados ou problema de billing no provider.';
+  }
+  if (msg.includes('model') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('invalid'))) {
+    return 'Modelo inexistente ou indisponível para esta conta.';
+  }
+  if (msg.includes('timeout') || msg.includes('etimedout')) {
+    return 'Timeout — o provider demorou a responder.';
+  }
+  if (msg.includes('network') || msg.includes('fetch failed') || msg.includes('econnrefused')) {
+    return 'Provider indisponível no momento.';
+  }
+  return raw || 'Falha desconhecida na conexão.';
+};
 
 interface IntegrationsPanelProps {
   clientId: string;
