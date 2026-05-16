@@ -1,93 +1,87 @@
-## Diagnóstico — por que está quebrando depois do multiusuário
+## Contexto da auditoria (já levantado)
 
-Mapeei como cada página descobre o `client_id` do usuário logado. Achei a causa raiz:
+- **Sem pagamentos:** não há Stripe/Mercado Pago. A seção "Blindagem de Pagamentos" do material **não se aplica** — ignorar para não introduzir risco desnecessário.
+- **Roles OK:** `user_roles` + `app_role` enum + `has_role()` + `is_super_admin()` SECURITY DEFINER já seguem o padrão recomendado. **Não vamos refatorar.**
+- **Gate Super Admin OK:** `SuperAdmin.tsx` já valida via `supabase.rpc("is_super_admin")` no servidor.
+- **Sem segredos em VITE_:** apenas URL/PUBLISHABLE_KEY/PROJECT_ID.
+- **RLS:** padrão `is_super_admin() OR user_can_access_client(client_id)` já adotado nas migrations recentes.
+- **`dangerouslySetInnerHTML`:** só em `ui/chart.tsx` (shadcn, seguro).
 
-**O `client_id` é resolvido manualmente em ~30 páginas, cada uma com regras diferentes.** Só 6 lugares usam o helper centralizado `resolveClientId()` (que respeita a “impersonação” do super admin):
+O que precisa endurecer de verdade:
+1. **77 Edge Functions** sem garantia uniforme de auth + validação Zod.
+2. Rotas autenticadas dependem só do `DashboardLayout` (sem `ProtectedRoute` explícito).
+3. Tabelas que o linter pode acusar de RLS frouxa/ausente.
+4. Falta telemetria de eventos sensíveis (mudança de role, acesso negado).
 
-- Usam `resolveClientId()`: `Comments`, `Settings`, `Eleicao`, `InteligenciaEleitoral`, `InteligenciaConteudo`, `SugestoesPanel`.
-- Fazem cópia/colagem do `getUser → clients → team_members`: `Dashboard`, `Pessoas`, `Disparos`, `Campanha`, `Funcionarios`, `Militancia`, `Territorial`, `MissoesIA`, `Engagement`, `ControlePresenca`, `CalendarioPolitico`, `Midia`, `StatusWhatsApp`, `Integrations`, `Recrutamento`, `Contratados`, `PessoaPerfil`, vários componentes de `inteligencia/*` etc.
+## Princípio inegociável: zero quebra
 
-Isso explica exatamente os sintomas:
+- Toda onda é **aditiva** (adiciona guardas, não remove).
+- Antes de cada commit: `bun run test` + `bun run test:coverage` precisam continuar verdes.
+- Mudanças em RLS: **uma tabela por migration**, com rollback SQL no comentário.
+- Edge Functions: novo Zod entra em **modo warn-only** por 48h antes de virar 400 bloqueante.
+- Nada de renomear env var, deletar tabela ou mudar contrato de Edge Function existente.
 
-1. **Super admin trocando de gerente só funciona em algumas abas.** Nas outras o `localStorage` da impersonação é ignorado → ele vê “sem dados” ou dados do cliente errado.
-2. **Super admin sem gerente selecionado fica sem `clientId`** em quase todas as páginas → consultas com `client_id=null` retornam vazio (ou estouram em `clientId!`), parecendo “bug de renderização”.
-3. **Filtros inconsistentes em `team_members`** entre páginas (umas filtram `status='active'`, outras não; umas pegam `maybeSingle()` sem ordenar). Usuário multi‑role pode cair no vínculo errado em uma aba e no certo em outra.
-4. **Caches do React Query não invalidam juntos** quando o super admin troca de gerente — o switcher faz `window.location.reload()`, mas páginas que guardam `clientId` em `useState` (sem `useQuery` chaveado por ele) só atualizam no reload. Após uma navegação interna, o estado some e cada página refaz a descoberta sozinha → flicker, queries duplicadas, “não carrega”.
-5. **Race condition**: queries disparam com `clientId=null` e depois reexecutam quando o id chega; algumas usam `clientId!` (non‑null assertion) e quebram em runtime quando o id é `null`.
-6. **`useCurrentClientId` (hook em `src/hooks/ic/`) NÃO respeita a impersonação** — diverge do `resolveClientId()`. Quem usa esse hook fica fora de sincronia com quem usa o helper.
-7. **Sem guarda para super admin sem cliente** — quando o switcher está em “Nenhum (Super Admin)” todas as páginas tentam carregar com `clientId=null` e mostram telas vazias/erros, sem nenhuma mensagem clara.
+---
 
-## Plano de correção
+## Onda 1 — Auditoria (zero risco, somente leitura)
 
-### 1) Fonte única da verdade para o `client_id`
+Gerar em `docs/security/`:
+- `security-baseline.md` — saída de `supabase--run_security_scan` + `supabase--linter` + `get_table_schema`, com cada tabela classificada (owner-scoped / multi-tenant / pública intencional).
+- `edge-functions-audit.csv` — uma linha por função em `supabase/functions/*`: `auth_required`, `validates_input`, `uses_service_role`, `returns_pii`, `risco`.
+- `routes-audit.md` — cada rota em `src/App.tsx` classificada (pública / autenticada / admin / portal-por-token) e qual gate a protege hoje.
 
-Criar `src/hooks/useActiveClientId.ts` (React Query) que devolve `{ clientId, isLoading, isSuperAdmin, needsClientSelection }` e:
+Saída: nenhum arquivo do app é alterado. Resultado é a lista priorizada para as ondas seguintes.
 
-- Reaproveita a lógica do `resolveClientId()` (super admin com impersonação → owner em `clients` → `team_members` ativo).
-- Tem **uma query key estável** (`["active-client-id"]`) para que o switcher invalide tudo de uma vez via `queryClient.invalidateQueries({ queryKey: ["active-client-id"] })` — sem `window.location.reload()`.
-- Expõe `needsClientSelection = isSuperAdmin && !clientId` para a UI mostrar um aviso “Selecione um gerente para visualizar os dados”.
+## Onda 2 — Defesa em profundidade nas rotas (frontend, aditivo)
 
-Substituir `useCurrentClientId` (em `src/hooks/ic/`) por um re‑export desse novo hook, mantendo o nome para não quebrar imports.
+- Criar `src/components/AuthGate.tsx` e `src/components/RequireRole.tsx` (novos, não removem nada).
+- Envolver `/super-admin` com `<RequireRole role="admin">` **em paralelo** ao gate existente.
+- Ocultar o item de menu `/super-admin` no `DashboardLayout` via consulta a `is_super_admin` reaproveitando `useActiveClientId.isSuperAdmin` (sem novo RPC).
+- Validar: suíte Vitest + troca manual de perfil no preview.
 
-### 2) Atualizar o helper e o switcher
+Risco: baixíssimo (só reforça).
 
-- `resolveClientId()` continua existindo (para chamadas fora de React, ex.: edge calls). Vai apenas chamar a mesma lógica internamente para ficar 1‑pra‑1 com o hook.
-- `SuperAdminClientSwitcher` deixa de fazer `window.location.reload()` e passa a fazer só `queryClient.invalidateQueries()`. Mais rápido, e funciona em todas as abas.
+## Onda 3 — Padronizar Edge Functions
 
-### 3) Migrar todas as páginas para o hook
+1. Em `supabase/functions/_shared/`: adicionar `validate.ts` (Zod helper que devolve 400 genérico) e `auth.ts` (`requireAuth(req)` validando JWT via `supabaseAdmin.auth.getUser(token)`). Reaproveitar o que já existir em `_shared/`.
+2. Aplicar em **lotes de 5 funções**, priorizadas pelo CSV da Onda 1 (maior risco primeiro: `manage-platform-user`, `create-team-user`, `eleicao-create-account`, `manage-whatsapp-instance`, `register-*`).
+3. **Modo warn-only por 48h** em cada lote: schema valida e loga `console.warn`, não bloqueia. Após 48h sem warns → ativar 400.
+4. Funções intencionalmente públicas (portais por `clientId`, `whatsapp-inbound-webhook`) recebem comentário no topo marcando como pública e validação de assinatura/HMAC quando aplicável.
 
-Para cada arquivo da lista “fazem cópia/colagem”, remover o bloco manual de `getUser → clients/team_members` e usar:
+Risco: médio, mitigado pelo warn-only e lotes pequenos.
 
-```tsx
-const { data: clientId, isLoading: loadingClient } = useActiveClientId();
-```
+## Onda 4 — RLS hardening dirigido pelo linter
 
-E gatear toda `useQuery`/efeito de fetch com `enabled: !!clientId`. Substituir `clientId!` por verificações reais.
+- Rodar `supabase--linter` + reler `security-baseline.md`.
+- Cada finding **error** → migration nominada via `supabase--migration` (uma tabela por migration).
+- Tabelas sem RLS que deveriam ter → habilitar RLS + policy padrão `is_super_admin() OR user_can_access_client(client_id)`.
+- Tabelas intencionalmente públicas → manter + registrar em `security--update_memory` para o scanner parar de acusar.
+- Antes de cada migration: SELECT representativo no preview + suíte E2E Playwright (já criada) como sanity check.
 
-Arquivos a tocar (sem mudar a UI nem regras de negócio):
-`Dashboard`, `Pessoas`, `Disparos`, `Campanha`, `Funcionarios`, `Militancia`, `Territorial`, `MissoesIA`, `Engagement`, `ControlePresenca`, `CalendarioPolitico`, `Midia`, `StatusWhatsApp`, `Integrations`, `Recrutamento`, `Contratados`, `PessoaPerfil`, `components/engagement/AIMissionsPanel`, `components/inteligencia/narrativa/NarrativaPolitica`, `components/inteligencia/PulsoPolitico`, `components/pessoas/TimelinePolitica`, `components/pessoas/InteracoesTimeline`, `components/calendario/PromptArteButton`, `components/inteligencia-conteudo/IngestDocumentDialog`.
+Risco: este é o ponto mais sensível. Mitigação: uma tabela por vez + rollback SQL incluso.
 
-### 4) Guarda visual para super admin sem cliente
+## Onda 5 — Telemetria e segredos
 
-Num componente compartilhado (ex.: `RequireClient`) usado dentro do `DashboardLayout` em volta do `<Outlet/>`:
+- Tabela `security_events` (insert-only, RLS deny-all exceto service role) com `event_type`, `user_id`, `metadata`, `at`. Funções sensíveis gravam `role_changed`, `permission_denied`, `admin_action`.
+- Hook `useSecurityLog` (complemento client-side, não substitui auditoria server-side).
+- `fetch_secrets` para confirmar que nenhuma chave privada está prefixada `VITE_`. Se encontrar, migrar para segredo runtime **antes** de remover do client.
 
-- Se `needsClientSelection`, renderiza um card amigável: “Você é Super Admin. Selecione um gerente no topo da barra lateral para visualizar os dados deste módulo.”
-- Para usuários comuns sem `clientId` (caso raro), mostra mensagem de “sem vínculo ativo”.
+## Critérios de aceitação
 
-Isso elimina as telas em branco e os erros silenciosos.
+- `bun run test` continua verde (27/27 atuais + novos testes de role/gate).
+- `bun run test:coverage` ≥ thresholds atuais.
+- `supabase--linter` retorna **0 errors**.
+- Nenhuma rota autenticada renderiza sem checagem server-side.
+- 100% das Edge Functions com Zod + auth explícita (ou marcação "público intencional" com verificação de assinatura).
+- `docs/security/security-baseline.md` versionado.
 
-### 5) Padronizar query keys
+## O que **não** vamos fazer
 
-Toda `useQuery` de dados do cliente deve incluir `clientId` na key (ex.: `["pessoas", clientId]`). Assim o switch de gerente refetcha automaticamente em todas as abas abertas e o cache do gerente anterior fica isolado (não “vaza” quando volta).
+- Não vamos adicionar checkout/Stripe (sistema não tem cobrança).
+- Não vamos trocar `react-router-dom` por TanStack Router só por segurança.
+- Não vamos refatorar `user_roles`/`is_super_admin` (já correto).
+- Não vamos esconder rotas via code-splitting "para esconder do navegador" (segurança por obscuridade — o gate server-side é o controle real).
 
-### 6) Corrigir consultas a `team_members` em todo lugar
+---
 
-Padronizar:
-```ts
-.from("team_members").select("client_id")
-.eq("user_id", uid).eq("status", "active")
-.order("created_at", { ascending: false })
-.limit(1).maybeSingle()
-```
-Isso resolve o caso de membros com mais de uma associação ou com vínculos antigos inativos pegando precedência.
-
-### 7) Verificação
-
-Após aplicar:
-- Login como super admin: trocar gerente no switcher → todas as abas atualizam sem reload.
-- Login como gerente comum (owner em `clients`): tudo funciona como hoje.
-- Login como `team_member` com `allowed_paths` parciais: páginas permitidas carregam; bloqueadas redirecionam com toast (já está no `DashboardLayout`).
-- Super admin sem gerente selecionado: vê o aviso “Selecione um gerente”, sem telas em branco.
-
-## Detalhes técnicos (para referência)
-
-- `src/lib/resolveClientId.ts` continua, mas vira um wrapper de uma função pura (`resolveClientIdFor(userId)`) reutilizada pelo `useActiveClientId`.
-- `useActiveClientId` usa `staleTime: 5 * 60_000` e `gcTime: 30 * 60_000`; é invalidado por: (a) switcher do super admin, (b) `onAuthStateChange` quando o `user.id` muda.
-- Páginas hoje guardam `clientId` em `useState` + `useEffect`; vão passar a derivar do hook (sem `useEffect` próprio para isso).
-- Não tocaremos em RLS nem em edge functions neste passo — o problema é puramente de resolução do `client_id` no frontend.
-
-## Fora do escopo
-
-- Mudanças no menu/permissões granulares (continua igual).
-- Refatorar lógica de negócio das páginas; só troco como elas obtêm o `client_id`.
-- Edge functions (já recebem `client_id` via body/JWT, e isso não é o que está quebrando).
+**Plano de execução proposto:** começar pela Onda 1 (zero risco) para gerar a baseline. Cada onda seguinte só inicia após sua revisão da anterior.
