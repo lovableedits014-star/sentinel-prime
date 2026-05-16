@@ -348,7 +348,9 @@ export function useContratadosData() {
   useEffect(() => {
     void load(0);
     return () => clearRetryTimer();
-  }, [load, clearRetryTimer]);
+    // Re-run when the impersonated client switches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, clearRetryTimer, activeClientId]);
 
   return { clientId, clientName, contratados, setContratados, indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, diagnostics, reload };
 }
