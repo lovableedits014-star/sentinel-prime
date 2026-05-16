@@ -57,6 +57,10 @@ Deno.serve(async (req) => {
     const { clientId, replace = true } = (await req.json()) as Req;
     if (!clientId) return errorResponse("clientId obrigatório", 400);
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: docs, error } = await supabase

@@ -21,12 +21,14 @@ interface Body {
   };
 }
 
-async function callIcFn(name: string, payload: any) {
+async function callIcFn(name: string, authHeader: string, payload: any) {
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      // Encaminha o token do usuário autenticado para que a function alvo
+      // possa validar tenant via requireClientAccess.
+      Authorization: authHeader,
       apikey: SERVICE_KEY,
     },
     body: JSON.stringify(payload),
@@ -61,6 +63,11 @@ Deno.serve(async (req) => {
       return errorResponse("clientId e transcriptionId são obrigatórios", 400);
     }
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+    const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: tr, error: trErr } = await admin
@@ -87,7 +94,7 @@ Deno.serve(async (req) => {
 
     if (regenerateMemory) {
       try {
-        const extract = await callIcFn("ic-extract-knowledge", {
+        const extract = await callIcFn("ic-extract-knowledge", userAuthHeader, {
           clientId,
           sourceType: "transcription",
           sourceId: transcriptionId,
@@ -118,7 +125,7 @@ Deno.serve(async (req) => {
       if (!ids.includes(transcriptionId)) ids.push(transcriptionId);
 
       try {
-        const out = await callIcFn("ic-write-materia", {
+        const out = await callIcFn("ic-write-materia", userAuthHeader, {
           clientId,
           tipo: materia?.tipo || cur?.tipo || "press_release",
           tom: materia?.tom || cur?.tom || "jornalistico",
@@ -139,7 +146,7 @@ Deno.serve(async (req) => {
       }
     } else if (generateMateria) {
       try {
-        const out = await callIcFn("ic-write-materia", {
+        const out = await callIcFn("ic-write-materia", userAuthHeader, {
           clientId,
           tipo: materia?.tipo || "press_release",
           tom: materia?.tom || "jornalistico",

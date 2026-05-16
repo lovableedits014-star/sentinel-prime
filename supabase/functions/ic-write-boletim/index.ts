@@ -52,6 +52,10 @@ Deno.serve(async (req) => {
 
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+
     const today = new Date();
     const sevenAgo = new Date(today.getTime() - 7 * 86400000);
     const sinceIso = startOfDay(since || sevenAgo.toISOString());

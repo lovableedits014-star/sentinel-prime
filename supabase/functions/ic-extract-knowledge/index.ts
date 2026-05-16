@@ -332,6 +332,10 @@ Deno.serve(async (req) => {
     if (!sourceType) return errorResponse("sourceType é obrigatório", 400);
     if (!text || text.trim().length < 30) return jsonResponse({ extracted: 0, skipped: "texto curto demais" });
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const baseConfig = await getClientLLMConfig(admin, clientId);
     const llmConfig = {

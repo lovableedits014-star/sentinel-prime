@@ -570,6 +570,11 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (dErr || !dossie) throw new Error("Dossiê não encontrado");
 
+    // Tenant guard: usuário precisa ter acesso ao client_id do dossiê
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, dossie.client_id);
+    if (!guard.ok) return guard.response;
+
     // Provedor de IA central (Settings → Provedor de IA)
     let llmConfig;
     try {

@@ -249,10 +249,16 @@ const Integrations = () => {
       return;
     }
 
+    if (!clientId) {
+      toast.error("Cliente não identificado — não é possível testar a conexão");
+      return;
+    }
+
     setTestingLLM(true);
     try {
       const { data, error } = await supabase.functions.invoke('test-llm-connection', {
         body: {
+          clientId,
           provider: llmData.provider,
           apiKey: llmData.apiKey,
           model: llmData.model,

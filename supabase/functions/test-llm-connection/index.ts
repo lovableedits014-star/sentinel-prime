@@ -1,13 +1,18 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.76.1';
 import { z } from 'npm:zod@3.23.8';
 import { callLLM, type LLMConfig, type LLMMessage } from '../_shared/llm-router.ts';
+import { requireClientAccess } from '../_shared/auth-guard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const RequestSchema = z.object({
+  // clientId é OBRIGATÓRIO: garante que o usuário só testa keys dentro de um
+  // tenant ao qual ele tem acesso (owner ou team_member). Sem isso, qualquer
+  // usuário autenticado poderia "pingar" providers e disparar custo arbitrário.
+  clientId: z.string().uuid(),
   provider: z.enum(['groq', 'openai', 'anthropic', 'gemini', 'mistral', 'cohere', 'lovable']),
   apiKey: z.string().min(1),
   model: z.string().optional(),
@@ -19,31 +24,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const body = RequestSchema.parse(await req.json());
-    const { provider, apiKey, model } = body;
+    const { clientId, provider, apiKey, model } = body;
+
+    // Tenant guard: valida JWT do usuário + acesso ao clientId informado.
+    // Bloqueia qualquer tentativa cross-tenant de testar credenciais.
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
 
     const defaultModels: Record<string, string> = {
       lovable: 'google/gemini-2.5-flash',
@@ -65,15 +52,13 @@ Deno.serve(async (req) => {
       { role: 'user', content: 'Responda apenas com a palavra "conectado" para confirmar a conexão.' },
     ];
 
-    console.log(`🔄 Testing connection to ${provider}...`);
+    console.log(`🔄 [test-llm-connection] client=${clientId} provider=${provider}`);
 
     const response = await callLLM(llmConfig, {
       messages,
       maxTokens: 20,
       temperature: 0,
     });
-
-    console.log(`✅ Connection to ${provider} successful`);
 
     return new Response(
       JSON.stringify({
@@ -85,18 +70,18 @@ Deno.serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
     console.error('Error testing LLM connection:', error);
-    const errorMessage = error instanceof z.ZodError 
-      ? 'Dados inválidos'
-      : error instanceof Error 
-      ? error.message
-      : 'Erro desconhecido';
-    
-    return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const errorMessage =
+      error instanceof z.ZodError
+        ? 'Dados inválidos (clientId/provider/apiKey obrigatórios)'
+        : error instanceof Error
+        ? error.message
+        : 'Erro desconhecido';
+
+    return new Response(JSON.stringify({ success: false, error: errorMessage }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
