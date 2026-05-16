@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
-import { resolveClientId, getImpersonatedClientId } from "@/lib/resolveClientId";
+import { resolveClientId, getImpersonatedClientId, IMPERSONATE_CLIENT_KEY } from "@/lib/resolveClientId";
 import { logTelemetry } from "@/lib/client-telemetry";
 
 export const ACTIVE_CLIENT_QUERY_KEY = ["active-client-id"] as const;
