@@ -426,6 +426,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     const body = await req.json();
+    validateInput(ManageWhatsappSchema, body, { fn: "manage-whatsapp-instance" });
     const { action, phone, message, client_id, name, instance_id, apelido, bridge_url, bridge_api_key, is_active, status: newStatus, media, mimetype, filename, caption } = body;
     const cronRequested = action === "health_check_all";
     if (!authHeader && !cronRequested) {
