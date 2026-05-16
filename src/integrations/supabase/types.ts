@@ -3009,16 +3009,21 @@ export type Database = {
         Row: {
           client_id: string
           completion_tokens: number | null
+          correlation_id: string | null
           created_at: string
           error_code: string | null
           error_message: string | null
+          error_type: string | null
+          estimated_cost_usd: number | null
           function_name: string
           id: string
           latency_ms: number | null
           model: string
+          parent_function: string | null
           prompt_tokens: number | null
           provider: string
           request_id: string
+          retries: number
           success: boolean
           tier: string
           total_tokens: number | null
@@ -3027,16 +3032,21 @@ export type Database = {
         Insert: {
           client_id: string
           completion_tokens?: number | null
+          correlation_id?: string | null
           created_at?: string
           error_code?: string | null
           error_message?: string | null
+          error_type?: string | null
+          estimated_cost_usd?: number | null
           function_name: string
           id?: string
           latency_ms?: number | null
           model: string
+          parent_function?: string | null
           prompt_tokens?: number | null
           provider: string
           request_id: string
+          retries?: number
           success: boolean
           tier: string
           total_tokens?: number | null
@@ -3045,16 +3055,21 @@ export type Database = {
         Update: {
           client_id?: string
           completion_tokens?: number | null
+          correlation_id?: string | null
           created_at?: string
           error_code?: string | null
           error_message?: string | null
+          error_type?: string | null
+          estimated_cost_usd?: number | null
           function_name?: string
           id?: string
           latency_ms?: number | null
           model?: string
+          parent_function?: string | null
           prompt_tokens?: number | null
           provider?: string
           request_id?: string
+          retries?: number
           success?: boolean
           tier?: string
           total_tokens?: number | null
@@ -6915,6 +6930,7 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: string
       }
+      purge_llm_usage_log: { Args: { p_days?: number }; Returns: number }
       recompute_militant: {
         Args: {
           p_client_id: string
