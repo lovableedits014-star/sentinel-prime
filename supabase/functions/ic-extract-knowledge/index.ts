@@ -502,7 +502,7 @@ Deno.serve(async (req) => {
       if (hasBairros || hasPessoas) {
         fetch(`${SUPABASE_URL}/functions/v1/ic-suggest-dispatches`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
           body: JSON.stringify({ clientId, knowledgeIds: insertedRows.map((r) => r.id) }),
         }).catch((e) => console.error("[ic-extract-knowledge] suggest fire failed:", e));
       }
