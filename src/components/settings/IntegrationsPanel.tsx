@@ -134,8 +134,11 @@ const humanizeLLMError = (raw: string): string => {
   if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key') || msg.includes('api key')) {
     return 'API key inválida ou sem permissão.';
   }
+  if (msg.includes('quota zero') || msg.includes('resource_exhausted') || msg.includes('quota_limit_value')) {
+    return 'Quota zero nesta API key. Ative billing no Google Cloud e habilite a Generative Language API.';
+  }
   if (msg.includes('429') || msg.includes('rate limit') || msg.includes('quota')) {
-    return 'Limite de requisições excedido — tente novamente em alguns segundos.';
+    return 'Limite de requisições por minuto excedido — aguarde alguns segundos.';
   }
   if (msg.includes('402') || msg.includes('credit') || msg.includes('billing')) {
     return 'Créditos esgotados ou problema de billing no provider.';
