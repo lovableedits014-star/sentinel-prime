@@ -259,6 +259,61 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     }));
   };
 
+  // -------- Provider-first card helpers (hybrid UX) --------
+  const updateCard = (id: string, patch: Partial<ProviderCard>) => {
+    setProviderCards(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)));
+  };
+
+  const changeCardProvider = (id: string, provider: LLMProvider) => {
+    setProviderCards(prev => {
+      // If another card already uses this provider, merge tiers & remove the duplicate
+      const existing = prev.find(c => c.id !== id && c.provider === provider);
+      const next = prev.map(c => {
+        if (c.id !== id) return c;
+        return {
+          ...c,
+          provider,
+          model: DEFAULT_MODELS[provider]?.default || '',
+          apiKey: '',
+          isConfigured: existing?.isConfigured ?? false,
+          tiers: existing ? { ...c.tiers, ...mergeTierFlags(c.tiers, existing.tiers) } : c.tiers,
+        };
+      });
+      return existing ? next.filter(c => c.id !== existing.id) : next;
+    });
+  };
+
+  const toggleCardTier = (id: string, tier: TierKey, on: boolean) => {
+    setProviderCards(prev => prev.map(c => {
+      if (c.id === id) return { ...c, tiers: { ...c.tiers, [tier]: on } };
+      // Tier is exclusive across providers — turn it off on every other card
+      if (on && c.tiers[tier]) return { ...c, tiers: { ...c.tiers, [tier]: false } };
+      return c;
+    }));
+  };
+
+  const addCard = () => {
+    const used = new Set(providerCards.map(c => c.provider));
+    const next = SELECTABLE_PROVIDERS.find(p => !used.has(p.value));
+    if (!next) {
+      toast.info('Todos os providers já foram adicionados.');
+      return;
+    }
+    setProviderCards(prev => [...prev, {
+      id: crypto.randomUUID(),
+      provider: next.value,
+      model: DEFAULT_MODELS[next.value]?.default || '',
+      apiKey: '',
+      isConfigured: false,
+      tiers: emptyTierFlags(),
+    }]);
+  };
+
+  const removeCard = (id: string) => {
+    setProviderCards(prev => prev.filter(c => c.id !== id));
+  };
+
+
   const updateTier = (tier: TierKey, patch: Partial<TierConfig>) => {
     setTiers(prev => ({ ...prev, [tier]: { ...prev[tier], ...patch } }));
   };
