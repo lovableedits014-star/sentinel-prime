@@ -9,7 +9,7 @@ interface Body {
   transcriptionId: string;
   provider?: string;     // override (groq, openai, anthropic, gemini, mistral, cohere, lovable)
   model?: string;        // override de modelo
-  apiKey?: string;       // opcional: chave temporária do override
+  // apiKey REMOVIDO — apiKey vem exclusivamente de integrations do client validado
   reprocessMateriaId?: string; // se informado, regenera UMA matéria existente
   regenerateMemory?: boolean;  // default true — re-extrai conhecimento da transcrição inteira
   generateMateria?: boolean;
