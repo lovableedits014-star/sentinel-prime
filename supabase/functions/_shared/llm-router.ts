@@ -133,7 +133,7 @@ export async function callLLMRaw(
 ): Promise<any> {
   if (!OPENAI_COMPATIBLE.includes(config.provider)) {
     const err: any = new Error(
-      `Provedor "${config.provider}" não suporta tool calling. Use OpenAI, Groq, Mistral ou Lovable AI nas Configurações.`,
+      `Provedor "${config.provider}" não suporta tool calling. Use OpenAI, Groq, Gemini, Mistral ou Lovable AI nas Configurações.`,
     );
     err.status = 400;
     throw err;
@@ -142,22 +142,43 @@ export async function callLLMRaw(
   const usesTools = Array.isArray((body as any).tools) && (body as any).tools.length > 0;
   const effectiveModel = usesTools ? pickToolsCapableModel(config.provider, config.model) : config.model;
   const endpoint = PROVIDER_ENDPOINTS[config.provider];
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ model: effectiveModel, ...body }),
-  });
-  if (!resp.ok) {
-    const txt = await resp.text();
-    const err: any = new Error(`${config.provider} error: ${resp.status} - ${txt}`);
-    err.status = resp.status;
-    err.providerBody = txt;
-    throw err;
+
+  const maxAttempts = 4;
+  let lastErrText = '';
+  let lastStatus = 0;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: effectiveModel, ...body }),
+    });
+    if (resp.ok) return resp.json();
+
+    lastStatus = resp.status;
+    lastErrText = await resp.text();
+    if ([429, 500, 502, 503, 504].includes(resp.status) && attempt < maxAttempts) {
+      let waitMs = 0;
+      const retryAfter = resp.headers.get('retry-after');
+      if (retryAfter) waitMs = Math.ceil(parseFloat(retryAfter) * 1000);
+      if (!waitMs) {
+        const m = lastErrText.match(/try again in ([\d.]+)s/i);
+        if (m) waitMs = Math.ceil(parseFloat(m[1]) * 1000);
+      }
+      if (!waitMs) waitMs = 1500 * attempt;
+      waitMs = Math.min(waitMs + 300, 15000);
+      console.log(`[${config.provider}] ${resp.status} retry ${attempt}/${maxAttempts - 1} em ${waitMs}ms`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    break;
   }
-  return resp.json();
+  const err: any = new Error(`${config.provider} error: ${lastStatus} - ${lastErrText}`);
+  err.status = lastStatus;
+  err.providerBody = lastErrText;
+  throw err;
 }
 
 /**
