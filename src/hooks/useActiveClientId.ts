@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { resolveClientId, getImpersonatedClientId } from "@/lib/resolveClientId";
+import { logTelemetry } from "@/lib/client-telemetry";
 
 export const ACTIVE_CLIENT_QUERY_KEY = ["active-client-id"] as const;
 
@@ -12,18 +13,35 @@ export interface ActiveClientInfo {
 }
 
 async function fetchActive(): Promise<ActiveClientInfo> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { clientId: null, isSuperAdmin: false, isImpersonating: false };
-
-  let isSuperAdmin = false;
+  const started = performance.now();
+  logTelemetry("resolve_started");
   try {
-    const { data } = await supabase.rpc("is_super_admin");
-    isSuperAdmin = data === true;
-  } catch {}
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      logTelemetry("resolve_finished", { clientId: null, reason: "no-user", ms: Math.round(performance.now() - started) });
+      return { clientId: null, isSuperAdmin: false, isImpersonating: false };
+    }
 
-  const clientId = await resolveClientId();
-  const isImpersonating = isSuperAdmin && !!getImpersonatedClientId() && !!clientId;
-  return { clientId, isSuperAdmin, isImpersonating };
+    let isSuperAdmin = false;
+    try {
+      const { data } = await supabase.rpc("is_super_admin");
+      isSuperAdmin = data === true;
+    } catch {}
+
+    const clientId = await resolveClientId();
+    const isImpersonating = isSuperAdmin && !!getImpersonatedClientId() && !!clientId;
+    logTelemetry("resolve_finished", {
+      clientId,
+      isSuperAdmin,
+      isImpersonating,
+      userId: user.id,
+      ms: Math.round(performance.now() - started),
+    });
+    return { clientId, isSuperAdmin, isImpersonating };
+  } catch (e: any) {
+    logTelemetry("resolve_error", { message: e?.message ?? String(e) });
+    throw e;
+  }
 }
 
 /**
