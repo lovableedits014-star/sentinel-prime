@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { getImpersonatedClientId, setImpersonatedClientId } from "@/lib/resolveClientId";
+import { logTelemetry } from "@/lib/client-telemetry";
 
 interface ClientRow {
   id: string;
@@ -37,10 +38,21 @@ export default function SuperAdminClientSwitcher() {
   const active = clients.find((c) => c.id === activeId) || null;
 
   const select = (id: string | null) => {
+    const previous = getImpersonatedClientId();
     setImpersonatedClientId(id);
     setActiveId(id);
-    // Invalidate ALL queries — the active-client-id key is the trigger so
-    // every page hook that depends on it (clientId) refetches with the new context.
+    logTelemetry(id ? "impersonation_set" : "impersonation_cleared", { from: previous, to: id });
+
+    // Snapshot every active query key BEFORE invalidating, so we can see what
+    // got reset when this switch happened (useful when a screen goes blank).
+    const snapshot = qc.getQueryCache().getAll().map(q => q.queryKey);
+    logTelemetry("queries_invalidated", {
+      reason: "client_switch",
+      to: id,
+      count: snapshot.length,
+      keys: snapshot.slice(0, 50), // cap to avoid console spam
+    });
+
     qc.invalidateQueries();
     toast.success(id ? "Visualizando como gerente selecionado" : "Modo super admin restaurado");
   };
