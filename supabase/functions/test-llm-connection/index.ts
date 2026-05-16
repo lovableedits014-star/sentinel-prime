@@ -1,11 +1,12 @@
 import { z } from 'npm:zod@3.23.8';
 import { callLLM, type LLMConfig, type LLMMessage } from '../_shared/llm-router.ts';
+import { getCorrelationId, getRequestId, type TelemetryContext } from '../_shared/telemetry.ts';
 import { requireClientAccess } from '../_shared/auth-guard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-correlation-id, x-request-id',
 };
 
 const RequestSchema = z.object({
