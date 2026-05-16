@@ -2,6 +2,7 @@
 // Permitido para: super admin OU gerente (is_manager=true) do mesmo client_id.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { validateInput, z } from "../_shared/validate.ts";
+import { logSecurityEvent, extractRequestMeta } from "../_shared/security-log.ts";
 
 const ManagePlatformUserSchema = z.object({
   action: z.enum(["create", "update", "delete", "list", "reset_password"]),
