@@ -106,7 +106,6 @@ Deno.serve(async (req) => {
           triggerSuggestions: false,
           providerOverride: provider,
           modelOverride: model,
-          apiKeyOverride: apiKey,
         });
         result.memory = extract;
       } catch (e: any) {
@@ -138,7 +137,6 @@ Deno.serve(async (req) => {
           salvarComo: "rascunho",
           providerOverride: provider,
           modelOverride: model,
-          apiKeyOverride: apiKey,
           reprocessMateriaId,
         });
         result.materia = out.saved;
@@ -159,7 +157,6 @@ Deno.serve(async (req) => {
           salvarComo: "rascunho",
           providerOverride: provider,
           modelOverride: model,
-          apiKeyOverride: apiKey,
         });
         result.materia = out.saved;
         result.materia_provider = out.provider;
