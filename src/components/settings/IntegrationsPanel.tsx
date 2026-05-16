@@ -424,6 +424,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       provider: next.value,
       model: DEFAULT_MODELS[next.value]?.default || '',
       apiKey: '',
+      savedApiKey: '',
       isConfigured: false,
       tiers: emptyTierFlags(),
       status: 'untested',
