@@ -300,12 +300,21 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
 
   // -------- Provider-first card helpers (hybrid UX) --------
   const updateCard = (id: string, patch: Partial<ProviderCard>) => {
-    setProviderCards(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)));
+    setProviderCards(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      // If anything operationally-meaningful changed, reset status to 'untested'
+      const invalidates =
+        ('provider' in patch && patch.provider !== c.provider) ||
+        ('model' in patch && patch.model !== c.model) ||
+        ('apiKey' in patch && (patch.apiKey ?? '').length > 0);
+      return invalidates && !('status' in patch)
+        ? { ...c, ...patch, status: 'untested', statusMessage: '' }
+        : { ...c, ...patch };
+    }));
   };
 
   const changeCardProvider = (id: string, provider: LLMProvider) => {
     setProviderCards(prev => {
-      // If another card already uses this provider, merge tiers & remove the duplicate
       const existing = prev.find(c => c.id !== id && c.provider === provider);
       const next = prev.map(c => {
         if (c.id !== id) return c;
@@ -316,6 +325,9 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           apiKey: '',
           isConfigured: existing?.isConfigured ?? false,
           tiers: existing ? { ...c.tiers, ...mergeTierFlags(c.tiers, existing.tiers) } : c.tiers,
+          status: 'untested' as ProviderCardStatus,
+          statusMessage: '',
+          testedAt: null,
         };
       });
       return existing ? next.filter(c => c.id !== existing.id) : next;
