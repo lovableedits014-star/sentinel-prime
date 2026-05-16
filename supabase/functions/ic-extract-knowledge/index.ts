@@ -8,12 +8,13 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 type SourceType = "transcription" | "post" | "comment" | "manual" | "pdf" | "url" | "manual_doc";
 
-const DOC_MODE_TYPES = new Set<SourceType>(["transcription", "pdf", "url", "manual_doc"]);
+const DOC_MODE_TYPES = new Set<SourceType>(["transcription", "pdf", "url", "manual_doc", "post"]);
 const TIPO_DOCUMENTO_MAP: Record<string, string> = {
   transcription: "transcricao",
   pdf: "pdf",
   url: "url",
   manual_doc: "nota_manual",
+  post: "post_social",
 };
 
 interface ExtractRequest {
