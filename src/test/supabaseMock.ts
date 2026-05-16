@@ -48,12 +48,22 @@ function buildQuery(table: string) {
       return { data: null, error: null };
     },
     then: (resolve: any) => {
-      // For non-maybeSingle (used by SuperAdminClientSwitcher list).
-      if (table === "clients" && !filters.id && !filters.user_id) {
+      // Array-form resolution (used by resolveClientId owner-check via .limit()).
+      if (table === "clients") {
+        if (filters.user_id) {
+          const row = state.clientsByUser[filters.user_id];
+          resolve({ data: row ? [row] : [], error: null });
+          return;
+        }
+        if (filters.id) {
+          const row = state.clientsById[filters.id];
+          resolve({ data: row ? [row] : [], error: null });
+          return;
+        }
         resolve({ data: Object.values(state.clientsById).filter(Boolean), error: null });
-      } else {
-        resolve({ data: [], error: null });
+        return;
       }
+      resolve({ data: [], error: null });
     },
   };
   return api;
