@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Users, UserPlus, TrendingUp, CalendarDays, MapPin, BarChart3, Clock } from "lucide-react";
