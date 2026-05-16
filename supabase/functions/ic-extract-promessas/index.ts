@@ -106,6 +106,11 @@ Deno.serve(async (req) => {
     const { clientId, documentId, limit = 50 } = body || {};
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
 
+    // Tenant guard: revalida acesso do usuário ao client_id alvo.
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     if (documentId) {
