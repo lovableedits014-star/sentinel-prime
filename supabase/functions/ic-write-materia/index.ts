@@ -20,7 +20,7 @@ interface WriteRequest {
   transcriptionIds?: string[]; // múltiplas transcrições-fonte combinadas com rastreabilidade
   providerOverride?: string;
   modelOverride?: string;
-  apiKeyOverride?: string;
+  // apiKeyOverride REMOVIDO — apiKey vem exclusivamente de integrations
   reprocessMateriaId?: string; // se informado, snapshota a versão atual e SOBRESCREVE a matéria
 }
 
