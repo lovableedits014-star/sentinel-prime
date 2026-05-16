@@ -131,6 +131,9 @@ const humanizeLLMError = (raw: string): string => {
   if (msg.includes('aborted') || msg.includes('aborterror') || msg.includes('timeout') || msg.includes('tempo limite')) {
     return 'Timeout — o provider demorou a responder.';
   }
+  if (msg.includes('sessão') || msg.includes('session') || msg.includes('forbidden') || msg.includes('sem acesso')) {
+    return 'Sessão expirada ou sem acesso ao cliente. Recarregue a página e tente novamente.';
+  }
   if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key') || msg.includes('api key')) {
     return 'API key inválida ou sem permissão.';
   }
@@ -179,6 +182,9 @@ const invokeFunctionWithTimeout = async <T,>(functionName: string, body: Record<
     const text = await response.text();
     const payload = text ? JSON.parse(text) : null;
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Sessão expirada ou sem acesso ao cliente');
+      }
       throw new Error(payload?.error || payload?.message || `Erro HTTP ${response.status}`);
     }
     return payload as T;
