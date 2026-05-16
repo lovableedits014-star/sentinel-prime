@@ -30,11 +30,15 @@ async function processClient(admin: any, cfg: any, triggeredBy: string) {
 
   try {
     if (cfg.resolve_invalid_ids) {
+      // Caller é cron/batch interno — autenticamos com CRON_SECRET (x-cron-token)
+      // para que resolve-supporter-profiles aceite a varredura sem JWT de usuário.
+      const cronSecret = Deno.env.get("CRON_SECRET") || "";
       const res = await fetch(`${SUPABASE_URL}/functions/v1/resolve-supporter-profiles`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SERVICE_ROLE}`,
+          "x-cron-token": cronSecret,
+          apikey: SERVICE_ROLE,
         },
         body: JSON.stringify({ client_id: cfg.client_id }),
       });
