@@ -39,6 +39,8 @@ async function processClient(admin: any, cfg: any, triggeredBy: string) {
           "Content-Type": "application/json",
           "x-cron-token": cronSecret,
           apikey: SERVICE_ROLE,
+          "x-correlation-id": `cron:autoresolve:${cfg.client_id}:${startedAt}`,
+          "x-request-id": crypto.randomUUID(),
         },
         body: JSON.stringify({ client_id: cfg.client_id }),
       });
