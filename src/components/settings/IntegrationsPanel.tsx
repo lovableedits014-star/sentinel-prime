@@ -345,6 +345,9 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       apiKey: '',
       isConfigured: false,
       tiers: emptyTierFlags(),
+      status: 'untested',
+      statusMessage: '',
+      testedAt: null,
     }]);
   };
 
