@@ -177,6 +177,7 @@ Deno.serve(async (req) => {
     const guard = await requireClientAccess(req, clientId);
     if (!guard.ok) return guard.response;
     const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+    const trace = tracingHeadersFromReq(req);
 
     const limit = Math.max(1, Math.min(body?.limit ?? 25, 100));
     const replace = !!body?.replace;
@@ -206,7 +207,7 @@ Deno.serve(async (req) => {
       let failed = 0;
       for (const post of toProcess) {
         try {
-          await callExtract(post, clientId, userAuthHeader);
+          await callExtract(post, clientId, userAuthHeader, trace);
           processed++;
         } catch (e: any) {
           failed++;
