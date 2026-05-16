@@ -88,7 +88,19 @@ Deno.serve(async (req) => {
 
     // Fallback: se nenhum bloco preenchido, passa null (comportamento padrão preservado)
     const customPrompt = promptSections.length > 0 ? promptSections.join('\n\n') : null;
-    console.log(`📝 Prompt blocks assembled: ${promptSections.length} section(s)`);
+    console.log('[generate-response] prompt loaded from database', {
+      clientId,
+      sections: promptSections.length,
+      hasLegacyPrompt: !!legacy,
+      blocks: {
+        tom_voz: typeof integration?.ai_prompt_tom_voz === 'string' ? integration.ai_prompt_tom_voz.trim() : '',
+        restricoes: typeof integration?.ai_prompt_restricoes === 'string' ? integration.ai_prompt_restricoes.trim() : '',
+        logica_comportamental: typeof integration?.ai_prompt_logica_comportamental === 'string' ? integration.ai_prompt_logica_comportamental.trim() : '',
+        regras_estruturais: typeof integration?.ai_prompt_regras_estruturais === 'string' ? integration.ai_prompt_regras_estruturais.trim() : '',
+        legacy,
+      },
+      assembledPrompt: customPrompt,
+    });
 
     if (commentError || !comment) {
       return new Response(
@@ -120,14 +132,15 @@ Deno.serve(async (req) => {
       comment.post_media_type,
       comment.author_name,
       customPrompt,
-      userGuidance
+      userGuidance,
+      telemetryCtx
     );
 
     // Auto-classify sentiment if not yet classified
     let sentiment = comment.sentiment;
     if (!sentiment) {
       try {
-        sentiment = await analyzeSentimentQuick(llmConfig, comment.text);
+        sentiment = await analyzeSentimentQuick(llmConfig, comment.text, telemetryCtx);
         console.log(`🎯 Auto-classified sentiment: ${sentiment}`);
       } catch (e) {
         console.warn('⚠️ Auto-sentiment failed (non-critical):', e);
@@ -184,7 +197,8 @@ async function generateResponse(
   postMediaType?: string,
   authorName?: string,
   customPrompt?: string | null,
-  userGuidance?: string
+  userGuidance?: string,
+  telemetryCtx?: TelemetryContext
 ): Promise<string> {
   const sentimentContext = sentiment === 'positive' 
     ? 'O comentário é POSITIVO. Agradeça de forma institucional e empática.'
@@ -232,25 +246,42 @@ ${sentimentContext}${postContext}${authorContext}${customInstructions}${guidance
   ];
 
   try {
-    console.log('📡 Calling LLM via router...');
+    console.log('[generate-response] final prompt sent to LLM', {
+      provider: llmConfig.provider,
+      model: llmConfig.model,
+      hasCustomPrompt: !!customPrompt,
+      systemPrompt,
+      userPrompt,
+    });
     const response = await callLLM(llmConfig as any, {
       messages,
       maxTokens: 200,
       temperature: 0.8,
     }, telemetryCtx);
 
-    console.log(`✅ Response generated via ${response.provider}`);
+    console.log('[generate-response] response generated without fallback', {
+      provider: response.provider,
+      model: response.model,
+      contentLength: response.content?.length ?? 0,
+      fallback: false,
+    });
     return response.content.trim();
     
   } catch (error) {
-    console.error('❌ LLM call failed:', error);
+    console.error('[generate-response] fallback activated', {
+      reason: error instanceof Error ? error.message : String(error),
+      provider: llmConfig.provider,
+      model: llmConfig.model,
+      hasCustomPrompt: !!customPrompt,
+    });
     return `Obrigado pelo seu comentário! Estamos analisando sua mensagem e retornaremos em breve.`;
   }
 }
 
 async function analyzeSentimentQuick(
   llmConfig: { provider: string; apiKey: string; model: string },
-  text: string
+  text: string,
+  telemetryCtx?: TelemetryContext
 ): Promise<string> {
   const messages: LLMMessage[] = [
     {
