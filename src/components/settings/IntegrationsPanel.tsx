@@ -108,6 +108,16 @@ const humanizeLLMError = (raw: string): string => {
   return raw || 'Falha desconhecida na conexão.';
 };
 
+function StatusDot({ status, compact = false }: { status: ProviderCardStatus; compact?: boolean }) {
+  const size = compact ? 'w-1.5 h-1.5' : 'w-2 h-2';
+  const cls =
+    status === 'ok' ? 'bg-emerald-500'
+    : status === 'error' ? 'bg-destructive'
+    : status === 'testing' ? 'bg-amber-400 animate-pulse'
+    : 'bg-muted-foreground/40';
+  return <span className={`inline-block rounded-full ${size} ${cls} flex-shrink-0`} aria-hidden />;
+}
+
 interface IntegrationsPanelProps {
   clientId: string;
 }
