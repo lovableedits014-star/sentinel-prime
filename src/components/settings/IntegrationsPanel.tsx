@@ -754,7 +754,6 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         apiKey: "",
         isConfigured: c.isConfigured || !!c.apiKey,
       })));
-      await fetchIntegrations();
 
       if (metaData.accessToken && metaData.accessToken.trim() !== "") {
         setTokenStatus(prev => ({ ...prev, isExpired: false, isExpiringSoon: false }));
