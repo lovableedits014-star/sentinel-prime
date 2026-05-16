@@ -1,0 +1,75 @@
+function,auth_required,validates_input_zod,uses_service_role,risco_inicial,observacao
+analyze-sentiment,Y,Y,Y,baixo,auth+zod
+batch-analyze-sentiments,Y,Y,Y,baixo,auth+zod
+calculate-ied,Y,N,Y,medio,auth OK, falta validação Zod
+check-alerts,Y,N,Y,medio,auth OK, falta validação Zod
+check-cpf-exists,N,N,Y,alto,service role sem auth
+check-presence-absences,N,N,Y,alto,service role sem auth
+cleanup-old-data,N,N,Y,alto,service role sem auth
+cleanup-whatsapp-media,N,N,Y,alto,service role sem auth
+create-team-user,Y,N,Y,medio,auth OK, falta validação Zod
+data-sources-health,Y,N,Y,medio,auth OK, falta validação Zod
+eleicao-create-account,Y,N,Y,medio,auth OK, falta validação Zod
+eleicao-notify-novo-lider,Y,N,Y,medio,auth OK, falta validação Zod
+eleicao-send-credentials,Y,N,Y,medio,auth OK, falta validação Zod
+fetch-meta-comments,Y,Y,Y,baixo,auth+zod
+gdelt-alerts-check,N,N,Y,alto,service role sem auth
+gdelt-media-fetch,N,N,Y,alto,service role sem auth
+generate-quick-replies,Y,Y,Y,baixo,auth+zod
+generate-response,Y,Y,Y,baixo,auth+zod
+geocode-tse-locais,N,N,Y,alto,service role sem auth
+holidays-fetch,N,N,Y,alto,service role sem auth
+ibge-municipio-fetch,N,N,Y,alto,service role sem auth
+ic-backfill-embeddings,N,N,Y,alto,service role sem auth
+ic-daily-ideas,N,N,Y,alto,service role sem auth
+ic-detect-contradictions,N,N,Y,alto,service role sem auth
+ic-detect-drift,N,N,Y,alto,service role sem auth
+ic-dna-analyzer,N,N,Y,alto,service role sem auth
+ic-extract-knowledge,Y,N,Y,medio,auth OK, falta validação Zod
+ic-extract-promessas,N,N,Y,alto,service role sem auth
+ic-feed-from-transcript,N,N,Y,alto,service role sem auth
+ic-generate-text,N,N,Y,alto,service role sem auth
+ic-ingest-document,Y,N,Y,medio,auth OK, falta validação Zod
+ic-memoria-insights,N,N,Y,alto,service role sem auth
+ic-migrate-knowledge-to-documents,Y,N,Y,medio,auth OK, falta validação Zod
+ic-project,N,N,Y,alto,service role sem auth
+ic-radar,Y,N,Y,medio,auth OK, falta validação Zod
+ic-reprocess-transcription,Y,N,Y,medio,auth OK, falta validação Zod
+ic-search-documents,N,N,Y,alto,service role sem auth
+ic-suggest-dispatches,N,N,Y,alto,service role sem auth
+ic-transcribe,Y,N,Y,medio,auth OK, falta validação Zod
+ic-write-boletim,N,N,Y,alto,service role sem auth
+ic-write-materia,N,N,Y,alto,service role sem auth
+import-tse-locais,Y,N,Y,medio,auth OK, falta validação Zod
+import-tse-results,Y,N,Y,medio,auth OK, falta validação Zod
+legacy-supporter-set-password,N,N,Y,alto,service role sem auth
+link-supporter-account,Y,N,Y,medio,auth OK, falta validação Zod
+main,Y,N,Y,medio,auth OK, falta validação Zod
+manage-comment,Y,Y,Y,baixo,auth+zod
+manage-platform-user,Y,N,Y,medio,auth OK, falta validação Zod
+manage-whatsapp-instance,Y,N,Y,medio,auth OK, falta validação Zod
+municipio-contexto-web,N,N,N,medio,público — precisa marcação explícita e validação
+municipios-indicadores-sync,N,N,Y,alto,service role sem auth
+narrativa-analise,N,N,Y,alto,service role sem auth
+narrativa-coleta,N,N,Y,alto,service role sem auth
+narrativa-gerar,Y,N,Y,medio,auth OK, falta validação Zod
+parlamentar-sync,N,N,Y,alto,service role sem auth
+preview-social-profile,N,N,N,medio,público — precisa marcação explícita e validação
+publish-to-meta,Y,Y,Y,baixo,auth+zod
+react-to-comment,Y,Y,Y,baixo,auth+zod
+register-contratado,N,N,Y,alto,service role sem auth
+register-funcionario,N,N,Y,alto,service role sem auth
+register-supporter,Y,N,Y,medio,auth OK, falta validação Zod
+renew-meta-token,Y,Y,Y,baixo,auth+zod
+resolve-social-link,N,N,N,medio,público — precisa marcação explícita e validação
+resolve-supporter-profiles,Y,N,Y,medio,auth OK, falta validação Zod
+resolve-whatsapp-link,Y,N,Y,medio,auth OK, falta validação Zod
+respond-to-comment,Y,Y,Y,baixo,auth+zod
+run-engagement-autoresolve,Y,N,Y,medio,auth OK, falta validação Zod
+send-birthday-messages,N,N,Y,alto,service role sem auth
+send-whatsapp-dispatch,Y,N,Y,medio,auth OK, falta validação Zod
+suggest-missions,N,N,Y,alto,service role sem auth
+tea-ms-sync,N,N,Y,alto,service role sem auth
+test-llm-connection,Y,Y,Y,baixo,auth+zod
+test-meta-connection,Y,Y,Y,baixo,auth+zod
+whatsapp-inbound-webhook,Y,N,Y,medio,auth OK, falta validação Zod
