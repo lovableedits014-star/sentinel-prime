@@ -21,12 +21,14 @@ interface Body {
   };
 }
 
-async function callIcFn(name: string, payload: any) {
+async function callIcFn(name: string, payload: any, authHeader: string) {
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      // Encaminha o token do usuário autenticado para que a function alvo
+      // possa validar tenant via requireClientAccess.
+      Authorization: authHeader,
       apikey: SERVICE_KEY,
     },
     body: JSON.stringify(payload),
