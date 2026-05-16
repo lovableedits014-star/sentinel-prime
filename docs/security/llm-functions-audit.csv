@@ -1,0 +1,24 @@
+function,usa_llm,usa_transcribe,chama_getClientLLMConfig,valida_acesso,metodo,tier_alvo,risco,acao_requerida
+analyze-sentiment,sim,nao,sim,sim,rpc user_has_client_access,classify,baixo,Fase 4: migrar para callLLMStructured
+batch-analyze-sentiments,sim,nao,sim,sim,rpc user_has_client_access,classify,baixo,Fase 4
+fetch-meta-comments,sim,nao,sim,sim,rpc user_has_client_access,fast,baixo,nenhuma
+generate-response,sim,nao,sim,sim,rpc user_has_client_access,fast,baixo,nenhuma
+respond-to-comment,sim,nao,sim,sim,rpc user_has_client_access,fast,baixo,nenhuma
+generate-quick-replies,sim,nao,sim,sim,query manual owned+team_members,fast,baixo,opcional: harmonizar para auth-guard
+ic-generate-text,sim,nao,sim,sim,auth-guard requireClientAccess,reasoning,baixo,nenhuma
+ic-write-materia,sim,nao,sim,sim,auth-guard requireClientAccess,deep,baixo,nenhuma
+ic-radar,sim,nao,sim,sim,auth-guard requireClientAccess,reasoning,baixo,nenhuma
+ic-suggest-dispatches,sim,nao,sim,sim,auth-guard requireClientAccess,reasoning,baixo,nenhuma
+suggest-missions,sim,nao,sim,sim,auth-guard requireClientAccess,reasoning,baixo,nenhuma
+ic-write-boletim,sim,nao,sim,NAO,SEM PROTECAO,deep,ALTO,adicionar requireClientAccess ANTES de getClientLLMConfig
+ic-dna-analyzer,sim,nao,sim,NAO,SEM PROTECAO,deep,ALTO,adicionar requireClientAccess
+ic-project,sim,nao,sim,NAO,SEM PROTECAO,deep,ALTO,adicionar requireClientAccess
+ic-detect-contradictions,sim,nao,sim,NAO,SEM PROTECAO,reasoning,ALTO,adicionar requireClientAccess
+ic-detect-drift,sim,nao,sim,NAO,SEM PROTECAO,reasoning,ALTO,adicionar requireClientAccess
+ic-extract-knowledge,sim,nao,sim,NAO,SEM PROTECAO,reasoning,ALTO,adicionar requireClientAccess
+ic-feed-from-transcript,sim,nao,sim,NAO,SEM PROTECAO,reasoning,ALTO,adicionar requireClientAccess
+narrativa-gerar,sim,nao,sim,NAO,SEM PROTECAO,reasoning,ALTO,adicionar requireClientAccess
+test-llm-connection,sim,nao,sim,NAO,SEM PROTECAO,fast,ALTO,exige auth + owner do client
+ic-daily-ideas,sim,nao,sim,N/A,cron iterando clients,reasoning,MEDIO,exigir CRON_SECRET; nunca chamado por usuario
+ic-reprocess-transcription,nao,sim,nao,verificar,verificar,multimodal,MEDIO,validar manualmente
+ic-transcribe,sim,sim,sim,sim,auth getUser direto,multimodal,baixo,nenhuma
