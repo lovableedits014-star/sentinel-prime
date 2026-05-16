@@ -866,15 +866,9 @@ const NarrativaPolitica = () => {
   // Descobre client_id (clients.user_id == auth.uid)
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: c } = await supabase
-        .from("clients").select("id").eq("user_id", user.id).maybeSingle();
-      if (c?.id) { setClientId(c.id); return; }
-      const { data: tm } = await supabase
-        .from("team_members" as any).select("client_id").eq("user_id", user.id).maybeSingle();
-      const tmRow = tm as any;
-      if (tmRow?.client_id) setClientId(tmRow.client_id);
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const cId = await resolveClientId();
+      if (cId) setClientId(cId);
     })();
   }, []);
 

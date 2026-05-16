@@ -32,15 +32,12 @@ export default function Engagement() {
   const [configForm, setConfigForm] = useState<Partial<EngagementConfig>>({});
 
   const { data: client } = useQuery({
-    queryKey: ["client"],
+    queryKey: ["client-active", "engagement"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-      const { data, error } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const cId = await resolveClientId();
+      if (!cId) return null;
+      const { data, error } = await supabase.from("clients").select("*").eq("id", cId).maybeSingle();
       if (error) throw error;
       return data;
     }

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { isPathAllowed, getRoleLabels, ALWAYS_ALLOWED_PATHS, type AccessProfile } from "@/lib/access-control";
 import SuperAdminClientSwitcher from "@/components/SuperAdminClientSwitcher";
+import RequireClient from "@/components/RequireClient";
 
 
 const AUTH_CHECK_TIMEOUT_MS = 12000;
@@ -486,7 +487,9 @@ const DashboardLayout = () => {
       {/* ── Main Content ── */}
       <main className="lg:pl-64 pt-20 lg:pt-0">
         <div className="min-h-screen">
-          <Outlet />
+          <RequireClient>
+            <Outlet />
+          </RequireClient>
         </div>
       </main>
     </div>

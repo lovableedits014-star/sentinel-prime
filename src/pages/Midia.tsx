@@ -189,8 +189,9 @@ const MidiaPage = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
-      const { data: clients } = await supabase.from("clients").select("id").eq("user_id", user.id).limit(1);
-      if (clients && clients.length > 0) setClientId(clients[0].id);
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const cId = await resolveClientId();
+      if (cId) setClientId(cId);
     })();
   }, []);
 

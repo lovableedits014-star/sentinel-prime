@@ -60,15 +60,9 @@ export function PromptArteButton(props: Props) {
   useEffect(() => {
     let cancel = false;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      if (!cancel && data?.id) setClientId(data.id);
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const cId = await resolveClientId();
+      if (!cancel && cId) setClientId(cId);
     })();
     return () => { cancel = true; };
   }, []);

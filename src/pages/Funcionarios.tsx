@@ -31,23 +31,12 @@ export default function Funcionarios() {
   const queryClient = useQueryClient();
 
   const { data: client } = useQuery({
-    queryKey: ["my-client"],
+    queryKey: ["my-client-active", "funcionarios"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data } = await supabase
-        .from("clients")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (!data) {
-        const { data: tm } = await supabase
-          .from("team_members")
-          .select("client_id, clients(id, name)")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        return (tm as any)?.clients || null;
-      }
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const cId = await resolveClientId();
+      if (!cId) return null;
+      const { data } = await supabase.from("clients").select("id, name").eq("id", cId).maybeSingle();
       return data;
     },
   });

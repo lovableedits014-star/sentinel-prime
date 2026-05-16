@@ -95,25 +95,9 @@ const Dashboard = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("No user");
 
-    // Resolve client_id: owner first, then team_member fallback (manager/funcionário)
-    let cId: string | null = null;
-    const { data: ownedClients } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("user_id", user.id)
-      .limit(1);
-    if (ownedClients && ownedClients.length > 0) {
-      cId = ownedClients[0].id;
-    } else {
-      const { data: teamRow } = await supabase
-        .from("team_members")
-        .select("client_id")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .limit(1)
-        .maybeSingle();
-      cId = (teamRow?.client_id as string) || null;
-    }
+    // Single source of truth for client_id (honors super-admin impersonation)
+    const { resolveClientId } = await import("@/lib/resolveClientId");
+    const cId = await resolveClientId();
 
     if (!cId) return { allComments: [] as DashboardComment[], supportersCount: 0, clientId: "" };
 

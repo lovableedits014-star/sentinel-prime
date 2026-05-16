@@ -1,88 +1,93 @@
-# Regiões dinâmicas em Eleição (Campo Grande)
+## Diagnóstico — por que está quebrando depois do multiusuário
 
-Hoje as 8 regiões (Centro, Segredo, Prosa, Bandeira, Anhanduizinho, Lagoa, Imbirussu, Moreninha) estão **hardcoded em 3 lugares**:
+Mapeei como cada página descobre o `client_id` do usuário logado. Achei a causa raiz:
 
-- `src/pages/Eleicao.tsx` — `REGIOES` + tipo `Regiao` (filtros, formulário do líder, listas)
-- `src/components/eleicao/EleicaoConfigPanel.tsx` — `REGIOES` (links de grupos por região)
-- `supabase/functions/eleicao-notify-novo-lider/index.ts` — `REGIAO_LABELS` (rótulo na mensagem)
+**O `client_id` é resolvido manualmente em ~30 páginas, cada uma com regras diferentes.** Só 6 lugares usam o helper centralizado `resolveClientId()` (que respeita a “impersonação” do super admin):
 
-Para o usuário poder **adicionar novas regiões a qualquer momento** (hoje quer +1, amanhã pode querer mais), a única solução limpa é mover essa lista para o banco e usá-la em todos os pontos.
+- Usam `resolveClientId()`: `Comments`, `Settings`, `Eleicao`, `InteligenciaEleitoral`, `InteligenciaConteudo`, `SugestoesPanel`.
+- Fazem cópia/colagem do `getUser → clients → team_members`: `Dashboard`, `Pessoas`, `Disparos`, `Campanha`, `Funcionarios`, `Militancia`, `Territorial`, `MissoesIA`, `Engagement`, `ControlePresenca`, `CalendarioPolitico`, `Midia`, `StatusWhatsApp`, `Integrations`, `Recrutamento`, `Contratados`, `PessoaPerfil`, vários componentes de `inteligencia/*` etc.
 
-## 1. Banco — nova tabela `eleicao_regioes`
+Isso explica exatamente os sintomas:
 
-Migration:
+1. **Super admin trocando de gerente só funciona em algumas abas.** Nas outras o `localStorage` da impersonação é ignorado → ele vê “sem dados” ou dados do cliente errado.
+2. **Super admin sem gerente selecionado fica sem `clientId`** em quase todas as páginas → consultas com `client_id=null` retornam vazio (ou estouram em `clientId!`), parecendo “bug de renderização”.
+3. **Filtros inconsistentes em `team_members`** entre páginas (umas filtram `status='active'`, outras não; umas pegam `maybeSingle()` sem ordenar). Usuário multi‑role pode cair no vínculo errado em uma aba e no certo em outra.
+4. **Caches do React Query não invalidam juntos** quando o super admin troca de gerente — o switcher faz `window.location.reload()`, mas páginas que guardam `clientId` em `useState` (sem `useQuery` chaveado por ele) só atualizam no reload. Após uma navegação interna, o estado some e cada página refaz a descoberta sozinha → flicker, queries duplicadas, “não carrega”.
+5. **Race condition**: queries disparam com `clientId=null` e depois reexecutam quando o id chega; algumas usam `clientId!` (non‑null assertion) e quebram em runtime quando o id é `null`.
+6. **`useCurrentClientId` (hook em `src/hooks/ic/`) NÃO respeita a impersonação** — diverge do `resolveClientId()`. Quem usa esse hook fica fora de sincronia com quem usa o helper.
+7. **Sem guarda para super admin sem cliente** — quando o switcher está em “Nenhum (Super Admin)” todas as páginas tentam carregar com `clientId=null` e mostram telas vazias/erros, sem nenhuma mensagem clara.
 
-```sql
-create table public.eleicao_regioes (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid not null references public.clients(id) on delete cascade,
-  value text not null,        -- slug minúsculo, ex: "centro", "novo_horizonte"
-  label text not null,        -- rótulo amigável, ex: "Centro"
-  ordem int not null default 0,
-  ativo boolean not null default true,
-  created_at timestamptz not null default now(),
-  unique (client_id, value)
-);
+## Plano de correção
 
-alter table public.eleicao_regioes enable row level security;
+### 1) Fonte única da verdade para o `client_id`
 
--- policies: leitura por membros do client; escrita por owner/super-admin
--- (mesmo padrão usado em outras tabelas client-scoped do projeto)
+Criar `src/hooks/useActiveClientId.ts` (React Query) que devolve `{ clientId, isLoading, isSuperAdmin, needsClientSelection }` e:
+
+- Reaproveita a lógica do `resolveClientId()` (super admin com impersonação → owner em `clients` → `team_members` ativo).
+- Tem **uma query key estável** (`["active-client-id"]`) para que o switcher invalide tudo de uma vez via `queryClient.invalidateQueries({ queryKey: ["active-client-id"] })` — sem `window.location.reload()`.
+- Expõe `needsClientSelection = isSuperAdmin && !clientId` para a UI mostrar um aviso “Selecione um gerente para visualizar os dados”.
+
+Substituir `useCurrentClientId` (em `src/hooks/ic/`) por um re‑export desse novo hook, mantendo o nome para não quebrar imports.
+
+### 2) Atualizar o helper e o switcher
+
+- `resolveClientId()` continua existindo (para chamadas fora de React, ex.: edge calls). Vai apenas chamar a mesma lógica internamente para ficar 1‑pra‑1 com o hook.
+- `SuperAdminClientSwitcher` deixa de fazer `window.location.reload()` e passa a fazer só `queryClient.invalidateQueries()`. Mais rápido, e funciona em todas as abas.
+
+### 3) Migrar todas as páginas para o hook
+
+Para cada arquivo da lista “fazem cópia/colagem”, remover o bloco manual de `getUser → clients/team_members` e usar:
+
+```tsx
+const { data: clientId, isLoading: loadingClient } = useActiveClientId();
 ```
 
-**Seed automático** das 8 regiões existentes para cada `client_id` que já tem líderes cadastrados, preservando os `value` atuais (`centro`, `segredo`, …) — assim nenhum líder fica órfão.
+E gatear toda `useQuery`/efeito de fetch com `enabled: !!clientId`. Substituir `clientId!` por verificações reais.
 
-## 2. Hook compartilhado `useRegioesEleicao(clientId)`
+Arquivos a tocar (sem mudar a UI nem regras de negócio):
+`Dashboard`, `Pessoas`, `Disparos`, `Campanha`, `Funcionarios`, `Militancia`, `Territorial`, `MissoesIA`, `Engagement`, `ControlePresenca`, `CalendarioPolitico`, `Midia`, `StatusWhatsApp`, `Integrations`, `Recrutamento`, `Contratados`, `PessoaPerfil`, `components/engagement/AIMissionsPanel`, `components/inteligencia/narrativa/NarrativaPolitica`, `components/inteligencia/PulsoPolitico`, `components/pessoas/TimelinePolitica`, `components/pessoas/InteracoesTimeline`, `components/calendario/PromptArteButton`, `components/inteligencia-conteudo/IngestDocumentDialog`.
 
-Novo arquivo `src/hooks/useRegioesEleicao.ts`:
+### 4) Guarda visual para super admin sem cliente
 
-- `data: { value, label, ordem }[]` ordenado por `ordem, label`
-- `add({ label })` — gera `value` a partir do label (slug `lowercase`, sem acento, `_` no espaço), insere com `ordem = max+1`
-- `rename`, `remove`, `reorder` (opcional, fora do escopo desta entrega — só `add` agora)
-- React Query, invalida ao mutar
+Num componente compartilhado (ex.: `RequireClient`) usado dentro do `DashboardLayout` em volta do `<Outlet/>`:
 
-## 3. UI — `EleicaoConfigPanel.tsx`
+- Se `needsClientSelection`, renderiza um card amigável: “Você é Super Admin. Selecione um gerente no topo da barra lateral para visualizar os dados deste módulo.”
+- Para usuários comuns sem `clientId` (caso raro), mostra mensagem de “sem vínculo ativo”.
 
-No card "Links dos grupos por região":
+Isso elimina as telas em branco e os erros silenciosos.
 
-- Substituir `REGIOES` constante pelo hook
-- Listar regiões dinamicamente; manter input de link por região (já salva em `grupos_links` JSON, que é flexível — nenhuma migração necessária)
-- Adicionar **botão "+ Nova região"** que abre um pequeno form inline (input do nome) e chama `add({ label })`
-- Layout responsivo: trocar `grid-cols-[140px_1fr]` por `flex flex-col sm:grid sm:grid-cols-[160px_1fr] gap-2` para empilhar no mobile
-- Botão de remover região (ícone X) ao lado de cada linha — só permite remover se não houver líder cadastrado naquela região (checa `pessoas_eleicao` antes; se houver, mostra toast explicando)
+### 5) Padronizar query keys
 
-## 4. UI — `src/pages/Eleicao.tsx`
+Toda `useQuery` de dados do cliente deve incluir `clientId` na key (ex.: `["pessoas", clientId]`). Assim o switch de gerente refetcha automaticamente em todas as abas abertas e o cache do gerente anterior fica isolado (não “vaza” quando volta).
 
-- Remover constante `REGIOES` e tipo literal `Regiao`; passar a usar `string` para `regiao`
-- Consumir `useRegioesEleicao(clientId)` em:
-  - filtro de região (linha ~382)
-  - render dos cards por região (linha ~544)
-  - select do formulário de cadastro de líder (linha ~680)
-  - lookup de label (linha ~1027)
-- Estado inicial do form: primeira região retornada pelo hook (em vez de `"centro"` fixo)
-- Garantir grids responsivos dos cards de região (já são `grid-cols-1 md:grid-cols-2 lg:grid-cols-4` — confirmar e ajustar se necessário para 1067px)
+### 6) Corrigir consultas a `team_members` em todo lugar
 
-## 5. Edge Function `eleicao-notify-novo-lider`
+Padronizar:
+```ts
+.from("team_members").select("client_id")
+.eq("user_id", uid).eq("status", "active")
+.order("created_at", { ascending: false })
+.limit(1).maybeSingle()
+```
+Isso resolve o caso de membros com mais de uma associação ou com vínculos antigos inativos pegando precedência.
 
-- Remover `REGIAO_LABELS` hardcoded
-- Buscar o label da região no banco: `select label from eleicao_regioes where client_id = ? and value = ?`
-- Fallback: se não encontrar, usa o próprio `value` capitalizado (não quebra envios)
-- O `link_grupo` continua vindo de `eleicao_notif_config.grupos_links[regiao]` (já é dinâmico)
+### 7) Verificação
 
-## 6. Responsividade (revisão geral)
+Após aplicar:
+- Login como super admin: trocar gerente no switcher → todas as abas atualizam sem reload.
+- Login como gerente comum (owner em `clients`): tudo funciona como hoje.
+- Login como `team_member` com `allowed_paths` parciais: páginas permitidas carregam; bloqueadas redirecionam com toast (já está no `DashboardLayout`).
+- Super admin sem gerente selecionado: vê o aviso “Selecione um gerente”, sem telas em branco.
 
-Viewport atual do usuário é 1067px. Verificar e ajustar:
+## Detalhes técnicos (para referência)
 
-- `EleicaoConfigPanel`: cards com padding consistente, inputs `w-full`, grid de regiões empilha no `< sm`
-- `Eleicao.tsx`: header de filtros com `flex-wrap`, cards de região em grid responsivo, tabelas com `overflow-x-auto` no mobile
-- Botão "Nova região": `w-full sm:w-auto`
+- `src/lib/resolveClientId.ts` continua, mas vira um wrapper de uma função pura (`resolveClientIdFor(userId)`) reutilizada pelo `useActiveClientId`.
+- `useActiveClientId` usa `staleTime: 5 * 60_000` e `gcTime: 30 * 60_000`; é invalidado por: (a) switcher do super admin, (b) `onAuthStateChange` quando o `user.id` muda.
+- Páginas hoje guardam `clientId` em `useState` + `useEffect`; vão passar a derivar do hook (sem `useEffect` próprio para isso).
+- Não tocaremos em RLS nem em edge functions neste passo — o problema é puramente de resolução do `client_id` no frontend.
 
-## Fora do escopo (para evitar regressão)
+## Fora do escopo
 
-- Não mexer em `pessoas_eleicao.regiao` (continua text livre)
-- Não mexer em outros módulos que usam o conceito "região" para outras coisas (inteligência eleitoral usa zona TSE, é independente)
-- Reordenação drag-and-drop e renomear ficam para iteração futura
-
----
-
-**Resultado esperado:** o gerente abre `Configurações > Eleição`, clica em "+ Nova região", digita o nome (ex.: "Novo Horizonte"), e ela passa a aparecer em todos os selects, no card de líderes da página Eleição, e nas mensagens de WhatsApp — com link de grupo configurável e tudo responsivo no mobile.
+- Mudanças no menu/permissões granulares (continua igual).
+- Refatorar lógica de negócio das páginas; só troco como elas obtêm o `client_id`.
+- Edge functions (já recebem `client_id` via body/JWT, e isso não é o que está quebrando).

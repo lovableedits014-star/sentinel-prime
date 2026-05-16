@@ -63,10 +63,11 @@ export default function StatusWhatsApp() {
     if (!silent) setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
-    const { data: client } = await supabase
-      .from("clients").select("id").eq("user_id", user.id).maybeSingle();
-    if (!client) { setLoading(false); return; }
-    setClientId(client.id);
+    const { resolveClientId } = await import("@/lib/resolveClientId");
+    const cId = await resolveClientId();
+    if (!cId) { setLoading(false); return; }
+    setClientId(cId);
+    const client = { id: cId };
 
     const [{ data: inst }, { data: queue }] = await Promise.all([
       supabase.from("whatsapp_instances")

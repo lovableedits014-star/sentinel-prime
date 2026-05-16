@@ -89,39 +89,18 @@ const Integrations = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get owned client first
-      let { data: clients } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("user_id", user.id)
-        .limit(1);
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      let currentClientId = (await resolveClientId()) || "";
 
-      let currentClientId = "";
-
-      if (clients && clients.length > 0) {
-        currentClientId = clients[0].id;
-      } else {
-        // Try team_members fallback (manager/funcionário)
-        const { data: tm } = await supabase
-          .from("team_members")
-          .select("client_id")
-          .eq("user_id", user.id)
-          .eq("status", "active")
-          .limit(1)
-          .maybeSingle();
-
-        if (tm?.client_id) {
-          currentClientId = tm.client_id as string;
-        } else {
-          // No owner, no team — create owned client
-          const { data: newClient, error: createError } = await supabase
-            .from("clients")
-            .insert({ user_id: user.id, name: user.email || "Cliente" })
-            .select()
-            .single();
-          if (createError) throw createError;
-          currentClientId = newClient.id;
-        }
+      if (!currentClientId) {
+        // No owner, no team — create owned client
+        const { data: newClient, error: createError } = await supabase
+          .from("clients")
+          .insert({ user_id: user.id, name: user.email || "Cliente" })
+          .select()
+          .single();
+        if (createError) throw createError;
+        currentClientId = newClient.id;
       }
 
       setClientId(currentClientId);
