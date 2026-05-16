@@ -754,44 +754,17 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
                 );
                 return (
                   <div key={card.id} className="rounded-lg border p-4 space-y-4 bg-card">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 space-y-3">
-                        <div className="grid md:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Provider</Label>
-                            <Select value={card.provider} onValueChange={(v) => changeCardProvider(card.id, v as LLMProvider)}>
-                              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {SELECTABLE_PROVIDERS.map((p) => (
-                                  <SelectItem key={p.value} value={p.value} disabled={otherUsed.has(p.value)}>
-                                    {p.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Modelo</Label>
-                            <Select value={card.model} onValueChange={(v) => updateCard(card.id, { model: v })}>
-                              <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
-                              <SelectContent>
-                                {models.map((m) => (
-                                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">API Key</Label>
-                          <Input
-                            type="password"
-                            className="h-9"
-                            placeholder={card.isConfigured ? "••••••••• (configurada — deixe em branco para manter)" : "API key"}
-                            value={card.apiKey}
-                            onChange={(e) => updateCard(card.id, { apiKey: e.target.value })}
-                          />
-                        </div>
+                    {/* Header with status indicator */}
+                    <div className="flex items-center justify-between gap-3 -mb-1">
+                      <div className="flex items-center gap-2">
+                        <StatusDot status={card.status} />
+                        <span className="text-sm font-semibold capitalize">{card.provider}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {card.status === 'ok' && 'Conectado'}
+                          {card.status === 'error' && 'Erro de conexão'}
+                          {card.status === 'testing' && 'Testando...'}
+                          {card.status === 'untested' && (card.isConfigured ? 'Não testado' : 'Aguardando configuração')}
+                        </span>
                       </div>
                       <Button
                         variant="ghost" size="sm"
@@ -800,6 +773,56 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
                       >
                         Remover
                       </Button>
+                    </div>
+
+                    {card.statusMessage && (
+                      <div className={`text-xs px-3 py-2 rounded-md border ${
+                        card.status === 'ok'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                          : card.status === 'error'
+                            ? 'bg-destructive/10 border-destructive/30 text-destructive'
+                            : 'bg-muted/40 border-border text-muted-foreground'
+                      }`}>
+                        {card.statusMessage}
+                      </div>
+                    )}
+
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Provider</Label>
+                        <Select value={card.provider} onValueChange={(v) => changeCardProvider(card.id, v as LLMProvider)}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {SELECTABLE_PROVIDERS.map((p) => (
+                              <SelectItem key={p.value} value={p.value} disabled={otherUsed.has(p.value)}>
+                                {p.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Modelo</Label>
+                        <Select value={card.model} onValueChange={(v) => updateCard(card.id, { model: v })}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>
+                            {models.map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">API Key</Label>
+                      <Input
+                        type="password"
+                        className="h-9"
+                        placeholder={card.isConfigured ? "••••••••• (configurada — deixe em branco para manter)" : "API key"}
+                        value={card.apiKey}
+                        onChange={(e) => updateCard(card.id, { apiKey: e.target.value })}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -826,6 +849,18 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
                         })}
                       </div>
                     </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => testCard(card.id)}
+                      disabled={card.status === 'testing' || (!card.apiKey && !card.isConfigured)}
+                      className="w-full"
+                    >
+                      {card.status === 'testing'
+                        ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testando configuração...</>
+                        : <><Zap className="w-4 h-4 mr-2" />Testar configuração</>}
+                    </Button>
                   </div>
                 );
               })}
@@ -839,30 +874,36 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
                 + Adicionar Provider
               </Button>
 
-              {/* Advanced (per-tier) debug view */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(v => !v)}
-                  className="text-xs text-muted-foreground hover:text-foreground underline"
-                >
-                  {showAdvanced ? '▾ Ocultar' : '▸ Ver'} mapeamento por tier (debug)
-                </button>
-                {showAdvanced && (
-                  <div className="mt-2 rounded-md border bg-muted/20 p-3 text-xs space-y-1 font-mono">
-                    {TIERS.map(t => {
-                      const card = providerCards.find(c => c.tiers[t.key]);
-                      return (
-                        <div key={t.key} className="flex items-center justify-between">
-                          <span className="text-muted-foreground">{t.label}</span>
-                          <span>
-                            {card ? `${card.provider} · ${card.model || '—'}` : 'Lovable AI (fallback)'}
-                          </span>
+              {/* Always-visible tier → provider mapping */}
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <Layers className="w-3.5 h-3.5" />
+                  Mapeamento Atual dos Tiers
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  {TIERS.map(t => {
+                    const card = providerCards.find(c => c.tiers[t.key]);
+                    const TierIcon = t.icon;
+                    return (
+                      <div key={t.key} className="flex items-center gap-2 p-2 rounded-md bg-card border">
+                        <TierIcon className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-[11px]">{t.label}</div>
+                          <div className="text-muted-foreground truncate flex items-center gap-1">
+                            {card ? (
+                              <>
+                                <StatusDot status={card.status} compact />
+                                <span className="capitalize">{card.provider}</span>
+                              </>
+                            ) : (
+                              <span className="italic">Lovable AI</span>
+                            )}
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
