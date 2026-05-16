@@ -66,9 +66,10 @@ export function useActiveClientId() {
   // Re-fetch when the auth user changes (login/logout/swap account).
   useEffect(() => {
     let lastUserId: string | null = null;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const uid = session?.user?.id ?? null;
       if (uid !== lastUserId) {
+        logTelemetry("queries_invalidated", { reason: "auth_state_change", event, userId: uid });
         lastUserId = uid;
         qc.invalidateQueries({ queryKey: ACTIVE_CLIENT_QUERY_KEY });
       }
@@ -77,9 +78,26 @@ export function useActiveClientId() {
   }, [qc]);
 
   const info = query.data;
+  const clientId = info?.clientId ?? null;
+
+  // Track clientId transitions (mount + any change) for debugging.
+  const prevClientIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (query.isLoading) return;
+    if (prevClientIdRef.current !== clientId) {
+      logTelemetry("client_id_changed", {
+        from: prevClientIdRef.current ?? null,
+        to: clientId,
+        isSuperAdmin: info?.isSuperAdmin ?? false,
+        isImpersonating: info?.isImpersonating ?? false,
+      });
+      prevClientIdRef.current = clientId;
+    }
+  }, [clientId, info?.isSuperAdmin, info?.isImpersonating, query.isLoading]);
+
   return {
     ...query,
-    clientId: info?.clientId ?? null,
+    clientId,
     isSuperAdmin: info?.isSuperAdmin ?? false,
     isImpersonating: info?.isImpersonating ?? false,
     needsClientSelection: !!info?.isSuperAdmin && !info?.clientId,
