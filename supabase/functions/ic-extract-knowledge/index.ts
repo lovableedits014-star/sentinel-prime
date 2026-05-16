@@ -27,7 +27,7 @@ interface ExtractRequest {
   triggerSuggestions?: boolean;
   providerOverride?: string;
   modelOverride?: string;
-  apiKeyOverride?: string;
+  // apiKeyOverride REMOVIDO — apiKey resolvida exclusivamente via integrations
   extractionRunId?: string;
   // novo
   documentTitleHint?: string;
