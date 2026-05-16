@@ -1,4 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { validateInput, z } from "../_shared/validate.ts";
+
+const EleicaoSendCredentialsSchema = z.object({
+  pessoa_id: z.string().uuid(),
+  channel: z.enum(["whatsapp", "link_only"]).optional(),
+  app_url: z.string().url().max(500).optional(),
+  email: z.string().email().max(255).optional(),
+  password: z.string().min(6).max(200).optional(),
+}).passthrough();
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
