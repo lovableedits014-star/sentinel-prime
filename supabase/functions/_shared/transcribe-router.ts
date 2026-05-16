@@ -24,7 +24,12 @@ export interface TranscribeProviderConfig {
   apiKey: string;
 }
 
-/** Lê integrations e devolve config de transcrição. Fallback para GROQ_API_KEY env. */
+/**
+ * Lê integrations.llm_provider/llm_api_key do tenant.
+ * NÃO existe fallback global (ex.: GROQ_API_KEY env) — isolamento multi-tenant.
+ * Retorna null quando o tenant não tem provedor de transcrição configurado;
+ * o caller DEVE retornar erro explícito, nunca usar credencial compartilhada.
+ */
 export async function getTranscribeConfig(
   admin: any,
   clientId: string,
@@ -38,8 +43,6 @@ export async function getTranscribeConfig(
   if (integ?.llm_api_key && ['groq', 'openai', 'gemini'].includes(integ.llm_provider)) {
     return { provider: integ.llm_provider, apiKey: integ.llm_api_key as string };
   }
-  const groqEnv = Deno.env.get('GROQ_API_KEY');
-  if (groqEnv) return { provider: 'groq', apiKey: groqEnv };
   return null;
 }
 
