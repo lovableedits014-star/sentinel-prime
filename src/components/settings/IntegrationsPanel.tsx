@@ -542,6 +542,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     } catch (e: any) {
       const friendly = humanizeLLMError(e?.message || String(e));
       updateCard(id, { status: 'error', statusMessage: friendly, testedAt: Date.now() });
+      toast.error(friendly);
       return false;
     }
   };
