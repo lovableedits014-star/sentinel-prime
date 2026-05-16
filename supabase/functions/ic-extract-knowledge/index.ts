@@ -162,7 +162,7 @@ async function extractDocSingleShot(
     ],
     maxTokens: 4500,
     temperature: 0.2,
-  });
+  }, telemetryCtx);
   const parsed = parseLooseJson<DocumentJson>(resp.content);
   return { ...emptyDoc(), ...parsed };
 }
@@ -206,7 +206,7 @@ Devolva APENAS o JSON consolidado no mesmo formato (titulo, resumo_executivo, po
     ],
     maxTokens: 5000,
     temperature: 0.2,
-  });
+  }, telemetryCtx);
   const merged = parseLooseJson<DocumentJson>(resp.content);
   return { ...emptyDoc(), ...merged };
 }
@@ -308,7 +308,7 @@ async function extractLegacyFacts(llmConfig: any, text: string): Promise<Derived
     ],
     maxTokens: 2500,
     temperature: 0.2,
-  });
+  }, telemetryCtx);
   const parsed = parseLooseJson<{ fatos?: DerivedFact[] }>(resp.content);
   return Array.isArray(parsed?.fatos) ? parsed.fatos : [];
 }
@@ -348,6 +348,14 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const baseConfig = await getClientLLMConfig(admin, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: admin,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-extract-knowledge',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     const llmConfig = {
       provider: (providerOverride as any) || baseConfig.provider,
       model: modelOverride || (providerOverride ? undefined : baseConfig.model),

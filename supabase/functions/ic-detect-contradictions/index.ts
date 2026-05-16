@@ -76,6 +76,14 @@ Deno.serve(async (req) => {
     }
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-detect-contradictions',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     const resp = await callLLM(llmConfig, {
       messages: [
         { role: "system", content: SYSTEM },
@@ -83,7 +91,7 @@ Deno.serve(async (req) => {
       ],
       maxTokens: 4000,
       temperature: 0.2,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<{ contradicoes: any[] }>(resp.content);
     const valid = (parsed.contradicoes || []).filter((c) =>

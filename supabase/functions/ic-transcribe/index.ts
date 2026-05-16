@@ -111,6 +111,14 @@ Deno.serve(async (req) => {
     if (inserted?.full_text && inserted.full_text.length > 30) {
       try {
         const llmConfig = await getClientLLMConfig(admin, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: admin,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-transcribe',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
         const titleResp = await callLLM(llmConfig, {
           messages: [
             {

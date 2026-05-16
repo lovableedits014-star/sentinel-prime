@@ -857,6 +857,14 @@ Deno.serve(async (req) => {
       syncLog.push('--- SENTIMENT ANALYSIS ---');
       try {
         const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabaseClient,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'fetch-meta-comments',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
         syncLog.push(`LLM: ${llmConfig.provider}/${llmConfig.model}`);
 
         const { data: unanalyzed } = await supabaseClient
@@ -885,7 +893,7 @@ Deno.serve(async (req) => {
             }];
 
             try {
-              const response = await callLLM(llmConfig, { messages, maxTokens: 400, temperature: 0 });
+              const response = await callLLM(llmConfig, { messages, maxTokens: 400, temperature: 0 }, telemetryCtx);
               const lines = response.content.trim().split('\n');
 
               for (const line of lines) {

@@ -56,6 +56,14 @@ serve(async (req) => {
       : "";
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-generate-text',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const formatsDesc: Record<string, string> = {
       facebook: '"facebook": texto longo (200-400 caracteres) com narrativa, emoção e CTA',
@@ -94,7 +102,7 @@ Gere as variantes pedidas. Responda APENAS com o JSON.`;
       ],
       maxTokens: 2200,
       temperature: 0.8,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<any>(resp.content);
 

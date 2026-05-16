@@ -73,6 +73,14 @@ serve(async (req) => {
       : "\nDNA EDITORIAL: ainda não calibrado — use tom claro, próximo, mobilizador.";
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-feed-from-transcript',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const systemPrompt = `Você é um redator político brasileiro experiente, ghostwriter de ${candidato}${cargo ? ` (${cargo})` : ""}.
 Sua tarefa: a partir de uma TRANSCRIÇÃO de fala/vídeo, gerar UM POST PRONTO para o feed.
@@ -112,7 +120,7 @@ Gere o post pronto para o feed. Responda APENAS com o JSON.`;
       ],
       maxTokens: 1500,
       temperature: 0.8,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<any>(resp.content);
 

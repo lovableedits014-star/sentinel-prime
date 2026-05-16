@@ -159,6 +159,14 @@ serve(async (req) => {
     const posVar = variation(currStats.pos, prevStats.pos);
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-radar',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     // === LLM: extrai temas e narrativas (mesmo prompt anterior, ligeiramente expandido) ===
     const systemPrompt = `Você é um analista político brasileiro especializado em escutar redes sociais.
@@ -196,7 +204,7 @@ Responda APENAS com o JSON.`;
       ],
       maxTokens: deep ? 2200 : 1700,
       temperature: 0.4,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<any>(resp.content);
 

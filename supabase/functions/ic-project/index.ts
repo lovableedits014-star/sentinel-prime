@@ -47,6 +47,14 @@ serve(async (req) => {
       .join("\n") || "(sem posts próprios para baseline)";
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-project',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const systemPrompt = `Você é um analista preditivo de comunicação política brasileira.
 Você NUNCA publica — apenas projeta como um texto provavelmente seria recebido.
@@ -81,7 +89,7 @@ Projete a recepção provável. Responda APENAS com o JSON.`;
       ],
       maxTokens: 1800,
       temperature: 0.4,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<any>(resp.content);
     return jsonResponse({ projection: parsed, provider: resp.provider });

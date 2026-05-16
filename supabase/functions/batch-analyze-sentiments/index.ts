@@ -61,6 +61,14 @@ Deno.serve(async (req) => {
 
     // Get LLM config
     const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabaseClient,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'batch-analyze-sentiments',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     console.log(`📡 Using LLM provider: ${llmConfig.provider} for batch sentiment analysis`);
 
     // Get political context (candidate name + role) for smarter analysis
@@ -314,7 +322,7 @@ Resposta:`
     messages,
     maxTokens: comments.length * 15,
     temperature: 0,
-  });
+  }, telemetryCtx);
 
   // Parse response - try multiple formats the LLM might use
   const responseText = response.content.trim();
@@ -425,7 +433,7 @@ Responda APENAS com uma palavra: positive, negative ou neutral.`,
     messages,
     maxTokens: 10,
     temperature: 0,
-  });
+  }, telemetryCtx);
 
   const result = response.content.toLowerCase().trim().replace(/[^a-z]/g, '');
   if (['positive', 'negative', 'neutral'].includes(result)) {
@@ -489,7 +497,7 @@ Responda APENAS uma palavra: positive, negative ou neutral.`,
     messages,
     maxTokens: 10,
     temperature: 0,
-  });
+  }, telemetryCtx);
 
   const result = response.content.toLowerCase().trim().replace(/[^a-z]/g, '');
   if (['positive', 'negative', 'neutral'].includes(result)) return applyHeuristicGuard(result as 'positive' | 'negative' | 'neutral', text, postMessage);

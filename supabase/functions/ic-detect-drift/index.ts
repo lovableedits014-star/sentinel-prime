@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
           ],
           temperature: 0.3,
           maxTokens: 800,
-        });
+        }, telemetryCtx);
         const parsed = parseLooseJson<any>(resp.content);
         if (!parsed?.mudou || parsed?.tipo === "estavel") continue;
 

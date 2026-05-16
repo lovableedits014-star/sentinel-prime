@@ -81,6 +81,14 @@ Deno.serve(async (req) => {
     }
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'generate-quick-replies',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const avoidBlock = currentReplies && currentReplies.length > 0
       ? `\n\nEvite repetir estas frases que já foram usadas:\n${currentReplies.map((r) => `- ${r}`).join('\n')}`
@@ -114,7 +122,7 @@ Sem texto antes ou depois, sem markdown, sem code fences.`;
         messages,
         maxTokens: 800,
         temperature: 0.95,
-      });
+      }, telemetryCtx);
       const raw = llmResp.content.trim();
       // Try to extract JSON object
       const jsonMatch = raw.match(/\{[\s\S]*\}/);

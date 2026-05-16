@@ -74,6 +74,14 @@ Deno.serve(async (req) => {
 
     // Get LLM config for this client
     const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabaseClient,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'analyze-sentiment',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     console.log(`📡 Using LLM provider: ${llmConfig.provider} for sentiment analysis`);
 
     // Get political context
@@ -204,7 +212,7 @@ COMENTÁRIO: "${text}"`,
       messages,
       maxTokens: 40,
       temperature: 0,
-    });
+    }, telemetryCtx);
 
     const raw = response.content.trim();
     // Try parsing JSON first
@@ -265,7 +273,7 @@ Responda APENAS: positive, negative ou neutral.`,
   ];
 
   try {
-    const response = await callLLM(llmConfig as any, { messages, maxTokens: 10, temperature: 0 });
+    const response = await callLLM(llmConfig as any, { messages, maxTokens: 10, temperature: 0 }, telemetryCtx);
     const result = response.content.toLowerCase().trim().replace(/[^a-z]/g, '');
     if (['positive', 'negative', 'neutral'].includes(result)) return applyHeuristicGuard(result as 'positive' | 'negative' | 'neutral', text, postMessage);
     if (result.includes('positive')) return applyHeuristicGuard('positive', text, postMessage);

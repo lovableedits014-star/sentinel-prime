@@ -76,6 +76,14 @@ async function generateForClient(supabase: any, clientId: string) {
     .maybeSingle();
 
   const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-daily-ideas',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
   const radarBlock = snap
     ? `RADAR (${snap.snapshot_date}):
@@ -119,7 +127,7 @@ Sugira 5 ideias variadas (misture tipos). Responda APENAS com o JSON.`;
     ],
     maxTokens: 1800,
     temperature: 0.8,
-  });
+  }, telemetryCtx);
 
   const parsed = parseLooseJson<{ ideas: any[] }>(resp.content);
   const ideas = (parsed.ideas ?? []).slice(0, 5);

@@ -348,6 +348,14 @@ ${acoesTxt || "(nenhuma ação registrada)"}
 ${visitasTxt || "(nenhuma visita registrada)"}`;
 
     const baseConfig = await getClientLLMConfig(admin, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: admin,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-write-boletim',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
     const llmConfig: any = providerOverride
       ? { provider: providerOverride, model: modelOverride || undefined, apiKey: baseConfig.apiKey }
       : { ...baseConfig, model: modelOverride || baseConfig.model };
@@ -365,7 +373,7 @@ ${visitasTxt || "(nenhuma visita registrada)"}`;
       ],
       maxTokens: 5000,
       temperature: 0.45,
-    });
+    }, telemetryCtx);
 
     // Parse defensivo
     let parsed: any;

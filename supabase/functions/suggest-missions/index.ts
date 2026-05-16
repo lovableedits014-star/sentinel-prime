@@ -38,6 +38,14 @@ serve(async (req) => {
     );
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'suggest-missions',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const themeSummary = themes
       .map((t: any) => `- ${t.label}: ${t.total} menções, crescimento ${t.growthPct ?? 0}%`)
@@ -92,7 +100,7 @@ Crie missões de engajamento relevantes para esses temas. Responda APENAS com o 
       ],
       maxTokens: 1500,
       temperature: 0.7,
-    });
+    }, telemetryCtx);
 
     // Parse JSON from response (handle markdown code fences if present)
     let parsed: { suggestions?: any[] } = {};

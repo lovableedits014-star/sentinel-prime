@@ -188,6 +188,14 @@ Deno.serve(async (req) => {
     if (!comment.sentiment) {
       try {
         const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabaseClient,
+      clientId: clientId,
+      userId: user?.id ?? null,
+      functionName: 'respond-to-comment',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
         const sentiment = await analyzeSentiment(llmConfig, comment.text);
         updateData.sentiment = sentiment;
         console.log(`🎯 Auto-classified sentiment: ${sentiment}`);
@@ -258,7 +266,7 @@ Responda APENAS com uma palavra: positive, negative ou neutral.`,
     messages,
     maxTokens: 10,
     temperature: 0,
-  });
+  }, telemetryCtx);
 
   const result = response.content.toLowerCase().trim().replace(/[^a-z]/g, '');
   if (['positive', 'negative', 'neutral'].includes(result)) return result;

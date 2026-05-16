@@ -54,6 +54,14 @@ serve(async (req) => {
       .join("\n");
 
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-dna-analyzer',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     const systemPrompt = `Você é um analista de comunicação política. A partir dos posts próprios do candidato, extraia o "DNA editorial".
 Retorne APENAS JSON válido, sem markdown:
@@ -78,7 +86,7 @@ Responda APENAS com o JSON.`;
       ],
       maxTokens: 1500,
       temperature: 0.3,
-    });
+    }, telemetryCtx);
 
     const parsed = parseLooseJson<any>(resp.content);
 

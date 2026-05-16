@@ -26,6 +26,14 @@ async function generateMessage(
 ): Promise<string> {
   try {
     const llmConfig = await getClientLLMConfig(supabase, clientId);
+    const telemetryCtx: TelemetryContext = {
+      admin: supabase,
+      clientId: clientId,
+      userId: null,
+      functionName: 'ic-suggest-dispatches',
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
 
     // Puxa DNA p/ tom/voz
     const { data: dna } = await supabase
@@ -61,7 +69,7 @@ Escreva APENAS a mensagem, sem aspas, sem rótulos.`;
       ],
       maxTokens: 350,
       temperature: 0.7,
-    });
+    }, telemetryCtx);
     return resp.content.trim().slice(0, 800);
   } catch (e) {
     console.error("[ic-suggest-dispatches] generateMessage failed:", e);
