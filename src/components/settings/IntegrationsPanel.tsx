@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -64,12 +64,53 @@ type ProviderCard = {
   provider: LLMProvider; // never 'lovable' here — lovable is the implicit fallback
   model: string;
   apiKey: string;
+  savedApiKey: string;
   isConfigured: boolean;
   tiers: Record<TierKey, boolean>;
   status: ProviderCardStatus;
   statusMessage: string;
   testedAt: number | null;
 };
+
+const INTEGRATIONS_QUERY_TIMEOUT_MS = 15000;
+const LLM_TEST_TIMEOUT_MS = 20000;
+const INTEGRATIONS_SELECT = "meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_api_key, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep";
+
+const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+const redactIntegrationForLog = (integration: any) => {
+  if (!integration) return null;
+  const redacted = { ...integration };
+  for (const key of Object.keys(redacted)) {
+    if (key.includes('api_key') || key.includes('access_token')) {
+      redacted[key] = redacted[key] ? '[REDACTED_PRESENT]' : null;
+    }
+  }
+  return redacted;
+};
+
+const redactCardsForLog = (cards: ProviderCard[]) => cards.map(card => ({
+  id: card.id,
+  provider: card.provider,
+  model: card.model,
+  hasNewApiKey: !!card.apiKey,
+  hasSavedApiKey: !!card.savedApiKey,
+  isConfigured: card.isConfigured,
+  tiers: card.tiers,
+  status: card.status,
+}));
 
 const emptyTierFlags = (): Record<TierKey, boolean> => ({
   fast: false, classify: false, reasoning: false, deep: false,
@@ -87,6 +128,9 @@ const mergeTierFlags = (a: Record<TierKey, boolean>, b: Record<TierKey, boolean>
 // Map raw provider errors → friendly Portuguese messages
 const humanizeLLMError = (raw: string): string => {
   const msg = (raw || '').toLowerCase();
+  if (msg.includes('aborted') || msg.includes('aborterror') || msg.includes('timeout') || msg.includes('tempo limite')) {
+    return 'Timeout — o provider demorou a responder.';
+  }
   if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key') || msg.includes('api key')) {
     return 'API key inválida ou sem permissão.';
   }
@@ -99,13 +143,44 @@ const humanizeLLMError = (raw: string): string => {
   if (msg.includes('model') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('invalid'))) {
     return 'Modelo inexistente ou indisponível para esta conta.';
   }
-  if (msg.includes('timeout') || msg.includes('etimedout')) {
-    return 'Timeout — o provider demorou a responder.';
-  }
   if (msg.includes('network') || msg.includes('fetch failed') || msg.includes('econnrefused')) {
     return 'Provider indisponível no momento.';
   }
   return raw || 'Falha desconhecida na conexão.';
+};
+
+const invokeFunctionWithTimeout = async <T,>(functionName: string, body: Record<string, unknown>, timeoutMs: number): Promise<T> => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+  if (!supabaseUrl || !anonKey) throw new Error('Configuração Supabase indisponível no navegador.');
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${accessToken || anonKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      throw new Error(payload?.error || payload?.message || `Erro HTTP ${response.status}`);
+    }
+    return payload as T;
+  } catch (error: any) {
+    if (error?.name === 'AbortError') throw new Error('Timeout ao testar provider');
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 function StatusDot({ status, compact = false }: { status: ProviderCardStatus; compact?: boolean }) {
@@ -161,6 +236,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
   });
   const [providerCards, setProviderCards] = useState<ProviderCard[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const fetchSeqRef = useRef(0);
 
   const [customPrompt, setCustomPrompt] = useState("");
 
@@ -169,12 +245,19 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
   }, [clientId]);
 
   const fetchIntegrations = async () => {
+    const fetchSeq = ++fetchSeqRef.current;
+    setLoading(true);
     try {
-      const { data: integration } = await supabase
+      console.info('[IntegrationsPanel] loading integrations', { clientId });
+      const { data: integration, error } = await withTimeout(supabase
         .from("integrations")
-        .select("meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep")
+        .select(INTEGRATIONS_SELECT)
         .eq("client_id", clientId)
-        .maybeSingle();
+        .maybeSingle(), INTEGRATIONS_QUERY_TIMEOUT_MS, 'Timeout ao carregar integrações');
+
+      if (fetchSeq !== fetchSeqRef.current) return;
+      if (error) throw error;
+      console.info('[IntegrationsPanel] integrations payload returned', redactIntegrationForLog(integration));
 
       if (integration) {
         setMetaData({
@@ -222,11 +305,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
 
         // Derive provider-first cards from tier columns
         const byProvider = new Map<LLMProvider, ProviderCard>();
-        const tierData: { tier: TierKey; provider: any; model: any; hasKey: boolean }[] = [
-          { tier: 'fast',      provider: integAny.llm_provider_fast,      model: integAny.llm_model_fast,      hasKey: !!integAny.llm_api_key_fast },
-          { tier: 'classify',  provider: integAny.llm_provider_classify,  model: integAny.llm_model_classify,  hasKey: !!integAny.llm_api_key_classify },
-          { tier: 'reasoning', provider: integAny.llm_provider_reasoning, model: integAny.llm_model_reasoning, hasKey: !!integAny.llm_api_key_reasoning },
-          { tier: 'deep',      provider: integAny.llm_provider_deep,      model: integAny.llm_model_deep,      hasKey: !!integAny.llm_api_key_deep },
+        const tierData: { tier: TierKey; provider: any; model: any; savedApiKey: string }[] = [
+          { tier: 'fast',      provider: integAny.llm_provider_fast,      model: integAny.llm_model_fast,      savedApiKey: integAny.llm_api_key_fast || '' },
+          { tier: 'classify',  provider: integAny.llm_provider_classify,  model: integAny.llm_model_classify,  savedApiKey: integAny.llm_api_key_classify || '' },
+          { tier: 'reasoning', provider: integAny.llm_provider_reasoning, model: integAny.llm_model_reasoning, savedApiKey: integAny.llm_api_key_reasoning || '' },
+          { tier: 'deep',      provider: integAny.llm_provider_deep,      model: integAny.llm_model_deep,      savedApiKey: integAny.llm_api_key_deep || '' },
         ];
         for (const t of tierData) {
           if (!t.provider) continue;
@@ -237,7 +320,8 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
               provider: key,
               model: t.model || DEFAULT_MODELS[key]?.default || '',
               apiKey: '',
-              isConfigured: t.hasKey,
+              savedApiKey: t.savedApiKey,
+              isConfigured: !!t.savedApiKey,
               tiers: emptyTierFlags(),
               status: 'untested',
               statusMessage: '',
@@ -247,9 +331,17 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           const card = byProvider.get(key)!;
           card.tiers[t.tier] = true;
           if (!card.model && t.model) card.model = t.model;
-          if (t.hasKey) card.isConfigured = true;
+          if (t.savedApiKey) {
+            card.savedApiKey = card.savedApiKey || t.savedApiKey;
+            card.isConfigured = true;
+          }
         }
-        setProviderCards(Array.from(byProvider.values()));
+        const hydratedCards = Array.from(byProvider.values());
+        console.info('[IntegrationsPanel] hydrated hybrid state', {
+          mode: integAny.llm_mode === 'hybrid' ? 'hybrid' : 'simple',
+          cards: redactCardsForLog(hydratedCards),
+        });
+        setProviderCards(hydratedCards);
 
         setCustomPrompt(integAny.ai_custom_prompt || "");
 
@@ -278,8 +370,9 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       }
     } catch (error: any) {
       console.error("Error fetching integrations:", error);
+      toast.error(error?.message || 'Erro ao carregar integrações');
     } finally {
-      setLoading(false);
+      if (fetchSeq === fetchSeqRef.current) setLoading(false);
     }
   };
 
@@ -333,6 +426,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           provider,
           model: DEFAULT_MODELS[provider]?.default || '',
           apiKey: '',
+          savedApiKey: existing?.savedApiKey ?? '',
           isConfigured: existing?.isConfigured ?? false,
           tiers: existing ? { ...c.tiers, ...mergeTierFlags(c.tiers, existing.tiers) } : c.tiers,
           status: 'untested' as ProviderCardStatus,
@@ -365,6 +459,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       provider: next.value,
       model: DEFAULT_MODELS[next.value]?.default || '',
       apiKey: '',
+      savedApiKey: '',
       isConfigured: false,
       tiers: emptyTierFlags(),
       status: 'untested',
@@ -381,15 +476,10 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     const card = providerCards.find(c => c.id === id);
     if (!card) return false;
 
-    if (!card.apiKey && !card.isConfigured) {
+    const apiKeyForTest = (card.apiKey || card.savedApiKey || '').trim();
+
+    if (!apiKeyForTest && !card.isConfigured) {
       updateCard(id, { status: 'error', statusMessage: 'Configure a API key antes de testar.' });
-      return false;
-    }
-    if (!card.apiKey) {
-      updateCard(id, {
-        status: 'untested',
-        statusMessage: 'Para re-testar, informe a API key (chave salva não é exposta ao navegador).',
-      });
       return false;
     }
     if (!clientId) {
@@ -398,11 +488,27 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     }
 
     updateCard(id, { status: 'testing', statusMessage: '' });
+    console.info('[IntegrationsPanel] test-llm-connection request', {
+      clientId,
+      provider: card.provider,
+      model: card.model,
+      usingSavedKey: !card.apiKey && !!card.savedApiKey,
+      hasApiKey: !!apiKeyForTest,
+    });
     try {
-      const { data, error } = await supabase.functions.invoke('test-llm-connection', {
-        body: { clientId, provider: card.provider, apiKey: card.apiKey, model: card.model },
+      const data = await invokeFunctionWithTimeout<any>('test-llm-connection', {
+        clientId,
+        provider: card.provider,
+        apiKey: apiKeyForTest,
+        model: card.model,
+      }, LLM_TEST_TIMEOUT_MS);
+      console.info('[IntegrationsPanel] test-llm-connection response', {
+        success: !!data?.success,
+        provider: data?.provider || card.provider,
+        model: data?.model || card.model,
+        errorType: data?.errorType || null,
+        error: data?.error || null,
       });
-      if (error) throw error;
       if (data?.success) {
         updateCard(id, {
           status: 'ok',
@@ -486,14 +592,29 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     }
     setTestingLLM(true);
     try {
-      const { data, error } = await supabase.functions.invoke('test-llm-connection', {
-        body: { clientId, provider: llmData.provider, apiKey: llmData.apiKey, model: llmData.model }
+      console.info('[IntegrationsPanel] simple LLM test request', {
+        clientId,
+        provider: llmData.provider,
+        model: llmData.model,
+        hasApiKey: !!llmData.apiKey,
       });
-      if (error) throw error;
-      if (data.success) toast.success(data.message);
-      else toast.error(data.error || 'Erro ao testar conexão');
+      const data = await invokeFunctionWithTimeout<any>('test-llm-connection', {
+        clientId,
+        provider: llmData.provider,
+        apiKey: llmData.apiKey,
+        model: llmData.model,
+      }, LLM_TEST_TIMEOUT_MS);
+      console.info('[IntegrationsPanel] simple LLM test response', {
+        success: !!data?.success,
+        provider: data?.provider || llmData.provider,
+        model: data?.model || llmData.model,
+        errorType: data?.errorType || null,
+        error: data?.error || null,
+      });
+      if (data.success) toast.success(data.message || 'Provider validado');
+      else toast.error(humanizeLLMError(data.error || 'Erro ao testar conexão'));
     } catch (error: any) {
-      toast.error(error.message || "Erro ao testar conexão com LLM");
+      toast.error(humanizeLLMError(error.message || "Erro ao testar conexão com LLM"));
     } finally {
       setTestingLLM(false);
     }
@@ -576,19 +697,24 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
             updateData[`llm_api_key_${t.key}`] = null;
             updateData[`llm_model_${t.key}`] = null;
           } else {
+            const keyToPersist = (card.apiKey || card.savedApiKey || '').trim();
             updateData[`llm_provider_${t.key}`] = card.provider;
             updateData[`llm_model_${t.key}`] = card.model || null;
-            if (card.apiKey && card.apiKey.trim() !== "") {
-              updateData[`llm_api_key_${t.key}`] = card.apiKey;
-            }
+            updateData[`llm_api_key_${t.key}`] = keyToPersist || null;
           }
         }
       }
 
       updateData.ai_custom_prompt = customPrompt || null;
 
-      const { error } = await supabase.from("integrations").upsert(updateData, { onConflict: 'client_id' });
+      console.info('[IntegrationsPanel] saving integrations payload', redactIntegrationForLog(updateData));
+      const { data: savedIntegration, error } = await withTimeout(supabase
+        .from("integrations")
+        .upsert(updateData, { onConflict: 'client_id' })
+        .select(INTEGRATIONS_SELECT)
+        .maybeSingle(), INTEGRATIONS_QUERY_TIMEOUT_MS, 'Timeout ao salvar integrações');
       if (error) throw error;
+      console.info('[IntegrationsPanel] saved integrations returned', redactIntegrationForLog(savedIntegration));
 
       // Capture cards with freshly-entered keys before we clear them — we'll auto-test these
       const cardsToTest = mode === 'hybrid'
@@ -624,6 +750,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       }
       setProviderCards(prev => prev.map(c => ({
         ...c,
+        savedApiKey: c.apiKey || c.savedApiKey,
         apiKey: "",
         isConfigured: c.isConfigured || !!c.apiKey,
       })));

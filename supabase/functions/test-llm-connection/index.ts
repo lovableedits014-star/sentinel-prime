@@ -19,6 +19,43 @@ const RequestSchema = z.object({
   model: z.string().optional(),
 });
 
+const TEST_TIMEOUT_MS = 18000;
+
+function classifyLLMTestError(error: unknown): { message: string; type: string; status: number } {
+  const raw = error instanceof Error ? error.message : String(error || 'Erro desconhecido');
+  const msg = raw.toLowerCase();
+  if (msg.includes('timeout') || msg.includes('aborted')) {
+    return { message: 'Timeout — o provider demorou a responder.', type: 'timeout', status: 408 };
+  }
+  if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key') || msg.includes('api key')) {
+    return { message: 'API key inválida ou sem permissão.', type: 'invalid_api_key', status: 400 };
+  }
+  if (msg.includes('model') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('invalid'))) {
+    return { message: 'Modelo inexistente ou indisponível para esta conta.', type: 'invalid_model', status: 400 };
+  }
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('quota')) {
+    return { message: 'Limite de requisições excedido no provider.', type: 'rate_limit', status: 429 };
+  }
+  if (msg.includes('fetch failed') || msg.includes('network') || msg.includes('503') || msg.includes('502')) {
+    return { message: 'Provider indisponível no momento.', type: 'provider_unavailable', status: 503 };
+  }
+  return { message: raw, type: 'unknown', status: 400 };
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: number | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -53,12 +90,23 @@ Deno.serve(async (req) => {
       { role: 'user', content: 'Responda apenas com a palavra "conectado" para confirmar a conexão.' },
     ];
 
-    console.log(`🔄 [test-llm-connection] client=${clientId} provider=${provider}`);
+    console.log('[test-llm-connection] request', {
+      clientId,
+      provider,
+      model: llmConfig.model,
+      hasApiKey: !!apiKey,
+    });
 
-    const response = await callLLM(llmConfig, {
+    const response = await withTimeout(callLLM(llmConfig, {
       messages,
       maxTokens: 20,
       temperature: 0,
+    }), TEST_TIMEOUT_MS);
+
+    console.log('[test-llm-connection] success', {
+      clientId,
+      provider: response.provider,
+      model: response.model,
     });
 
     return new Response(
@@ -72,16 +120,17 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error testing LLM connection:', error);
-    const errorMessage =
-      error instanceof z.ZodError
-        ? 'Dados inválidos (clientId/provider/apiKey obrigatórios)'
-        : error instanceof Error
-        ? error.message
-        : 'Erro desconhecido';
+    const classified = error instanceof z.ZodError
+      ? { message: 'Dados inválidos (clientId/provider/apiKey obrigatórios)', type: 'invalid_payload', status: 400 }
+      : classifyLLMTestError(error);
 
-    return new Response(JSON.stringify({ success: false, error: errorMessage }), {
-      status: 400,
+    console.error('[test-llm-connection] failure', {
+      type: classified.type,
+      message: classified.message,
+    });
+
+    return new Response(JSON.stringify({ success: false, error: classified.message, errorType: classified.type }), {
+      status: classified.status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
