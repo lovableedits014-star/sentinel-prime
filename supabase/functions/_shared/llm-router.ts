@@ -1,6 +1,7 @@
 /**
  * Multi-LLM Router - Routes requests to different LLM providers based on client configuration
  */
+import { logLLMUsage, classifyError, type TelemetryContext } from './telemetry.ts';
 
 export type LLMProvider = 'groq' | 'openai' | 'anthropic' | 'gemini' | 'mistral' | 'cohere' | 'lovable';
 
