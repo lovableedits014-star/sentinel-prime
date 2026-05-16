@@ -21,7 +21,7 @@ interface Body {
   };
 }
 
-async function callIcFn(name: string, payload: any, authHeader: string) {
+async function callIcFn(name: string, authHeader: string, payload: any) {
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
