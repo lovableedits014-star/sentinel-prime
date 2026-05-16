@@ -74,7 +74,58 @@ type ProviderCard = {
 
 const INTEGRATIONS_QUERY_TIMEOUT_MS = 15000;
 const LLM_TEST_TIMEOUT_MS = 20000;
-const INTEGRATIONS_SELECT = "meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_api_key, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep";
+const INTEGRATIONS_SELECT = "meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_api_key, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, ai_prompt_tom_voz, ai_prompt_restricoes, ai_prompt_logica_comportamental, ai_prompt_regras_estruturais, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep";
+
+// Blocos estruturados do prompt da IA (todos opcionais, persistidos individualmente)
+type PromptBlockKey = 'tom_voz' | 'restricoes' | 'logica_comportamental' | 'regras_estruturais';
+const PROMPT_BLOCKS: Array<{
+  key: PromptBlockKey;
+  column: string;
+  label: string;
+  hint: string;
+  placeholder: string;
+  sectionHeader: string;
+}> = [
+  {
+    key: 'tom_voz',
+    column: 'ai_prompt_tom_voz',
+    label: 'Tom de Voz',
+    hint: 'Personalidade, formalidade, postura institucional. Como a IA deve "soar".',
+    placeholder: 'Ex: Tom formal, empático e institucional. Sempre respeitoso, nunca irônico.',
+    sectionHeader: '🎙️ TOM DE VOZ',
+  },
+  {
+    key: 'restricoes',
+    column: 'ai_prompt_restricoes',
+    label: 'Restrições',
+    hint: 'O que a IA NUNCA pode fazer: temas proibidos, palavras vetadas, promessas, etc.',
+    placeholder: 'Ex: Nunca fazer promessas políticas. Nunca citar adversários. Evitar repetição da mesma saudação.',
+    sectionHeader: '🚫 RESTRIÇÕES',
+  },
+  {
+    key: 'logica_comportamental',
+    column: 'ai_prompt_logica_comportamental',
+    label: 'Lógica Comportamental',
+    hint: 'Como reagir a elogios, críticas, dúvidas, ataques, ofensas.',
+    placeholder: 'Ex: Em elogios, agradecer brevemente. Em críticas, demonstrar escuta. Em dúvidas, orientar com gentileza.',
+    sectionHeader: '🧭 LÓGICA COMPORTAMENTAL',
+  },
+  {
+    key: 'regras_estruturais',
+    column: 'ai_prompt_regras_estruturais',
+    label: 'Regras Estruturais',
+    hint: 'Tamanho, formato, idioma, uso de emoji, assinatura.',
+    placeholder: 'Ex: Máximo 2 frases. Sem emojis. Sempre em português. Não assinar a resposta.',
+    sectionHeader: '📐 REGRAS ESTRUTURAIS',
+  },
+];
+
+const emptyPromptBlocks = (): Record<PromptBlockKey, string> => ({
+  tom_voz: '',
+  restricoes: '',
+  logica_comportamental: '',
+  regras_estruturais: '',
+});
 
 const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -264,6 +315,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
   const fetchSeqRef = useRef(0);
 
   const [customPrompt, setCustomPrompt] = useState("");
+  const [promptBlocks, setPromptBlocks] = useState<Record<PromptBlockKey, string>>(emptyPromptBlocks());
 
   useEffect(() => {
     fetchIntegrations();
@@ -369,6 +421,12 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         setProviderCards(hydratedCards);
 
         setCustomPrompt(integAny.ai_custom_prompt || "");
+        setPromptBlocks({
+          tom_voz: integAny.ai_prompt_tom_voz || "",
+          restricoes: integAny.ai_prompt_restricoes || "",
+          logica_comportamental: integAny.ai_prompt_logica_comportamental || "",
+          regras_estruturais: integAny.ai_prompt_regras_estruturais || "",
+        });
 
         const expiresAt = (integration as any).meta_token_expires_at;
         const tType = (integration as any).meta_token_type;
@@ -732,6 +790,10 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       }
 
       updateData.ai_custom_prompt = customPrompt || null;
+      for (const block of PROMPT_BLOCKS) {
+        const value = (promptBlocks[block.key] || '').trim();
+        updateData[block.column] = value ? value : null;
+      }
 
       console.info('[IntegrationsPanel] saving integrations payload', redactIntegrationForLog(updateData));
       const { data: savedIntegration, error } = await withTimeout(supabase
@@ -1091,7 +1153,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         </CardContent>
       </Card>
 
-      {/* Custom AI Prompt */}
+      {/* Custom AI Prompt — estruturado por blocos */}
       <Card className="border-primary/20">
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -1100,26 +1162,52 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
             </div>
             <div>
               <CardTitle>Prompt de Resposta</CardTitle>
-              <CardDescription>Defina as instruções que a IA deve seguir ao gerar respostas para comentários</CardDescription>
+              <CardDescription>
+                Defina as instruções da IA em blocos organizados. Todos os blocos são opcionais e podem ser editados livremente.
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="custom-prompt">Instruções para a IA</Label>
+        <CardContent className="space-y-5">
+          {customPrompt && PROMPT_BLOCKS.every(b => !(promptBlocks[b.key] || '').trim()) && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              Detectamos seu prompt atual em <strong>Instruções complementares</strong> (abaixo). Para melhor organização,
+              distribua-o nos blocos acima — o comportamento da IA permanece idêntico até você salvar.
+            </div>
+          )}
+
+          {PROMPT_BLOCKS.map((block) => (
+            <div key={block.key} className="space-y-2">
+              <Label htmlFor={`prompt-${block.key}`}>{block.label}</Label>
+              <Textarea
+                id={`prompt-${block.key}`}
+                placeholder={block.placeholder}
+                value={promptBlocks[block.key]}
+                onChange={(e) =>
+                  setPromptBlocks((prev) => ({ ...prev, [block.key]: e.target.value }))
+                }
+                className="min-h-[90px]"
+              />
+              <p className="text-xs text-muted-foreground">{block.hint}</p>
+            </div>
+          ))}
+
+          <div className="space-y-2 pt-2 border-t">
+            <Label htmlFor="custom-prompt">Instruções complementares (livre)</Label>
             <Textarea
               id="custom-prompt"
-              placeholder="Ex: Responda sempre em nome do Deputado João Silva. Use tom formal e empático..."
+              placeholder="Qualquer instrução extra que não se encaixe nos blocos acima."
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
-              className="min-h-[120px]"
+              className="min-h-[100px]"
             />
             <p className="text-xs text-muted-foreground">
-              Este prompt será usado como base para todas as respostas geradas pela IA. Deixe em branco para usar o comportamento padrão.
+              Campo livre — preserva qualquer prompt antigo já salvo. Deixe em branco para usar apenas os blocos estruturados.
             </p>
           </div>
         </CardContent>
       </Card>
+
 
       {/* Meta Graph API */}
       <Card>

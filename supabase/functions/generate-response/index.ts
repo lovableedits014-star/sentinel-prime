@@ -67,14 +67,28 @@ Deno.serve(async (req) => {
       .eq('client_id', clientId)
       .single();
 
-    // Get custom prompt from integrations
+    // Get custom prompt (blocos estruturados + legado livre) from integrations
     const { data: integration } = await supabaseClient
       .from('integrations')
-      .select('ai_custom_prompt')
+      .select('ai_custom_prompt, ai_prompt_tom_voz, ai_prompt_restricoes, ai_prompt_logica_comportamental, ai_prompt_regras_estruturais')
       .eq('client_id', clientId)
       .single();
-    
-    const customPrompt = integration?.ai_custom_prompt || null;
+
+    const promptSections: string[] = [];
+    const pushBlock = (header: string, value: unknown) => {
+      const v = typeof value === 'string' ? value.trim() : '';
+      if (v) promptSections.push(`${header}\n${v}`);
+    };
+    pushBlock('🎙️ TOM DE VOZ', integration?.ai_prompt_tom_voz);
+    pushBlock('🚫 RESTRIÇÕES', integration?.ai_prompt_restricoes);
+    pushBlock('🧭 LÓGICA COMPORTAMENTAL', integration?.ai_prompt_logica_comportamental);
+    pushBlock('📐 REGRAS ESTRUTURAIS', integration?.ai_prompt_regras_estruturais);
+    const legacy = typeof integration?.ai_custom_prompt === 'string' ? integration.ai_custom_prompt.trim() : '';
+    if (legacy) promptSections.push(`📝 INSTRUÇÕES COMPLEMENTARES\n${legacy}`);
+
+    // Fallback: se nenhum bloco preenchido, passa null (comportamento padrão preservado)
+    const customPrompt = promptSections.length > 0 ? promptSections.join('\n\n') : null;
+    console.log(`📝 Prompt blocks assembled: ${promptSections.length} section(s)`);
 
     if (commentError || !comment) {
       return new Response(
