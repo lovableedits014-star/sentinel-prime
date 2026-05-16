@@ -645,77 +645,135 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
               )}
             </>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="text-xs text-muted-foreground p-3 rounded-md bg-primary/5 border border-primary/10">
-                Cada tier consulta suas próprias colunas no banco (<code>llm_provider_*</code>, <code>llm_api_key_*</code>, <code>llm_model_*</code>).
-                Se um tier ficar em "Lovable AI", o router faz fallback automático para o provider Lovable nesse tier.
+                Configure cada provider <strong>uma única vez</strong> e marque quais tiers ele atende.
+                Tiers sem provider explícito caem automaticamente no <strong>Lovable AI</strong> (fallback).
               </div>
-              {TIERS.map((tierDef) => {
-                const cfg = tiers[tierDef.key];
-                const Icon = tierDef.icon;
-                const models = DEFAULT_MODELS[cfg.provider]?.models || [];
+
+              {providerCards.length === 0 && (
+                <div className="text-center py-8 text-sm text-muted-foreground border border-dashed rounded-lg">
+                  Nenhum provider configurado — todos os tiers usarão Lovable AI por padrão.
+                </div>
+              )}
+
+              {providerCards.map((card) => {
+                const models = DEFAULT_MODELS[card.provider]?.models || [];
+                const otherUsed = new Set(
+                  providerCards.filter(c => c.id !== card.id).map(c => c.provider)
+                );
                 return (
-                  <div key={tierDef.key} className="rounded-lg border p-4 space-y-3 bg-card">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm">{tierDef.label}</span>
-                          {cfg.provider !== 'lovable' && (
-                            <Badge variant="outline" className="text-[10px]">{cfg.provider}</Badge>
-                          )}
-                          {cfg.provider === 'lovable' && (
-                            <Badge variant="secondary" className="text-[10px]">Lovable AI (padrão)</Badge>
-                          )}
+                  <div key={card.id} className="rounded-lg border p-4 space-y-4 bg-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 space-y-3">
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Provider</Label>
+                            <Select value={card.provider} onValueChange={(v) => changeCardProvider(card.id, v as LLMProvider)}>
+                              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {SELECTABLE_PROVIDERS.map((p) => (
+                                  <SelectItem key={p.value} value={p.value} disabled={otherUsed.has(p.value)}>
+                                    {p.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Modelo</Label>
+                            <Select value={card.model} onValueChange={(v) => updateCard(card.id, { model: v })}>
+                              <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent>
+                                {models.map((m) => (
+                                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{tierDef.description}</p>
+                        <div className="space-y-1">
+                          <Label className="text-xs">API Key</Label>
+                          <Input
+                            type="password"
+                            className="h-9"
+                            placeholder={card.isConfigured ? "••••••••• (configurada — deixe em branco para manter)" : "API key"}
+                            value={card.apiKey}
+                            onChange={(e) => updateCard(card.id, { apiKey: e.target.value })}
+                          />
+                        </div>
                       </div>
+                      <Button
+                        variant="ghost" size="sm"
+                        onClick={() => removeCard(card.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        Remover
+                      </Button>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Provider</Label>
-                        <Select value={cfg.provider} onValueChange={(v) => handleTierProviderChange(tierDef.key, v)}>
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {LLM_PROVIDERS.map((p) => (
-                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Modelo</Label>
-                        <Select
-                          value={cfg.model}
-                          onValueChange={(v) => updateTier(tierDef.key, { model: v })}
-                          disabled={cfg.provider === 'lovable'}
-                        >
-                          <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent>
-                            {models.map((m) => (
-                              <SelectItem key={m} value={m}>{m}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">API Key</Label>
-                        <Input
-                          type="password"
-                          className="h-9"
-                          disabled={cfg.provider === 'lovable'}
-                          placeholder={cfg.isConfigured ? "••••••••• (configurada)" : "API key"}
-                          value={cfg.apiKey}
-                          onChange={(e) => updateTier(tierDef.key, { apiKey: e.target.value })}
-                        />
+                    <div className="space-y-2">
+                      <Label className="text-xs">Tiers atendidos por este provider</Label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {TIERS.map((tierDef) => {
+                          const Icon = tierDef.icon;
+                          const checked = card.tiers[tierDef.key];
+                          return (
+                            <label
+                              key={tierDef.key}
+                              className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                                checked ? 'bg-primary/10 border-primary/30' : 'bg-muted/30 border-border hover:bg-muted/60'
+                              }`}
+                            >
+                              <Switch
+                                checked={checked}
+                                onCheckedChange={(v) => toggleCardTier(card.id, tierDef.key, v)}
+                              />
+                              <Icon className="w-3.5 h-3.5 text-primary" />
+                              <span className="text-xs font-medium">{tierDef.label}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                 );
               })}
+
+              <Button
+                variant="outline"
+                onClick={addCard}
+                disabled={providerCards.length >= SELECTABLE_PROVIDERS.length}
+                className="w-full"
+              >
+                + Adicionar Provider
+              </Button>
+
+              {/* Advanced (per-tier) debug view */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(v => !v)}
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                >
+                  {showAdvanced ? '▾ Ocultar' : '▸ Ver'} mapeamento por tier (debug)
+                </button>
+                {showAdvanced && (
+                  <div className="mt-2 rounded-md border bg-muted/20 p-3 text-xs space-y-1 font-mono">
+                    {TIERS.map(t => {
+                      const card = providerCards.find(c => c.tiers[t.key]);
+                      return (
+                        <div key={t.key} className="flex items-center justify-between">
+                          <span className="text-muted-foreground">{t.label}</span>
+                          <span>
+                            {card ? `${card.provider} · ${card.model || '—'}` : 'Lovable AI (fallback)'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
