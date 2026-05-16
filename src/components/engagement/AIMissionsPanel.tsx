@@ -58,16 +58,8 @@ export default function AIMissionsPanel() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Não autenticado");
 
-      let clientId: string | null = null;
-      const { data: client } = await supabase
-        .from("clients").select("id").eq("user_id", session.user.id).maybeSingle();
-      if (client) clientId = client.id;
-      else {
-        const { data: tm } = await supabase
-          .from("team_members").select("client_id")
-          .eq("user_id", session.user.id).eq("status", "active").maybeSingle();
-        if (tm) clientId = tm.client_id;
-      }
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const clientId: string | null = await resolveClientId();
       if (!clientId) throw new Error("Cliente não encontrado");
 
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

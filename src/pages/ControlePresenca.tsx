@@ -51,14 +51,15 @@ export default function ControlePresenca() {
   const [running, setRunning] = useState(false);
 
   const { data: client } = useQuery({
-    queryKey: ["my-client-presenca"],
+    queryKey: ["my-client-presenca-active"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const cId = await resolveClientId();
+      if (!cId) return null;
       const { data } = await supabase
         .from("clients")
         .select("id, name, presence_absence_days_threshold")
-        .eq("user_id", user.id)
+        .eq("id", cId)
         .maybeSingle();
       return data;
     },
