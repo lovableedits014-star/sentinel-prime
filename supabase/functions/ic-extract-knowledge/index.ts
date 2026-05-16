@@ -341,6 +341,10 @@ Deno.serve(async (req) => {
     const { requireClientAccess } = await import("../_shared/auth-guard.ts");
     const guard = await requireClientAccess(req, clientId);
     if (!guard.ok) return guard.response;
+    // JWT do usuário autenticado — propagado para todas as chamadas downstream
+    // (ic-extract-promessas, ic-memoria-insights, ic-suggest-dispatches),
+    // garantindo que cada uma revalide tenant via requireClientAccess.
+    const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const baseConfig = await getClientLLMConfig(admin, clientId);
