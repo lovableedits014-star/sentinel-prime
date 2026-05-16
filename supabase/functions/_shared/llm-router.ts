@@ -380,11 +380,13 @@ async function callGemini(
   model: string,
   messages: LLMMessage[],
   maxTokens: number,
-  temperature: number
+  temperature: number,
+  ctx?: TelemetryContext,
 ): Promise<LLMResponse> {
   const data = await callLLMRaw(
     { provider: 'gemini', apiKey, model },
     { messages, max_tokens: maxTokens, temperature },
+    ctx,
   );
   return {
     content: data.choices?.[0]?.message?.content ?? '',
