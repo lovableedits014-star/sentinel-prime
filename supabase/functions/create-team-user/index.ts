@@ -118,6 +118,15 @@ Deno.serve(async (req) => {
       role: "team_member",
     });
 
+    await logSecurityEvent(adminClient, {
+      event_type: "team_user_created",
+      user_id: caller.id,
+      target_user_id: newUser.user.id,
+      client_id: clientData.id,
+      metadata: { role: normalizedRole, email },
+      ...extractRequestMeta(req),
+    });
+
     return new Response(JSON.stringify({ 
       success: true, 
       user_id: newUser.user.id,
