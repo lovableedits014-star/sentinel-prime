@@ -421,6 +421,12 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         setProviderCards(hydratedCards);
 
         setCustomPrompt(integAny.ai_custom_prompt || "");
+        setPromptBlocks({
+          tom_voz: integAny.ai_prompt_tom_voz || "",
+          restricoes: integAny.ai_prompt_restricoes || "",
+          logica_comportamental: integAny.ai_prompt_logica_comportamental || "",
+          regras_estruturais: integAny.ai_prompt_regras_estruturais || "",
+        });
 
         const expiresAt = (integration as any).meta_token_expires_at;
         const tType = (integration as any).meta_token_type;
