@@ -1,0 +1,28 @@
+function,usa_llm,usa_transcribe,chama_getClientLLMConfig,valida_acesso,metodo_validacao,tier_alvo,risco,observacoes
+analyze-sentiment,sim,nao,sim,sim,rpc user_has_client_access,classify,baixo,já protegido. Fase 4 troca para callLLMStructured.
+batch-analyze-sentiments,sim,nao,sim,sim,rpc user_has_client_access,classify,baixo,já protegido. Fase 4.
+fetch-meta-comments,sim,nao,sim,sim,rpc user_has_client_access,fast,baixo,já protegido.
+generate-response,sim,nao,sim,sim,rpc user_has_client_access,fast,baixo,já protegido.
+respond-to-comment,sim,nao,sim,sim,rpc user_has_client_access,fast,baixo,já protegido.
+generate-quick-replies,sim,nao,sim,sim,owned+team_members (manual),fast,baixo,protegido via query manual; harmonizar para auth-guard depois.
+ic-generate-text,sim,nao,sim,sim,auth-guard requireClientAccess,reasoning,baixo,protegido via shared guard.
+ic-write-materia,sim,nao,sim,parcial,verificar,deep,MEDIO,checar se usa requireClientAccess; possivelmente sem proteção.
+ic-write-boletim,sim,nao,sim,parcial,verificar,deep,MEDIO,idem.
+ic-dna-analyzer,sim,nao,sim,parcial,verificar,deep,MEDIO,idem.
+ic-project,sim,nao,sim,parcial,verificar,deep,MEDIO,idem.
+ic-detect-contradictions,sim,nao,sim,parcial,verificar,reasoning,MEDIO,idem.
+ic-detect-drift,sim,nao,sim,parcial,verificar,reasoning,MEDIO,idem.
+ic-extract-knowledge,sim,nao,sim,parcial,verificar,reasoning,MEDIO,idem.
+ic-feed-from-transcript,sim,nao,sim,parcial,verificar,reasoning,MEDIO,idem.
+ic-radar,sim,nao,sim,parcial,verificar,reasoning,MEDIO,idem.
+ic-suggest-dispatches,sim,nao,sim,parcial,verificar,reasoning,MEDIO,idem.
+ic-daily-ideas,sim,nao,sim,nao,CRON (itera todos clients),reasoning,ALTO,cron job - precisa guard de CRON_SECRET; nunca chamado por usuário.
+ic-transcribe,sim,sim,sim,sim,auth getUser direto,fast(multi),baixo,protegido. Multimodal: gemini se config.
+ic-reprocess-transcription,nao,sim,nao,verificar,verificar,fast(multi),MEDIO,herda config de transcribe-router.
+narrativa-gerar,sim,nao,sim,parcial,verificar,reasoning,MEDIO,verificar.
+suggest-missions,sim,nao,sim,parcial,verificar,reasoning,MEDIO,verificar.
+test-llm-connection,sim,nao,sim,sim?,verificar,fast,baixo,utilitário; precisa pelo menos auth do super-admin ou owner.
+calculate-ied,nao,nao,nao,sim,auth getUser,n/a,n/a,não usa LLM.
+check-alerts,nao,nao,nao,sim,auth getUser,n/a,n/a,não usa LLM.
+react-to-comment,nao,nao,nao,sim,rpc user_has_client_access,n/a,n/a,não usa LLM.
+manage-comment,nao,nao,nao,sim,rpc user_has_client_access,n/a,n/a,não usa LLM.
