@@ -31,9 +31,6 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const {
-      client_id, nome, telefone, email, senha, cpf,
-      cidade, bairro, endereco, redes_sociais, data_nascimento,
     const rawBody = await req.json();
     validateInput(RegisterFuncionarioSchema, rawBody, { fn: "register-funcionario" });
     const {
