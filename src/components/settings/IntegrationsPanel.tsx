@@ -592,14 +592,29 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     }
     setTestingLLM(true);
     try {
-      const { data, error } = await supabase.functions.invoke('test-llm-connection', {
-        body: { clientId, provider: llmData.provider, apiKey: llmData.apiKey, model: llmData.model }
+      console.info('[IntegrationsPanel] simple LLM test request', {
+        clientId,
+        provider: llmData.provider,
+        model: llmData.model,
+        hasApiKey: !!llmData.apiKey,
       });
-      if (error) throw error;
-      if (data.success) toast.success(data.message);
-      else toast.error(data.error || 'Erro ao testar conexão');
+      const data = await invokeFunctionWithTimeout<any>('test-llm-connection', {
+        clientId,
+        provider: llmData.provider,
+        apiKey: llmData.apiKey,
+        model: llmData.model,
+      }, LLM_TEST_TIMEOUT_MS);
+      console.info('[IntegrationsPanel] simple LLM test response', {
+        success: !!data?.success,
+        provider: data?.provider || llmData.provider,
+        model: data?.model || llmData.model,
+        errorType: data?.errorType || null,
+        error: data?.error || null,
+      });
+      if (data.success) toast.success(data.message || 'Provider validado');
+      else toast.error(humanizeLLMError(data.error || 'Erro ao testar conexão'));
     } catch (error: any) {
-      toast.error(error.message || "Erro ao testar conexão com LLM");
+      toast.error(humanizeLLMError(error.message || "Erro ao testar conexão com LLM"));
     } finally {
       setTestingLLM(false);
     }
