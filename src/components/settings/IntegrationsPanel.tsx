@@ -74,7 +74,58 @@ type ProviderCard = {
 
 const INTEGRATIONS_QUERY_TIMEOUT_MS = 15000;
 const LLM_TEST_TIMEOUT_MS = 20000;
-const INTEGRATIONS_SELECT = "meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_api_key, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep";
+const INTEGRATIONS_SELECT = "meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_api_key, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, ai_prompt_tom_voz, ai_prompt_restricoes, ai_prompt_logica_comportamental, ai_prompt_regras_estruturais, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep";
+
+// Blocos estruturados do prompt da IA (todos opcionais, persistidos individualmente)
+type PromptBlockKey = 'tom_voz' | 'restricoes' | 'logica_comportamental' | 'regras_estruturais';
+const PROMPT_BLOCKS: Array<{
+  key: PromptBlockKey;
+  column: string;
+  label: string;
+  hint: string;
+  placeholder: string;
+  sectionHeader: string;
+}> = [
+  {
+    key: 'tom_voz',
+    column: 'ai_prompt_tom_voz',
+    label: 'Tom de Voz',
+    hint: 'Personalidade, formalidade, postura institucional. Como a IA deve "soar".',
+    placeholder: 'Ex: Tom formal, empático e institucional. Sempre respeitoso, nunca irônico.',
+    sectionHeader: '🎙️ TOM DE VOZ',
+  },
+  {
+    key: 'restricoes',
+    column: 'ai_prompt_restricoes',
+    label: 'Restrições',
+    hint: 'O que a IA NUNCA pode fazer: temas proibidos, palavras vetadas, promessas, etc.',
+    placeholder: 'Ex: Nunca fazer promessas políticas. Nunca citar adversários. Evitar repetição da mesma saudação.',
+    sectionHeader: '🚫 RESTRIÇÕES',
+  },
+  {
+    key: 'logica_comportamental',
+    column: 'ai_prompt_logica_comportamental',
+    label: 'Lógica Comportamental',
+    hint: 'Como reagir a elogios, críticas, dúvidas, ataques, ofensas.',
+    placeholder: 'Ex: Em elogios, agradecer brevemente. Em críticas, demonstrar escuta. Em dúvidas, orientar com gentileza.',
+    sectionHeader: '🧭 LÓGICA COMPORTAMENTAL',
+  },
+  {
+    key: 'regras_estruturais',
+    column: 'ai_prompt_regras_estruturais',
+    label: 'Regras Estruturais',
+    hint: 'Tamanho, formato, idioma, uso de emoji, assinatura.',
+    placeholder: 'Ex: Máximo 2 frases. Sem emojis. Sempre em português. Não assinar a resposta.',
+    sectionHeader: '📐 REGRAS ESTRUTURAIS',
+  },
+];
+
+const emptyPromptBlocks = (): Record<PromptBlockKey, string> => ({
+  tom_voz: '',
+  restricoes: '',
+  logica_comportamental: '',
+  regras_estruturais: '',
+});
 
 const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
