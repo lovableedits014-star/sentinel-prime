@@ -153,7 +153,8 @@ function emptyDoc(): DocumentJson {
 async function extractDocSingleShot(
   llmConfig: any,
   text: string,
-  hint?: string,
+  hint: string | undefined,
+  ctx?: TelemetryContext,
 ): Promise<DocumentJson> {
   const resp = await callLLM(llmConfig, {
     messages: [
@@ -162,7 +163,7 @@ async function extractDocSingleShot(
     ],
     maxTokens: 4500,
     temperature: 0.2,
-  }, telemetryCtx);
+  }, ctx);
   const parsed = parseLooseJson<DocumentJson>(resp.content);
   return { ...emptyDoc(), ...parsed };
 }
@@ -170,7 +171,8 @@ async function extractDocSingleShot(
 async function extractDocMapReduce(
   llmConfig: any,
   text: string,
-  hint?: string,
+  hint: string | undefined,
+  ctx?: TelemetryContext,
 ): Promise<DocumentJson> {
   const chunks = splitIntoChunks(text);
   console.log(`[ic-extract-knowledge] map-reduce com ${chunks.length} chunks`);
@@ -181,6 +183,7 @@ async function extractDocMapReduce(
         llmConfig,
         chunks[i],
         `${hint ?? ""} (parte ${i + 1}/${chunks.length} — extração parcial)`.trim(),
+        ctx,
       );
       partials.push(partial);
     } catch (e) {
@@ -206,7 +209,7 @@ Devolva APENAS o JSON consolidado no mesmo formato (titulo, resumo_executivo, po
     ],
     maxTokens: 5000,
     temperature: 0.2,
-  }, telemetryCtx);
+  }, ctx);
   const merged = parseLooseJson<DocumentJson>(resp.content);
   return { ...emptyDoc(), ...merged };
 }
@@ -215,6 +218,7 @@ async function extractDocument(
   llmConfig: any,
   text: string,
   hint?: string,
+  ctx?: TelemetryContext,
 ): Promise<DocumentJson> {
   if (text.length <= SINGLE_SHOT_LIMIT) return extractDocSingleShot(llmConfig, text, hint);
   return extractDocMapReduce(llmConfig, text, hint);
@@ -297,7 +301,7 @@ const LEGACY_SYSTEM = `Você é um analista político brasileiro extraindo fatos
 Tipos: promessa, proposta, bandeira, bairro, pessoa, adversario, historia, bordao, numero, evento, dado, outro.
 Retorne JSON: { "fatos": [{ "tipo","tema","texto","contexto","entidades":{"bairros":[],"pessoas":[],"valores":[],"datas":[]}, "confidence": 0.0 }] }`;
 
-async function extractLegacyFacts(llmConfig: any, text: string): Promise<DerivedFact[]> {
+async function extractLegacyFacts(llmConfig: any, text: string, ctx?: TelemetryContext): Promise<DerivedFact[]> {
   const resp = await callLLM(llmConfig, {
     messages: [
       { role: "system", content: LEGACY_SYSTEM },
@@ -308,7 +312,7 @@ async function extractLegacyFacts(llmConfig: any, text: string): Promise<Derived
     ],
     maxTokens: 2500,
     temperature: 0.2,
-  }, telemetryCtx);
+  }, ctx);
   const parsed = parseLooseJson<{ fatos?: DerivedFact[] }>(resp.content);
   return Array.isArray(parsed?.fatos) ? parsed.fatos : [];
 }
@@ -371,7 +375,7 @@ Deno.serve(async (req) => {
 
     if (isDocMode) {
       console.log(`[ic-extract-knowledge] DOC MODE (${sourceType}) — ${text.length} chars`);
-      const doc = await extractDocument(llmConfig, text, documentTitleHint);
+      const doc = await extractDocument(llmConfig, text, documentTitleHint, telemetryCtx);
 
       // Apaga documento anterior dessa fonte (re-processa)
       if (sourceId) {
@@ -457,7 +461,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ clientId }),
       }).catch((e) => console.error("[ic-extract-knowledge] insights fire failed:", e));
     } else {
-      derivedFacts = await extractLegacyFacts(llmConfig, text);
+      derivedFacts = await extractLegacyFacts(llmConfig, text, telemetryCtx);
     }
 
     // Limpa fatos antigos da mesma fonte (idempotência)
