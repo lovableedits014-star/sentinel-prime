@@ -454,20 +454,32 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         updateData.llm_model = llmData.model;
       }
 
-      // Hybrid mode: persist llm_mode + tier columns
+      // Hybrid mode: derive tier columns from provider-first cards
       updateData.llm_mode = mode;
       if (mode === 'hybrid') {
+        // Build tier -> card mapping. Tiers not assigned to any card → cleared (Lovable fallback).
+        const tierAssignment: Record<TierKey, ProviderCard | null> = {
+          fast: null, classify: null, reasoning: null, deep: null,
+        };
+        for (const card of providerCards) {
+          for (const t of TIERS) {
+            if (card.tiers[t.key]) {
+              // Last-writer-wins; UI prevents duplicates via toggleCardTier
+              tierAssignment[t.key] = card;
+            }
+          }
+        }
         for (const t of TIERS) {
-          const cfg = tiers[t.key];
-          if (cfg.provider === 'lovable') {
+          const card = tierAssignment[t.key];
+          if (!card) {
             updateData[`llm_provider_${t.key}`] = null;
             updateData[`llm_api_key_${t.key}`] = null;
             updateData[`llm_model_${t.key}`] = null;
           } else {
-            updateData[`llm_provider_${t.key}`] = cfg.provider;
-            updateData[`llm_model_${t.key}`] = cfg.model || null;
-            if (cfg.apiKey && cfg.apiKey.trim() !== "") {
-              updateData[`llm_api_key_${t.key}`] = cfg.apiKey;
+            updateData[`llm_provider_${t.key}`] = card.provider;
+            updateData[`llm_model_${t.key}`] = card.model || null;
+            if (card.apiKey && card.apiKey.trim() !== "") {
+              updateData[`llm_api_key_${t.key}`] = card.apiKey;
             }
           }
         }
