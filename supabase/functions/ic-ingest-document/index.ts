@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
     // Chama ic-extract-knowledge
     const extractRes = await fetch(`${SUPABASE_URL}/functions/v1/ic-extract-knowledge`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+      headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
       body: JSON.stringify({
         clientId,
         sourceType: extractSourceType,
