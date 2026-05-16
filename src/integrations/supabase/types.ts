@@ -2742,6 +2742,10 @@ export type Database = {
       integrations: {
         Row: {
           ai_custom_prompt: string | null
+          ai_prompt_logica_comportamental: string | null
+          ai_prompt_regras_estruturais: string | null
+          ai_prompt_restricoes: string | null
+          ai_prompt_tom_voz: string | null
           client_id: string
           created_at: string | null
           id: string
@@ -2775,6 +2779,10 @@ export type Database = {
         }
         Insert: {
           ai_custom_prompt?: string | null
+          ai_prompt_logica_comportamental?: string | null
+          ai_prompt_regras_estruturais?: string | null
+          ai_prompt_restricoes?: string | null
+          ai_prompt_tom_voz?: string | null
           client_id: string
           created_at?: string | null
           id?: string
@@ -2808,6 +2816,10 @@ export type Database = {
         }
         Update: {
           ai_custom_prompt?: string | null
+          ai_prompt_logica_comportamental?: string | null
+          ai_prompt_regras_estruturais?: string | null
+          ai_prompt_restricoes?: string | null
+          ai_prompt_tom_voz?: string | null
           client_id?: string
           created_at?: string | null
           id?: string
