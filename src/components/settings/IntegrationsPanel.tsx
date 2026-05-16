@@ -128,6 +128,9 @@ const mergeTierFlags = (a: Record<TierKey, boolean>, b: Record<TierKey, boolean>
 // Map raw provider errors → friendly Portuguese messages
 const humanizeLLMError = (raw: string): string => {
   const msg = (raw || '').toLowerCase();
+  if (msg.includes('aborted') || msg.includes('aborterror') || msg.includes('timeout') || msg.includes('tempo limite')) {
+    return 'Timeout — o provider demorou a responder.';
+  }
   if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('invalid api key') || msg.includes('api key')) {
     return 'API key inválida ou sem permissão.';
   }
@@ -140,13 +143,44 @@ const humanizeLLMError = (raw: string): string => {
   if (msg.includes('model') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('invalid'))) {
     return 'Modelo inexistente ou indisponível para esta conta.';
   }
-  if (msg.includes('timeout') || msg.includes('etimedout')) {
-    return 'Timeout — o provider demorou a responder.';
-  }
   if (msg.includes('network') || msg.includes('fetch failed') || msg.includes('econnrefused')) {
     return 'Provider indisponível no momento.';
   }
   return raw || 'Falha desconhecida na conexão.';
+};
+
+const invokeFunctionWithTimeout = async <T,>(functionName: string, body: Record<string, unknown>, timeoutMs: number): Promise<T> => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+  if (!supabaseUrl || !anonKey) throw new Error('Configuração Supabase indisponível no navegador.');
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${accessToken || anonKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      throw new Error(payload?.error || payload?.message || `Erro HTTP ${response.status}`);
+    }
+    return payload as T;
+  } catch (error: any) {
+    if (error?.name === 'AbortError') throw new Error('Timeout ao testar provider');
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 function StatusDot({ status, compact = false }: { status: ProviderCardStatus; compact?: boolean }) {
