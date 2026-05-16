@@ -3005,6 +3005,112 @@ export type Database = {
           },
         ]
       }
+      llm_alert_rules: {
+        Row: {
+          alert_type: string
+          client_id: string | null
+          created_at: string
+          debounce_minutes: number
+          enabled: boolean
+          id: string
+          severity: string
+          threshold: number
+          updated_at: string
+          window_minutes: number
+        }
+        Insert: {
+          alert_type: string
+          client_id?: string | null
+          created_at?: string
+          debounce_minutes?: number
+          enabled?: boolean
+          id?: string
+          severity?: string
+          threshold: number
+          updated_at?: string
+          window_minutes?: number
+        }
+        Update: {
+          alert_type?: string
+          client_id?: string | null
+          created_at?: string
+          debounce_minutes?: number
+          enabled?: boolean
+          id?: string
+          severity?: string
+          threshold?: number
+          updated_at?: string
+          window_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_alert_rules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      llm_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          client_id: string | null
+          context: Json
+          created_at: string
+          id: string
+          message: string | null
+          observed_value: number | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          threshold: number | null
+          title: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          client_id?: string | null
+          context?: Json
+          created_at?: string
+          id?: string
+          message?: string | null
+          observed_value?: number | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          threshold?: number | null
+          title: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          client_id?: string | null
+          context?: Json
+          created_at?: string
+          id?: string
+          message?: string | null
+          observed_value?: number | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          threshold?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_alerts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       llm_usage_log: {
         Row: {
           client_id: string
@@ -6653,6 +6759,15 @@ export type Database = {
         }
         Returns: number
       }
+      detect_llm_alerts: {
+        Args: never
+        Returns: {
+          alert_id: string
+          alert_type: string
+          client_id: string
+          severity: string
+        }[]
+      }
       eleicao_pessoa_in_user_tree: {
         Args: { _pessoa_id: string; _user_id: string }
         Returns: boolean
@@ -6845,6 +6960,86 @@ export type Database = {
       link_orphan_engagement_actions: {
         Args: { p_client_id: string }
         Returns: number
+      }
+      llm_ops_chain: {
+        Args: { p_correlation_id: string }
+        Returns: {
+          client_id: string
+          completion_tokens: number | null
+          correlation_id: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          error_type: string | null
+          estimated_cost_usd: number | null
+          function_name: string
+          id: string
+          latency_ms: number | null
+          model: string
+          parent_function: string | null
+          prompt_tokens: number | null
+          provider: string
+          request_id: string
+          retries: number
+          success: boolean
+          tier: string
+          total_tokens: number | null
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "llm_usage_log"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      llm_ops_cost_by_tenant: {
+        Args: { p_minutes?: number }
+        Returns: {
+          calls: number
+          client_id: string
+          estimated_cost_usd: number
+          total_tokens: number
+        }[]
+      }
+      llm_ops_error_heatmap: {
+        Args: { p_minutes?: number }
+        Returns: {
+          bucket: string
+          error_type: string
+          errors: number
+          function_name: string
+        }[]
+      }
+      llm_ops_latency_percentiles: {
+        Args: { p_minutes?: number }
+        Returns: {
+          calls: number
+          model: string
+          p50_ms: number
+          p95_ms: number
+          p99_ms: number
+          provider: string
+        }[]
+      }
+      llm_ops_retry_heatmap: {
+        Args: { p_minutes?: number }
+        Returns: {
+          bucket: string
+          calls: number
+          provider: string
+          retries: number
+        }[]
+      }
+      llm_ops_top_functions: {
+        Args: { p_limit?: number; p_minutes?: number }
+        Returns: {
+          avg_latency_ms: number
+          calls: number
+          error_rate: number
+          function_name: string
+          total_tokens: number
+        }[]
       }
       log_whatsapp_send: {
         Args: {
