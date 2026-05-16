@@ -74,30 +74,12 @@ export async function getClientLLMConfig(
     };
   }
 
-  // Fallback 1: Global env var defaults (for self-hosted deploys)
-  const defaultProvider = Deno.env.get('DEFAULT_LLM_PROVIDER') as LLMProvider | undefined;
-  const defaultKey = Deno.env.get('DEFAULT_LLM_API_KEY');
-  const defaultModel = Deno.env.get('DEFAULT_LLM_MODEL');
-  if (defaultProvider && defaultKey) {
-    return {
-      provider: defaultProvider,
-      apiKey: defaultKey,
-      model: defaultModel || DEFAULT_MODELS[defaultProvider],
-    };
-  }
-
-  // Fallback 2: Lovable AI Gateway (only if running on Lovable Cloud)
-  const lovableKey = Deno.env.get('LOVABLE_API_KEY');
-  if (lovableKey) {
-    return {
-      provider: 'lovable',
-      apiKey: lovableKey,
-      model: 'google/gemini-2.5-flash',
-    };
-  }
-
+  // SECURITY/ISOLATION: NÃO existe mais fallback global de credencial.
+  // Cada tenant DEVE possuir seu próprio provedor + api_key em integrations.
+  // Fallbacks anteriores (DEFAULT_LLM_API_KEY, LOVABLE_API_KEY) foram removidos
+  // para impedir consumo cruzado, billing compartilhado e bypass de isolamento.
   throw new Error(
-    'No LLM provider configured. Configure one in Settings > Integrations or set DEFAULT_LLM_PROVIDER + DEFAULT_LLM_API_KEY env vars.'
+    `LLM_CONFIG_MISSING: tenant ${clientId} não possui llm_provider/llm_api_key configurados em integrations. Configure em Configurações > Integrações.`,
   );
 }
 
