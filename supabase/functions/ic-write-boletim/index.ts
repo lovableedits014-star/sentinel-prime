@@ -45,12 +45,15 @@ Deno.serve(async (req) => {
       incluir = { posts: true, acoes: true, visitas: true },
       providerOverride,
       modelOverride,
-      apiKeyOverride,
       reprocessMateriaId,
       briefing,
     } = body || ({} as BoletimRequest);
 
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
+
+    if (body && typeof (body as any).apiKeyOverride === "string" && (body as any).apiKeyOverride.length > 0) {
+      console.warn(`[SECURITY] ic-write-boletim: apiKeyOverride bloqueado (client=${clientId})`);
+    }
 
     const { requireClientAccess } = await import("../_shared/auth-guard.ts");
     const guard = await requireClientAccess(req, clientId);
