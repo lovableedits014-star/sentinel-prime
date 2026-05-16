@@ -94,6 +94,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     isConfigured: false,
   });
 
+  const [mode, setMode] = useState<'simple' | 'hybrid'>('simple');
+  const [tiers, setTiers] = useState<Record<TierKey, TierConfig>>({
+    fast: emptyTier(), classify: emptyTier(), reasoning: emptyTier(), deep: emptyTier(),
+  });
+
   const [customPrompt, setCustomPrompt] = useState("");
 
   useEffect(() => {
