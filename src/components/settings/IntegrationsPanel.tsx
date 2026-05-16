@@ -57,6 +57,28 @@ type TierConfig = { provider: LLMProvider | 'lovable'; apiKey: string; model: st
 
 const emptyTier = (): TierConfig => ({ provider: 'lovable', apiKey: '', model: '', isConfigured: false });
 
+type ProviderCard = {
+  id: string;
+  provider: LLMProvider; // never 'lovable' here — lovable is the implicit fallback
+  model: string;
+  apiKey: string;
+  isConfigured: boolean;
+  tiers: Record<TierKey, boolean>;
+};
+
+const emptyTierFlags = (): Record<TierKey, boolean> => ({
+  fast: false, classify: false, reasoning: false, deep: false,
+});
+
+const SELECTABLE_PROVIDERS = LLM_PROVIDERS.filter(p => p.value !== 'lovable') as { value: LLMProvider; label: string; description: string }[];
+
+const mergeTierFlags = (a: Record<TierKey, boolean>, b: Record<TierKey, boolean>): Record<TierKey, boolean> => ({
+  fast: a.fast || b.fast,
+  classify: a.classify || b.classify,
+  reasoning: a.reasoning || b.reasoning,
+  deep: a.deep || b.deep,
+});
+
 interface IntegrationsPanelProps {
   clientId: string;
 }
@@ -98,6 +120,8 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
   const [tiers, setTiers] = useState<Record<TierKey, TierConfig>>({
     fast: emptyTier(), classify: emptyTier(), reasoning: emptyTier(), deep: emptyTier(),
   });
+  const [providerCards, setProviderCards] = useState<ProviderCard[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [customPrompt, setCustomPrompt] = useState("");
 
@@ -157,6 +181,34 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           },
         });
 
+        // Derive provider-first cards from tier columns
+        const byProvider = new Map<LLMProvider, ProviderCard>();
+        const tierData: { tier: TierKey; provider: any; model: any; hasKey: boolean }[] = [
+          { tier: 'fast',      provider: integAny.llm_provider_fast,      model: integAny.llm_model_fast,      hasKey: !!integAny.llm_api_key_fast },
+          { tier: 'classify',  provider: integAny.llm_provider_classify,  model: integAny.llm_model_classify,  hasKey: !!integAny.llm_api_key_classify },
+          { tier: 'reasoning', provider: integAny.llm_provider_reasoning, model: integAny.llm_model_reasoning, hasKey: !!integAny.llm_api_key_reasoning },
+          { tier: 'deep',      provider: integAny.llm_provider_deep,      model: integAny.llm_model_deep,      hasKey: !!integAny.llm_api_key_deep },
+        ];
+        for (const t of tierData) {
+          if (!t.provider) continue;
+          const key = t.provider as LLMProvider;
+          if (!byProvider.has(key)) {
+            byProvider.set(key, {
+              id: crypto.randomUUID(),
+              provider: key,
+              model: t.model || DEFAULT_MODELS[key]?.default || '',
+              apiKey: '',
+              isConfigured: t.hasKey,
+              tiers: emptyTierFlags(),
+            });
+          }
+          const card = byProvider.get(key)!;
+          card.tiers[t.tier] = true;
+          if (!card.model && t.model) card.model = t.model;
+          if (t.hasKey) card.isConfigured = true;
+        }
+        setProviderCards(Array.from(byProvider.values()));
+
         setCustomPrompt(integAny.ai_custom_prompt || "");
 
         const expiresAt = (integration as any).meta_token_expires_at;
@@ -213,6 +265,61 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       },
     }));
   };
+
+  // -------- Provider-first card helpers (hybrid UX) --------
+  const updateCard = (id: string, patch: Partial<ProviderCard>) => {
+    setProviderCards(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)));
+  };
+
+  const changeCardProvider = (id: string, provider: LLMProvider) => {
+    setProviderCards(prev => {
+      // If another card already uses this provider, merge tiers & remove the duplicate
+      const existing = prev.find(c => c.id !== id && c.provider === provider);
+      const next = prev.map(c => {
+        if (c.id !== id) return c;
+        return {
+          ...c,
+          provider,
+          model: DEFAULT_MODELS[provider]?.default || '',
+          apiKey: '',
+          isConfigured: existing?.isConfigured ?? false,
+          tiers: existing ? { ...c.tiers, ...mergeTierFlags(c.tiers, existing.tiers) } : c.tiers,
+        };
+      });
+      return existing ? next.filter(c => c.id !== existing.id) : next;
+    });
+  };
+
+  const toggleCardTier = (id: string, tier: TierKey, on: boolean) => {
+    setProviderCards(prev => prev.map(c => {
+      if (c.id === id) return { ...c, tiers: { ...c.tiers, [tier]: on } };
+      // Tier is exclusive across providers — turn it off on every other card
+      if (on && c.tiers[tier]) return { ...c, tiers: { ...c.tiers, [tier]: false } };
+      return c;
+    }));
+  };
+
+  const addCard = () => {
+    const used = new Set(providerCards.map(c => c.provider));
+    const next = SELECTABLE_PROVIDERS.find(p => !used.has(p.value));
+    if (!next) {
+      toast.info('Todos os providers já foram adicionados.');
+      return;
+    }
+    setProviderCards(prev => [...prev, {
+      id: crypto.randomUUID(),
+      provider: next.value,
+      model: DEFAULT_MODELS[next.value]?.default || '',
+      apiKey: '',
+      isConfigured: false,
+      tiers: emptyTierFlags(),
+    }]);
+  };
+
+  const removeCard = (id: string) => {
+    setProviderCards(prev => prev.filter(c => c.id !== id));
+  };
+
 
   const updateTier = (tier: TierKey, patch: Partial<TierConfig>) => {
     setTiers(prev => ({ ...prev, [tier]: { ...prev[tier], ...patch } }));
@@ -347,20 +454,32 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         updateData.llm_model = llmData.model;
       }
 
-      // Hybrid mode: persist llm_mode + tier columns
+      // Hybrid mode: derive tier columns from provider-first cards
       updateData.llm_mode = mode;
       if (mode === 'hybrid') {
+        // Build tier -> card mapping. Tiers not assigned to any card → cleared (Lovable fallback).
+        const tierAssignment: Record<TierKey, ProviderCard | null> = {
+          fast: null, classify: null, reasoning: null, deep: null,
+        };
+        for (const card of providerCards) {
+          for (const t of TIERS) {
+            if (card.tiers[t.key]) {
+              // Last-writer-wins; UI prevents duplicates via toggleCardTier
+              tierAssignment[t.key] = card;
+            }
+          }
+        }
         for (const t of TIERS) {
-          const cfg = tiers[t.key];
-          if (cfg.provider === 'lovable') {
+          const card = tierAssignment[t.key];
+          if (!card) {
             updateData[`llm_provider_${t.key}`] = null;
             updateData[`llm_api_key_${t.key}`] = null;
             updateData[`llm_model_${t.key}`] = null;
           } else {
-            updateData[`llm_provider_${t.key}`] = cfg.provider;
-            updateData[`llm_model_${t.key}`] = cfg.model || null;
-            if (cfg.apiKey && cfg.apiKey.trim() !== "") {
-              updateData[`llm_api_key_${t.key}`] = cfg.apiKey;
+            updateData[`llm_provider_${t.key}`] = card.provider;
+            updateData[`llm_model_${t.key}`] = card.model || null;
+            if (card.apiKey && card.apiKey.trim() !== "") {
+              updateData[`llm_api_key_${t.key}`] = card.apiKey;
             }
           }
         }
@@ -385,6 +504,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         }
         return next;
       });
+      setProviderCards(prev => prev.map(c => ({
+        ...c,
+        apiKey: "",
+        isConfigured: c.isConfigured || !!c.apiKey,
+      })));
 
       if (metaData.accessToken && metaData.accessToken.trim() !== "") {
         setTokenStatus(prev => ({ ...prev, isExpired: false, isExpiringSoon: false }));
@@ -521,77 +645,135 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
               )}
             </>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="text-xs text-muted-foreground p-3 rounded-md bg-primary/5 border border-primary/10">
-                Cada tier consulta suas próprias colunas no banco (<code>llm_provider_*</code>, <code>llm_api_key_*</code>, <code>llm_model_*</code>).
-                Se um tier ficar em "Lovable AI", o router faz fallback automático para o provider Lovable nesse tier.
+                Configure cada provider <strong>uma única vez</strong> e marque quais tiers ele atende.
+                Tiers sem provider explícito caem automaticamente no <strong>Lovable AI</strong> (fallback).
               </div>
-              {TIERS.map((tierDef) => {
-                const cfg = tiers[tierDef.key];
-                const Icon = tierDef.icon;
-                const models = DEFAULT_MODELS[cfg.provider]?.models || [];
+
+              {providerCards.length === 0 && (
+                <div className="text-center py-8 text-sm text-muted-foreground border border-dashed rounded-lg">
+                  Nenhum provider configurado — todos os tiers usarão Lovable AI por padrão.
+                </div>
+              )}
+
+              {providerCards.map((card) => {
+                const models = DEFAULT_MODELS[card.provider]?.models || [];
+                const otherUsed = new Set(
+                  providerCards.filter(c => c.id !== card.id).map(c => c.provider)
+                );
                 return (
-                  <div key={tierDef.key} className="rounded-lg border p-4 space-y-3 bg-card">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm">{tierDef.label}</span>
-                          {cfg.provider !== 'lovable' && (
-                            <Badge variant="outline" className="text-[10px]">{cfg.provider}</Badge>
-                          )}
-                          {cfg.provider === 'lovable' && (
-                            <Badge variant="secondary" className="text-[10px]">Lovable AI (padrão)</Badge>
-                          )}
+                  <div key={card.id} className="rounded-lg border p-4 space-y-4 bg-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 space-y-3">
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Provider</Label>
+                            <Select value={card.provider} onValueChange={(v) => changeCardProvider(card.id, v as LLMProvider)}>
+                              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {SELECTABLE_PROVIDERS.map((p) => (
+                                  <SelectItem key={p.value} value={p.value} disabled={otherUsed.has(p.value)}>
+                                    {p.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Modelo</Label>
+                            <Select value={card.model} onValueChange={(v) => updateCard(card.id, { model: v })}>
+                              <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectContent>
+                                {models.map((m) => (
+                                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{tierDef.description}</p>
+                        <div className="space-y-1">
+                          <Label className="text-xs">API Key</Label>
+                          <Input
+                            type="password"
+                            className="h-9"
+                            placeholder={card.isConfigured ? "••••••••• (configurada — deixe em branco para manter)" : "API key"}
+                            value={card.apiKey}
+                            onChange={(e) => updateCard(card.id, { apiKey: e.target.value })}
+                          />
+                        </div>
                       </div>
+                      <Button
+                        variant="ghost" size="sm"
+                        onClick={() => removeCard(card.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        Remover
+                      </Button>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Provider</Label>
-                        <Select value={cfg.provider} onValueChange={(v) => handleTierProviderChange(tierDef.key, v)}>
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {LLM_PROVIDERS.map((p) => (
-                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Modelo</Label>
-                        <Select
-                          value={cfg.model}
-                          onValueChange={(v) => updateTier(tierDef.key, { model: v })}
-                          disabled={cfg.provider === 'lovable'}
-                        >
-                          <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
-                          <SelectContent>
-                            {models.map((m) => (
-                              <SelectItem key={m} value={m}>{m}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">API Key</Label>
-                        <Input
-                          type="password"
-                          className="h-9"
-                          disabled={cfg.provider === 'lovable'}
-                          placeholder={cfg.isConfigured ? "••••••••• (configurada)" : "API key"}
-                          value={cfg.apiKey}
-                          onChange={(e) => updateTier(tierDef.key, { apiKey: e.target.value })}
-                        />
+                    <div className="space-y-2">
+                      <Label className="text-xs">Tiers atendidos por este provider</Label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {TIERS.map((tierDef) => {
+                          const Icon = tierDef.icon;
+                          const checked = card.tiers[tierDef.key];
+                          return (
+                            <label
+                              key={tierDef.key}
+                              className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                                checked ? 'bg-primary/10 border-primary/30' : 'bg-muted/30 border-border hover:bg-muted/60'
+                              }`}
+                            >
+                              <Switch
+                                checked={checked}
+                                onCheckedChange={(v) => toggleCardTier(card.id, tierDef.key, v)}
+                              />
+                              <Icon className="w-3.5 h-3.5 text-primary" />
+                              <span className="text-xs font-medium">{tierDef.label}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                 );
               })}
+
+              <Button
+                variant="outline"
+                onClick={addCard}
+                disabled={providerCards.length >= SELECTABLE_PROVIDERS.length}
+                className="w-full"
+              >
+                + Adicionar Provider
+              </Button>
+
+              {/* Advanced (per-tier) debug view */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(v => !v)}
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                >
+                  {showAdvanced ? '▾ Ocultar' : '▸ Ver'} mapeamento por tier (debug)
+                </button>
+                {showAdvanced && (
+                  <div className="mt-2 rounded-md border bg-muted/20 p-3 text-xs space-y-1 font-mono">
+                    {TIERS.map(t => {
+                      const card = providerCards.find(c => c.tiers[t.key]);
+                      return (
+                        <div key={t.key} className="flex items-center justify-between">
+                          <span className="text-muted-foreground">{t.label}</span>
+                          <span>
+                            {card ? `${card.provider} · ${card.model || '—'}` : 'Lovable AI (fallback)'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
