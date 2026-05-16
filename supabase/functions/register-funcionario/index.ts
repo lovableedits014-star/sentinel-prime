@@ -34,7 +34,12 @@ Deno.serve(async (req) => {
     const {
       client_id, nome, telefone, email, senha, cpf,
       cidade, bairro, endereco, redes_sociais, data_nascimento,
-    } = await req.json();
+    const rawBody = await req.json();
+    validateInput(RegisterFuncionarioSchema, rawBody, { fn: "register-funcionario" });
+    const {
+      client_id, nome, telefone, email, senha, cpf,
+      cidade, bairro, endereco, redes_sociais, data_nascimento,
+    } = rawBody;
 
     if (!client_id || !nome || !telefone || !email || !senha || !cpf) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios: nome, cpf, telefone, email, senha" }), {
