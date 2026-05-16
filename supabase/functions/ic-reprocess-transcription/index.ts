@@ -72,6 +72,7 @@ Deno.serve(async (req) => {
     const guard = await requireClientAccess(req, clientId);
     if (!guard.ok) return guard.response;
     const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+    const trace = tracingHeadersFromReq(req);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -99,7 +100,7 @@ Deno.serve(async (req) => {
 
     if (regenerateMemory) {
       try {
-        const extract = await callIcFn("ic-extract-knowledge", userAuthHeader, {
+        const extract = await callIcFn("ic-extract-knowledge", userAuthHeader, trace, {
           clientId,
           sourceType: "transcription",
           sourceId: transcriptionId,
@@ -129,7 +130,7 @@ Deno.serve(async (req) => {
       if (!ids.includes(transcriptionId)) ids.push(transcriptionId);
 
       try {
-        const out = await callIcFn("ic-write-materia", userAuthHeader, {
+        const out = await callIcFn("ic-write-materia", userAuthHeader, trace, {
           clientId,
           tipo: materia?.tipo || cur?.tipo || "press_release",
           tom: materia?.tom || cur?.tom || "jornalistico",
@@ -149,7 +150,7 @@ Deno.serve(async (req) => {
       }
     } else if (generateMateria) {
       try {
-        const out = await callIcFn("ic-write-materia", userAuthHeader, {
+        const out = await callIcFn("ic-write-materia", userAuthHeader, trace, {
           clientId,
           tipo: materia?.tipo || "press_release",
           tom: materia?.tom || "jornalistico",
