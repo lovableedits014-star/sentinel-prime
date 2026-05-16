@@ -233,6 +233,13 @@ Deno.serve(async (req) => {
       await admin.from("team_members").delete().eq("id", id);
       await admin.from("user_roles").delete().eq("user_id", target.user_id).eq("role", "team_member");
       // Não removemos o auth user aqui — pode pertencer a outro contexto.
+      await logSecurityEvent(admin, {
+        event_type: "team_member_deleted",
+        user_id: caller.id,
+        target_user_id: target.user_id,
+        client_id: target.client_id,
+        ...extractRequestMeta(req),
+      });
       return json({ success: true });
     }
 
