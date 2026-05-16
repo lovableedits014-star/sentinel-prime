@@ -8,27 +8,10 @@ import BandeiraAutismoMS from "./bandeira/BandeiraAutismoMS";
 
 export default function PulsoPolitico() {
   const { data: clientId } = useQuery({
-    queryKey: ["client-id-current"],
-    staleTime: Infinity,
+    queryKey: ["client-id-current-active"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      // Tenta team_members primeiro
-      const { data: tm } = await supabase
-        .from("team_members")
-        .select("client_id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      if (tm?.client_id) return tm.client_id as string;
-      // Senão, dono do cliente
-      const { data: cli } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      return (cli?.id as string | undefined) ?? null;
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      return await resolveClientId();
     },
   });
 
