@@ -69,6 +69,7 @@ async function resolveShareUrl(
   platform: "facebook" | "instagram",
   supabaseUrl: string,
   serviceRoleKey: string,
+  trace: Record<string, string>,
 ): Promise<string | null> {
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/resolve-social-link`, {
@@ -76,6 +77,7 @@ async function resolveShareUrl(
       headers: {
         Authorization: `Bearer ${serviceRoleKey}`,
         "Content-Type": "application/json",
+        ...trace,
       },
       body: JSON.stringify({ url: shareUrl, platform }),
     });

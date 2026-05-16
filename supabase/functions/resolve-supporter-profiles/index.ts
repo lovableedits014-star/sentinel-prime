@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
       // depois tentar matchar handle contra index OU contra author_name
       if (!newId && isShareToken(row.platform_user_id)) {
         const shareCode = row.platform_user_id.replace(/^share_/i, "");
-        const realHandle = await resolveShareToken(shareCode, row.platform);
+        const realHandle = await resolveShareToken(shareCode, row.platform, tracingHeadersFromReq(req));
         if (realHandle) {
           if (isNumericId(realHandle)) {
             newId = realHandle;
