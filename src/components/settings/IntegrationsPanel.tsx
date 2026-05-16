@@ -207,10 +207,14 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       toast.error("Insira sua API key para testar");
       return;
     }
+    if (!clientId) {
+      toast.error("Cliente não identificado — não é possível testar a conexão");
+      return;
+    }
     setTestingLLM(true);
     try {
       const { data, error } = await supabase.functions.invoke('test-llm-connection', {
-        body: { provider: llmData.provider, apiKey: llmData.apiKey, model: llmData.model }
+        body: { clientId, provider: llmData.provider, apiKey: llmData.apiKey, model: llmData.model }
       });
       if (error) throw error;
       if (data.success) toast.success(data.message);
