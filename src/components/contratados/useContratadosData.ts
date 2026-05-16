@@ -138,6 +138,9 @@ const writeCache = (uid: string, data: Omit<CacheShape, "ts">) => {
 };
 
 export function useContratadosData() {
+  // Subscribe to the unified active-client query so swapping impersonation
+  // forces this hook to reload via the load effect below.
+  const { clientId: activeClientId } = useActiveClientId();
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [contratados, setContratados] = useState<Contratado[]>([]);
