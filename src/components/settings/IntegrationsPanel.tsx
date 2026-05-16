@@ -72,6 +72,13 @@ const emptyTierFlags = (): Record<TierKey, boolean> => ({
 
 const SELECTABLE_PROVIDERS = LLM_PROVIDERS.filter(p => p.value !== 'lovable') as { value: LLMProvider; label: string; description: string }[];
 
+const mergeTierFlags = (a: Record<TierKey, boolean>, b: Record<TierKey, boolean>): Record<TierKey, boolean> => ({
+  fast: a.fast || b.fast,
+  classify: a.classify || b.classify,
+  reasoning: a.reasoning || b.reasoning,
+  deep: a.deep || b.deep,
+});
+
 interface IntegrationsPanelProps {
   clientId: string;
 }
