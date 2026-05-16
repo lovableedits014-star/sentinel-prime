@@ -33,18 +33,18 @@ export const DEFAULT_MODELS: Record<LLMProvider, string> = {
   lovable: 'google/gemini-2.5-flash',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-haiku-20240307',
-  gemini: 'gemini-1.5-flash',
+  gemini: 'gemini-2.5-flash',
   groq: 'llama-3.1-8b-instant',
   mistral: 'mistral-small-latest',
   cohere: 'command-r',
 };
 
-// Provider API endpoints
+// Provider API endpoints (Gemini usa o endpoint OpenAI-compatible para suportar tool calling)
 const PROVIDER_ENDPOINTS: Record<LLMProvider, string> = {
   lovable: 'https://ai.gateway.lovable.dev/v1/chat/completions',
   openai: 'https://api.openai.com/v1/chat/completions',
   anthropic: 'https://api.anthropic.com/v1/messages',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta/models',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   mistral: 'https://api.mistral.ai/v1/chat/completions',
   cohere: 'https://api.cohere.ai/v1/chat',
@@ -106,7 +106,7 @@ export async function getClientLLMConfig(
  * Use this when you need tool_calls/tool_choice/response_format.
  * Throws an Error with `.status` set on non-2xx so callers can map 429/402.
  */
-const OPENAI_COMPATIBLE: LLMProvider[] = ['lovable', 'openai', 'groq', 'mistral'];
+const OPENAI_COMPATIBLE: LLMProvider[] = ['lovable', 'openai', 'groq', 'mistral', 'gemini'];
 
 export function isOpenAICompatible(provider: LLMProvider): boolean {
   return OPENAI_COMPATIBLE.includes(provider);
@@ -133,7 +133,7 @@ export async function callLLMRaw(
 ): Promise<any> {
   if (!OPENAI_COMPATIBLE.includes(config.provider)) {
     const err: any = new Error(
-      `Provedor "${config.provider}" não suporta tool calling. Use OpenAI, Groq, Mistral ou Lovable AI nas Configurações.`,
+      `Provedor "${config.provider}" não suporta tool calling. Use OpenAI, Groq, Gemini, Mistral ou Lovable AI nas Configurações.`,
     );
     err.status = 400;
     throw err;
@@ -142,22 +142,43 @@ export async function callLLMRaw(
   const usesTools = Array.isArray((body as any).tools) && (body as any).tools.length > 0;
   const effectiveModel = usesTools ? pickToolsCapableModel(config.provider, config.model) : config.model;
   const endpoint = PROVIDER_ENDPOINTS[config.provider];
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ model: effectiveModel, ...body }),
-  });
-  if (!resp.ok) {
-    const txt = await resp.text();
-    const err: any = new Error(`${config.provider} error: ${resp.status} - ${txt}`);
-    err.status = resp.status;
-    err.providerBody = txt;
-    throw err;
+
+  const maxAttempts = 4;
+  let lastErrText = '';
+  let lastStatus = 0;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: effectiveModel, ...body }),
+    });
+    if (resp.ok) return resp.json();
+
+    lastStatus = resp.status;
+    lastErrText = await resp.text();
+    if ([429, 500, 502, 503, 504].includes(resp.status) && attempt < maxAttempts) {
+      let waitMs = 0;
+      const retryAfter = resp.headers.get('retry-after');
+      if (retryAfter) waitMs = Math.ceil(parseFloat(retryAfter) * 1000);
+      if (!waitMs) {
+        const m = lastErrText.match(/try again in ([\d.]+)s/i);
+        if (m) waitMs = Math.ceil(parseFloat(m[1]) * 1000);
+      }
+      if (!waitMs) waitMs = 1500 * attempt;
+      waitMs = Math.min(waitMs + 300, 15000);
+      console.log(`[${config.provider}] ${resp.status} retry ${attempt}/${maxAttempts - 1} em ${waitMs}ms`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    break;
   }
-  return resp.json();
+  const err: any = new Error(`${config.provider} error: ${lastStatus} - ${lastErrText}`);
+  err.status = lastStatus;
+  err.providerBody = lastErrText;
+  throw err;
 }
 
 /**
@@ -308,7 +329,7 @@ async function callAnthropic(
   };
 }
 
-// Google Gemini
+// Google Gemini — usa o endpoint OpenAI-compatible (suporta tools e mesma forma de body)
 async function callGemini(
   apiKey: string,
   model: string,
@@ -316,37 +337,15 @@ async function callGemini(
   maxTokens: number,
   temperature: number
 ): Promise<LLMResponse> {
-  const contents = messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
-  }));
-
-  const response = await fetch(
-    `${PROVIDER_ENDPOINTS.gemini}/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature,
-        },
-      }),
-    }
+  const data = await callLLMRaw(
+    { provider: 'gemini', apiKey, model },
+    { messages, max_tokens: maxTokens, temperature },
   );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gemini error: ${response.status} - ${error}`);
-  }
-
-  const data = await response.json();
   return {
-    content: data.candidates[0].content.parts[0].text,
+    content: data.choices?.[0]?.message?.content ?? '',
     provider: 'gemini',
     model,
-    usage: data.usageMetadata?.totalTokenCount,
+    usage: data.usage?.total_tokens,
   };
 }
 

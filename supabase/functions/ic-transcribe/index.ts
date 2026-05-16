@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
+import { getTranscribeConfig, transcribeAudio } from "../_shared/transcribe-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,6 +49,7 @@ Deno.serve(async (req) => {
 
     if (!clientId) return json({ error: "clientId é obrigatório" }, 400);
     if (!(file instanceof File)) return json({ error: "Arquivo ausente" }, 400);
+    // Gemini suporta até ~18MB inline; outros provedores: limite Whisper de 25MB
     if (file.size > 25 * 1024 * 1024)
       return json({ error: "Arquivo excede 25MB. Exporte só o áudio (MP3/M4A) do Premiere." }, 400);
 
@@ -71,90 +73,41 @@ Deno.serve(async (req) => {
     }
     if (!allowed) return json({ error: "Sem acesso a este cliente" }, 403);
 
-    // Get Groq key from integrations (preferred) or env fallback
-    const { data: integ } = await admin
-      .from("integrations")
-      .select("llm_provider, llm_api_key")
-      .eq("client_id", clientId)
-      .maybeSingle();
-
-    let groqKey: string | null = null;
-    if (integ?.llm_provider === "groq" && integ.llm_api_key) {
-      groqKey = integ.llm_api_key as string;
-    } else {
-      groqKey = Deno.env.get("GROQ_API_KEY") ?? null;
-    }
-    if (!groqKey) {
+    // Resolve provider de transcrição via integrations (gemini, groq, openai)
+    const trCfg = await getTranscribeConfig(admin, clientId);
+    if (!trCfg) {
       return json(
         {
           error:
-            "Groq não configurado. Vá em Configurações > Integrações e selecione Groq como provedor de IA.",
+            "Nenhum provedor de transcrição configurado. Vá em Configurações > Integrações e selecione Gemini, Groq ou OpenAI com sua API key.",
         },
         400
       );
     }
 
-    // Call Groq Whisper
-    const groqForm = new FormData();
-    groqForm.append("file", file, file.name);
-    groqForm.append("model", "whisper-large-v3");
-    groqForm.append("response_format", "verbose_json");
-    groqForm.append("temperature", "0");
-    if (language) groqForm.append("language", language);
-    if (prompt) groqForm.append("prompt", prompt);
-
-    // Retry com backoff para erros transitórios do Groq (502/503/504/429)
-    let groqRes: Response | null = null;
-    let lastErrText = "";
-    const maxAttempts = 4;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${groqKey}` },
-          body: groqForm,
-        });
-        if (groqRes.ok) break;
-        // status retentável?
-        if ([429, 500, 502, 503, 504].includes(groqRes.status) && attempt < maxAttempts) {
-          lastErrText = await groqRes.text().catch(() => "");
-          console.warn(`[ic-transcribe] Groq ${groqRes.status} (tentativa ${attempt}/${maxAttempts}), retry...`);
-          await new Promise((r) => setTimeout(r, 1500 * attempt));
-          continue;
-        }
-        break;
-      } catch (e) {
-        lastErrText = e instanceof Error ? e.message : String(e);
-        console.warn(`[ic-transcribe] fetch falhou (tentativa ${attempt}/${maxAttempts}):`, lastErrText);
-        if (attempt < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 1500 * attempt));
-          continue;
-        }
-      }
+    // Gemini inline limit (~20MB do request total — usamos margem de 18MB pro base64)
+    if (trCfg.provider === "gemini" && file.size > 18 * 1024 * 1024) {
+      return json(
+        { error: "Arquivo excede 18MB para transcrição via Gemini inline. Reduza o áudio ou use Groq/OpenAI." },
+        400
+      );
     }
 
-    if (!groqRes || !groqRes.ok) {
-      const status = groqRes?.status ?? 0;
-      const txt = groqRes ? await groqRes.text().catch(() => lastErrText) : lastErrText;
-      console.error("Groq error final", status, txt);
-      const friendly =
-        status === 502 || status === 503 || status === 504
-          ? "Os servidores do Groq estão instáveis no momento (502/503). Tente novamente em alguns minutos."
-          : status === 429
-          ? "Limite de uso do Groq atingido. Aguarde um instante e tente novamente."
-          : status === 413 || /too large/i.test(txt)
-          ? "Arquivo grande demais para o Groq. Reduza para MP3 mono 16kHz ou divida o áudio."
-          : `Groq (${status}): ${String(txt).slice(0, 300)}`;
+    let tr;
+    try {
+      tr = await transcribeAudio(trCfg, { file, language, prompt });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[ic-transcribe] provider error:", msg);
+      const friendly = /429/.test(msg)
+        ? `Limite de uso do provedor (${trCfg.provider}) atingido. Aguarde e tente de novo.`
+        : /50[234]/.test(msg)
+        ? `Servidores do provedor (${trCfg.provider}) instáveis. Tente novamente em alguns minutos.`
+        : /too large|413/i.test(msg)
+        ? "Arquivo grande demais para o provedor. Reduza para MP3 mono 16kHz ou divida o áudio."
+        : `Falha na transcrição: ${msg.slice(0, 300)}`;
       return json({ error: friendly }, 502);
     }
-
-    const result = await groqRes.json();
-    const segments = (result.segments ?? []).map((s: any) => ({
-      id: s.id,
-      start: Number(s.start),
-      end: Number(s.end),
-      text: String(s.text ?? "").trim(),
-    }));
 
     const { data: inserted, error: insErr } = await admin
       .from("ic_transcriptions")
@@ -162,11 +115,11 @@ Deno.serve(async (req) => {
         client_id: clientId,
         user_id: userId,
         filename: file.name,
-        duration_sec: result.duration ?? null,
-        language: result.language ?? language ?? null,
-        model: "whisper-large-v3",
-        full_text: result.text ?? null,
-        segments,
+        duration_sec: tr.duration ?? null,
+        language: tr.language ?? language ?? null,
+        model: tr.model,
+        full_text: tr.text ?? null,
+        segments: tr.segments,
       })
       .select("*")
       .single();

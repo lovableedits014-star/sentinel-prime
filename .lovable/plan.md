@@ -1,79 +1,86 @@
-## Contexto
+# Migração para Gemini — usando o IntegrationsPanel que já existe
 
-Hoje a Timeline (`Memória → Timeline`) só lê `ic_knowledge_documents`, alimentada por transcrições, PDFs, URLs e notas manuais. Posts e comentários do Facebook/Instagram passam pelo extrator em "modo fato" (geram propostas, promessas, bordões em `ic_facts`), mas **não viram documentos** — por isso não aparecem ali.
+## Diagnóstico
 
-Não existe tabela `posts` separada: cada post vive desnormalizado dentro de `public.comments` (`post_id`, `post_message`, `post_permalink_url`, `post_full_picture`, `post_media_type`, `platform`, `comment_created_time`). Posts são reconstruídos agrupando comentários por `post_id`.
+Você está certíssimo. O sistema **já tem** toda a infra de configuração de LLM por cliente:
 
-Você escolheu **as duas coisas**, com escopo **todos os posts do sistema**.
+- `IntegrationsPanel.tsx` → o usuário escolhe provider + modelo + cola API key
+- Tabela `integrations` → guarda `llm_provider`, `llm_api_key`, `llm_model` por cliente
+- `getClientLLMConfig()` em `_shared/llm-router.ts` → lê essa config e roteia a chamada
 
----
+**Então não precisa criar secret `GEMINI_API_KEY` nem trocar default global.** Você simplesmente vai em Configurações → Provedor de IA, escolhe **Google Gemini**, cola sua key do AI Studio, escolhe o modelo, salva. Pronto — todas as 27 funções passam a usar Gemini para esse cliente.
 
-## Parte A — Mesclar posts na Timeline (UI, rápido)
+## Problemas reais que impedem isso de funcionar 100% hoje
 
-Objetivo: ver posts publicados ao lado de documentos da memória, sem mexer na estrutura da memória.
+Auditando o código, encontrei 4 lacunas:
 
-1. **Hook novo `usePostsTimeline(clientId)`** em `src/components/inteligencia-conteudo/`:
-   - Lê `comments` agrupando por `post_id + platform`.
-   - Para cada post: pega `post_message`, `post_permalink_url`, `post_full_picture`, `post_media_type`, `platform`, data = `min(comment_created_time)` como aproximação da publicação, e contadores (nº comentários, sentimentos agregados).
-   - Limite ~500 posts mais recentes do cliente.
+### 1. Lista de modelos Gemini no painel está desatualizada
+`IntegrationsPanel.tsx` linha 30 oferece só `gemini-1.5-pro` e `gemini-1.5-flash` (modelos legados/caros). Faltam os **2.5** que você quer usar (Flash-Lite, Flash, Pro).
 
-2. **`DocumentsTimeline` em `MemoriaPanel.tsx`**:
-   - Mescla `ic_knowledge_documents` + posts em uma única lista ordenada por data desc.
-   - Cada item carrega `kind: "doc" | "post"`.
-   - Posts renderizam com card distinto: ícone Instagram/Facebook, thumb do `post_full_picture`, trecho do `post_message`, badges (nº comentários, sentimento dominante), botão "Ver original" (link externo) e "Promover a documento" (chama Parte B sob demanda).
-   - Novo chip de filtro **"Posts"** ao lado de Todas / Propostas / Promessas / Bandeiras / Bordões. Filtros existentes continuam aplicando-se só a documentos.
+### 2. `callGemini` no router não tem retry em 429/503
+A função `callGroq` tem retry exponencial robusto (linhas 351-382). A `callGemini` (linhas 273-313) chama uma vez e morre. Em uso real vai dar erro toda hora.
 
-3. **Sem mudança de schema, sem novo endpoint** nesta parte.
+### 3. Gemini não suporta tool calling no router
+`callLLMRaw` (usado por funções com tools como `ic-extract-knowledge`, `ic-write-materia`, `ic-dna-analyzer`, `ic-feed-from-transcript` etc.) só aceita providers OpenAI-compatíveis. Se o cliente escolher Gemini, **todas as funções de extração com tools quebram** com "Provedor 'gemini' não suporta tool calling".
 
----
+Solução: o endpoint Gemini também é OpenAI-compatível via `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`. Adicionar à lista `OPENAI_COMPATIBLE` e ajustar o endpoint.
 
-## Parte B — Promover posts a documentos da memória
+### 4. Transcrição (`ic-transcribe` / `ic-reprocess-transcription`) está hardcoded em Groq Whisper
+Mesmo com o cliente configurado pra Gemini, transcrição **ignora** a config e tenta usar Groq (linhas 81-115 de `ic-transcribe`). Precisa ler `llm_provider` da integração e, quando for `gemini`, usar a API multimodal do Gemini (que aceita áudio direto, até 9h, sem limite de 25MB).
 
-Objetivo: posts viram entradas em `ic_knowledge_documents` (com resumo, propostas, promessas, bandeiras, bordões, embeddings) e passam a aparecer no DNA, Livro de Campanha, busca, widgets, drift, contradições.
+## Mudanças (todas pequenas, nenhum schema novo)
 
-1. **Extender `ic-extract-knowledge`** (edge function existente):
-   - Adicionar `"post"` ao `DOC_MODE_TYPES` e ao `TIPO_DOCUMENTO_MAP` (`post → "post_social"`).
-   - Passar `sourceId = post_id`, `sourceType = "post"`, `sourceUrl = post_permalink_url`, `sourceDate = comment_created_time` mais antigo do post, `text = post_message` (+ opcionalmente top N comentários para contexto), `documentTitleHint` = primeiros ~80 chars da legenda.
-   - Reuso completo da pipeline (LLM → resumo → propostas/promessas/bandeiras → embedding).
-
-2. **Nova edge function `ic-import-posts`** (orquestrador):
-   - Input: `{ clientId, limit?, sinceDate?, postIds? }`.
-   - Lista posts distintos de `comments` (todos os posts do sistema para esse cliente, conforme escolhido).
-   - Pula posts já importados (checa `ic_knowledge_documents.tipo_documento='post_social' AND source_ref=post_id`).
-   - Pula posts sem `post_message` (vídeo/imagem sem legenda) — fica visível só na Parte A.
-   - Chama `ic-extract-knowledge` em lote com throttling (1–2 por segundo) para evitar limite de LLM/custo.
-   - Retorna `{ processed, skipped, failed }`.
-
-3. **UI em `MemoriaPanel`**:
-   - Botão **"Importar posts para memória"** no header, ao lado de "Adicionar documento", com dialog mostrando: total de posts elegíveis, quantos já importados, opção de janela temporal (últimos 30/90/365 dias / tudo) e barra de progresso.
-   - Botão por linha "Promover a documento" no card de post da Timeline (atalho 1-a-1).
-
-4. **Cron opcional (sugerido, mas opt-in)**:
-   - Schedule diário no `cron` Supabase chamando `ic-import-posts` com `sinceDate = now() - 1 day`. Fica como toggle em Settings da Inteligência de Conteúdo, **não ligado por padrão** (custo de LLM).
-
----
-
-## Detalhes técnicos
-
-- **Sem migração obrigatória.** `ic_knowledge_documents.source_ref` (text) e `tipo_documento` (text) já suportam o novo tipo.
-- **Dedupe**: `delete where client_id=? and source_ref=post_id and tipo_documento='post_social'` antes de inserir (mesmo padrão de transcrições).
-- **Custo**: cada post = 1 chamada LLM. Por isso a Parte B é manual/opt-in, não automática.
-- **Auth**: `ic-import-posts` recebe `Authorization: Bearer <user>` e usa `requireSupabaseAuth` (segue padrão do projeto). Internamente usa service role para escrita.
-- **Performance da Parte A**: query única `select distinct on (post_id, platform) ... from comments where client_id=? order by post_id, comment_created_time asc` + segunda query agregando contagens. Cache via TanStack Query (`staleTime: 60s`).
-
----
-
-## Entregáveis
-
-```text
-Parte A (UI)
-├── src/components/inteligencia-conteudo/usePostsTimeline.ts   (novo)
-└── src/components/inteligencia-conteudo/MemoriaPanel.tsx      (DocumentsTimeline + chip "Posts")
-
-Parte B (memória)
-├── supabase/functions/ic-extract-knowledge/index.ts           (aceita sourceType="post")
-├── supabase/functions/ic-import-posts/index.ts                (novo, orquestrador)
-└── src/components/inteligencia-conteudo/ImportPostsDialog.tsx (novo, botão no header)
+### A. `IntegrationsPanel.tsx`
+Atualizar a lista de modelos Gemini:
+```ts
+gemini: {
+  models: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+  default: 'gemini-2.5-flash'
+}
 ```
+E na descrição: "Gemini 2.5 (Flash-Lite/Flash/Pro) — recomendado para uso intenso".
 
-Sem mudanças em schema, RLS, ou outras telas. Outras superfícies que já leem `ic_knowledge_documents` (DNA, Livro de Campanha, Cobertura, Drift, Contradições, widgets) passam a incluir posts automaticamente.
+### B. `_shared/llm-router.ts`
+- Trocar endpoint Gemini para o modo **OpenAI-compatible** (`/v1beta/openai/chat/completions`), que aceita o mesmo body que OpenAI/Groq, incluindo `tools`
+- Adicionar `gemini` à lista `OPENAI_COMPATIBLE`
+- Atualizar `DEFAULT_MODELS.gemini` para `gemini-2.5-flash`
+- Adicionar retry 429/503 no caminho Gemini (mesma lógica do Groq, respeitando `retry-after`)
+- Reescrever `callGemini` para usar o endpoint OpenAI-compatible (assim chat e tools usam o mesmo caminho)
+
+Resultado: **nenhuma das 27 edge functions precisa ser tocada** — todas continuam chamando `callLLM` / `callLLMRaw` e passam a funcionar com Gemini automaticamente quando o cliente escolher Gemini no painel.
+
+### C. `_shared/transcribe-router.ts` (novo helper, ~80 linhas)
+Função única `transcribeAudio({ supabase, clientId, file, language, prompt })` que:
+1. Lê `integrations.llm_provider` + `llm_api_key`
+2. Se for `gemini` → upload via Gemini Files API ou inline (`inlineData` base64) e chama `gemini-2.5-flash` com prompt "Transcreva este áudio em português, retorne JSON com `text` e `segments` no formato Whisper"
+3. Se for `groq` ou ausente → mantém comportamento atual (Whisper na Groq)
+4. Se for `openai` → usa Whisper da OpenAI
+5. Retorno padronizado igual ao formato Whisper de hoje (`text`, `segments`, `language`)
+
+### D. `ic-transcribe/index.ts` e `ic-reprocess-transcription/index.ts`
+Trocar o bloco hardcoded de Groq pelo novo `transcribeAudio()`. Sem mudança de contrato pra o frontend.
+
+### E. `test-llm-connection`
+Sem mudança no código — já testa Gemini via `callLLM`. Só vai ficar mais robusto porque o `callGemini` novo tem retry.
+
+## Como você usa depois que estiver pronto
+
+1. Cria a key em https://aistudio.google.com/apikey
+2. Vai em **Configurações → Integrações → Provedor de IA**
+3. Seleciona **Google Gemini**
+4. Cola a key, escolhe **gemini-2.5-flash** (ou Flash-Lite se quiser ainda mais barato)
+5. Clica **Testar Conexão** → deve responder "conectado"
+6. Salva
+
+A partir daí: extração, geração de matéria, sentimento, DNA, transcrição de vídeos, tudo passa a usar Gemini com a sua key. Se quiser voltar pra Groq depois, é só trocar no painel — zero código.
+
+## Riscos
+
+| Risco | Mitigação |
+|---|---|
+| Endpoint OpenAI-compat do Gemini é beta | Se falhar em produção, fallback para o endpoint nativo `generateContent` (já está implementado, vira fallback) |
+| Transcrição via Gemini retorna formato diferente de Whisper | Helper normaliza pro mesmo shape `{text, segments[]}` — frontend nem percebe |
+| Cliente esquece de salvar a key | Painel já mostra "✓ API key configurada" / "Insira sua API key" |
+
+## Estimativa
+~20 min de execução. 4 arquivos tocados: `IntegrationsPanel.tsx`, `_shared/llm-router.ts`, novo `_shared/transcribe-router.ts`, `ic-transcribe/index.ts`, `ic-reprocess-transcription/index.ts`.
