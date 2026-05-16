@@ -1,4 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { validateInput, z } from "../_shared/validate.ts";
+
+// Onda 3 — schema em modo warn-only.
+const EleicaoCreateAccountSchema = z.object({
+  pessoa_id: z.string().uuid(),
+  email: z.string().trim().email().max(255),
+  password: z.string().min(6).max(200),
+});
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +16,9 @@ const cors = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
-    const { pessoa_id, email, password } = await req.json();
+    const rawBody = await req.json();
+    validateInput(EleicaoCreateAccountSchema, rawBody, { fn: "eleicao-create-account" });
+    const { pessoa_id, email, password } = rawBody;
     if (!pessoa_id || !email || !password || password.length < 6) {
       return new Response(JSON.stringify({ error: "Dados inválidos" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
     }

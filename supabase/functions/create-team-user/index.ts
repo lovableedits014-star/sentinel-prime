@@ -1,4 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateInput, z } from "../_shared/validate.ts";
+
+// Onda 3 — schema em modo warn-only. Após 48h sem warns nos logs, mudar
+// EDGE_VALIDATION_MODE para "enforce" para bloquear payloads inválidos.
+const CreateTeamUserSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  email: z.string().trim().email().max(255),
+  password: z.string().min(8).max(200),
+  role: z.string().min(1).max(200),
+});
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,7 +53,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { name, email, password, role } = await req.json();
+    const rawBody = await req.json();
+    validateInput(CreateTeamUserSchema, rawBody, { fn: "create-team-user" });
+    const { name, email, password, role } = rawBody;
 
     if (!name || !email || !password || !role) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios: name, email, password, role" }), {
