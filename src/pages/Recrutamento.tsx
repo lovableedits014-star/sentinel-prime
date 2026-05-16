@@ -118,7 +118,7 @@ export default function Recrutamento() {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [clientId]);
 
   const now = useMemo(() => new Date(), []);
   const todayStart = useMemo(() => startOfDay(now), [now]);
