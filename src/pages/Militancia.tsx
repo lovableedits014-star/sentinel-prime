@@ -125,14 +125,11 @@ const Militancia = () => {
   const [drawer, setDrawer] = useState<MilitantRow | null>(null);
 
   const { data: clientId } = useQuery({
-    queryKey: ["current-client-id"],
+    queryKey: ["current-client-id-active", "militancia"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data } = await supabase.from("clients").select("id").eq("user_id", user.id).limit(1).maybeSingle();
-      return data?.id || null;
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      return await resolveClientId();
     },
-    staleTime: Infinity,
   });
 
   const { data: militants = [], isLoading } = useQuery({

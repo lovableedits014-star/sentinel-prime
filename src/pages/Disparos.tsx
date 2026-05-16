@@ -85,11 +85,12 @@ export default function Disparos() {
   const queryClient = useQueryClient();
 
   const { data: client } = useQuery({
-    queryKey: ["client"],
+    queryKey: ["client-with-active", "disparos"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-      const { data } = await supabase.from("clients").select("*").eq("user_id", user.id).maybeSingle();
+      const { resolveClientId } = await import("@/lib/resolveClientId");
+      const cId = await resolveClientId();
+      if (!cId) return null;
+      const { data } = await supabase.from("clients").select("*").eq("id", cId).maybeSingle();
       return data;
     },
   });

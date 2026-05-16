@@ -64,12 +64,9 @@ export default function Pessoas() {
   useEffect(() => { if (clientId) fetchAll(); }, [clientId]);
 
   async function resolveClient() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const { data: client } = await supabase.from("clients").select("id").eq("user_id", session.user.id).maybeSingle();
-    if (client) { setClientId(client.id); return; }
-    const { data: tm } = await supabase.from("team_members").select("client_id").eq("user_id", session.user.id).eq("status", "active").maybeSingle();
-    if (tm) setClientId(tm.client_id);
+    const { resolveClientId } = await import("@/lib/resolveClientId");
+    const cId = await resolveClientId();
+    if (cId) setClientId(cId);
   }
 
   async function fetchAll() {

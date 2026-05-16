@@ -119,15 +119,8 @@ const CampanhaPage = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const { data: client } = await supabase
-      .from("clients").select("id").eq("user_id", session.user.id).maybeSingle();
-
-    let cId = client?.id;
-    if (!cId) {
-      const { data: tm } = await supabase
-        .from("team_members").select("client_id").eq("user_id", session.user.id).eq("status", "active").maybeSingle();
-      cId = tm?.client_id;
-    }
+    const { resolveClientId } = await import("@/lib/resolveClientId");
+    const cId = await resolveClientId();
     if (!cId) { setLoading(false); return; }
     setClientId(cId);
 
