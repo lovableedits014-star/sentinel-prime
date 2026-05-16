@@ -33,8 +33,15 @@ function classifyLLMTestError(error: unknown): { message: string; type: string; 
   if (msg.includes('model') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('invalid'))) {
     return { message: 'Modelo inexistente ou indisponível para esta conta.', type: 'invalid_model', status: 400 };
   }
+  if (msg.includes('resource_exhausted') || msg.includes('quota_limit_value": "0') || msg.includes('billing')) {
+    return {
+      message: 'Quota zero nesta API key. Ative o billing no Google Cloud e habilite a Generative Language API no projeto da key.',
+      type: 'quota_zero',
+      status: 429,
+    };
+  }
   if (msg.includes('429') || msg.includes('rate limit') || msg.includes('quota')) {
-    return { message: 'Limite de requisições excedido no provider.', type: 'rate_limit', status: 429 };
+    return { message: 'Limite de requisições por minuto excedido. Aguarde alguns segundos e tente novamente.', type: 'rate_limit', status: 429 };
   }
   if (msg.includes('fetch failed') || msg.includes('network') || msg.includes('503') || msg.includes('502')) {
     return { message: 'Provider indisponível no momento.', type: 'provider_unavailable', status: 503 };
