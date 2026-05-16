@@ -504,6 +504,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         }
         return next;
       });
+      setProviderCards(prev => prev.map(c => ({
+        ...c,
+        apiKey: "",
+        isConfigured: c.isConfigured || !!c.apiKey,
+      })));
 
       if (metaData.accessToken && metaData.accessToken.trim() !== "") {
         setTokenStatus(prev => ({ ...prev, isExpired: false, isExpiringSoon: false }));
