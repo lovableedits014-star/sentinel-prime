@@ -78,6 +78,7 @@ export function MemoriaPanel({ clientId, clientName }: { clientId: string | null
             </div>
             <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
               <IngestDocumentDialog clientId={clientId!} />
+              <ImportPostsDialog clientId={clientId!} />
               <Button size="sm" variant="outline" onClick={handleExport} disabled={exporting}>
                 {exporting ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <BookOpen className="w-4 h-4 mr-1.5" />}
                 Livro de campanha
