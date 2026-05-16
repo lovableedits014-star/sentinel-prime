@@ -128,7 +128,36 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           isConfigured: !!integration.llm_provider,
         });
 
-        setCustomPrompt((integration as any).ai_custom_prompt || "");
+        const integAny = integration as any;
+        setMode(integAny.llm_mode === 'hybrid' ? 'hybrid' : 'simple');
+        setTiers({
+          fast: {
+            provider: (integAny.llm_provider_fast as LLMProvider) || 'lovable',
+            apiKey: '',
+            model: integAny.llm_model_fast || '',
+            isConfigured: !!integAny.llm_api_key_fast || !!integAny.llm_provider_fast,
+          },
+          classify: {
+            provider: (integAny.llm_provider_classify as LLMProvider) || 'lovable',
+            apiKey: '',
+            model: integAny.llm_model_classify || '',
+            isConfigured: !!integAny.llm_api_key_classify || !!integAny.llm_provider_classify,
+          },
+          reasoning: {
+            provider: (integAny.llm_provider_reasoning as LLMProvider) || 'lovable',
+            apiKey: '',
+            model: integAny.llm_model_reasoning || '',
+            isConfigured: !!integAny.llm_api_key_reasoning || !!integAny.llm_provider_reasoning,
+          },
+          deep: {
+            provider: (integAny.llm_provider_deep as LLMProvider) || 'lovable',
+            apiKey: '',
+            model: integAny.llm_model_deep || '',
+            isConfigured: !!integAny.llm_api_key_deep || !!integAny.llm_provider_deep,
+          },
+        });
+
+        setCustomPrompt(integAny.ai_custom_prompt || "");
 
         const expiresAt = (integration as any).meta_token_expires_at;
         const tType = (integration as any).meta_token_type;
