@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
 
 export interface Contratado {
   id: string;
