@@ -224,16 +224,22 @@ export function useContratadosData() {
 
       const clientStep = startStep("client", "Vínculo com cliente");
       let client: { id: string; name: string } | null = null;
-      let clientSource = "supabase-js";
+      let clientSource = "resolveClientId";
       try {
-        const { data, error } = await withTimeout(
-          supabase.from("clients").select("id, name").eq("user_id", user.id).maybeSingle(),
-          "Cliente"
-        );
-        if (error) throw error;
-        client = data;
+        // Honor super-admin impersonation + team_members fallback via the
+        // unified resolver instead of querying clients by user_id directly.
+        const { resolveClientId } = await import("@/lib/resolveClientId");
+        const resolvedId = await withTimeout(resolveClientId(), "Cliente");
+        if (resolvedId) {
+          const { data, error } = await withTimeout(
+            supabase.from("clients").select("id, name").eq("id", resolvedId).maybeSingle(),
+            "Cliente"
+          );
+          if (error) throw error;
+          client = data;
+        }
       } catch (err) {
-        console.warn("[Contratados] supabase-js falhou para clients, tentando REST", err);
+        console.warn("[Contratados] resolveClientId falhou, tentando REST", err);
         if (!storedAuth?.accessToken) throw err;
         clientSource = "REST fallback";
         const rows = await restSelect<{ id: string; name: string }>(`clients?select=id,name&user_id=eq.${user.id}&limit=1`, storedAuth.accessToken, "Cliente");
