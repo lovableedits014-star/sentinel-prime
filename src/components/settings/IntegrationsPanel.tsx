@@ -355,6 +355,49 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     setProviderCards(prev => prev.filter(c => c.id !== id));
   };
 
+  const testCard = async (id: string): Promise<boolean> => {
+    const card = providerCards.find(c => c.id === id);
+    if (!card) return false;
+
+    if (!card.apiKey && !card.isConfigured) {
+      updateCard(id, { status: 'error', statusMessage: 'Configure a API key antes de testar.' });
+      return false;
+    }
+    if (!card.apiKey) {
+      updateCard(id, {
+        status: 'untested',
+        statusMessage: 'Para re-testar, informe a API key (chave salva não é exposta ao navegador).',
+      });
+      return false;
+    }
+    if (!clientId) {
+      toast.error('Cliente não identificado.');
+      return false;
+    }
+
+    updateCard(id, { status: 'testing', statusMessage: '' });
+    try {
+      const { data, error } = await supabase.functions.invoke('test-llm-connection', {
+        body: { clientId, provider: card.provider, apiKey: card.apiKey, model: card.model },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        updateCard(id, {
+          status: 'ok',
+          statusMessage: `Modelo ${data.model || card.model} respondeu OK`,
+          testedAt: Date.now(),
+        });
+        return true;
+      }
+      const friendly = humanizeLLMError(data?.error || '');
+      updateCard(id, { status: 'error', statusMessage: friendly, testedAt: Date.now() });
+      return false;
+    } catch (e: any) {
+      const friendly = humanizeLLMError(e?.message || String(e));
+      updateCard(id, { status: 'error', statusMessage: friendly, testedAt: Date.now() });
+      return false;
+    }
+  };
 
   const updateTier = (tier: TierKey, patch: Partial<TierConfig>) => {
     setTiers(prev => ({ ...prev, [tier]: { ...prev[tier], ...patch } }));
