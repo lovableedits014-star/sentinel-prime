@@ -1,0 +1,69 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { resolveClientId, getImpersonatedClientId } from "@/lib/resolveClientId";
+
+export const ACTIVE_CLIENT_QUERY_KEY = ["active-client-id"] as const;
+
+export interface ActiveClientInfo {
+  clientId: string | null;
+  isSuperAdmin: boolean;
+  isImpersonating: boolean;
+}
+
+async function fetchActive(): Promise<ActiveClientInfo> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { clientId: null, isSuperAdmin: false, isImpersonating: false };
+
+  let isSuperAdmin = false;
+  try {
+    const { data } = await supabase.rpc("is_super_admin");
+    isSuperAdmin = data === true;
+  } catch {}
+
+  const clientId = await resolveClientId();
+  const isImpersonating = isSuperAdmin && !!getImpersonatedClientId() && !!clientId;
+  return { clientId, isSuperAdmin, isImpersonating };
+}
+
+/**
+ * Single source of truth for the active client_id in the UI.
+ * - Honors super-admin impersonation via localStorage.
+ * - Cached under one stable key so the SuperAdminClientSwitcher can
+ *   invalidate the whole app without a page reload.
+ *
+ * Returns `data` (clientId) plus auxiliary flags. Most pages should also
+ * gate their data queries with `enabled: !!clientId` and include `clientId`
+ * in the React Query key.
+ */
+export function useActiveClientId() {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: ACTIVE_CLIENT_QUERY_KEY,
+    queryFn: fetchActive,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+  });
+
+  // Re-fetch when the auth user changes (login/logout/swap account).
+  useEffect(() => {
+    let lastUserId: string | null = null;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      const uid = session?.user?.id ?? null;
+      if (uid !== lastUserId) {
+        lastUserId = uid;
+        qc.invalidateQueries({ queryKey: ACTIVE_CLIENT_QUERY_KEY });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [qc]);
+
+  const info = query.data;
+  return {
+    ...query,
+    clientId: info?.clientId ?? null,
+    isSuperAdmin: info?.isSuperAdmin ?? false,
+    isImpersonating: info?.isImpersonating ?? false,
+    needsClientSelection: !!info?.isSuperAdmin && !info?.clientId,
+  };
+}

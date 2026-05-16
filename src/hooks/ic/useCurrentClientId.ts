@@ -1,29 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client-selfhosted";
+// Re-export the unified hook so legacy imports keep working
+// and everyone shares the same impersonation-aware cache.
+import { useActiveClientId } from "@/hooks/useActiveClientId";
 
 export function useCurrentClientId() {
-  return useQuery({
-    queryKey: ["current-client-id"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data: ownedClient } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      if (ownedClient?.id) return ownedClient.id as string;
-
-      const { data: teamClient } = await supabase
-        .from("team_members")
-        .select("client_id")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .limit(1)
-        .maybeSingle();
-      return (teamClient?.client_id as string) || null;
-    },
-    staleTime: Infinity,
-  });
+  const q = useActiveClientId();
+  // Preserve the original useQuery-like shape: `data` is the clientId string.
+  return {
+    ...q,
+    data: q.clientId,
+  };
 }
