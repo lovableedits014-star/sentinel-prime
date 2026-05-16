@@ -315,6 +315,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
   const fetchSeqRef = useRef(0);
 
   const [customPrompt, setCustomPrompt] = useState("");
+  const [promptBlocks, setPromptBlocks] = useState<Record<PromptBlockKey, string>>(emptyPromptBlocks());
 
   useEffect(() => {
     fetchIntegrations();
