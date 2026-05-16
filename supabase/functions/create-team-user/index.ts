@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { validateInput, z } from "../_shared/validate.ts";
+import { logSecurityEvent, extractRequestMeta } from "../_shared/security-log.ts";
 
 // Onda 3 — schema em modo warn-only. Após 48h sem warns nos logs, mudar
 // EDGE_VALIDATION_MODE para "enforce" para bloquear payloads inválidos.
