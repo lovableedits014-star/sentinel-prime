@@ -200,6 +200,24 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     }));
   };
 
+  const handleTierProviderChange = (tier: TierKey, value: string) => {
+    const provider = value as LLMProvider | 'lovable';
+    const defaultModel = DEFAULT_MODELS[provider]?.default || '';
+    setTiers(prev => ({
+      ...prev,
+      [tier]: {
+        ...prev[tier],
+        provider,
+        model: defaultModel,
+        apiKey: provider === 'lovable' ? '' : prev[tier].apiKey,
+      },
+    }));
+  };
+
+  const updateTier = (tier: TierKey, patch: Partial<TierConfig>) => {
+    setTiers(prev => ({ ...prev, [tier]: { ...prev[tier], ...patch } }));
+  };
+
   const handleCheckPermissions = async () => {
     setCheckingPermissions(true);
     try {
