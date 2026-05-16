@@ -113,6 +113,7 @@ export function pickToolsCapableModel(provider: LLMProvider, model: string): str
 export async function callLLMRaw(
   config: LLMConfig,
   body: Record<string, any>,
+  ctx?: TelemetryContext,
 ): Promise<any> {
   if (!OPENAI_COMPATIBLE.includes(config.provider)) {
     const err: any = new Error(
@@ -126,6 +127,8 @@ export async function callLLMRaw(
   const effectiveModel = usesTools ? pickToolsCapableModel(config.provider, config.model) : config.model;
   const endpoint = PROVIDER_ENDPOINTS[config.provider];
 
+  const startedAt = Date.now();
+  let retries = 0;
   const maxAttempts = 4;
   let lastErrText = '';
   let lastStatus = 0;
@@ -138,11 +141,27 @@ export async function callLLMRaw(
       },
       body: JSON.stringify({ model: effectiveModel, ...body }),
     });
-    if (resp.ok) return resp.json();
+    if (resp.ok) {
+      const data = await resp.json();
+      if (ctx) {
+        logLLMUsage(ctx, {
+          provider: config.provider,
+          model: effectiveModel,
+          latencyMs: Date.now() - startedAt,
+          promptTokens: data?.usage?.prompt_tokens,
+          completionTokens: data?.usage?.completion_tokens,
+          totalTokens: data?.usage?.total_tokens,
+          retries,
+          success: true,
+        });
+      }
+      return data;
+    }
 
     lastStatus = resp.status;
     lastErrText = await resp.text();
     if ([429, 500, 502, 503, 504].includes(resp.status) && attempt < maxAttempts) {
+      retries++;
       let waitMs = 0;
       const retryAfter = resp.headers.get('retry-after');
       if (retryAfter) waitMs = Math.ceil(parseFloat(retryAfter) * 1000);
@@ -158,6 +177,18 @@ export async function callLLMRaw(
     }
     break;
   }
+  if (ctx) {
+    logLLMUsage(ctx, {
+      provider: config.provider,
+      model: effectiveModel,
+      latencyMs: Date.now() - startedAt,
+      retries,
+      success: false,
+      errorCode: String(lastStatus),
+      errorMessage: lastErrText,
+      errorType: classifyError(lastStatus, lastErrText),
+    });
+  }
   const err: any = new Error(`${config.provider} error: ${lastStatus} - ${lastErrText}`);
   err.status = lastStatus;
   err.providerBody = lastErrText;
@@ -167,29 +198,60 @@ export async function callLLMRaw(
 /**
  * Route request to the appropriate LLM provider
  */
-export async function callLLM(config: LLMConfig, request: LLMRequest): Promise<LLMResponse> {
+export async function callLLM(
+  config: LLMConfig,
+  request: LLMRequest,
+  ctx?: TelemetryContext,
+): Promise<LLMResponse> {
   const { provider, apiKey, model } = config;
   const { messages, maxTokens = 200, temperature = 0.7 } = request;
 
   console.log(`🤖 Routing to ${provider} with model ${model}`);
+  const startedAt = Date.now();
 
-  switch (provider) {
-    case 'lovable':
-      return callLovableAI(apiKey, model, messages, maxTokens, temperature);
-    case 'openai':
-      return callOpenAI(apiKey, model, messages, maxTokens, temperature);
-    case 'anthropic':
-      return callAnthropic(apiKey, model, messages, maxTokens, temperature);
-    case 'gemini':
-      return callGemini(apiKey, model, messages, maxTokens, temperature);
-    case 'groq':
-      return callGroq(apiKey, model, messages, maxTokens, temperature);
-    case 'mistral':
-      return callMistral(apiKey, model, messages, maxTokens, temperature);
-    case 'cohere':
-      return callCohere(apiKey, model, messages, maxTokens, temperature);
-    default:
-      throw new Error(`Unsupported provider: ${provider}`);
+  try {
+    let result: LLMResponse;
+    switch (provider) {
+      case 'lovable':
+        result = await callLovableAI(apiKey, model, messages, maxTokens, temperature); break;
+      case 'openai':
+        result = await callOpenAI(apiKey, model, messages, maxTokens, temperature); break;
+      case 'anthropic':
+        result = await callAnthropic(apiKey, model, messages, maxTokens, temperature); break;
+      case 'gemini':
+        // callGemini delega para callLLMRaw — passamos ctx para evitar log duplicado aqui
+        result = await callGemini(apiKey, model, messages, maxTokens, temperature, ctx); break;
+      case 'groq':
+        result = await callGroq(apiKey, model, messages, maxTokens, temperature); break;
+      case 'mistral':
+        result = await callMistral(apiKey, model, messages, maxTokens, temperature); break;
+      case 'cohere':
+        result = await callCohere(apiKey, model, messages, maxTokens, temperature); break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
+    }
+    // Gemini já loga via callLLMRaw
+    if (ctx && provider !== 'gemini') {
+      logLLMUsage(ctx, {
+        provider, model,
+        latencyMs: Date.now() - startedAt,
+        totalTokens: result.usage,
+        success: true,
+      });
+    }
+    return result;
+  } catch (e: any) {
+    if (ctx && provider !== 'gemini') {
+      logLLMUsage(ctx, {
+        provider, model,
+        latencyMs: Date.now() - startedAt,
+        success: false,
+        errorCode: String(e?.status ?? ''),
+        errorMessage: e?.message,
+        errorType: classifyError(e?.status, e?.message ?? ''),
+      });
+    }
+    throw e;
   }
 }
 
