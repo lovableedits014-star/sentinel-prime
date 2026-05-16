@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Brain, Trash2, ExternalLink, Loader2, Search, Sparkles, FileText,
   MapPin, Users, Megaphone, Quote, Hash, Flag, Calendar, FileAudio, BookOpen,
-  AlertTriangle, RefreshCw,
+  AlertTriangle, RefreshCw, Instagram, Facebook, MessageSquare, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
@@ -21,6 +21,8 @@ import { InsightsCard } from "./InsightsCard";
 import { CoberturaPanel } from "./CoberturaPanel";
 import { DriftPanel } from "./DriftPanel";
 import { IngestDocumentDialog } from "./IngestDocumentDialog";
+import { ImportPostsDialog } from "./ImportPostsDialog";
+import { usePostsTimeline, type PostTimelineItem } from "./usePostsTimeline";
 import { findBestSegment, formatTime, type AudioSegment } from "./audioMatch";
 import { useRef, useEffect, createContext, useContext } from "react";
 import { Play } from "lucide-react";
