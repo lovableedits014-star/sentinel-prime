@@ -347,6 +347,25 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         updateData.llm_model = llmData.model;
       }
 
+      // Hybrid mode: persist llm_mode + tier columns
+      updateData.llm_mode = mode;
+      if (mode === 'hybrid') {
+        for (const t of TIERS) {
+          const cfg = tiers[t.key];
+          if (cfg.provider === 'lovable') {
+            updateData[`llm_provider_${t.key}`] = null;
+            updateData[`llm_api_key_${t.key}`] = null;
+            updateData[`llm_model_${t.key}`] = null;
+          } else {
+            updateData[`llm_provider_${t.key}`] = cfg.provider;
+            updateData[`llm_model_${t.key}`] = cfg.model || null;
+            if (cfg.apiKey && cfg.apiKey.trim() !== "") {
+              updateData[`llm_api_key_${t.key}`] = cfg.apiKey;
+            }
+          }
+        }
+      }
+
       updateData.ai_custom_prompt = customPrompt || null;
 
       const { error } = await supabase.from("integrations").upsert(updateData, { onConflict: 'client_id' });
