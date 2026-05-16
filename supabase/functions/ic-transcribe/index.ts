@@ -146,13 +146,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fire-and-forget: extrai inteligência da transcrição
+    // Fire-and-forget: extrai inteligência da transcrição.
+    // IMPORTANTE: encaminha o JWT do usuário, pois ic-extract-knowledge
+    // valida tenant via requireClientAccess (não aceita mais SERVICE_KEY).
     if (inserted?.full_text && inserted.full_text.length > 50) {
       fetch(`${SUPABASE_URL}/functions/v1/ic-extract-knowledge`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SERVICE_KEY}`,
+          Authorization: authHeader,
+          apikey: SERVICE_KEY,
         },
         body: JSON.stringify({
           clientId,
