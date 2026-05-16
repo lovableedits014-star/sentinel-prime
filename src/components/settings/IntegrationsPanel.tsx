@@ -229,6 +229,9 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
               apiKey: '',
               isConfigured: t.hasKey,
               tiers: emptyTierFlags(),
+              status: 'untested',
+              statusMessage: '',
+              testedAt: null,
             });
           }
           const card = byProvider.get(key)!;
