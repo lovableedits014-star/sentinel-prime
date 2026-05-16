@@ -74,6 +74,7 @@ type ProviderCard = {
 
 const INTEGRATIONS_QUERY_TIMEOUT_MS = 15000;
 const LLM_TEST_TIMEOUT_MS = 20000;
+const INTEGRATIONS_SELECT = "meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_api_key, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep";
 
 const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -201,6 +202,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
   });
   const [providerCards, setProviderCards] = useState<ProviderCard[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const fetchSeqRef = useRef(0);
 
   const [customPrompt, setCustomPrompt] = useState("");
 
@@ -209,12 +211,19 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
   }, [clientId]);
 
   const fetchIntegrations = async () => {
+    const fetchSeq = ++fetchSeqRef.current;
+    setLoading(true);
     try {
-      const { data: integration } = await supabase
+      console.info('[IntegrationsPanel] loading integrations', { clientId });
+      const { data: integration, error } = await withTimeout(supabase
         .from("integrations")
-        .select("meta_page_id, meta_instagram_id, meta_webhook_url, llm_provider, llm_model, meta_token_expires_at, meta_token_type, ai_custom_prompt, llm_mode, llm_provider_fast, llm_model_fast, llm_provider_classify, llm_model_classify, llm_provider_reasoning, llm_model_reasoning, llm_provider_deep, llm_model_deep, llm_api_key_fast, llm_api_key_classify, llm_api_key_reasoning, llm_api_key_deep")
+        .select(INTEGRATIONS_SELECT)
         .eq("client_id", clientId)
-        .maybeSingle();
+        .maybeSingle(), INTEGRATIONS_QUERY_TIMEOUT_MS, 'Timeout ao carregar integrações');
+
+      if (fetchSeq !== fetchSeqRef.current) return;
+      if (error) throw error;
+      console.info('[IntegrationsPanel] integrations payload returned', redactIntegrationForLog(integration));
 
       if (integration) {
         setMetaData({
@@ -262,11 +271,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
 
         // Derive provider-first cards from tier columns
         const byProvider = new Map<LLMProvider, ProviderCard>();
-        const tierData: { tier: TierKey; provider: any; model: any; hasKey: boolean }[] = [
-          { tier: 'fast',      provider: integAny.llm_provider_fast,      model: integAny.llm_model_fast,      hasKey: !!integAny.llm_api_key_fast },
-          { tier: 'classify',  provider: integAny.llm_provider_classify,  model: integAny.llm_model_classify,  hasKey: !!integAny.llm_api_key_classify },
-          { tier: 'reasoning', provider: integAny.llm_provider_reasoning, model: integAny.llm_model_reasoning, hasKey: !!integAny.llm_api_key_reasoning },
-          { tier: 'deep',      provider: integAny.llm_provider_deep,      model: integAny.llm_model_deep,      hasKey: !!integAny.llm_api_key_deep },
+        const tierData: { tier: TierKey; provider: any; model: any; savedApiKey: string }[] = [
+          { tier: 'fast',      provider: integAny.llm_provider_fast,      model: integAny.llm_model_fast,      savedApiKey: integAny.llm_api_key_fast || '' },
+          { tier: 'classify',  provider: integAny.llm_provider_classify,  model: integAny.llm_model_classify,  savedApiKey: integAny.llm_api_key_classify || '' },
+          { tier: 'reasoning', provider: integAny.llm_provider_reasoning, model: integAny.llm_model_reasoning, savedApiKey: integAny.llm_api_key_reasoning || '' },
+          { tier: 'deep',      provider: integAny.llm_provider_deep,      model: integAny.llm_model_deep,      savedApiKey: integAny.llm_api_key_deep || '' },
         ];
         for (const t of tierData) {
           if (!t.provider) continue;
@@ -277,7 +286,8 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
               provider: key,
               model: t.model || DEFAULT_MODELS[key]?.default || '',
               apiKey: '',
-              isConfigured: t.hasKey,
+              savedApiKey: t.savedApiKey,
+              isConfigured: !!t.savedApiKey,
               tiers: emptyTierFlags(),
               status: 'untested',
               statusMessage: '',
@@ -287,9 +297,17 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           const card = byProvider.get(key)!;
           card.tiers[t.tier] = true;
           if (!card.model && t.model) card.model = t.model;
-          if (t.hasKey) card.isConfigured = true;
+          if (t.savedApiKey) {
+            card.savedApiKey = card.savedApiKey || t.savedApiKey;
+            card.isConfigured = true;
+          }
         }
-        setProviderCards(Array.from(byProvider.values()));
+        const hydratedCards = Array.from(byProvider.values());
+        console.info('[IntegrationsPanel] hydrated hybrid state', {
+          mode: integAny.llm_mode === 'hybrid' ? 'hybrid' : 'simple',
+          cards: redactCardsForLog(hydratedCards),
+        });
+        setProviderCards(hydratedCards);
 
         setCustomPrompt(integAny.ai_custom_prompt || "");
 
@@ -318,8 +336,9 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       }
     } catch (error: any) {
       console.error("Error fetching integrations:", error);
+      toast.error(error?.message || 'Erro ao carregar integrações');
     } finally {
-      setLoading(false);
+      if (fetchSeq === fetchSeqRef.current) setLoading(false);
     }
   };
 
