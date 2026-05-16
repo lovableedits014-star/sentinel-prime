@@ -2746,8 +2746,25 @@ export type Database = {
           created_at: string | null
           id: string
           llm_api_key: string | null
+          llm_api_key_classify: string | null
+          llm_api_key_deep: string | null
+          llm_api_key_fast: string | null
+          llm_api_key_reasoning: string | null
+          llm_mode: string
           llm_model: string | null
+          llm_model_classify: string | null
+          llm_model_deep: string | null
+          llm_model_fast: string | null
+          llm_model_reasoning: string | null
           llm_provider: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_classify:
+            | Database["public"]["Enums"]["llm_provider"]
+            | null
+          llm_provider_deep: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_fast: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_reasoning:
+            | Database["public"]["Enums"]["llm_provider"]
+            | null
           meta_access_token: string | null
           meta_instagram_id: string | null
           meta_page_id: string | null
@@ -2762,8 +2779,25 @@ export type Database = {
           created_at?: string | null
           id?: string
           llm_api_key?: string | null
+          llm_api_key_classify?: string | null
+          llm_api_key_deep?: string | null
+          llm_api_key_fast?: string | null
+          llm_api_key_reasoning?: string | null
+          llm_mode?: string
           llm_model?: string | null
+          llm_model_classify?: string | null
+          llm_model_deep?: string | null
+          llm_model_fast?: string | null
+          llm_model_reasoning?: string | null
           llm_provider?: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_classify?:
+            | Database["public"]["Enums"]["llm_provider"]
+            | null
+          llm_provider_deep?: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_fast?: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_reasoning?:
+            | Database["public"]["Enums"]["llm_provider"]
+            | null
           meta_access_token?: string | null
           meta_instagram_id?: string | null
           meta_page_id?: string | null
@@ -2778,8 +2812,25 @@ export type Database = {
           created_at?: string | null
           id?: string
           llm_api_key?: string | null
+          llm_api_key_classify?: string | null
+          llm_api_key_deep?: string | null
+          llm_api_key_fast?: string | null
+          llm_api_key_reasoning?: string | null
+          llm_mode?: string
           llm_model?: string | null
+          llm_model_classify?: string | null
+          llm_model_deep?: string | null
+          llm_model_fast?: string | null
+          llm_model_reasoning?: string | null
           llm_provider?: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_classify?:
+            | Database["public"]["Enums"]["llm_provider"]
+            | null
+          llm_provider_deep?: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_fast?: Database["public"]["Enums"]["llm_provider"] | null
+          llm_provider_reasoning?:
+            | Database["public"]["Enums"]["llm_provider"]
+            | null
           meta_access_token?: string | null
           meta_instagram_id?: string | null
           meta_page_id?: string | null
@@ -2950,6 +3001,71 @@ export type Database = {
             columns: ["used_by_contratado_id"]
             isOneToOne: false
             referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      llm_usage_log: {
+        Row: {
+          client_id: string
+          completion_tokens: number | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          function_name: string
+          id: string
+          latency_ms: number | null
+          model: string
+          prompt_tokens: number | null
+          provider: string
+          request_id: string
+          success: boolean
+          tier: string
+          total_tokens: number | null
+          user_id: string | null
+        }
+        Insert: {
+          client_id: string
+          completion_tokens?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          latency_ms?: number | null
+          model: string
+          prompt_tokens?: number | null
+          provider: string
+          request_id: string
+          success: boolean
+          tier: string
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          completion_tokens?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          latency_ms?: number | null
+          model?: string
+          prompt_tokens?: number | null
+          provider?: string
+          request_id?: string
+          success?: boolean
+          tier?: string
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_usage_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
