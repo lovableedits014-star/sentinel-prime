@@ -113,6 +113,8 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
   const [tiers, setTiers] = useState<Record<TierKey, TierConfig>>({
     fast: emptyTier(), classify: emptyTier(), reasoning: emptyTier(), deep: emptyTier(),
   });
+  const [providerCards, setProviderCards] = useState<ProviderCard[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [customPrompt, setCustomPrompt] = useState("");
 
