@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
 
     if (regenerateMemory) {
       try {
-        const extract = await callIcFn("ic-extract-knowledge", {
+        const extract = await callIcFn("ic-extract-knowledge", userAuthHeader, {
           clientId,
           sourceType: "transcription",
           sourceId: transcriptionId,
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       if (!ids.includes(transcriptionId)) ids.push(transcriptionId);
 
       try {
-        const out = await callIcFn("ic-write-materia", {
+        const out = await callIcFn("ic-write-materia", userAuthHeader, {
           clientId,
           tipo: materia?.tipo || cur?.tipo || "press_release",
           tom: materia?.tom || cur?.tom || "jornalistico",
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
       }
     } else if (generateMateria) {
       try {
-        const out = await callIcFn("ic-write-materia", {
+        const out = await callIcFn("ic-write-materia", userAuthHeader, {
           clientId,
           tipo: materia?.tipo || "press_release",
           tom: materia?.tom || "jornalistico",
