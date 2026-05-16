@@ -2,6 +2,7 @@
 // Permitido para: super admin OU gerente (is_manager=true) do mesmo client_id.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { validateInput, z } from "../_shared/validate.ts";
+import { logSecurityEvent, extractRequestMeta } from "../_shared/security-log.ts";
 
 const ManagePlatformUserSchema = z.object({
   action: z.enum(["create", "update", "delete", "list", "reset_password"]),
@@ -152,6 +153,14 @@ Deno.serve(async (req) => {
       await admin.from("user_roles").insert({ user_id: userId, role: "team_member" })
         .then(() => {}, () => {});
 
+      await logSecurityEvent(admin, {
+        event_type: "team_member_created",
+        user_id: caller.id,
+        target_user_id: userId,
+        client_id,
+        metadata: { is_manager: !!is_manager, email: normalizedEmail },
+        ...extractRequestMeta(req),
+      });
       return json({ success: true, user_id: userId });
     }
 
@@ -197,6 +206,14 @@ Deno.serve(async (req) => {
         await admin.auth.admin.updateUserById(target.user_id, { ban_duration: "none" }).catch(() => {});
       }
 
+      await logSecurityEvent(admin, {
+        event_type: "team_member_updated",
+        user_id: caller.id,
+        target_user_id: target.user_id,
+        client_id: target.client_id,
+        metadata: { patch_keys: Object.keys(patch), password_changed: typeof password === "string" && password.length > 0, status_change: status ?? null },
+        ...extractRequestMeta(req),
+      });
       return json({ success: true });
     }
 
@@ -216,6 +233,13 @@ Deno.serve(async (req) => {
       await admin.from("team_members").delete().eq("id", id);
       await admin.from("user_roles").delete().eq("user_id", target.user_id).eq("role", "team_member");
       // Não removemos o auth user aqui — pode pertencer a outro contexto.
+      await logSecurityEvent(admin, {
+        event_type: "team_member_deleted",
+        user_id: caller.id,
+        target_user_id: target.user_id,
+        client_id: target.client_id,
+        ...extractRequestMeta(req),
+      });
       return json({ success: true });
     }
 

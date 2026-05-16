@@ -4853,6 +4853,42 @@ export type Database = {
           },
         ]
       }
+      security_events: {
+        Row: {
+          at: string
+          client_id: string | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          target_user_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          at?: string
+          client_id?: string | null
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          target_user_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          at?: string
+          client_id?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          target_user_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       sentiment_corrections: {
         Row: {
           ai_predicted: string | null

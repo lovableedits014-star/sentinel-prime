@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { validateInput, z } from "../_shared/validate.ts";
+import { logSecurityEvent, extractRequestMeta } from "../_shared/security-log.ts";
 
 // Onda 3 — schema em modo warn-only. Após 48h sem warns nos logs, mudar
 // EDGE_VALIDATION_MODE para "enforce" para bloquear payloads inválidos.
@@ -115,6 +116,15 @@ Deno.serve(async (req) => {
     await adminClient.from("user_roles").insert({
       user_id: newUser.user.id,
       role: "team_member",
+    });
+
+    await logSecurityEvent(adminClient, {
+      event_type: "team_user_created",
+      user_id: caller.id,
+      target_user_id: newUser.user.id,
+      client_id: clientData.id,
+      metadata: { role: normalizedRole, email },
+      ...extractRequestMeta(req),
     });
 
     return new Response(JSON.stringify({ 
