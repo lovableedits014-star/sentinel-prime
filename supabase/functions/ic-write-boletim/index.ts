@@ -13,7 +13,7 @@ interface BoletimRequest {
   incluir?: { posts?: boolean; acoes?: boolean; visitas?: boolean };
   providerOverride?: string;
   modelOverride?: string;
-  apiKeyOverride?: string;
+  // apiKeyOverride REMOVIDO — apiKey vem exclusivamente de integrations
   reprocessMateriaId?: string;
   briefing?: string; // orientação extra (usada na reescrita)
 }
