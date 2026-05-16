@@ -9,7 +9,7 @@ interface Body {
   transcriptionId: string;
   provider?: string;     // override (groq, openai, anthropic, gemini, mistral, cohere, lovable)
   model?: string;        // override de modelo
-  apiKey?: string;       // opcional: chave temporária do override
+  // apiKey REMOVIDO — apiKey vem exclusivamente de integrations do client validado
   reprocessMateriaId?: string; // se informado, regenera UMA matéria existente
   regenerateMemory?: boolean;  // default true — re-extrai conhecimento da transcrição inteira
   generateMateria?: boolean;
@@ -52,7 +52,6 @@ Deno.serve(async (req) => {
       transcriptionId,
       provider,
       model,
-      apiKey,
       reprocessMateriaId,
       regenerateMemory = true,
       generateMateria = false,
@@ -61,6 +60,10 @@ Deno.serve(async (req) => {
 
     if (!clientId || !transcriptionId) {
       return errorResponse("clientId e transcriptionId são obrigatórios", 400);
+    }
+
+    if (body && typeof (body as any).apiKey === "string" && (body as any).apiKey.length > 0) {
+      console.warn(`[SECURITY] ic-reprocess-transcription: apiKey injetado bloqueado (client=${clientId})`);
     }
 
     const { requireClientAccess } = await import("../_shared/auth-guard.ts");
@@ -103,7 +106,6 @@ Deno.serve(async (req) => {
           triggerSuggestions: false,
           providerOverride: provider,
           modelOverride: model,
-          apiKeyOverride: apiKey,
         });
         result.memory = extract;
       } catch (e: any) {
@@ -135,7 +137,6 @@ Deno.serve(async (req) => {
           salvarComo: "rascunho",
           providerOverride: provider,
           modelOverride: model,
-          apiKeyOverride: apiKey,
           reprocessMateriaId,
         });
         result.materia = out.saved;
@@ -156,7 +157,6 @@ Deno.serve(async (req) => {
           salvarComo: "rascunho",
           providerOverride: provider,
           modelOverride: model,
-          apiKeyOverride: apiKey,
         });
         result.materia = out.saved;
         result.materia_provider = out.provider;

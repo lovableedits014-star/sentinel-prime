@@ -13,7 +13,7 @@ interface BoletimRequest {
   incluir?: { posts?: boolean; acoes?: boolean; visitas?: boolean };
   providerOverride?: string;
   modelOverride?: string;
-  apiKeyOverride?: string;
+  // apiKeyOverride REMOVIDO — apiKey vem exclusivamente de integrations
   reprocessMateriaId?: string;
   briefing?: string; // orientação extra (usada na reescrita)
 }
@@ -45,12 +45,15 @@ Deno.serve(async (req) => {
       incluir = { posts: true, acoes: true, visitas: true },
       providerOverride,
       modelOverride,
-      apiKeyOverride,
       reprocessMateriaId,
       briefing,
     } = body || ({} as BoletimRequest);
 
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
+
+    if (body && typeof (body as any).apiKeyOverride === "string" && (body as any).apiKeyOverride.length > 0) {
+      console.warn(`[SECURITY] ic-write-boletim: apiKeyOverride bloqueado (client=${clientId})`);
+    }
 
     const { requireClientAccess } = await import("../_shared/auth-guard.ts");
     const guard = await requireClientAccess(req, clientId);
@@ -346,7 +349,7 @@ ${visitasTxt || "(nenhuma visita registrada)"}`;
 
     const baseConfig = await getClientLLMConfig(admin, clientId);
     const llmConfig: any = providerOverride
-      ? { provider: providerOverride, model: modelOverride || undefined, apiKey: apiKeyOverride || baseConfig.apiKey }
+      ? { provider: providerOverride, model: modelOverride || undefined, apiKey: baseConfig.apiKey }
       : { ...baseConfig, model: modelOverride || baseConfig.model };
     if (!llmConfig.model) llmConfig.model = baseConfig.model;
     // Auto-upgrade Groq: o default `llama-3.1-8b-instant` tem TPM de 6000 e estoura

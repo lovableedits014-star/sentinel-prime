@@ -23,16 +23,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const token = authHeader.replace("Bearer ", "").trim();
-    if (!token) return json({ error: "Não autenticado" }, 401);
-
-    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) return json({ error: "Sessão inválida" }, 401);
-    const userId = userData.user.id;
+    const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization") ?? "";
+    if (!authHeader) return json({ error: "Não autenticado" }, 401);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -53,25 +45,11 @@ Deno.serve(async (req) => {
     if (file.size > 25 * 1024 * 1024)
       return json({ error: "Arquivo excede 25MB. Exporte só o áudio (MP3/M4A) do Premiere." }, 400);
 
-    // verify client access
-    const { data: clientRow } = await admin
-      .from("clients")
-      .select("id,user_id")
-      .eq("id", clientId)
-      .maybeSingle();
-    if (!clientRow) return json({ error: "Cliente não encontrado" }, 404);
-
-    let allowed = clientRow.user_id === userId;
-    if (!allowed) {
-      const { data: tm } = await admin
-        .from("team_members")
-        .select("id")
-        .eq("client_id", clientId)
-        .eq("user_id", userId)
-        .maybeSingle();
-      allowed = !!tm;
-    }
-    if (!allowed) return json({ error: "Sem acesso a este cliente" }, 403);
+    // Tenant guard padronizado
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+    const userId = guard.userId;
 
     // Resolve provider de transcrição via integrations (gemini, groq, openai)
     const trCfg = await getTranscribeConfig(admin, clientId);
@@ -168,13 +146,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fire-and-forget: extrai inteligência da transcrição
+    // Fire-and-forget: extrai inteligência da transcrição.
+    // IMPORTANTE: encaminha o JWT do usuário, pois ic-extract-knowledge
+    // valida tenant via requireClientAccess (não aceita mais SERVICE_KEY).
     if (inserted?.full_text && inserted.full_text.length > 50) {
       fetch(`${SUPABASE_URL}/functions/v1/ic-extract-knowledge`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SERVICE_KEY}`,
+          Authorization: authHeader,
+          apikey: SERVICE_KEY,
         },
         body: JSON.stringify({
           clientId,

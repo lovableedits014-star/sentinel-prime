@@ -27,7 +27,7 @@ interface ExtractRequest {
   triggerSuggestions?: boolean;
   providerOverride?: string;
   modelOverride?: string;
-  apiKeyOverride?: string;
+  // apiKeyOverride REMOVIDO — apiKey resolvida exclusivamente via integrations
   extractionRunId?: string;
   // novo
   documentTitleHint?: string;
@@ -324,13 +324,19 @@ Deno.serve(async (req) => {
     const body = (await req.json()) as ExtractRequest;
     const {
       clientId, sourceType, sourceId, sourceUrl, sourceDate, text,
-      triggerSuggestions = true, providerOverride, modelOverride, apiKeyOverride,
+      triggerSuggestions = true, providerOverride, modelOverride,
       extractionRunId, documentTitleHint, audioUrl,
     } = body || ({} as ExtractRequest);
 
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
     if (!sourceType) return errorResponse("sourceType é obrigatório", 400);
     if (!text || text.trim().length < 30) return jsonResponse({ extracted: 0, skipped: "texto curto demais" });
+
+    // SECURITY: campo apiKeyOverride banido. Se alguém tentar injetar, logamos
+    // como evento de segurança e ignoramos. apiKey vem SEMPRE de integrations.
+    if (body && typeof (body as any).apiKeyOverride === "string" && (body as any).apiKeyOverride.length > 0) {
+      console.warn(`[SECURITY] ic-extract-knowledge: apiKeyOverride bloqueado (client=${clientId})`);
+    }
 
     const { requireClientAccess } = await import("../_shared/auth-guard.ts");
     const guard = await requireClientAccess(req, clientId);
@@ -341,7 +347,7 @@ Deno.serve(async (req) => {
     const llmConfig = {
       provider: (providerOverride as any) || baseConfig.provider,
       model: modelOverride || (providerOverride ? undefined : baseConfig.model),
-      apiKey: apiKeyOverride || baseConfig.apiKey,
+      apiKey: baseConfig.apiKey,
     } as any;
     if (!llmConfig.model) llmConfig.model = baseConfig.model;
 

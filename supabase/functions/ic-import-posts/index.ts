@@ -134,7 +134,7 @@ async function alreadyImportedIds(
   return new Set((data ?? []).map((r: any) => r.source_ref).filter(Boolean));
 }
 
-async function callExtract(post: PostAggregate, clientId: string) {
+async function callExtract(post: PostAggregate, clientId: string, authHeader: string) {
   const title = (post.post_message ?? "").trim().slice(0, 80) ||
     `Post ${post.platform} ${post.post_id.slice(0, 8)}`;
   const text = (post.post_message ?? "").trim();
@@ -142,7 +142,8 @@ async function callExtract(post: PostAggregate, clientId: string) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      Authorization: authHeader,
+      apikey: SERVICE_KEY,
     },
     body: JSON.stringify({
       clientId,
@@ -170,6 +171,11 @@ Deno.serve(async (req) => {
     const clientId = body?.clientId;
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+    const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+
     const limit = Math.max(1, Math.min(body?.limit ?? 25, 100));
     const replace = !!body?.replace;
     const sinceDate = body?.sinceDate;
@@ -177,16 +183,12 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Listamos até ~3000 comentários para reconstruir posts. Posts são raros
-    // comparados a comentários, então isso cobre milhares de posts.
     const hardLimit = postIds?.length ? Math.max(2000, postIds.length * 50) : 3000;
     const allPosts = await listPosts(admin, clientId, { sinceDate, postIds, hardLimit });
 
-    // sem legenda → fica só na timeline visual, não vai pra memória
     const withText = allPosts.filter((p) => (p.post_message ?? "").trim().length >= 30);
     const skipped_empty = allPosts.length - withText.length;
 
-    // dedupe
     const existing = replace ? new Set<string>() : await alreadyImportedIds(
       admin,
       clientId,
@@ -197,16 +199,12 @@ Deno.serve(async (req) => {
 
     const toProcess = eligible.slice(0, limit);
 
-    // Processa em background: a extração via LLM (Groq) sofre retries longos
-    // em 429, então 25 posts sequenciais facilmente extrapolam o limite de
-    // CPU/wall-time do worker. Respondemos imediatamente e seguimos extraindo
-    // — a UI vê os documentos aparecerem via refetch da Timeline.
     const runBackground = async () => {
       let processed = 0;
       let failed = 0;
       for (const post of toProcess) {
         try {
-          await callExtract(post, clientId);
+          await callExtract(post, clientId, userAuthHeader);
           processed++;
         } catch (e: any) {
           failed++;

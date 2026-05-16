@@ -15,6 +15,11 @@ Deno.serve(async (req) => {
     const { clientId, limit = 20 } = await req.json();
     if (!clientId) return errorResponse("clientId é obrigatório", 400);
 
+    const { requireClientAccess } = await import("../_shared/auth-guard.ts");
+    const guard = await requireClientAccess(req, clientId);
+    if (!guard.ok) return guard.response;
+    const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const { data: existingDocs } = await admin
