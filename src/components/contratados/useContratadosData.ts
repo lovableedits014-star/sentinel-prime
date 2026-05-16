@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
 
 export interface Contratado {
   id: string;
@@ -137,6 +138,9 @@ const writeCache = (uid: string, data: Omit<CacheShape, "ts">) => {
 };
 
 export function useContratadosData() {
+  // Subscribe to the unified active-client query so swapping impersonation
+  // forces this hook to reload via the load effect below.
+  const { clientId: activeClientId } = useActiveClientId();
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [contratados, setContratados] = useState<Contratado[]>([]);
@@ -224,16 +228,22 @@ export function useContratadosData() {
 
       const clientStep = startStep("client", "Vínculo com cliente");
       let client: { id: string; name: string } | null = null;
-      let clientSource = "supabase-js";
+      let clientSource = "resolveClientId";
       try {
-        const { data, error } = await withTimeout(
-          supabase.from("clients").select("id, name").eq("user_id", user.id).maybeSingle(),
-          "Cliente"
-        );
-        if (error) throw error;
-        client = data;
+        // Honor super-admin impersonation + team_members fallback via the
+        // unified resolver instead of querying clients by user_id directly.
+        const { resolveClientId } = await import("@/lib/resolveClientId");
+        const resolvedId = await withTimeout(resolveClientId(), "Cliente");
+        if (resolvedId) {
+          const { data, error } = await withTimeout(
+            supabase.from("clients").select("id, name").eq("id", resolvedId).maybeSingle(),
+            "Cliente"
+          );
+          if (error) throw error;
+          client = data;
+        }
       } catch (err) {
-        console.warn("[Contratados] supabase-js falhou para clients, tentando REST", err);
+        console.warn("[Contratados] resolveClientId falhou, tentando REST", err);
         if (!storedAuth?.accessToken) throw err;
         clientSource = "REST fallback";
         const rows = await restSelect<{ id: string; name: string }>(`clients?select=id,name&user_id=eq.${user.id}&limit=1`, storedAuth.accessToken, "Cliente");
@@ -338,7 +348,9 @@ export function useContratadosData() {
   useEffect(() => {
     void load(0);
     return () => clearRetryTimer();
-  }, [load, clearRetryTimer]);
+    // Re-run when the impersonated client switches.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, clearRetryTimer, activeClientId]);
 
   return { clientId, clientName, contratados, setContratados, indicados, setIndicados, checkinStats, loading, loadError, retryAttempt, diagnostics, reload };
 }
