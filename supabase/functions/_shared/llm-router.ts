@@ -33,18 +33,18 @@ export const DEFAULT_MODELS: Record<LLMProvider, string> = {
   lovable: 'google/gemini-2.5-flash',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-haiku-20240307',
-  gemini: 'gemini-1.5-flash',
+  gemini: 'gemini-2.5-flash',
   groq: 'llama-3.1-8b-instant',
   mistral: 'mistral-small-latest',
   cohere: 'command-r',
 };
 
-// Provider API endpoints
+// Provider API endpoints (Gemini usa o endpoint OpenAI-compatible para suportar tool calling)
 const PROVIDER_ENDPOINTS: Record<LLMProvider, string> = {
   lovable: 'https://ai.gateway.lovable.dev/v1/chat/completions',
   openai: 'https://api.openai.com/v1/chat/completions',
   anthropic: 'https://api.anthropic.com/v1/messages',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta/models',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   mistral: 'https://api.mistral.ai/v1/chat/completions',
   cohere: 'https://api.cohere.ai/v1/chat',
@@ -106,7 +106,7 @@ export async function getClientLLMConfig(
  * Use this when you need tool_calls/tool_choice/response_format.
  * Throws an Error with `.status` set on non-2xx so callers can map 429/402.
  */
-const OPENAI_COMPATIBLE: LLMProvider[] = ['lovable', 'openai', 'groq', 'mistral'];
+const OPENAI_COMPATIBLE: LLMProvider[] = ['lovable', 'openai', 'groq', 'mistral', 'gemini'];
 
 export function isOpenAICompatible(provider: LLMProvider): boolean {
   return OPENAI_COMPATIBLE.includes(provider);
