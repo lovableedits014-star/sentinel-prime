@@ -39,10 +39,10 @@ export default function SuperAdminClientSwitcher() {
   const select = (id: string | null) => {
     setImpersonatedClientId(id);
     setActiveId(id);
+    // Invalidate ALL queries — the active-client-id key is the trigger so
+    // every page hook that depends on it (clientId) refetches with the new context.
     qc.invalidateQueries();
     toast.success(id ? "Visualizando como gerente selecionado" : "Modo super admin restaurado");
-    // Reload to ensure all client-id-dependent UI re-fetches with the new context.
-    setTimeout(() => window.location.reload(), 250);
   };
 
   return (
