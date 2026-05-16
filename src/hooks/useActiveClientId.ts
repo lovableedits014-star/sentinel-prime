@@ -77,6 +77,25 @@ export function useActiveClientId() {
     return () => subscription.unsubscribe();
   }, [qc]);
 
+  // Cross-tab sync: when another tab/window changes the impersonated client,
+  // invalidate the active-client-id key so this tab refetches with the new
+  // context (and every dependent query rebuilds).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== IMPERSONATE_CLIENT_KEY) return;
+      if (e.oldValue === e.newValue) return;
+      logTelemetry("queries_invalidated", {
+        reason: "cross_tab_storage",
+        from: e.oldValue,
+        to: e.newValue,
+      });
+      qc.invalidateQueries({ queryKey: ACTIVE_CLIENT_QUERY_KEY });
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [qc]);
+
   const info = query.data;
   const clientId = info?.clientId ?? null;
 
