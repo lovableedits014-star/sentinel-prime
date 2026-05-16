@@ -426,6 +426,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           provider,
           model: DEFAULT_MODELS[provider]?.default || '',
           apiKey: '',
+          savedApiKey: existing?.savedApiKey ?? '',
           isConfigured: existing?.isConfigured ?? false,
           tiers: existing ? { ...c.tiers, ...mergeTierFlags(c.tiers, existing.tiers) } : c.tiers,
           status: 'untested' as ProviderCardStatus,
@@ -475,15 +476,10 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     const card = providerCards.find(c => c.id === id);
     if (!card) return false;
 
-    if (!card.apiKey && !card.isConfigured) {
+    const apiKeyForTest = (card.apiKey || card.savedApiKey || '').trim();
+
+    if (!apiKeyForTest && !card.isConfigured) {
       updateCard(id, { status: 'error', statusMessage: 'Configure a API key antes de testar.' });
-      return false;
-    }
-    if (!card.apiKey) {
-      updateCard(id, {
-        status: 'untested',
-        statusMessage: 'Para re-testar, informe a API key (chave salva não é exposta ao navegador).',
-      });
       return false;
     }
     if (!clientId) {
@@ -492,11 +488,27 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
     }
 
     updateCard(id, { status: 'testing', statusMessage: '' });
+    console.info('[IntegrationsPanel] test-llm-connection request', {
+      clientId,
+      provider: card.provider,
+      model: card.model,
+      usingSavedKey: !card.apiKey && !!card.savedApiKey,
+      hasApiKey: !!apiKeyForTest,
+    });
     try {
-      const { data, error } = await supabase.functions.invoke('test-llm-connection', {
-        body: { clientId, provider: card.provider, apiKey: card.apiKey, model: card.model },
+      const data = await invokeFunctionWithTimeout<any>('test-llm-connection', {
+        clientId,
+        provider: card.provider,
+        apiKey: apiKeyForTest,
+        model: card.model,
+      }, LLM_TEST_TIMEOUT_MS);
+      console.info('[IntegrationsPanel] test-llm-connection response', {
+        success: !!data?.success,
+        provider: data?.provider || card.provider,
+        model: data?.model || card.model,
+        errorType: data?.errorType || null,
+        error: data?.error || null,
       });
-      if (error) throw error;
       if (data?.success) {
         updateCard(id, {
           status: 'ok',
