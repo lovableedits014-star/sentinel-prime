@@ -341,6 +341,10 @@ Deno.serve(async (req) => {
     const { requireClientAccess } = await import("../_shared/auth-guard.ts");
     const guard = await requireClientAccess(req, clientId);
     if (!guard.ok) return guard.response;
+    // JWT do usuário autenticado — propagado para todas as chamadas downstream
+    // (ic-extract-promessas, ic-memoria-insights, ic-suggest-dispatches),
+    // garantindo que cada uma revalide tenant via requireClientAccess.
+    const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
     const baseConfig = await getClientLLMConfig(admin, clientId);
@@ -429,17 +433,19 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Dispara extração de promessas estruturadas e regeneração de insights (fire-and-forget)
+      // Dispara extração de promessas estruturadas e regeneração de insights (fire-and-forget).
+      // IMPORTANTE: encaminhamos o JWT do usuário (NUNCA SERVICE_KEY) para que as
+      // functions downstream revalidem tenant via requireClientAccess.
       if (documentId) {
         fetch(`${SUPABASE_URL}/functions/v1/ic-extract-promessas`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
           body: JSON.stringify({ clientId, documentId }),
         }).catch((e) => console.error("[ic-extract-knowledge] promessas fire failed:", e));
       }
       fetch(`${SUPABASE_URL}/functions/v1/ic-memoria-insights`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+        headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
         body: JSON.stringify({ clientId }),
       }).catch((e) => console.error("[ic-extract-knowledge] insights fire failed:", e));
     } else {
@@ -496,7 +502,7 @@ Deno.serve(async (req) => {
       if (hasBairros || hasPessoas) {
         fetch(`${SUPABASE_URL}/functions/v1/ic-suggest-dispatches`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
           body: JSON.stringify({ clientId, knowledgeIds: insertedRows.map((r) => r.id) }),
         }).catch((e) => console.error("[ic-extract-knowledge] suggest fire failed:", e));
       }

@@ -88,6 +88,24 @@ Deno.serve(async (req) => {
     const dryRun: boolean = body.dry_run === true;
     const limit: number = Math.min(Number(body.limit ?? 100), 500);
 
+    // SECURITY: esta function usa SERVICE_ROLE_KEY (bypassa RLS) para varrer
+    // supporter_profiles e atualizar IDs. Para evitar bypass cross-tenant exigimos:
+    //  - client_id explícito no body (sem isso, recusamos);
+    //  - OU caller autenticado como cron (x-cron-token / CRON_SECRET);
+    //  - validação requireClientAccess para o tenant alvo (quando não-cron).
+    const { requireClientAccess, isCronCaller } = await import("../_shared/auth-guard.ts");
+    const cron = isCronCaller(req);
+    if (!cron) {
+      if (!clientIdFilter) {
+        return new Response(
+          JSON.stringify({ error: "client_id é obrigatório (varredura global proibida sem CRON_SECRET)" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const guard = await requireClientAccess(req, clientIdFilter);
+      if (!guard.ok) return guard.response;
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // 1) Buscar perfis problemáticos (com client_id e nome do supporter via join)
