@@ -72,7 +72,9 @@ Deno.serve(async (req) => {
     if (!caller) return json({ error: "Não autenticado" }, 401);
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
-    const body = await req.json();
+    const rawBody = await req.json();
+    validateInput(ManagePlatformUserSchema, rawBody, { fn: "manage-platform-user" });
+    const body = rawBody;
     const action = body.action as string;
 
     if (action === "create") {
