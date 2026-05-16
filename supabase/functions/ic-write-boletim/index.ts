@@ -349,7 +349,7 @@ ${visitasTxt || "(nenhuma visita registrada)"}`;
 
     const baseConfig = await getClientLLMConfig(admin, clientId);
     const llmConfig: any = providerOverride
-      ? { provider: providerOverride, model: modelOverride || undefined, apiKey: apiKeyOverride || baseConfig.apiKey }
+      ? { provider: providerOverride, model: modelOverride || undefined, apiKey: baseConfig.apiKey }
       : { ...baseConfig, model: modelOverride || baseConfig.model };
     if (!llmConfig.model) llmConfig.model = baseConfig.model;
     // Auto-upgrade Groq: o default `llama-3.1-8b-instant` tem TPM de 6000 e estoura
