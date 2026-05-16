@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { tracingHeadersFromReq } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -170,7 +171,7 @@ Deno.serve(async (req) => {
       if (p.username) {
         profiles.push({ platform: p.platform, username: p.username });
       } else if (p.pendingShareUrl) {
-        const resolved = await resolveShareUrl(p.pendingShareUrl, p.platform, supabaseUrl, serviceRoleKey);
+        const resolved = await resolveShareUrl(p.pendingShareUrl, p.platform, supabaseUrl, serviceRoleKey, tracingHeadersFromReq(req));
         if (resolved) {
           profiles.push({ platform: p.platform, username: resolved });
         } else {
