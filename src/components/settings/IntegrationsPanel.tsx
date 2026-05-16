@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -64,12 +64,52 @@ type ProviderCard = {
   provider: LLMProvider; // never 'lovable' here — lovable is the implicit fallback
   model: string;
   apiKey: string;
+  savedApiKey: string;
   isConfigured: boolean;
   tiers: Record<TierKey, boolean>;
   status: ProviderCardStatus;
   statusMessage: string;
   testedAt: number | null;
 };
+
+const INTEGRATIONS_QUERY_TIMEOUT_MS = 15000;
+const LLM_TEST_TIMEOUT_MS = 20000;
+
+const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+const redactIntegrationForLog = (integration: any) => {
+  if (!integration) return null;
+  const redacted = { ...integration };
+  for (const key of Object.keys(redacted)) {
+    if (key.includes('api_key') || key.includes('access_token')) {
+      redacted[key] = redacted[key] ? '[REDACTED_PRESENT]' : null;
+    }
+  }
+  return redacted;
+};
+
+const redactCardsForLog = (cards: ProviderCard[]) => cards.map(card => ({
+  id: card.id,
+  provider: card.provider,
+  model: card.model,
+  hasNewApiKey: !!card.apiKey,
+  hasSavedApiKey: !!card.savedApiKey,
+  isConfigured: card.isConfigured,
+  tiers: card.tiers,
+  status: card.status,
+}));
 
 const emptyTierFlags = (): Record<TierKey, boolean> => ({
   fast: false, classify: false, reasoning: false, deep: false,
