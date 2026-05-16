@@ -21,6 +21,14 @@ const RequestSchema = z.object({
 
 const TEST_TIMEOUT_MS = 18000;
 
+const OPENAI_COMPAT_ENDPOINTS: Partial<Record<string, string>> = {
+  lovable: 'https://ai.gateway.lovable.dev/v1/chat/completions',
+  openai: 'https://api.openai.com/v1/chat/completions',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+  groq: 'https://api.groq.com/openai/v1/chat/completions',
+  mistral: 'https://api.mistral.ai/v1/chat/completions',
+};
+
 function classifyLLMTestError(error: unknown): { message: string; type: string; status: number } {
   const raw = error instanceof Error ? error.message : String(error || 'Erro desconhecido');
   const msg = raw.toLowerCase();
@@ -60,6 +68,52 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
     ]);
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function testLLMOnce(config: LLMConfig, messages: LLMMessage[]) {
+  const endpoint = OPENAI_COMPAT_ENDPOINTS[config.provider];
+  if (!endpoint) {
+    return await withTimeout(callLLM(config, { messages, maxTokens: 20, temperature: 0 }), TEST_TIMEOUT_MS);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages,
+        max_tokens: 20,
+        temperature: 0,
+      }),
+      signal: controller.signal,
+    });
+
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      const err: any = new Error(`${config.provider} error: ${response.status} - ${text}`);
+      err.status = response.status;
+      throw err;
+    }
+
+    return {
+      content: payload?.choices?.[0]?.message?.content ?? '',
+      provider: config.provider,
+      model: config.model,
+      usage: payload?.usage?.total_tokens,
+    };
+  } catch (error: any) {
+    if (error?.name === 'AbortError') throw new Error('timeout');
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -104,11 +158,7 @@ Deno.serve(async (req) => {
       hasApiKey: !!apiKey,
     });
 
-    const response = await withTimeout(callLLM(llmConfig, {
-      messages,
-      maxTokens: 20,
-      temperature: 0,
-    }), TEST_TIMEOUT_MS);
+    const response = await testLLMOnce(llmConfig, messages);
 
     console.log('[test-llm-connection] success', {
       clientId,
