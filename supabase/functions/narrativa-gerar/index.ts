@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, callLLMRaw, getClientLLMConfig } from "../_shared/llm-router.ts";
-import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
+import { getCorrelationId, getRequestId, tracingHeadersFromReq, type TelemetryContext } from "../_shared/telemetry.ts";
 import { parseLooseJson } from "../_shared/ic-utils.ts";
 
 const corsHeaders = {
@@ -728,8 +728,9 @@ Deno.serve(async (req) => {
         const webRes = await fetch(`${SUPA_URL}/functions/v1/municipio-contexto-web`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${SUPA_KEY}`,
+            Authorization: req.headers.get("Authorization") || req.headers.get("authorization") || `Bearer ${SUPA_KEY}`,
             "Content-Type": "application/json",
+            ...tracingHeadersFromReq(req),
           },
           body: JSON.stringify({ municipio: meta.municipio, uf: meta.uf, max_news: 8 }),
         });

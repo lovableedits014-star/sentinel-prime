@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
-import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
+import { getCorrelationId, getRequestId, tracingHeadersFromReq, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse, parseLooseJson, sample } from "../_shared/ic-utils.ts";
 
 // ===== Helpers para Radar++ =====
@@ -92,7 +92,8 @@ serve(async (req) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            Authorization: req.headers.get("Authorization") || req.headers.get("authorization") || `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            ...tracingHeadersFromReq(req),
           },
           body: JSON.stringify({ year: new Date().getFullYear() }),
         }).then((r) => r.ok ? r.json() : null).catch(() => null),
