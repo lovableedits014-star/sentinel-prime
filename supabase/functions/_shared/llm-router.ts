@@ -329,7 +329,7 @@ async function callAnthropic(
   };
 }
 
-// Google Gemini
+// Google Gemini — usa o endpoint OpenAI-compatible (suporta tools e mesma forma de body)
 async function callGemini(
   apiKey: string,
   model: string,
@@ -337,37 +337,15 @@ async function callGemini(
   maxTokens: number,
   temperature: number
 ): Promise<LLMResponse> {
-  const contents = messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
-  }));
-
-  const response = await fetch(
-    `${PROVIDER_ENDPOINTS.gemini}/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature,
-        },
-      }),
-    }
+  const data = await callLLMRaw(
+    { provider: 'gemini', apiKey, model },
+    { messages, max_tokens: maxTokens, temperature },
   );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gemini error: ${response.status} - ${error}`);
-  }
-
-  const data = await response.json();
   return {
-    content: data.candidates[0].content.parts[0].text,
+    content: data.choices?.[0]?.message?.content ?? '',
     provider: 'gemini',
     model,
-    usage: data.usageMetadata?.totalTokenCount,
+    usage: data.usage?.total_tokens,
   };
 }
 
