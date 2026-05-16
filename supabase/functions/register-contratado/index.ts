@@ -35,11 +35,13 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
+    const rawBody = await req.json();
+    validateInput(RegisterContratadoSchema, rawBody, { fn: "register-contratado" });
     const {
       client_id, lider_id, nome, telefone, email, senha,
       cidade, bairro, endereco, zona_eleitoral, secao_eleitoral, notas, redes_sociais, data_nascimento,
       is_lider,
-    } = await req.json();
+    } = rawBody;
 
     // Auto-determine: if no lider_id, this person is a líder
     const finalIsLider = is_lider === true || !lider_id;
