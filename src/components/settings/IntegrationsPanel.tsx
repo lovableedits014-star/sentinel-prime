@@ -174,6 +174,34 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
           },
         });
 
+        // Derive provider-first cards from tier columns
+        const byProvider = new Map<LLMProvider, ProviderCard>();
+        const tierData: { tier: TierKey; provider: any; model: any; hasKey: boolean }[] = [
+          { tier: 'fast',      provider: integAny.llm_provider_fast,      model: integAny.llm_model_fast,      hasKey: !!integAny.llm_api_key_fast },
+          { tier: 'classify',  provider: integAny.llm_provider_classify,  model: integAny.llm_model_classify,  hasKey: !!integAny.llm_api_key_classify },
+          { tier: 'reasoning', provider: integAny.llm_provider_reasoning, model: integAny.llm_model_reasoning, hasKey: !!integAny.llm_api_key_reasoning },
+          { tier: 'deep',      provider: integAny.llm_provider_deep,      model: integAny.llm_model_deep,      hasKey: !!integAny.llm_api_key_deep },
+        ];
+        for (const t of tierData) {
+          if (!t.provider) continue;
+          const key = t.provider as LLMProvider;
+          if (!byProvider.has(key)) {
+            byProvider.set(key, {
+              id: crypto.randomUUID(),
+              provider: key,
+              model: t.model || DEFAULT_MODELS[key]?.default || '',
+              apiKey: '',
+              isConfigured: t.hasKey,
+              tiers: emptyTierFlags(),
+            });
+          }
+          const card = byProvider.get(key)!;
+          card.tiers[t.tier] = true;
+          if (!card.model && t.model) card.model = t.model;
+          if (t.hasKey) card.isConfigured = true;
+        }
+        setProviderCards(Array.from(byProvider.values()));
+
         setCustomPrompt(integAny.ai_custom_prompt || "");
 
         const expiresAt = (integration as any).meta_token_expires_at;
