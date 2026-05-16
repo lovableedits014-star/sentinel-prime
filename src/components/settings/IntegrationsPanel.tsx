@@ -44,6 +44,19 @@ const REQUIRED_PERMISSIONS = [
   { name: 'public_profile', label: 'Perfil público', required: false, platform: 'general' },
 ];
 
+type TierKey = 'fast' | 'classify' | 'reasoning' | 'deep';
+
+const TIERS: { key: TierKey; label: string; description: string; icon: any }[] = [
+  { key: 'fast',      label: 'FAST',      description: 'Tarefas rápidas e de alto volume (classificação leve, respostas curtas)', icon: Rocket },
+  { key: 'classify',  label: 'CLASSIFY',  description: 'Classificação estruturada (sentimento, tags, intenções)',                  icon: Gauge },
+  { key: 'reasoning', label: 'REASONING', description: 'Raciocínio multi-passo, análises e síntese',                                icon: Layers },
+  { key: 'deep',      label: 'DEEP',      description: 'Conteúdos longos, geração editorial e contextos densos',                    icon: Sparkles },
+];
+
+type TierConfig = { provider: LLMProvider | 'lovable'; apiKey: string; model: string; isConfigured: boolean };
+
+const emptyTier = (): TierConfig => ({ provider: 'lovable', apiKey: '', model: '', isConfigured: false });
+
 interface IntegrationsPanelProps {
   clientId: string;
 }
