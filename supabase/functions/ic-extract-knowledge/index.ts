@@ -220,8 +220,8 @@ async function extractDocument(
   hint?: string,
   ctx?: TelemetryContext,
 ): Promise<DocumentJson> {
-  if (text.length <= SINGLE_SHOT_LIMIT) return extractDocSingleShot(llmConfig, text, hint);
-  return extractDocMapReduce(llmConfig, text, hint);
+  if (text.length <= SINGLE_SHOT_LIMIT) return extractDocSingleShot(llmConfig, text, hint, ctx);
+  return extractDocMapReduce(llmConfig, text, hint, ctx);
 }
 
 /* ---------- derivação de fatos a partir do documento ---------- */
