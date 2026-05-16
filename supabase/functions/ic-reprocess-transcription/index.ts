@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/ic-utils.ts";
+import { tracingHeadersFromReq } from "../_shared/telemetry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -21,7 +22,7 @@ interface Body {
   };
 }
 
-async function callIcFn(name: string, authHeader: string, payload: any) {
+async function callIcFn(name: string, authHeader: string, trace: Record<string, string>, payload: any) {
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
@@ -30,6 +31,7 @@ async function callIcFn(name: string, authHeader: string, payload: any) {
       // possa validar tenant via requireClientAccess.
       Authorization: authHeader,
       apikey: SERVICE_KEY,
+      ...trace,
     },
     body: JSON.stringify(payload),
   });
@@ -70,6 +72,7 @@ Deno.serve(async (req) => {
     const guard = await requireClientAccess(req, clientId);
     if (!guard.ok) return guard.response;
     const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+    const trace = tracingHeadersFromReq(req);
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -97,7 +100,7 @@ Deno.serve(async (req) => {
 
     if (regenerateMemory) {
       try {
-        const extract = await callIcFn("ic-extract-knowledge", userAuthHeader, {
+        const extract = await callIcFn("ic-extract-knowledge", userAuthHeader, trace, {
           clientId,
           sourceType: "transcription",
           sourceId: transcriptionId,
@@ -127,7 +130,7 @@ Deno.serve(async (req) => {
       if (!ids.includes(transcriptionId)) ids.push(transcriptionId);
 
       try {
-        const out = await callIcFn("ic-write-materia", userAuthHeader, {
+        const out = await callIcFn("ic-write-materia", userAuthHeader, trace, {
           clientId,
           tipo: materia?.tipo || cur?.tipo || "press_release",
           tom: materia?.tom || cur?.tom || "jornalistico",
@@ -147,7 +150,7 @@ Deno.serve(async (req) => {
       }
     } else if (generateMateria) {
       try {
-        const out = await callIcFn("ic-write-materia", userAuthHeader, {
+        const out = await callIcFn("ic-write-materia", userAuthHeader, trace, {
           clientId,
           tipo: materia?.tipo || "press_release",
           tom: materia?.tom || "jornalistico",

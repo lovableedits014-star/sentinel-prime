@@ -17,6 +17,7 @@
 //   { eligible, processed, skipped_existing, skipped_empty, failed, errors[] }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { tracingHeadersFromReq } from "../_shared/telemetry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -134,7 +135,7 @@ async function alreadyImportedIds(
   return new Set((data ?? []).map((r: any) => r.source_ref).filter(Boolean));
 }
 
-async function callExtract(post: PostAggregate, clientId: string, authHeader: string) {
+async function callExtract(post: PostAggregate, clientId: string, authHeader: string, trace: Record<string, string>) {
   const title = (post.post_message ?? "").trim().slice(0, 80) ||
     `Post ${post.platform} ${post.post_id.slice(0, 8)}`;
   const text = (post.post_message ?? "").trim();
@@ -144,6 +145,7 @@ async function callExtract(post: PostAggregate, clientId: string, authHeader: st
       "Content-Type": "application/json",
       Authorization: authHeader,
       apikey: SERVICE_KEY,
+      ...trace,
     },
     body: JSON.stringify({
       clientId,
@@ -175,6 +177,7 @@ Deno.serve(async (req) => {
     const guard = await requireClientAccess(req, clientId);
     if (!guard.ok) return guard.response;
     const userAuthHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+    const trace = tracingHeadersFromReq(req);
 
     const limit = Math.max(1, Math.min(body?.limit ?? 25, 100));
     const replace = !!body?.replace;
@@ -204,7 +207,7 @@ Deno.serve(async (req) => {
       let failed = 0;
       for (const post of toProcess) {
         try {
-          await callExtract(post, clientId, userAuthHeader);
+          await callExtract(post, clientId, userAuthHeader, trace);
           processed++;
         } catch (e: any) {
           failed++;

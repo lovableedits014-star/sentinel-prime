@@ -8,6 +8,7 @@
 //  3) Para username não-numérico: chama Graph API direto p/ obter ID
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { tracingHeadersFromReq } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,7 +42,7 @@ function normalizeName(s: string): string {
     .trim();
 }
 
-async function resolveShareToken(shareId: string, platform: string): Promise<string | null> {
+async function resolveShareToken(shareId: string, platform: string, trace: Record<string, string>): Promise<string | null> {
   const url = platform === "instagram"
     ? `https://www.instagram.com/share/${shareId}`
     : `https://www.facebook.com/share/${shareId}`;
@@ -51,6 +52,7 @@ async function resolveShareToken(shareId: string, platform: string): Promise<str
       headers: {
         Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         "Content-Type": "application/json",
+        ...trace,
       },
       body: JSON.stringify({ url, platform }),
     });
@@ -206,7 +208,7 @@ Deno.serve(async (req) => {
       // depois tentar matchar handle contra index OU contra author_name
       if (!newId && isShareToken(row.platform_user_id)) {
         const shareCode = row.platform_user_id.replace(/^share_/i, "");
-        const realHandle = await resolveShareToken(shareCode, row.platform);
+        const realHandle = await resolveShareToken(shareCode, row.platform, tracingHeadersFromReq(req));
         if (realHandle) {
           if (isNumericId(realHandle)) {
             newId = realHandle;

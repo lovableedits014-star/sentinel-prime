@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callLLM, getClientLLMConfig } from "../_shared/llm-router.ts";
-import { getCorrelationId, getRequestId, type TelemetryContext } from "../_shared/telemetry.ts";
+import { getCorrelationId, getRequestId, tracingHeaders, type TelemetryContext } from "../_shared/telemetry.ts";
 import { corsHeaders, errorResponse, jsonResponse, parseLooseJson } from "../_shared/ic-utils.ts";
 import { generateEmbedding, buildDocEmbeddingText, EMBEDDING_MODEL } from "../_shared/embeddings.ts";
 
@@ -452,13 +452,13 @@ Deno.serve(async (req) => {
       if (documentId) {
         fetch(`${SUPABASE_URL}/functions/v1/ic-extract-promessas`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
+          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY, ...tracingHeaders(telemetryCtx.correlationId, telemetryCtx.requestId) },
           body: JSON.stringify({ clientId, documentId }),
         }).catch((e) => console.error("[ic-extract-knowledge] promessas fire failed:", e));
       }
       fetch(`${SUPABASE_URL}/functions/v1/ic-memoria-insights`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
+        headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY, ...tracingHeaders(telemetryCtx.correlationId, telemetryCtx.requestId) },
         body: JSON.stringify({ clientId }),
       }).catch((e) => console.error("[ic-extract-knowledge] insights fire failed:", e));
     } else {
@@ -515,7 +515,7 @@ Deno.serve(async (req) => {
       if (hasBairros || hasPessoas) {
         fetch(`${SUPABASE_URL}/functions/v1/ic-suggest-dispatches`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
+          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY, ...tracingHeaders(telemetryCtx.correlationId, telemetryCtx.requestId) },
           body: JSON.stringify({ clientId, knowledgeIds: insertedRows.map((r) => r.id) }),
         }).catch((e) => console.error("[ic-extract-knowledge] suggest fire failed:", e));
       }

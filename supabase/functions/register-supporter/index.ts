@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { tracingHeadersFromReq } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,6 +70,7 @@ async function resolveShareUrl(
   platform: "facebook" | "instagram",
   supabaseUrl: string,
   serviceRoleKey: string,
+  trace: Record<string, string>,
 ): Promise<string | null> {
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/resolve-social-link`, {
@@ -76,6 +78,7 @@ async function resolveShareUrl(
       headers: {
         Authorization: `Bearer ${serviceRoleKey}`,
         "Content-Type": "application/json",
+        ...trace,
       },
       body: JSON.stringify({ url: shareUrl, platform }),
     });
@@ -168,7 +171,7 @@ Deno.serve(async (req) => {
       if (p.username) {
         profiles.push({ platform: p.platform, username: p.username });
       } else if (p.pendingShareUrl) {
-        const resolved = await resolveShareUrl(p.pendingShareUrl, p.platform, supabaseUrl, serviceRoleKey);
+        const resolved = await resolveShareUrl(p.pendingShareUrl, p.platform, supabaseUrl, serviceRoleKey, tracingHeadersFromReq(req));
         if (resolved) {
           profiles.push({ platform: p.platform, username: resolved });
         } else {

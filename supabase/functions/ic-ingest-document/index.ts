@@ -2,6 +2,7 @@
 // extrai texto e dispara ic-extract-knowledge para virar documento estruturado.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/ic-utils.ts";
+import { tracingHeadersFromReq } from "../_shared/telemetry.ts";
 // unpdf é projetado para serverless/Deno, sem dependência de canvas
 import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
 
@@ -133,7 +134,7 @@ Deno.serve(async (req) => {
     // Chama ic-extract-knowledge
     const extractRes = await fetch(`${SUPABASE_URL}/functions/v1/ic-extract-knowledge`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
+      headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY, ...tracingHeadersFromReq(req) },
       body: JSON.stringify({
         clientId,
         sourceType: extractSourceType,

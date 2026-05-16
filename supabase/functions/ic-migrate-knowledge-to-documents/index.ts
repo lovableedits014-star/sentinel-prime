@@ -5,6 +5,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders, errorResponse, jsonResponse } from "../_shared/ic-utils.ts";
+import { tracingHeadersFromReq } from "../_shared/telemetry.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -52,7 +53,7 @@ Deno.serve(async (req) => {
       try {
         const r = await fetch(`${SUPABASE_URL}/functions/v1/ic-extract-knowledge`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY },
+          headers: { "Content-Type": "application/json", Authorization: userAuthHeader, apikey: SERVICE_KEY, ...tracingHeadersFromReq(req) },
           body: JSON.stringify({
             clientId,
             sourceType: "transcription",
