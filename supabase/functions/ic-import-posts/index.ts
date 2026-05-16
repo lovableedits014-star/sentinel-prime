@@ -197,31 +197,46 @@ Deno.serve(async (req) => {
 
     const toProcess = eligible.slice(0, limit);
 
-    let processed = 0;
-    let failed = 0;
-    const errors: Array<{ post_id: string; error: string }> = [];
-
-    for (const post of toProcess) {
-      try {
-        await callExtract(post, clientId);
-        processed++;
-      } catch (e: any) {
-        failed++;
-        errors.push({ post_id: post.post_id, error: e?.message ?? String(e) });
-        console.warn("[ic-import-posts] falhou", post.post_id, e?.message);
+    // Processa em background: a extração via LLM (Groq) sofre retries longos
+    // em 429, então 25 posts sequenciais facilmente extrapolam o limite de
+    // CPU/wall-time do worker. Respondemos imediatamente e seguimos extraindo
+    // — a UI vê os documentos aparecerem via refetch da Timeline.
+    const runBackground = async () => {
+      let processed = 0;
+      let failed = 0;
+      for (const post of toProcess) {
+        try {
+          await callExtract(post, clientId);
+          processed++;
+        } catch (e: any) {
+          failed++;
+          console.warn("[ic-import-posts] bg falhou", post.post_id, e?.message);
+        }
+        await new Promise((r) => setTimeout(r, 400));
       }
-      // throttle leve para não saturar LLM
-      await new Promise((r) => setTimeout(r, 400));
+      console.log(
+        `[ic-import-posts] bg done client=${clientId} processed=${processed} failed=${failed}`,
+      );
+    };
+
+    // @ts-ignore EdgeRuntime existe no runtime Supabase
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(runBackground());
+    } else {
+      // fallback: dispara sem await (não bloqueia resposta)
+      runBackground().catch((e) => console.error("[ic-import-posts] bg crash", e));
     }
 
     return jsonResponse({
       eligible: eligible.length,
-      processed,
+      accepted: toProcess.length,
       skipped_existing,
       skipped_empty,
-      failed,
       remaining: Math.max(0, eligible.length - toProcess.length),
-      errors,
+      status: "processing",
+      message:
+        "Importação iniciada em segundo plano. Os documentos vão aparecer na Timeline conforme forem processados.",
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

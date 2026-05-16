@@ -55,23 +55,29 @@ export function ImportPostsDialog({ clientId, trigger }: Props) {
       if (error) throw error;
       return data as {
         eligible: number;
-        processed: number;
+        accepted: number;
         skipped_existing: number;
         skipped_empty: number;
-        failed: number;
         remaining: number;
+        status: string;
+        message?: string;
       };
     },
     onSuccess: (r) => {
       toast.success(
-        `${r.processed} post(s) importado(s) à memória. ${r.skipped_existing} já existiam, ${r.skipped_empty} sem legenda, ${r.failed} falharam.${
-          r.remaining > 0 ? ` Restam ${r.remaining} — rode novamente para processar mais.` : ""
-        }`,
+        `${r.accepted} post(s) em processamento. ${r.skipped_existing} já existiam, ${r.skipped_empty} sem legenda.${
+          r.remaining > 0 ? ` Restam ${r.remaining} — rode novamente após concluir.` : ""
+        } Os documentos vão aparecer na Timeline conforme forem extraídos.`,
       );
-      qc.invalidateQueries({ queryKey: ["ic-knowledge-documents-timeline", clientId] });
-      qc.invalidateQueries({ queryKey: ["ic-knowledge-documents", clientId] });
-      qc.invalidateQueries({ queryKey: ["posts-timeline", clientId] });
-      qc.invalidateQueries({ queryKey: ["ic-memoria-insights", clientId] });
+      const refetchAll = () => {
+        qc.invalidateQueries({ queryKey: ["ic-knowledge-documents-timeline", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-knowledge-documents", clientId] });
+        qc.invalidateQueries({ queryKey: ["posts-timeline", clientId] });
+        qc.invalidateQueries({ queryKey: ["ic-memoria-insights", clientId] });
+      };
+      refetchAll();
+      setTimeout(refetchAll, 30_000);
+      setTimeout(refetchAll, 60_000);
     },
     onError: (e: any) => {
       toast.error(e?.message || "Falha ao importar posts.");
