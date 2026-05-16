@@ -790,6 +790,10 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       }
 
       updateData.ai_custom_prompt = customPrompt || null;
+      for (const block of PROMPT_BLOCKS) {
+        const value = (promptBlocks[block.key] || '').trim();
+        updateData[block.column] = value ? value : null;
+      }
 
       console.info('[IntegrationsPanel] saving integrations payload', redactIntegrationForLog(updateData));
       const { data: savedIntegration, error } = await withTimeout(supabase
