@@ -134,7 +134,7 @@ async function alreadyImportedIds(
   return new Set((data ?? []).map((r: any) => r.source_ref).filter(Boolean));
 }
 
-async function callExtract(post: PostAggregate, clientId: string) {
+async function callExtract(post: PostAggregate, clientId: string, authHeader: string) {
   const title = (post.post_message ?? "").trim().slice(0, 80) ||
     `Post ${post.platform} ${post.post_id.slice(0, 8)}`;
   const text = (post.post_message ?? "").trim();
@@ -142,7 +142,8 @@ async function callExtract(post: PostAggregate, clientId: string) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      Authorization: authHeader,
+      apikey: SERVICE_KEY,
     },
     body: JSON.stringify({
       clientId,
