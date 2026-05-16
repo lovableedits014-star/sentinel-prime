@@ -160,7 +160,9 @@ async function preflightInstance(admin: any, inst: any) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
-    const { pessoa_id, channel, app_url, email, password: providedPassword } = await req.json(); // channel: "whatsapp" | "link_only"
+    const rawBody = await req.json();
+    validateInput(EleicaoSendCredentialsSchema, rawBody, { fn: "eleicao-send-credentials" });
+    const { pessoa_id, channel, app_url, email, password: providedPassword } = rawBody; // channel: "whatsapp" | "link_only"
     const emailInput = typeof email === "string" ? email.trim().toLowerCase() : "";
     const passwordInput = typeof providedPassword === "string" ? providedPassword : "";
     if (emailInput && !validEmail(emailInput)) {
