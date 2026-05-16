@@ -374,6 +374,17 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
       toast.success("Integrações salvas com sucesso!");
       setMetaData(prev => ({ ...prev, accessToken: "" }));
       setLlmData(prev => ({ ...prev, apiKey: "", isConfigured: prev.provider !== 'lovable' }));
+      setTiers(prev => {
+        const next = { ...prev };
+        for (const t of TIERS) {
+          next[t.key] = {
+            ...prev[t.key],
+            apiKey: "",
+            isConfigured: prev[t.key].provider !== 'lovable',
+          };
+        }
+        return next;
+      });
 
       if (metaData.accessToken && metaData.accessToken.trim() !== "") {
         setTokenStatus(prev => ({ ...prev, isExpired: false, isExpiringSoon: false }));
