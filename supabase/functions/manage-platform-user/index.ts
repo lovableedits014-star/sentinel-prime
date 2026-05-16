@@ -1,6 +1,18 @@
 // Gerencia usuários de equipe (team_members) vinculados a um cliente.
 // Permitido para: super admin OU gerente (is_manager=true) do mesmo client_id.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateInput, z } from "../_shared/validate.ts";
+
+const ManagePlatformUserSchema = z.object({
+  action: z.enum(["create", "update", "delete", "list", "reset_password"]),
+  client_id: z.string().uuid().optional(),
+  user_id: z.string().uuid().optional(),
+  name: z.string().min(1).max(200).optional(),
+  email: z.string().email().max(255).optional(),
+  password: z.string().min(6).max(200).optional(),
+  allowed_paths: z.array(z.string()).optional(),
+  is_manager: z.boolean().optional(),
+}).passthrough();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +72,9 @@ Deno.serve(async (req) => {
     if (!caller) return json({ error: "Não autenticado" }, 401);
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
-    const body = await req.json();
+    const rawBody = await req.json();
+    validateInput(ManagePlatformUserSchema, rawBody, { fn: "manage-platform-user" });
+    const body = rawBody;
     const action = body.action as string;
 
     if (action === "create") {

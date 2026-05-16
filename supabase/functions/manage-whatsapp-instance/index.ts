@@ -1,4 +1,22 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateInput, z } from "../_shared/validate.ts";
+
+const ManageWhatsappSchema = z.object({
+  action: z.string().min(1).max(80),
+  client_id: z.string().uuid().optional(),
+  instance_id: z.string().max(120).optional(),
+  phone: z.string().max(40).optional(),
+  message: z.string().max(8000).optional(),
+  name: z.string().max(200).optional(),
+  apelido: z.string().max(200).optional(),
+  bridge_url: z.string().url().optional(),
+  bridge_api_key: z.string().max(500).optional(),
+  is_active: z.boolean().optional(),
+  status: z.string().max(40).optional(),
+  mimetype: z.string().max(120).optional(),
+  filename: z.string().max(255).optional(),
+  caption: z.string().max(2000).optional(),
+}).passthrough();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -408,6 +426,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     const body = await req.json();
+    validateInput(ManageWhatsappSchema, body, { fn: "manage-whatsapp-instance" });
     const { action, phone, message, client_id, name, instance_id, apelido, bridge_url, bridge_api_key, is_active, status: newStatus, media, mimetype, filename, caption } = body;
     const cronRequested = action === "health_check_all";
     if (!authHeader && !cronRequested) {

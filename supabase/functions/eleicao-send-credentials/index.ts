@@ -1,4 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { validateInput, z } from "../_shared/validate.ts";
+
+const EleicaoSendCredentialsSchema = z.object({
+  pessoa_id: z.string().uuid(),
+  channel: z.enum(["whatsapp", "link_only"]).optional(),
+  app_url: z.string().url().max(500).optional(),
+  email: z.string().email().max(255).optional(),
+  password: z.string().min(6).max(200).optional(),
+}).passthrough();
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -151,7 +160,9 @@ async function preflightInstance(admin: any, inst: any) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
-    const { pessoa_id, channel, app_url, email, password: providedPassword } = await req.json(); // channel: "whatsapp" | "link_only"
+    const rawBody = await req.json();
+    validateInput(EleicaoSendCredentialsSchema, rawBody, { fn: "eleicao-send-credentials" });
+    const { pessoa_id, channel, app_url, email, password: providedPassword } = rawBody; // channel: "whatsapp" | "link_only"
     const emailInput = typeof email === "string" ? email.trim().toLowerCase() : "";
     const passwordInput = typeof providedPassword === "string" ? providedPassword : "";
     if (emailInput && !validEmail(emailInput)) {
