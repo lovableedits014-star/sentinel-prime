@@ -57,6 +57,21 @@ type TierConfig = { provider: LLMProvider | 'lovable'; apiKey: string; model: st
 
 const emptyTier = (): TierConfig => ({ provider: 'lovable', apiKey: '', model: '', isConfigured: false });
 
+type ProviderCard = {
+  id: string;
+  provider: LLMProvider; // never 'lovable' here — lovable is the implicit fallback
+  model: string;
+  apiKey: string;
+  isConfigured: boolean;
+  tiers: Record<TierKey, boolean>;
+};
+
+const emptyTierFlags = (): Record<TierKey, boolean> => ({
+  fast: false, classify: false, reasoning: false, deep: false,
+});
+
+const SELECTABLE_PROVIDERS = LLM_PROVIDERS.filter(p => p.value !== 'lovable') as { value: LLMProvider; label: string; description: string }[];
+
 interface IntegrationsPanelProps {
   clientId: string;
 }
