@@ -1,4 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateInput, z } from "../_shared/validate.ts";
+
+const RegisterFuncionarioSchema = z.object({
+  client_id: z.string().uuid(),
+  nome: z.string().min(1).max(200),
+  telefone: z.string().min(1).max(40),
+  email: z.string().email().max(255),
+  senha: z.string().min(6).max(200),
+  cpf: z.string().min(11).max(20),
+  cidade: z.string().min(1).max(120),
+  bairro: z.string().min(1).max(120),
+  endereco: z.string().min(1).max(255),
+  redes_sociais: z.any().optional(),
+  data_nascimento: z.string().min(1).max(40),
+}).passthrough();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
