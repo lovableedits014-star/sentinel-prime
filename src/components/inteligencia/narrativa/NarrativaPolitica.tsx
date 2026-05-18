@@ -1002,22 +1002,24 @@ const NarrativaPolitica = () => {
 
   // Pipeline: coleta -> analise -> gerar
   const runPipeline = useMutation({
-    mutationFn: async ({ uf, municipio, force }: { uf: string; municipio: string; force?: boolean }) => {
+    mutationFn: async ({ uf, municipio }: { uf: string; municipio: string }) => {
       if (!clientId) throw new Error("Cliente não identificado");
-      // Trava anti-duplicação: se existe dossiê pronto e não é regeneração explícita, aborta.
+      // Trava de 30 dias: se existe dossiê pronto há menos de 30 dias, aborta.
       const { data: existente } = await supabase
         .from("narrativa_dossies" as any)
-        .select("id,status")
+        .select("id,status,generated_at,created_at")
         .eq("client_id", clientId)
         .eq("uf", uf)
         .eq("municipio", municipio)
         .eq("status", "pronto")
         .maybeSingle();
-      if (existente && !force) {
-        throw new Error(`Já existe dossiê para ${municipio}/${uf}. Use "Regerar mesmo assim" para sobrescrever.`);
-      }
-      // Regeneração: apaga o(s) anterior(es) para liberar o índice único.
-      if (force) {
+      if (existente) {
+        const dt = new Date((existente as any).generated_at || (existente as any).created_at).getTime();
+        const dias = (Date.now() - dt) / (1000 * 60 * 60 * 24);
+        if (dias < 30) {
+          throw new Error(`Dossiê de ${municipio}/${uf} foi gerado há ${Math.floor(dias)} dia(s). Aguarde ${Math.ceil(30 - dias)} dia(s) para gerar novamente.`);
+        }
+        // Liberado (>=30 dias): apaga o anterior para liberar o índice único e gerar de novo.
         await supabase
           .from("narrativa_dossies" as any)
           .delete()
@@ -1075,9 +1077,6 @@ const NarrativaPolitica = () => {
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
-
-  // Estado do diálogo de confirmação de regeneração
-  const [regerarOpen, setRegerarOpen] = useState(false);
 
   // Salvar perfil
   const savePerfil = useMutation({
@@ -1151,91 +1150,84 @@ const NarrativaPolitica = () => {
                 </Select>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                disabled={
-                  !municipio ||
-                  runPipeline.isPending ||
-                  tseChecking ||
-                  !!tseStatus?.bloqueado ||
-                  !!dossieExistente
-                }
-                onClick={() => runPipeline.mutate({ uf, municipio })}
-                title={
-                  dossieExistente
-                    ? "Já existe dossiê para esta cidade — use 'Regerar mesmo assim' para sobrescrever"
-                    : tseStatus?.bloqueado
-                    ? "Sem dados zonais TSE para esta cidade"
-                    : undefined
-                }
-              >
-                {runPipeline.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : dossieExistente ? <Lock className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                {dossieExistente ? "Dossiê já gerado" : "Gerar dossiê"}
-              </Button>
-              {dossieExistente && !runPipeline.isPending && (
+            {(() => {
+              const dtExist = dossieExistente
+                ? new Date(dossieExistente.generated_at || dossieExistente.created_at).getTime()
+                : 0;
+              const diasDesde = dossieExistente ? (Date.now() - dtExist) / (1000 * 60 * 60 * 24) : 0;
+              const diasRestantes = dossieExistente ? Math.max(0, Math.ceil(30 - diasDesde)) : 0;
+              const travado = !!dossieExistente && diasRestantes > 0;
+              const liberadoEm = dossieExistente ? new Date(dtExist + 30 * 24 * 60 * 60 * 1000) : null;
+              return (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setActiveDossieId(dossieExistente.id)}
-                  >
-                    Ver dossiê existente
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400"
-                    onClick={() => setRegerarOpen(true)}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Regerar mesmo assim
-                  </Button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      disabled={
+                        !municipio ||
+                        runPipeline.isPending ||
+                        tseChecking ||
+                        !!tseStatus?.bloqueado ||
+                        travado
+                      }
+                      onClick={() => runPipeline.mutate({ uf, municipio })}
+                      title={
+                        travado
+                          ? `Liberado em ${liberadoEm?.toLocaleDateString("pt-BR")} (${diasRestantes} dia(s))`
+                          : tseStatus?.bloqueado
+                          ? "Sem dados zonais TSE para esta cidade"
+                          : undefined
+                      }
+                    >
+                      {runPipeline.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : travado ? (
+                        <Lock className="w-4 h-4 mr-2" />
+                      ) : (
+                        <Sparkles className="w-4 h-4 mr-2" />
+                      )}
+                      {travado ? "Dossiê já gerado — sem informações novas" : "Gerar dossiê"}
+                    </Button>
+                    {travado && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          setActiveDossieId(dossieExistente!.id);
+                          setTimeout(() => {
+                            const el = document.getElementById("dossie-resultado");
+                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }, 50);
+                        }}
+                      >
+                        <Search className="w-3.5 h-3.5 mr-1.5" /> Abrir dossiê de {dossieExistente!.municipio}/{dossieExistente!.uf}
+                      </Button>
+                    )}
+                    {runPipeline.isPending && (
+                      <span className="text-xs text-muted-foreground">
+                        Coletando IBGE, TSE e mídia… isso pode levar até 30s.
+                      </span>
+                    )}
+                    {!runPipeline.isPending && municipio && tseChecking && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Checando dados TSE…
+                      </span>
+                    )}
+                  </div>
+
+                  {travado && (
+                    <div className="flex items-start gap-2 text-xs rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-amber-900 dark:text-amber-200">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>
+                        Já existe um dossiê pronto para <b>{dossieExistente!.municipio}/{dossieExistente!.uf}</b>, gerado em{" "}
+                        <b>{new Date(dtExist).toLocaleDateString("pt-BR")}</b>. Os dados oficiais (IBGE, TSE, mídia) não mudam de um dia para o outro —{" "}
+                        <b>não há informação nova a coletar</b>. Um novo dossiê desta cidade será liberado em{" "}
+                        <b>{diasRestantes} dia(s)</b> ({liberadoEm?.toLocaleDateString("pt-BR")}).
+                      </span>
+                    </div>
+                  )}
                 </>
-              )}
-              {runPipeline.isPending && (
-                <span className="text-xs text-muted-foreground">
-                  Coletando IBGE, TSE e mídia… isso pode levar até 30s.
-                </span>
-              )}
-              {!runPipeline.isPending && municipio && tseChecking && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Checando dados TSE…
-                </span>
-              )}
-            </div>
-
-            {dossieExistente && !runPipeline.isPending && (
-              <div className="flex items-start gap-2 text-xs rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-amber-900 dark:text-amber-200">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  Já existe um dossiê pronto para <b>{municipio}/{uf}</b> (gerado em{" "}
-                  {new Date(dossieExistente.generated_at || dossieExistente.created_at).toLocaleString("pt-BR")}).
-                  Para evitar custos desnecessários de IA, a geração está travada. Use <b>"Regerar mesmo assim"</b> apenas se realmente quiser substituir o atual.
-                </span>
-              </div>
-            )}
-
-            <AlertDialog open={regerarOpen} onOpenChange={setRegerarOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Regerar dossiê de {municipio}/{uf}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    O dossiê atual será <b>apagado e substituído</b> por uma nova versão.
-                    Isso consome novos créditos de IA (coleta + análise + geração). Continuar?
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      setRegerarOpen(false);
-                      runPipeline.mutate({ uf, municipio, force: true });
-                    }}
-                  >
-                    Sim, regerar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              );
+            })()}
 
             {/* Avisos de dados zonais TSE removidos — não são mais obrigatórios desde a substituição
                 do roteiro estratégico pela seção "Curiosidades & Cultura Local". */}
@@ -1362,11 +1354,13 @@ const NarrativaPolitica = () => {
       )}
 
       {/* Resultado */}
-      {activeDossie ? <DossieView dossie={activeDossie} clientId={clientId} /> : (
-        <Card><CardContent className="p-8 text-center text-muted-foreground text-sm">
-          Nenhum dossiê ainda. Selecione uma cidade acima e gere o primeiro.
-        </CardContent></Card>
-      )}
+      <div id="dossie-resultado">
+        {activeDossie ? <DossieView dossie={activeDossie} clientId={clientId} /> : (
+          <Card><CardContent className="p-8 text-center text-muted-foreground text-sm">
+            Nenhum dossiê ainda. Selecione uma cidade acima e gere o primeiro.
+          </CardContent></Card>
+        )}
+      </div>
     </div>
   );
 };
