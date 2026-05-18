@@ -1302,25 +1302,60 @@ const NarrativaPolitica = () => {
         />
       </div>
 
-      {/* Histórico curto */}
+      {/* Histórico */}
       {dossies && dossies.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2"><History className="w-4 h-4" /> Histórico recente</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <History className="w-4 h-4" /> Histórico de dossiês gerados
+              <Badge variant="secondary" className="ml-1 text-[10px]">{dossies.length}</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Cada cidade só pode ter um dossiê pronto por vez. Para gerar novamente, use "Regerar mesmo assim" na cidade.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {dossies.slice(0, 12).map((d) => (
-                <Button
-                  key={d.id}
-                  variant={activeDossie?.id === d.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveDossieId(d.id)}
-                >
-                  {d.municipio}/{d.uf}
-                  <Badge variant="secondary" className="ml-2 text-[10px]">{d.status}</Badge>
-                </Button>
-              ))}
+            <div className="space-y-1.5">
+              {dossies.map((d) => {
+                const isActive = activeDossie?.id === d.id;
+                const dt = d.generated_at || d.created_at;
+                return (
+                  <div
+                    key={d.id}
+                    className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                      isActive ? "border-primary bg-primary/5" : "border-border bg-background hover:bg-muted/50"
+                    }`}
+                  >
+                    <button
+                      className="flex-1 flex items-center gap-2 text-left min-w-0"
+                      onClick={() => setActiveDossieId(d.id)}
+                    >
+                      <span className="font-medium truncate">{d.municipio}/{d.uf}</span>
+                      <Badge
+                        variant={d.status === "pronto" ? "default" : d.status === "erro" ? "destructive" : "secondary"}
+                        className="text-[10px] shrink-0"
+                      >
+                        {d.status}
+                      </Badge>
+                      <span className="text-muted-foreground text-[11px] ml-auto shrink-0">
+                        {dt ? new Date(dt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </span>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                      title="Excluir do histórico"
+                      disabled={deleteDossie.isPending}
+                      onClick={() => {
+                        if (confirm(`Excluir o dossiê de ${d.municipio}/${d.uf}?`)) deleteDossie.mutate(d.id);
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
