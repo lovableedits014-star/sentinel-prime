@@ -596,6 +596,15 @@ Deno.serve(async (req) => {
 
     await supa.from("narrativa_dossies").update({ status: "gerando" }).eq("id", dossie_id);
 
+    const telemetryCtx: TelemetryContext = {
+      admin: supa,
+      clientId: dossie.client_id,
+      userId: guard.userId ?? null,
+      functionName: "narrativa-gerar",
+      correlationId: getCorrelationId(req),
+      requestId: getRequestId(req),
+    };
+
     // Busca ranking estadual (Atlas/INEP/DATASUS/SNIS) para o município do dossiê
     let rankingMap: Record<string, any> = {};
     try {
