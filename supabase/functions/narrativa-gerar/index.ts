@@ -829,7 +829,8 @@ USE estes números para amarrar a bandeira do candidato (autismo) à realidade l
           ...llmConfig,
           model: /8b|mixtral/i.test(llmConfig.model) ? "llama-3.3-70b-versatile" : llmConfig.model,
         };
-        const aiText = await callLLM(groqCfg, { messages, maxTokens: 7000, temperature: 0.4 }, telemetryCtx);
+        // Groq llama-3.3-70b TPM limit = 12000 (input+output). Mantém margem.
+        const aiText = await callLLM(groqCfg, { messages, maxTokens: 5000, temperature: 0.4 }, telemetryCtx);
         conteudos = normalizeConteudos(parseLooseJson(aiText.content));
       } else {
         const aiJson = await callLLMRaw(llmConfig, {
