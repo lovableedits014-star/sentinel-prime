@@ -1354,11 +1354,13 @@ const NarrativaPolitica = () => {
       )}
 
       {/* Resultado */}
-      {activeDossie ? <DossieView dossie={activeDossie} clientId={clientId} /> : (
-        <Card><CardContent className="p-8 text-center text-muted-foreground text-sm">
-          Nenhum dossiê ainda. Selecione uma cidade acima e gere o primeiro.
-        </CardContent></Card>
-      )}
+      <div id="dossie-resultado">
+        {activeDossie ? <DossieView dossie={activeDossie} clientId={clientId} /> : (
+          <Card><CardContent className="p-8 text-center text-muted-foreground text-sm">
+            Nenhum dossiê ainda. Selecione uma cidade acima e gere o primeiro.
+          </CardContent></Card>
+        )}
+      </div>
     </div>
   );
 };
