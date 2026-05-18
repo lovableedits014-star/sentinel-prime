@@ -1101,6 +1101,15 @@ const NarrativaPolitica = () => {
     [dossies, activeDossieId],
   );
 
+  // Dossiê já pronto para a cidade selecionada → trava o botão de geração.
+  const dossieExistente = useMemo(
+    () =>
+      (dossies || []).find(
+        (d) => d.uf === uf && d.municipio === municipio && d.status === "pronto",
+      ) || null,
+    [dossies, uf, municipio],
+  );
+
   return (
     <div className="space-y-4">
       {/* Header explicativo */}
