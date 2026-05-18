@@ -1002,8 +1002,29 @@ const NarrativaPolitica = () => {
 
   // Pipeline: coleta -> analise -> gerar
   const runPipeline = useMutation({
-    mutationFn: async ({ uf, municipio }: { uf: string; municipio: string }) => {
+    mutationFn: async ({ uf, municipio, force }: { uf: string; municipio: string; force?: boolean }) => {
       if (!clientId) throw new Error("Cliente não identificado");
+      // Trava anti-duplicação: se existe dossiê pronto e não é regeneração explícita, aborta.
+      const { data: existente } = await supabase
+        .from("narrativa_dossies" as any)
+        .select("id,status")
+        .eq("client_id", clientId)
+        .eq("uf", uf)
+        .eq("municipio", municipio)
+        .eq("status", "pronto")
+        .maybeSingle();
+      if (existente && !force) {
+        throw new Error(`Já existe dossiê para ${municipio}/${uf}. Use "Regerar mesmo assim" para sobrescrever.`);
+      }
+      // Regeneração: apaga o(s) anterior(es) para liberar o índice único.
+      if (force) {
+        await supabase
+          .from("narrativa_dossies" as any)
+          .delete()
+          .eq("client_id", clientId)
+          .eq("uf", uf)
+          .eq("municipio", municipio);
+      }
       // 1) coleta
       const r1 = await supabase.functions.invoke("narrativa-coleta", {
         body: { client_id: clientId, uf, municipio },
@@ -1039,6 +1060,24 @@ const NarrativaPolitica = () => {
       toast({ title: "Erro", description: e?.message || "Falha ao gerar dossiê", variant: "destructive" });
     },
   });
+
+  // Excluir um dossiê do histórico
+  const deleteDossie = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("narrativa_dossies" as any).delete().eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => {
+      if (activeDossieId === id) setActiveDossieId(null);
+      qc.invalidateQueries({ queryKey: ["narrativa-dossies", clientId] });
+      toast({ title: "Dossiê removido do histórico." });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  // Estado do diálogo de confirmação de regeneração
+  const [regerarOpen, setRegerarOpen] = useState(false);
 
   // Salvar perfil
   const savePerfil = useMutation({
