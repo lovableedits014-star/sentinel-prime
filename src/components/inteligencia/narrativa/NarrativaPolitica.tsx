@@ -15,9 +15,13 @@ import { toast } from "@/hooks/use-toast";
 import {
   Megaphone, Target, Flame, Users, MapPin, Newspaper, Sparkles, RefreshCw, Settings,
   AlertTriangle, History, Copy, Loader2, Search, FileDown, Send, MapPinned, Star, Pencil, Check, X,
-  BookOpen, Landmark, Utensils, Music, Trophy, Church, Map as MapIcon, Lightbulb, Quote,
+  BookOpen, Landmark, Utensils, Music, Trophy, Church, Map as MapIcon, Lightbulb, Quote, Trash2, Lock,
 } from "lucide-react";
 import jsPDF from "jspdf";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Dossie = {
   id: string;
@@ -998,8 +1002,29 @@ const NarrativaPolitica = () => {
 
   // Pipeline: coleta -> analise -> gerar
   const runPipeline = useMutation({
-    mutationFn: async ({ uf, municipio }: { uf: string; municipio: string }) => {
+    mutationFn: async ({ uf, municipio, force }: { uf: string; municipio: string; force?: boolean }) => {
       if (!clientId) throw new Error("Cliente não identificado");
+      // Trava anti-duplicação: se existe dossiê pronto e não é regeneração explícita, aborta.
+      const { data: existente } = await supabase
+        .from("narrativa_dossies" as any)
+        .select("id,status")
+        .eq("client_id", clientId)
+        .eq("uf", uf)
+        .eq("municipio", municipio)
+        .eq("status", "pronto")
+        .maybeSingle();
+      if (existente && !force) {
+        throw new Error(`Já existe dossiê para ${municipio}/${uf}. Use "Regerar mesmo assim" para sobrescrever.`);
+      }
+      // Regeneração: apaga o(s) anterior(es) para liberar o índice único.
+      if (force) {
+        await supabase
+          .from("narrativa_dossies" as any)
+          .delete()
+          .eq("client_id", clientId)
+          .eq("uf", uf)
+          .eq("municipio", municipio);
+      }
       // 1) coleta
       const r1 = await supabase.functions.invoke("narrativa-coleta", {
         body: { client_id: clientId, uf, municipio },
@@ -1036,6 +1061,24 @@ const NarrativaPolitica = () => {
     },
   });
 
+  // Excluir um dossiê do histórico
+  const deleteDossie = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("narrativa_dossies" as any).delete().eq("id", id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => {
+      if (activeDossieId === id) setActiveDossieId(null);
+      qc.invalidateQueries({ queryKey: ["narrativa-dossies", clientId] });
+      toast({ title: "Dossiê removido do histórico." });
+    },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  // Estado do diálogo de confirmação de regeneração
+  const [regerarOpen, setRegerarOpen] = useState(false);
+
   // Salvar perfil
   const savePerfil = useMutation({
     mutationFn: async (p: Partial<Perfil>) => {
@@ -1056,6 +1099,15 @@ const NarrativaPolitica = () => {
   const activeDossie = useMemo(
     () => (dossies || []).find((d) => d.id === activeDossieId) || dossies?.[0] || null,
     [dossies, activeDossieId],
+  );
+
+  // Dossiê já pronto para a cidade selecionada → trava o botão de geração.
+  const dossieExistente = useMemo(
+    () =>
+      (dossies || []).find(
+        (d) => d.uf === uf && d.municipio === municipio && d.status === "pronto",
+      ) || null,
+    [dossies, uf, municipio],
   );
 
   return (
@@ -1099,15 +1151,46 @@ const NarrativaPolitica = () => {
                 </Select>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
-                disabled={!municipio || runPipeline.isPending || tseChecking || !!tseStatus?.bloqueado}
+                disabled={
+                  !municipio ||
+                  runPipeline.isPending ||
+                  tseChecking ||
+                  !!tseStatus?.bloqueado ||
+                  !!dossieExistente
+                }
                 onClick={() => runPipeline.mutate({ uf, municipio })}
-                title={tseStatus?.bloqueado ? "Sem dados zonais TSE para esta cidade" : undefined}
+                title={
+                  dossieExistente
+                    ? "Já existe dossiê para esta cidade — use 'Regerar mesmo assim' para sobrescrever"
+                    : tseStatus?.bloqueado
+                    ? "Sem dados zonais TSE para esta cidade"
+                    : undefined
+                }
               >
-                {runPipeline.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                Gerar / atualizar dossiê
+                {runPipeline.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : dossieExistente ? <Lock className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                {dossieExistente ? "Dossiê já gerado" : "Gerar dossiê"}
               </Button>
+              {dossieExistente && !runPipeline.isPending && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveDossieId(dossieExistente.id)}
+                  >
+                    Ver dossiê existente
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400"
+                    onClick={() => setRegerarOpen(true)}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Regerar mesmo assim
+                  </Button>
+                </>
+              )}
               {runPipeline.isPending && (
                 <span className="text-xs text-muted-foreground">
                   Coletando IBGE, TSE e mídia… isso pode levar até 30s.
@@ -1119,6 +1202,40 @@ const NarrativaPolitica = () => {
                 </span>
               )}
             </div>
+
+            {dossieExistente && !runPipeline.isPending && (
+              <div className="flex items-start gap-2 text-xs rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  Já existe um dossiê pronto para <b>{municipio}/{uf}</b> (gerado em{" "}
+                  {new Date(dossieExistente.generated_at || dossieExistente.created_at).toLocaleString("pt-BR")}).
+                  Para evitar custos desnecessários de IA, a geração está travada. Use <b>"Regerar mesmo assim"</b> apenas se realmente quiser substituir o atual.
+                </span>
+              </div>
+            )}
+
+            <AlertDialog open={regerarOpen} onOpenChange={setRegerarOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Regerar dossiê de {municipio}/{uf}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O dossiê atual será <b>apagado e substituído</b> por uma nova versão.
+                    Isso consome novos créditos de IA (coleta + análise + geração). Continuar?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      setRegerarOpen(false);
+                      runPipeline.mutate({ uf, municipio, force: true });
+                    }}
+                  >
+                    Sim, regerar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Avisos de dados zonais TSE removidos — não são mais obrigatórios desde a substituição
                 do roteiro estratégico pela seção "Curiosidades & Cultura Local". */}
@@ -1185,25 +1302,60 @@ const NarrativaPolitica = () => {
         />
       </div>
 
-      {/* Histórico curto */}
+      {/* Histórico */}
       {dossies && dossies.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2"><History className="w-4 h-4" /> Histórico recente</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <History className="w-4 h-4" /> Histórico de dossiês gerados
+              <Badge variant="secondary" className="ml-1 text-[10px]">{dossies.length}</Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Cada cidade só pode ter um dossiê pronto por vez. Para gerar novamente, use "Regerar mesmo assim" na cidade.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {dossies.slice(0, 12).map((d) => (
-                <Button
-                  key={d.id}
-                  variant={activeDossie?.id === d.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveDossieId(d.id)}
-                >
-                  {d.municipio}/{d.uf}
-                  <Badge variant="secondary" className="ml-2 text-[10px]">{d.status}</Badge>
-                </Button>
-              ))}
+            <div className="space-y-1.5">
+              {dossies.map((d) => {
+                const isActive = activeDossie?.id === d.id;
+                const dt = d.generated_at || d.created_at;
+                return (
+                  <div
+                    key={d.id}
+                    className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                      isActive ? "border-primary bg-primary/5" : "border-border bg-background hover:bg-muted/50"
+                    }`}
+                  >
+                    <button
+                      className="flex-1 flex items-center gap-2 text-left min-w-0"
+                      onClick={() => setActiveDossieId(d.id)}
+                    >
+                      <span className="font-medium truncate">{d.municipio}/{d.uf}</span>
+                      <Badge
+                        variant={d.status === "pronto" ? "default" : d.status === "erro" ? "destructive" : "secondary"}
+                        className="text-[10px] shrink-0"
+                      >
+                        {d.status}
+                      </Badge>
+                      <span className="text-muted-foreground text-[11px] ml-auto shrink-0">
+                        {dt ? new Date(dt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      </span>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                      title="Excluir do histórico"
+                      disabled={deleteDossie.isPending}
+                      onClick={() => {
+                        if (confirm(`Excluir o dossiê de ${d.municipio}/${d.uf}?`)) deleteDossie.mutate(d.id);
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
