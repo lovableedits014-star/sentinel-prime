@@ -1002,22 +1002,24 @@ const NarrativaPolitica = () => {
 
   // Pipeline: coleta -> analise -> gerar
   const runPipeline = useMutation({
-    mutationFn: async ({ uf, municipio, force }: { uf: string; municipio: string; force?: boolean }) => {
+    mutationFn: async ({ uf, municipio }: { uf: string; municipio: string }) => {
       if (!clientId) throw new Error("Cliente não identificado");
-      // Trava anti-duplicação: se existe dossiê pronto e não é regeneração explícita, aborta.
+      // Trava de 30 dias: se existe dossiê pronto há menos de 30 dias, aborta.
       const { data: existente } = await supabase
         .from("narrativa_dossies" as any)
-        .select("id,status")
+        .select("id,status,generated_at,created_at")
         .eq("client_id", clientId)
         .eq("uf", uf)
         .eq("municipio", municipio)
         .eq("status", "pronto")
         .maybeSingle();
-      if (existente && !force) {
-        throw new Error(`Já existe dossiê para ${municipio}/${uf}. Use "Regerar mesmo assim" para sobrescrever.`);
-      }
-      // Regeneração: apaga o(s) anterior(es) para liberar o índice único.
-      if (force) {
+      if (existente) {
+        const dt = new Date((existente as any).generated_at || (existente as any).created_at).getTime();
+        const dias = (Date.now() - dt) / (1000 * 60 * 60 * 24);
+        if (dias < 30) {
+          throw new Error(`Dossiê de ${municipio}/${uf} foi gerado há ${Math.floor(dias)} dia(s). Aguarde ${Math.ceil(30 - dias)} dia(s) para gerar novamente.`);
+        }
+        // Liberado (>=30 dias): apaga o anterior para liberar o índice único e gerar de novo.
         await supabase
           .from("narrativa_dossies" as any)
           .delete()
@@ -1075,9 +1077,6 @@ const NarrativaPolitica = () => {
     },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
-
-  // Estado do diálogo de confirmação de regeneração
-  const [regerarOpen, setRegerarOpen] = useState(false);
 
   // Salvar perfil
   const savePerfil = useMutation({
