@@ -1151,15 +1151,46 @@ const NarrativaPolitica = () => {
                 </Select>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
-                disabled={!municipio || runPipeline.isPending || tseChecking || !!tseStatus?.bloqueado}
+                disabled={
+                  !municipio ||
+                  runPipeline.isPending ||
+                  tseChecking ||
+                  !!tseStatus?.bloqueado ||
+                  !!dossieExistente
+                }
                 onClick={() => runPipeline.mutate({ uf, municipio })}
-                title={tseStatus?.bloqueado ? "Sem dados zonais TSE para esta cidade" : undefined}
+                title={
+                  dossieExistente
+                    ? "Já existe dossiê para esta cidade — use 'Regerar mesmo assim' para sobrescrever"
+                    : tseStatus?.bloqueado
+                    ? "Sem dados zonais TSE para esta cidade"
+                    : undefined
+                }
               >
-                {runPipeline.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                Gerar / atualizar dossiê
+                {runPipeline.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : dossieExistente ? <Lock className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                {dossieExistente ? "Dossiê já gerado" : "Gerar dossiê"}
               </Button>
+              {dossieExistente && !runPipeline.isPending && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveDossieId(dossieExistente.id)}
+                  >
+                    Ver dossiê existente
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400"
+                    onClick={() => setRegerarOpen(true)}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Regerar mesmo assim
+                  </Button>
+                </>
+              )}
               {runPipeline.isPending && (
                 <span className="text-xs text-muted-foreground">
                   Coletando IBGE, TSE e mídia… isso pode levar até 30s.
@@ -1171,6 +1202,40 @@ const NarrativaPolitica = () => {
                 </span>
               )}
             </div>
+
+            {dossieExistente && !runPipeline.isPending && (
+              <div className="flex items-start gap-2 text-xs rounded-md border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  Já existe um dossiê pronto para <b>{municipio}/{uf}</b> (gerado em{" "}
+                  {new Date(dossieExistente.generated_at || dossieExistente.created_at).toLocaleString("pt-BR")}).
+                  Para evitar custos desnecessários de IA, a geração está travada. Use <b>"Regerar mesmo assim"</b> apenas se realmente quiser substituir o atual.
+                </span>
+              </div>
+            )}
+
+            <AlertDialog open={regerarOpen} onOpenChange={setRegerarOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Regerar dossiê de {municipio}/{uf}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O dossiê atual será <b>apagado e substituído</b> por uma nova versão.
+                    Isso consome novos créditos de IA (coleta + análise + geração). Continuar?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      setRegerarOpen(false);
+                      runPipeline.mutate({ uf, municipio, force: true });
+                    }}
+                  >
+                    Sim, regerar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Avisos de dados zonais TSE removidos — não são mais obrigatórios desde a substituição
                 do roteiro estratégico pela seção "Curiosidades & Cultura Local". */}
