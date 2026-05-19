@@ -60,6 +60,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         auto_enviar: !!d.auto_enviar,
         template_coordenador: d.template_coordenador || DEFAULT_TPL_COORD,
         template_lider: d.template_lider || DEFAULT_TPL_LIDER,
+        template_coordenador_boas_vindas: d.template_coordenador_boas_vindas || DEFAULT_TPL_COORD_BV,
         grupos_links: d.grupos_links || {},
       });
     }
