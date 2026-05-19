@@ -14,6 +14,8 @@ const DEFAULT_TPL_COORD =
   "Foi adicionado novo líder na região: *{regiao}*\n\nNome: {nome}\nTelefone: {telefone}\nRua: {rua}, {numero}\nBairro: {bairro}";
 const DEFAULT_TPL_LIDER =
   "Olá {nome}! Você foi cadastrado como líder na região *{regiao}*.\n\nEntre no grupo da região para receber as orientações:\n{link_grupo}";
+const DEFAULT_TPL_COORD_BV =
+  "Olá {nome}! Você foi cadastrado como coordenador da região *{regiao}*.\n\nEntre no grupo da sua região e aguarde as próximas instruções:\n{link_grupo}";
 
 interface Cfg {
   id?: string;
@@ -22,6 +24,7 @@ interface Cfg {
   auto_enviar: boolean;
   template_coordenador: string;
   template_lider: string;
+  template_coordenador_boas_vindas: string;
   grupos_links: Record<string, string>;
 }
 
@@ -37,6 +40,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     auto_enviar: true,
     template_coordenador: DEFAULT_TPL_COORD,
     template_lider: DEFAULT_TPL_LIDER,
+    template_coordenador_boas_vindas: DEFAULT_TPL_COORD_BV,
     grupos_links: {},
   });
 
@@ -56,6 +60,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         auto_enviar: !!d.auto_enviar,
         template_coordenador: d.template_coordenador || DEFAULT_TPL_COORD,
         template_lider: d.template_lider || DEFAULT_TPL_LIDER,
+        template_coordenador_boas_vindas: d.template_coordenador_boas_vindas || DEFAULT_TPL_COORD_BV,
         grupos_links: d.grupos_links || {},
       });
     }
@@ -72,6 +77,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       auto_enviar: cfg.auto_enviar,
       template_coordenador: cfg.template_coordenador,
       template_lider: cfg.template_lider,
+      template_coordenador_boas_vindas: cfg.template_coordenador_boas_vindas,
       grupos_links: cfg.grupos_links,
     };
     const q = cfg.id
@@ -208,6 +214,16 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         <Textarea rows={6} className="font-mono text-xs"
           value={cfg.template_lider}
           onChange={e => setCfg(c => ({ ...c, template_lider: e.target.value }))} />
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <div className="font-medium text-sm">Mensagem de boas-vindas para o coordenador cadastrado</div>
+        <p className="text-xs text-muted-foreground">
+          Enviada automaticamente ao novo coordenador, com o link do grupo da região dele. Placeholders: <code className="bg-muted px-1 rounded text-[10px] sm:text-xs">{"{nome} {regiao} {link_grupo}"}</code>
+        </p>
+        <Textarea rows={6} className="font-mono text-xs"
+          value={cfg.template_coordenador_boas_vindas}
+          onChange={e => setCfg(c => ({ ...c, template_coordenador_boas_vindas: e.target.value }))} />
       </Card>
 
       <div className="flex justify-end">

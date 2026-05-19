@@ -256,11 +256,50 @@ export default function Eleicao() {
         password: form.password,
         closeRegisterDialog: true,
       });
+      // Após enviar credenciais, dispara também a mensagem de boas-vindas.
+      void notifyCoordBoasVindas((savedPessoa as any).id);
       return;
     }
+
+    // Coordenador novo (sem envio de credenciais): manda apenas a boas-vindas.
+    if (!editing && form.tipo === "coordenador" && savedPessoa) {
+      void notifyCoordBoasVindas((savedPessoa as any).id);
+    }
+
     toast.success(editing ? "Atualizado!" : "Cadastrado!");
     setDialogOpen(false);
     load();
+  }
+
+  async function notifyCoordBoasVindas(pessoaId: string) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) return;
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/eleicao-notify-novo-lider`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || (import.meta.env as any).VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ pessoa_id: pessoaId, target: "coordenador_boas_vindas" }),
+        },
+      );
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || data?.error) {
+        toast.warning("Coordenador cadastrado, mas não foi possível enviar a mensagem de boas-vindas", { description: data?.error });
+        return;
+      }
+      const r = data?.result;
+      if (r?.sent) toast.success("Mensagem de boas-vindas enviada ao coordenador no WhatsApp");
+      else if (r?.reason) toast.info(`Boas-vindas não enviada: ${r.reason}`);
+      else if (r?.error) toast.warning(`Falha na boas-vindas: ${r.error}`);
+    } catch (e: any) {
+      toast.warning("Falha ao enviar boas-vindas ao coordenador", { description: e?.message });
+    }
   }
 
   async function remove(id: string) {

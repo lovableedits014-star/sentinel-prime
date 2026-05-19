@@ -322,7 +322,7 @@ Deno.serve(async (req) => {
     const pessoa_id = body?.pessoa_id;
     const target = (body?.target as string | undefined)?.toLowerCase();
     if (!pessoa_id) throw new Error("pessoa_id obrigatório");
-    if (target && !["coordenador", "secretaria", "lider"].includes(target)) {
+    if (target && !["coordenador", "secretaria", "lider", "coordenador_boas_vindas"].includes(target)) {
       throw new Error("target inválido");
     }
 
@@ -343,7 +343,13 @@ Deno.serve(async (req) => {
       .select("id, client_id, nome, telefone, tipo, escopo, regiao, parent_id, rua, numero, bairro, endereco")
       .eq("id", pessoa_id).maybeSingle();
     if (!pessoa) throw new Error("Pessoa não encontrada");
-    if (pessoa.tipo !== "lider") {
+
+    const isWelcomeCoord = target === "coordenador_boas_vindas";
+    if (isWelcomeCoord) {
+      if (pessoa.tipo !== "coordenador") {
+        return new Response(JSON.stringify({ success: true, skipped: "Não é coordenador" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      }
+    } else if (pessoa.tipo !== "lider") {
       return new Response(JSON.stringify({ success: true, skipped: "Não é líder" }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
@@ -383,7 +389,7 @@ Deno.serve(async (req) => {
       const { data: regRow } = await admin
         .from("eleicao_regioes")
         .select("label")
-        .eq("client_id", clientId)
+        .eq("client_id", pessoa.client_id)
         .eq("value", pessoa.regiao)
         .maybeSingle();
       regiaoLabel = (regRow as any)?.label
@@ -403,6 +409,11 @@ Deno.serve(async (req) => {
 
     const msgInterno = applyTemplate(cfg.template_coordenador, vars);
     const msgLider = applyTemplate(cfg.template_lider, vars);
+    const msgCoordBoasVindas = applyTemplate(
+      cfg.template_coordenador_boas_vindas
+        || "Olá {nome}! Você foi cadastrado como coordenador da região *{regiao}*.\n\nEntre no grupo da sua região e aguarde as próximas instruções:\n{link_grupo}",
+      vars,
+    );
 
     const results: Record<string, SendOutcome> = {};
 
@@ -489,10 +500,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    async function runCoordBoasVindas() {
+      results.coordenador_boas_vindas = await sendTo({
+        ...baseSendCtx,
+        destinatarioTipo: "coordenador_boas_vindas", destinatarioNome: pessoa.nome,
+        destinatarioTelefone: pessoa.telefone, message: msgCoordBoasVindas,
+      });
+    }
+
     if (target) {
       if (target === "coordenador") await runCoordenador();
       else if (target === "secretaria") await runSecretaria();
       else if (target === "lider") await runLider();
+      else if (target === "coordenador_boas_vindas") await runCoordBoasVindas();
       return new Response(
         JSON.stringify({ success: true, preflight: pre, target, result: results[target] }),
         { headers: { ...cors, "Content-Type": "application/json" } },
