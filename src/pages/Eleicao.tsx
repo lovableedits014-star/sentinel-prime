@@ -1283,6 +1283,9 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               <DropdownMenuItem onClick={() => onCredentials(p)}>
                 <KeyRound className="w-3.5 h-3.5 mr-2" />Definir e enviar acesso
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => sendCoordBoasVindas(p.id)}>
+                <BellRing className="w-3.5 h-3.5 mr-2" />Enviar boas-vindas (grupo)
+              </DropdownMenuItem>
             </>
           )}
           <DropdownMenuSeparator />
