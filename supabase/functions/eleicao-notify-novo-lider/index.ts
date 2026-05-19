@@ -389,7 +389,7 @@ Deno.serve(async (req) => {
       const { data: regRow } = await admin
         .from("eleicao_regioes")
         .select("label")
-        .eq("client_id", clientId)
+        .eq("client_id", pessoa.client_id)
         .eq("value", pessoa.regiao)
         .maybeSingle();
       regiaoLabel = (regRow as any)?.label
