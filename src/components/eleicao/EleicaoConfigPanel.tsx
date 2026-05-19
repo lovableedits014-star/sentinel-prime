@@ -14,6 +14,8 @@ const DEFAULT_TPL_COORD =
   "Foi adicionado novo líder na região: *{regiao}*\n\nNome: {nome}\nTelefone: {telefone}\nRua: {rua}, {numero}\nBairro: {bairro}";
 const DEFAULT_TPL_LIDER =
   "Olá {nome}! Você foi cadastrado como líder na região *{regiao}*.\n\nEntre no grupo da região para receber as orientações:\n{link_grupo}";
+const DEFAULT_TPL_COORD_BV =
+  "Olá {nome}! Você foi cadastrado como coordenador da região *{regiao}*.\n\nEntre no grupo da sua região e aguarde as próximas instruções:\n{link_grupo}";
 
 interface Cfg {
   id?: string;
@@ -22,6 +24,7 @@ interface Cfg {
   auto_enviar: boolean;
   template_coordenador: string;
   template_lider: string;
+  template_coordenador_boas_vindas: string;
   grupos_links: Record<string, string>;
 }
 
