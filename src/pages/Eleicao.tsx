@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star } from "lucide-react";
+import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star, BellRing } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -46,6 +46,38 @@ const fmtPhone = (s: string) => {
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
   return s;
 };
+
+async function sendCoordBoasVindas(pessoaId: string) {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) { toast.error("Sessão expirada"); return; }
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/eleicao-notify-novo-lider`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || (import.meta.env as any).VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ pessoa_id: pessoaId, target: "coordenador_boas_vindas" }),
+      },
+    );
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data?.error) {
+      toast.warning("Não foi possível enviar a mensagem de boas-vindas", { description: data?.error });
+      return;
+    }
+    const r = data?.result;
+    if (r?.sent) toast.success("Mensagem de boas-vindas enviada ao coordenador no WhatsApp");
+    else if (r?.reason) toast.info(`Boas-vindas não enviada: ${r.reason}`);
+    else if (r?.error) toast.warning(`Falha na boas-vindas: ${r.error}`);
+    else toast.info("Solicitação processada");
+  } catch (e: any) {
+    toast.warning("Falha ao enviar boas-vindas ao coordenador", { description: e?.message });
+  }
+}
 
 async function gerarContratosLote(
   pessoas: Pessoa[],
@@ -272,35 +304,9 @@ export default function Eleicao() {
   }
 
   async function notifyCoordBoasVindas(pessoaId: string) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      if (!accessToken) return;
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/eleicao-notify-novo-lider`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || (import.meta.env as any).VITE_SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({ pessoa_id: pessoaId, target: "coordenador_boas_vindas" }),
-        },
-      );
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || data?.error) {
-        toast.warning("Coordenador cadastrado, mas não foi possível enviar a mensagem de boas-vindas", { description: data?.error });
-        return;
-      }
-      const r = data?.result;
-      if (r?.sent) toast.success("Mensagem de boas-vindas enviada ao coordenador no WhatsApp");
-      else if (r?.reason) toast.info(`Boas-vindas não enviada: ${r.reason}`);
-      else if (r?.error) toast.warning(`Falha na boas-vindas: ${r.error}`);
-    } catch (e: any) {
-      toast.warning("Falha ao enviar boas-vindas ao coordenador", { description: e?.message });
-    }
+    await sendCoordBoasVindas(pessoaId);
   }
+
 
   async function remove(id: string) {
     if (!confirm("Excluir este cadastro? As pessoas vinculadas a ele ficarão sem vínculo.")) return;
@@ -1276,6 +1282,9 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onCredentials(p)}>
                 <KeyRound className="w-3.5 h-3.5 mr-2" />Definir e enviar acesso
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => sendCoordBoasVindas(p.id)}>
+                <BellRing className="w-3.5 h-3.5 mr-2" />Enviar boas-vindas (grupo)
               </DropdownMenuItem>
             </>
           )}
