@@ -409,6 +409,11 @@ Deno.serve(async (req) => {
 
     const msgInterno = applyTemplate(cfg.template_coordenador, vars);
     const msgLider = applyTemplate(cfg.template_lider, vars);
+    const msgCoordBoasVindas = applyTemplate(
+      cfg.template_coordenador_boas_vindas
+        || "Olá {nome}! Você foi cadastrado como coordenador da região *{regiao}*.\n\nEntre no grupo da sua região e aguarde as próximas instruções:\n{link_grupo}",
+      vars,
+    );
 
     const results: Record<string, SendOutcome> = {};
 
