@@ -244,7 +244,7 @@ export default function SupporterRegister() {
                 cpf: cpfDigits(cpf),
                 phone: phone.trim(),
                 birth_date: birthDate,
-                endereco: rua.trim(),
+                endereco: rua.trim() || null,
                 facebook_username: fbResolved,
                 instagram_username: igResolved,
                 referred_by: data.referrer_account_id || null,
