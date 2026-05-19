@@ -234,8 +234,8 @@ export default function Eleicao() {
   }
 
   async function save() {
-    if (!form.nome.trim() || !form.telefone.trim() || !form.rua.trim() || !form.bairro.trim()) {
-      toast.error("Nome, telefone, rua e bairro são obrigatórios"); return;
+    if (!form.nome.trim() || !form.telefone.trim() || !form.bairro.trim()) {
+      toast.error("Nome, telefone e bairro são obrigatórios"); return;
     }
     if (form.escopo === "interior" && !form.cidade.trim()) {
       toast.error("Cidade é obrigatória para Interior"); return;
@@ -249,7 +249,7 @@ export default function Eleicao() {
     const rua = form.rua.trim();
     const numero = form.numero.trim();
     const bairro = form.bairro.trim();
-    const enderecoConcat = [`${rua}${numero ? ", " + numero : ""}`, bairro].filter(Boolean).join(" - ");
+    const enderecoConcat = [rua ? `${rua}${numero ? ", " + numero : ""}` : "", bairro].filter(Boolean).join(" - ");
     const payload: any = {
       client_id: clientId,
       tipo: form.tipo,
@@ -778,8 +778,8 @@ export default function Eleicao() {
             )}
             <div className="grid grid-cols-[1fr_100px] gap-2">
               <div>
-                <Label>Rua *</Label>
-                <Input value={form.rua} onChange={e => setForm(f => ({ ...f, rua: e.target.value }))} placeholder="Av. Afonso Pena" />
+                <Label>Rua</Label>
+                <Input value={form.rua} onChange={e => setForm(f => ({ ...f, rua: e.target.value }))} placeholder="Av. Afonso Pena (opcional)" />
               </div>
               <div>
                 <Label>Nº</Label>
