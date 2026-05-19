@@ -778,8 +778,8 @@ export default function Eleicao() {
             )}
             <div className="grid grid-cols-[1fr_100px] gap-2">
               <div>
-                <Label>Rua *</Label>
-                <Input value={form.rua} onChange={e => setForm(f => ({ ...f, rua: e.target.value }))} placeholder="Av. Afonso Pena" />
+                <Label>Rua</Label>
+                <Input value={form.rua} onChange={e => setForm(f => ({ ...f, rua: e.target.value }))} placeholder="Av. Afonso Pena (opcional)" />
               </div>
               <div>
                 <Label>Nº</Label>
