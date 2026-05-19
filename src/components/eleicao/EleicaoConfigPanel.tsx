@@ -77,6 +77,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       auto_enviar: cfg.auto_enviar,
       template_coordenador: cfg.template_coordenador,
       template_lider: cfg.template_lider,
+      template_coordenador_boas_vindas: cfg.template_coordenador_boas_vindas,
       grupos_links: cfg.grupos_links,
     };
     const q = cfg.id
