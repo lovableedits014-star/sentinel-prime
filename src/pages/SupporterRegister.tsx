@@ -163,10 +163,6 @@ export default function SupporterRegister() {
       setError("Por favor, informe sua cidade.");
       return;
     }
-    if (!rua.trim()) {
-      setError("Por favor, informe sua rua.");
-      return;
-    }
     if (!neighborhood.trim()) {
       setError("Por favor, informe seu bairro.");
       return;
@@ -189,7 +185,7 @@ export default function SupporterRegister() {
           instagram_url: instagramConn?.url || null,
           phone: phone.trim(),
           birth_date: birthDate,
-          endereco: rua.trim(),
+          endereco: rua.trim() || null,
           notes: notes.trim() || null,
           referral_code: refCode || null,
           city: city.trim() || null,
@@ -248,7 +244,7 @@ export default function SupporterRegister() {
                 cpf: cpfDigits(cpf),
                 phone: phone.trim(),
                 birth_date: birthDate,
-                endereco: rua.trim(),
+                endereco: rua.trim() || null,
                 facebook_username: fbResolved,
                 instagram_username: igResolved,
                 referred_by: data.referrer_account_id || null,
@@ -472,8 +468,7 @@ export default function SupporterRegister() {
               <Input
                 value={rua}
                 onChange={(e) => { setRua(e.target.value); setError(""); }}
-                placeholder="Rua *"
-                required
+                placeholder="Rua (opcional)"
               />
               <Input
                 value={neighborhood}
