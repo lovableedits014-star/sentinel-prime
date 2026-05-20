@@ -1096,7 +1096,7 @@ export default function Disparos() {
                     <><ImagePlus className="w-4 h-4 mr-2" /> Anexar imagem</>
                   )}
                 </Button>
-                <span className="text-xs text-muted-foreground">JPG/PNG até 8MB. Não é enviado para grupos.</span>
+                <span className="text-xs text-muted-foreground">JPG/PNG até 8MB. Enviada para contatos e grupos.</span>
               </div>
             )}
           </div>
