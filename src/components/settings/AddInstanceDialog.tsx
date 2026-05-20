@@ -53,6 +53,11 @@ export default function AddInstanceDialog({ open, onOpenChange, clientId, onCrea
             Após criar, conecte gerando o QR Code com o WhatsApp daquele número.
           </DialogDescription>
         </DialogHeader>
+        {isImpersonating && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-xs p-2.5">
+            ⚠️ Modo Super Admin: a instância será criada para o cliente atualmente selecionado no seletor lateral.
+          </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="apelido">Apelido do chip</Label>
           <Input
