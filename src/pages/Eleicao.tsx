@@ -804,7 +804,7 @@ export default function Eleicao() {
 
       {/* Dialog credenciais */}
       <Dialog open={credOpen} onOpenChange={setCredOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader><DialogTitle>Acesso ao portal — {credPessoa?.nome}</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">Defina email e senha para salvar o acesso e enviar pelo WhatsApp conectado.</p>
           <div className="space-y-3 mt-2">
