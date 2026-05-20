@@ -44,15 +44,18 @@ function cleanPhoneForBridge(raw: string): string {
 
 const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
 
-async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string; phone: string; message: string }) {
-  const { bridgeUrl, bridgeApiKey, phone, message } = params;
+async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string; phone: string; message: string; mediaUrl?: string | null }) {
+  const { bridgeUrl, bridgeApiKey, phone, message, mediaUrl } = params;
   const isGroup = typeof phone === "string" && phone.endsWith("@g.us");
+  const hasMedia = !!mediaUrl && !isGroup;
 
   // Para grupos, montamos uma cadeia de tentativas com formatos diferentes
   // pois bridges variam: algumas aceitam `action:"send_group"` com `group_jid`,
   // outras aceitam o JID direto em `to` ou `phone` no `action:"send"`.
   // A primeira que NÃO devolver "unsupported"/"número inválido" vence.
-  const attempts: Array<Record<string, unknown>> = isGroup
+  const attempts: Array<Record<string, unknown>> = hasMedia
+    ? [{ action: "send_media", phone, media_url: mediaUrl, caption: message }]
+    : isGroup
     ? [
         { action: "send_group", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, message },
         { action: "send", jid: phone, group_jid: phone, remoteJid: phone, chatId: phone, is_group: true, isGroup: true, message },
