@@ -360,6 +360,7 @@ Deno.serve(async (req) => {
       const queueId = payload.retry_queue_id as string;
       const queueClientId = payload.client_id as string;
       const queueMsg = String(payload.mensagem || "");
+      const queueMediaUrl = (payload.media_url as string | null) || null;
       const queueRecipient = (payload.recipients?.[0] || {}) as { telefone?: string; nome?: string };
 
       if (!queueClientId || !queueRecipient.telefone || !queueMsg) {
