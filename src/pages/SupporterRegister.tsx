@@ -217,7 +217,7 @@ export default function SupporterRegister() {
           const { data: authData, error: signUpError } = await supabase.auth.signUp({
             email: email.trim(),
             password,
-            options: { data: { full_name: name.trim() } },
+            options: { data: { full_name: name.trim(), account_type: "portal_pessoa" } },
           });
           if (signUpError) {
             console.error("Auth signup error:", signUpError);

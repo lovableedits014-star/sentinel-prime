@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       email: normalizedEmail,
       password: senha,
       email_confirm: true,
-      user_metadata: { full_name: nome, role: "contratado" },
+      user_metadata: { full_name: nome, role: "contratado", account_type: "funcionario" },
     });
 
     if (createError) {

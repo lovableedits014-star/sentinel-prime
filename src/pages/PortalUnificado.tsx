@@ -158,7 +158,7 @@ export default function PortalUnificado() {
     try {
       const { error } = await supabase.auth.signUp({
         email, password,
-        options: { data: { full_name: name } },
+        options: { data: { full_name: name, account_type: "portal_pessoa" } },
       });
       if (error) throw error;
       toast.success("Conta criada!");

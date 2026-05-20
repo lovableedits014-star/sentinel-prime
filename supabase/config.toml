@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.manage-platform-user]
 verify_jwt = true
+
+[functions.create-gerente]
+verify_jwt = true
