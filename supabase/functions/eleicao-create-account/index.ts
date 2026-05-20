@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
         email: emailNorm,
         password,
         email_confirm: true,
-        user_metadata: { full_name: pessoa.nome },
+        user_metadata: { full_name: pessoa.nome, account_type: "portal_pessoa" },
       });
       if (cErr) throw cErr;
       userId = created.user!.id;
