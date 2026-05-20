@@ -988,6 +988,7 @@ Deno.serve(async (req) => {
               bridgeApiKey,
               phone: destination,
               message: personalizedMsg,
+              mediaUrl: media_url,
             });
 
             const failure = getSendFailure(sendRes, sendData);
