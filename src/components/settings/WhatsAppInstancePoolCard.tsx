@@ -83,8 +83,10 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
   const [polling, setPolling] = useState(false);
   const [showTest, setShowTest] = useState(false);
   const [testPhone, setTestPhone] = useState("");
+  const [reassignOpen, setReassignOpen] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { groups, isSyncing, syncFromInstance } = useWhatsAppGroups(clientId);
+  const { isSuperAdmin } = useActiveClientId();
   const groupsForThisInstance = groups.filter((g) => g.instance_id === instance.id).length;
 
   useEffect(() => setName(instance.apelido), [instance.apelido]);
