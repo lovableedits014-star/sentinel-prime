@@ -4,6 +4,7 @@ import { validateInput, z } from "../_shared/validate.ts";
 const ManageWhatsappSchema = z.object({
   action: z.string().min(1).max(80),
   client_id: z.string().uuid().optional(),
+  target_client_id: z.string().uuid().optional(),
   instance_id: z.string().max(120).optional(),
   phone: z.string().max(40).optional(),
   message: z.string().max(8000).optional(),
@@ -17,6 +18,66 @@ const ManageWhatsappSchema = z.object({
   filename: z.string().max(255).optional(),
   caption: z.string().max(2000).optional(),
 }).passthrough();
+
+/**
+ * Verifica se o `user` autenticado pode operar sobre `clientId`:
+ *  - dono do cliente (clients.user_id), OU
+ *  - membro ativo de team_members daquele cliente, OU
+ *  - super admin (is_super_admin()).
+ * Retorna { ok, role } com o papel efetivo, ou { ok: false }.
+ */
+async function assertCanActOnClient(
+  adminClient: any,
+  user: { id: string } | null,
+  clientId: string,
+): Promise<{ ok: boolean; role?: "owner" | "team_member" | "super_admin" }> {
+  if (!user) return { ok: false };
+
+  // 1) super admin
+  try {
+    const { data: rolesData } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+    const roles = (rolesData || []).map((r: any) => r.role);
+    if (roles.includes("super_admin") || roles.includes("admin")) {
+      // is_super_admin() na DB é por e-mail, mas user_roles tem precedência
+      return { ok: true, role: "super_admin" };
+    }
+  } catch {}
+  try {
+    const { data: emailRow } = await adminClient
+      .from("clients")
+      .select("id")
+      .limit(1); // só p/ confirmar conexão; super_admin real abaixo
+    void emailRow;
+    const { data: superRow } = await adminClient.auth.admin.getUserById(user.id);
+    if (superRow?.user?.email === "lovableedits014@gmail.com") {
+      return { ok: true, role: "super_admin" };
+    }
+  } catch {}
+
+  // 2) dono
+  const { data: ownerRow } = await adminClient
+    .from("clients")
+    .select("id")
+    .eq("id", clientId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (ownerRow) return { ok: true, role: "owner" };
+
+  // 3) team_member ativo
+  const { data: tmRow } = await adminClient
+    .from("team_members")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (tmRow) return { ok: true, role: "team_member" };
+
+  return { ok: false };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
