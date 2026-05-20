@@ -6376,6 +6376,8 @@ export type Database = {
           error_message: string | null
           falhas: number
           id: string
+          media_type: string | null
+          media_url: string | null
           mensagem_template: string
           pause_reason: string | null
           paused_until: string | null
@@ -6399,6 +6401,8 @@ export type Database = {
           error_message?: string | null
           falhas?: number
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           mensagem_template: string
           pause_reason?: string | null
           paused_until?: string | null
@@ -6422,6 +6426,8 @@ export type Database = {
           error_message?: string | null
           falhas?: number
           id?: string
+          media_type?: string | null
+          media_url?: string | null
           mensagem_template?: string
           pause_reason?: string | null
           paused_until?: string | null
