@@ -347,6 +347,34 @@ export default function Disparos() {
     enabled: !!clientId,
   });
 
+  const handleMediaUpload = async (file: File) => {
+    if (!clientId) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máx 8MB).");
+      return;
+    }
+    setMediaUploading(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `dispatches/${clientId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("whatsapp-media").upload(path, file, {
+        cacheControl: "3600", upsert: false, contentType: file.type,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("whatsapp-media").getPublicUrl(path);
+      setMediaUrl(pub.publicUrl);
+      toast.success("Imagem anexada.");
+    } catch (err: any) {
+      toast.error("Falha ao enviar imagem: " + (err.message || ""));
+    } finally {
+      setMediaUploading(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!titulo.trim() || !mensagem.trim()) {
       toast.error("Preencha título e mensagem");
