@@ -44,15 +44,18 @@ function cleanPhoneForBridge(raw: string): string {
 
 const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
 
-async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string; phone: string; message: string }) {
-  const { bridgeUrl, bridgeApiKey, phone, message } = params;
+async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string; phone: string; message: string; mediaUrl?: string | null }) {
+  const { bridgeUrl, bridgeApiKey, phone, message, mediaUrl } = params;
   const isGroup = typeof phone === "string" && phone.endsWith("@g.us");
+  const hasMedia = !!mediaUrl && !isGroup;
 
   // Para grupos, montamos uma cadeia de tentativas com formatos diferentes
   // pois bridges variam: algumas aceitam `action:"send_group"` com `group_jid`,
   // outras aceitam o JID direto em `to` ou `phone` no `action:"send"`.
   // A primeira que NÃO devolver "unsupported"/"número inválido" vence.
-  const attempts: Array<Record<string, unknown>> = isGroup
+  const attempts: Array<Record<string, unknown>> = hasMedia
+    ? [{ action: "send_media", phone, media_url: mediaUrl, caption: message }]
+    : isGroup
     ? [
         { action: "send_group", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, message },
         { action: "send", jid: phone, group_jid: phone, remoteJid: phone, chatId: phone, is_group: true, isGroup: true, message },
@@ -357,6 +360,7 @@ Deno.serve(async (req) => {
       const queueId = payload.retry_queue_id as string;
       const queueClientId = payload.client_id as string;
       const queueMsg = String(payload.mensagem || "");
+      const queueMediaUrl = (payload.media_url as string | null) || null;
       const queueRecipient = (payload.recipients?.[0] || {}) as { telefone?: string; nome?: string };
 
       if (!queueClientId || !queueRecipient.telefone || !queueMsg) {
@@ -429,7 +433,7 @@ Deno.serve(async (req) => {
 
         const { res: sendRes, data: sendData } = await fetchBridgeSend({
           bridgeUrl: inst.bridge_url, bridgeApiKey: inst.bridge_api_key,
-          phone: phoneClean, message: personalizedMsg,
+          phone: phoneClean, message: personalizedMsg, mediaUrl: queueMediaUrl,
         });
         const failure = getSendFailure(sendRes, sendData);
 
@@ -491,6 +495,7 @@ Deno.serve(async (req) => {
     let delay_max: number | undefined;
     let batch_pause: number | undefined;
     let existingDispatchId: string | null = null;
+    let media_url: string | null = null;
 
     if (isResume) {
       const { data: d } = await adminClient
@@ -509,6 +514,7 @@ Deno.serve(async (req) => {
       client_id = d.client_id;
       titulo = d.titulo;
       mensagem = d.mensagem_template;
+      media_url = (d.media_url as string | null) || null;
       tipo = d.tipo;
       tag_filtro = d.tag_filtro;
       batch_size = d.batch_size;
@@ -537,6 +543,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
       }
       ({ client_id, titulo, mensagem, tipo, tag_filtro, batch_size, delay_min, delay_max, batch_pause } = payload);
+      media_url = (payload.media_url as string | null) || null;
       var eleicao_tipo = payload.eleicao_tipo || null;
       var eleicao_escopo = payload.eleicao_escopo || null;
       var eleicao_regiao = payload.eleicao_regiao || null;
@@ -746,6 +753,7 @@ Deno.serve(async (req) => {
           titulo,
           mensagem_template: mensagem,
           total_destinatarios: recipients.length,
+          media_url,
           tag_filtro,
           status: shouldQueue ? "enfileirado" : "enviando",
           started_at: shouldQueue ? null : new Date().toISOString(),
@@ -981,6 +989,7 @@ Deno.serve(async (req) => {
               bridgeApiKey,
               phone: destination,
               message: personalizedMsg,
+              mediaUrl: media_url,
             });
 
             const failure = getSendFailure(sendRes, sendData);

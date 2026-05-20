@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
-  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star,
+  Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star, ImagePlus, X,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -210,6 +210,8 @@ export default function Disparos() {
   // Composer state
   const [titulo, setTitulo] = useState("");
   const [mensagem, setMensagem] = useState("");
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaUploading, setMediaUploading] = useState(false);
   const [tipoDisparo, setTipoDisparo] = useState("manual");
   const [tagFiltro, setTagFiltro] = useState("_all");
   const [eleicaoTipo, setEleicaoTipo] = useState<"all" | "coordenador" | "lider" | "cabo">("all");
@@ -345,6 +347,34 @@ export default function Disparos() {
     enabled: !!clientId,
   });
 
+  const handleMediaUpload = async (file: File) => {
+    if (!clientId) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máx 8MB).");
+      return;
+    }
+    setMediaUploading(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `dispatches/${clientId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("whatsapp-media").upload(path, file, {
+        cacheControl: "3600", upsert: false, contentType: file.type,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("whatsapp-media").getPublicUrl(path);
+      setMediaUrl(pub.publicUrl);
+      toast.success("Imagem anexada.");
+    } catch (err: any) {
+      toast.error("Falha ao enviar imagem: " + (err.message || ""));
+    } finally {
+      setMediaUploading(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!titulo.trim() || !mensagem.trim()) {
       toast.error("Preencha título e mensagem");
@@ -367,6 +397,7 @@ export default function Disparos() {
           client_id: clientId,
           titulo: titulo.trim(),
           mensagem: mensagem.trim(),
+          media_url: mediaUrl,
           tipo: tipoDisparo,
           tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
           eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
@@ -388,6 +419,7 @@ export default function Disparos() {
       }
       setTitulo("");
       setMensagem("");
+      setMediaUrl(null);
       setTagFiltro("_all");
       setSelectedGroupJids([]);
       refetch();
@@ -1014,6 +1046,56 @@ export default function Disparos() {
             <p className="text-xs text-muted-foreground">
               Use <code className="bg-muted px-1 rounded">{"{nome}"}</code> para personalizar com o nome do destinatário.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Imagem (opcional)</Label>
+            {mediaUrl ? (
+              <div className="flex items-start gap-3 p-2 border rounded-md bg-muted/30">
+                <img src={mediaUrl} alt="anexo" className="w-20 h-20 object-cover rounded" />
+                <div className="flex-1 text-xs text-muted-foreground break-all">
+                  Imagem anexada — será enviada como mídia com a mensagem acima como legenda.
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMediaUrl(null)}
+                  disabled={sending}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Input
+                  id="dispatch-media-input"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={sending || mediaUploading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleMediaUpload(f);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={sending || mediaUploading}
+                  onClick={() => document.getElementById("dispatch-media-input")?.click()}
+                >
+                  {mediaUploading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
+                  ) : (
+                    <><ImagePlus className="w-4 h-4 mr-2" /> Anexar imagem</>
+                  )}
+                </Button>
+                <span className="text-xs text-muted-foreground">JPG/PNG até 8MB. Não é enviado para grupos.</span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between gap-4 pt-2">
