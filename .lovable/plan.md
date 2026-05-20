@@ -1,110 +1,64 @@
-## Problema
 
-Quando você (super admin) entra em "Configurações" impersonando o cliente do Wellington e cria uma instância de WhatsApp, ela acaba não ficando visível/funcional para ele. Investigando o fluxo encontrei três causas que se reforçam:
+## Diagnóstico — o que está acontecendo hoje
 
-### 1. A página `Settings.tsx` usa `resolveClientId()` direto, não o hook compartilhado
+Investiguei o banco e encontrei a causa-raiz do problema com o Wellington (e na verdade com **todos os outros usuários** que você cadastrou).
 
-`src/pages/Settings.tsx` (linha 25) chama `resolveClientId()` no `useEffect` e guarda o resultado em estado local. Esse helper, quando o super admin **não** tem impersonação ativa naquele instante, cai no fallback `clients.user_id = seu_próprio_user_id` e devolve o **client_id do próprio super admin**.
+**Estado atual confirmado no banco:**
 
-Resultado: a instância é criada com `client_id` do super admin, não do Wellington. Quando o Wellington loga, o `list_instances` filtra por `client_id = wellington` e a instância simplesmente não aparece — ela existe, mas está pendurada no cliente errado.
+- Existem **37 usuários** cadastrados em `auth.users`.
+- **36** deles têm `role = 'client'` em `user_roles`.
+- Mas a tabela `public.clients` (que é a "ficha do cliente" — onde ficam configurações de WhatsApp, presença, janela de envio, logo, etc.) tem **apenas 1 linha**: a do **Junior Coringa** (`lovableedits014@gmail.com`).
+- Wellington (`wellington.advogado2013@gmail.com`) tem usuário e tem role `client`, mas **não tem linha em `clients`** — por isso o sistema não acha "cliente" pra ele e cai de volta no Junior.
+- A função `is_super_admin()` está fixada no e-mail do Junior. Ele é, ao mesmo tempo, super admin **e** dono da única ficha de cliente — exatamente o que você quer separar.
+- O trigger `handle_new_user` cria `profiles` + `user_roles`, mas **nunca criou** linha em `clients`. Por isso o Wellington (e os outros 35) ficaram "órfãos".
+- A única instância de WhatsApp existente (`279b290d…`) está corretamente atribuída ao cliente do Junior — confirmando seu princípio: "tudo que temos hoje é do Junior Coringa".
+- O `SuperAdminClientSwitcher` lê da tabela `clients` — como só tem o Junior lá, **não aparece ninguém pra você selecionar/impersonar**, e qualquer instância que você tentar criar acaba indo pro Junior.
 
-Isso é agravado por:
-- A página não escuta mudança da chave `lovable.super_admin.impersonate_client_id` (não usa `useActiveClientId`), então alternar o cliente no switcher não re-resolve.
-- Não há indicação visual de "você está impersonando X" no card de instâncias.
-
-### 2. O Edge Function `manage-whatsapp-instance` confia cegamente no `client_id` do body
-
-Em `supabase/functions/manage-whatsapp-instance/index.ts` (linhas 494–622), todas as ações de pool (`create_instance_record`, `update_instance_record`, `set_primary_instance`, `delete_instance_record`, `create_instance`, `disconnect`, `set_webhook`, `sync_groups`) usam o `client_id` enviado pelo cliente sem verificar:
-
-- se o usuário autenticado é dono daquele `clients.user_id`,
-- ou é `team_member` ativo daquele cliente,
-- ou é super admin.
-
-Isso é problema duplo: (a) buraco de segurança — qualquer usuário autenticado pode passar um UUID de outro cliente, (b) impossibilita um log claro de "essa instância foi criada por super admin X em nome do cliente Y", o que dificulta auditar o problema atual.
-
-### 3. Não há como reatribuir uma instância já criada ao client_id correto
-
-Hoje, se a instância foi criada no cliente errado, a única saída é deletar e re-parear o QR Code — o que faz o Wellington perder a sessão WhatsApp que talvez já esteja conectada. Precisamos de uma ação administrativa de "mover instância para outro cliente".
+**Conclusão:** o problema não é a tela de criar instância — ela já está correta após o último ajuste. O problema é que **os clientes nunca foram criados no banco**. Sem ficha de cliente, não há `client_id` válido pra anexar a instância.
 
 ---
 
-## Plano
+## Plano de correção
 
-### Frente A — Corrigir a página Settings (raiz do bug)
+### 1. Backfill — criar ficha de cliente para todos os 36 usuários órfãos
 
-1. Em `src/pages/Settings.tsx`, trocar o `useEffect + resolveClientId` por `useActiveClientId()`. Assim:
-   - A impersonação é respeitada de verdade (cache compartilhado, invalidação ao trocar de cliente).
-   - Enquanto `isLoading`, não renderiza `WhatsAppPoolManager` (evita race condition).
-   - Se `needsClientSelection` (super admin sem cliente escolhido), mostra um aviso "Selecione um cliente no switcher antes de configurar instâncias".
+Para cada usuário com `role='client'` que ainda não tem linha em `public.clients`, criar uma com:
+- `user_id` = id do usuário
+- `name` = `full_name` do profile (ou e-mail, se vazio)
+- demais campos com os padrões já definidos na tabela (janela de WhatsApp, etc.)
 
-2. Em `src/components/settings/WhatsAppPoolManager.tsx`, adicionar um **banner contextual no topo** quando `isImpersonating` for true:
-   > "Você está configurando o WhatsApp em nome de **{nomeDoCliente}**. As instâncias criadas aqui ficarão vinculadas a esse cliente."
+Isso faz o Wellington (e todo mundo) aparecer no seletor de gerente do super admin e ter um `client_id` próprio onde anexar instâncias.
 
-3. Em `AddInstanceDialog.tsx`, antes do POST, validar localmente que o `clientId` recebido como prop bate com `useActiveClientId().clientId`. Se divergir, abortar e pedir um refresh — evita criar instância contra um cliente "stale".
+### 2. Trigger — garantir que novos usuários ganhem ficha automaticamente
 
-### Frente B — Autorização no Edge Function
+Atualizar `public.handle_new_user()` para também inserir em `public.clients` no cadastro. Assim, ninguém mais vai ficar "órfão" no futuro.
 
-Em `supabase/functions/manage-whatsapp-instance/index.ts`, criar um helper `assertCanActOnClient(adminClient, user, clientId)` que retorna OK se:
+### 3. RLS — super admin enxerga e gerencia todas as fichas de cliente
 
-- `user.id == clients.user_id` (dono), OU
-- existe `team_members` ativo do `user.id` para esse `client_id`, OU
-- `has_role(user.id, 'super_admin')` é true (via RPC `is_super_admin` já existente).
+Hoje as policies de `public.clients` só permitem o dono ver/editar a própria ficha (e `admin` apenas ver). Adicionar/ajustar policies para que **super admin** possa:
+- listar todas as fichas (pra aparecer no seletor)
+- criar/atualizar quando estiver gerenciando um cliente
+- nunca aparecer como "dono" — o `user_id` da ficha continua sendo do cliente real
 
-Chamar esse helper imediatamente após resolver `resolvedClientId` (linha ~511), antes de qualquer ação de pool ou de bridge. Em caso de falha, retornar 403 com mensagem clara: `"Usuário não autorizado a operar nesse cliente"`.
+Isso reforça sua regra: **super admin gerencia, mas não é dono**.
 
-Adicionar também, no `create_instance_record`, um log estruturado: `created_by_user_id`, `acting_as_super_admin: boolean`, salvo em coluna nova `created_by` (uuid) e `created_by_role` (text) na tabela `whatsapp_instances` — facilita auditar "quem criou".
+### 4. Verificação da instância existente do Junior
 
-### Frente C — Migration de suporte
+A instância `279b290d…` permanece como está: ela é do cliente do Junior, conectada, primária. Nada muda. Continua sendo "tudo do Junior".
 
-Criar migration que:
+### 5. Como vai funcionar depois da correção (fluxo final)
 
-1. Adiciona colunas `created_by uuid` e `created_by_role text` em `whatsapp_instances` (nullable, sem default).
-2. Garante que `whatsapp_instances` tem RLS ativa com policies:
-   - SELECT/UPDATE/DELETE: dono do cliente OU team_member ativo OU super admin.
-   - INSERT: mesmo conjunto.
-   (Mesmo a edge function usando service role, isso protege qualquer query direta feita pelo front.)
+1. Você loga como super admin (Junior).
+2. Abre o seletor "Gerente" no menu lateral — agora aparece **a lista completa** (Wellington, todos os outros).
+3. Seleciona "Wellington" → o sistema passa a operar **como** o cliente do Wellington (sem alterar a dono-ria da ficha).
+4. Vai em Configurações → WhatsApp → "Adicionar instância". A instância é criada **anexada ao `client_id` do Wellington** (não ao do Junior).
+5. Wellington loga com a conta dele e vê/usa a instância normalmente — porque ela está na ficha **dele**.
 
-### Frente D — Ação de "mover instância para outro cliente"
+### Detalhes técnicos (para referência)
 
-Nova ação `reassign_instance` no edge function, restrita a super admin:
+- Migração SQL única com: `INSERT … SELECT` para backfill; `CREATE OR REPLACE FUNCTION handle_new_user` com o `INSERT public.clients`; `DROP/CREATE POLICY` em `clients` adicionando `is_super_admin()` no `USING`/`WITH CHECK` de SELECT, INSERT e UPDATE.
+- A função `is_super_admin()` continua hardcoded no e-mail do Junior (do jeito que já está) — não estou mexendo nisso agora.
+- A instância existente não é tocada. As fichas backfilladas ficam com configurações padrão; cada cliente edita as próprias depois.
+- Nenhuma alteração em código front-end é necessária — `useActiveClientId`, `resolveClientId` e `SuperAdminClientSwitcher` já estão prontos pra esse fluxo, só precisavam que as fichas existissem.
 
-- Body: `{ action: "reassign_instance", instance_id, target_client_id }`.
-- Verifica via RPC `is_super_admin`.
-- Atualiza `whatsapp_instances.client_id` e `is_primary = false`.
-- Re-registra o webhook na bridge apontando para `target_client_id` (chama `set_webhook` internamente).
-- Retorna a instância atualizada.
-
-Botão "Mover para outro cliente" no `WhatsAppInstancePoolCard`, visível **apenas** quando `useActiveClientId().isSuperAdmin` é true. Abre um dialog com busca de clientes (igual ao switcher).
-
-Assim, a instância órfã que está hoje pendurada no seu super admin pode ser movida para o cliente do Wellington sem precisar refazer o QR.
-
-### Frente E — Diagnóstico imediato
-
-Antes ou junto com as mudanças acima, rodar uma query de diagnóstico para localizar a instância "perdida" do Wellington:
-
-```sql
-select wi.id, wi.apelido, wi.status, wi.client_id,
-       c.name as cliente_atual, c.user_id as dono_atual
-  from whatsapp_instances wi
-  join clients c on c.id = wi.client_id
- where wi.created_at > now() - interval '7 days'
- order by wi.created_at desc;
-```
-
-Identificar a instância criada errada e, depois da Frente D estar pronta, movê-la para o cliente do Wellington — ou, como fix imediato manual via SQL, dar `update whatsapp_instances set client_id = '<id_wellington>' where id = '<id_da_instancia>';`.
-
----
-
-## Resultado esperado
-
-- Impossível criar instância no cliente errado (UI + edge function travam).
-- Banner deixa claro em nome de quem você está atuando.
-- Instâncias já mal-atribuídas podem ser corrigidas sem perder a sessão WhatsApp.
-- Qualquer ação no pool é auditável (quem criou, em que papel).
-- Wellington passa a ver e usar a instância normalmente após o reassign.
-
-## Detalhes técnicos
-
-- Arquivos tocados: `src/pages/Settings.tsx`, `src/components/settings/WhatsAppPoolManager.tsx`, `src/components/settings/AddInstanceDialog.tsx`, `src/components/settings/WhatsAppInstancePoolCard.tsx`, `supabase/functions/manage-whatsapp-instance/index.ts`, nova migration em `supabase/migrations/`.
-- Nenhuma quebra de contrato com a Bridge WhatsHub — o `reassign_instance` reaproveita o `set_webhook` já existente.
-- A coluna `created_by` é nullable, então linhas antigas continuam válidas.
+Quando você aprovar, eu rodo a migração e te aviso pra retestar criando uma instância pro Wellington.
