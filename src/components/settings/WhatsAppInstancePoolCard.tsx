@@ -439,6 +439,18 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
           </>
         )}
 
+        {isSuperAdmin && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+            onClick={() => setReassignOpen(true)}
+            title="Mover esta instância para outro cliente (super admin)"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+          </Button>
+        )}
+
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 ml-auto">
