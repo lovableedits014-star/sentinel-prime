@@ -635,11 +635,86 @@ Deno.serve(async (req) => {
           status: "disconnected",
           is_active: true,
           is_primary: isFirst,
+          created_by: user!.id,
+          created_by_role: callerRole,
         })
         .select()
         .single();
       if (error) return jsonResponse({ success: false, error: error.message }, 500);
+      console.log("[whatsapp] instance created", {
+        instance_id: data.id,
+        client_id: resolvedClientId,
+        created_by: user!.id,
+        created_by_role: callerRole,
+        acting_as_super_admin: isSuperAdminCaller,
+      });
       return jsonResponse({ success: true, instance: data });
+    }
+
+    // === REASSIGN INSTANCE (super admin only) ===
+    // Move uma instância de um cliente para outro sem precisar re-parear o QR.
+    // Útil quando uma instância foi criada no client_id errado (ex.: super
+    // admin esqueceu de impersonar antes de criar).
+    if (action === "reassign_instance") {
+      if (!isSuperAdminCaller) {
+        return jsonResponse({ success: false, error: "Apenas super admin pode mover instâncias entre clientes" }, 403);
+      }
+      if (!instance_id) return jsonResponse({ success: false, error: "instance_id obrigatório" }, 400);
+      if (!target_client_id) return jsonResponse({ success: false, error: "target_client_id obrigatório" }, 400);
+
+      const { data: targetClient } = await adminClient
+        .from("clients")
+        .select("id, name")
+        .eq("id", target_client_id)
+        .maybeSingle();
+      if (!targetClient) return jsonResponse({ success: false, error: "Cliente destino não encontrado" }, 404);
+
+      const { data: inst } = await adminClient
+        .from("whatsapp_instances")
+        .select("id, client_id, bridge_api_key")
+        .eq("id", instance_id)
+        .maybeSingle();
+      if (!inst) return jsonResponse({ success: false, error: "Instância não encontrada" }, 404);
+
+      const { count: targetExisting } = await adminClient
+        .from("whatsapp_instances")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", target_client_id);
+      const shouldBePrimary = (targetExisting || 0) === 0;
+
+      const { error: updErr } = await adminClient
+        .from("whatsapp_instances")
+        .update({
+          client_id: target_client_id,
+          is_primary: shouldBePrimary,
+        })
+        .eq("id", instance_id);
+      if (updErr) return jsonResponse({ success: false, error: updErr.message }, 500);
+
+      // Re-aponta o webhook da bridge para o client_id novo, se possível.
+      let webhookRebound = false;
+      if (inst.bridge_api_key) {
+        try {
+          const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${target_client_id}`;
+          const bridgeRes = await fetch(BRIDGE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Api-Key": inst.bridge_api_key },
+            body: JSON.stringify({ action: "set_webhook", instance_id, webhook_url: webhookUrl }),
+          });
+          webhookRebound = bridgeRes.ok;
+        } catch (err) {
+          console.warn("[whatsapp] reassign webhook error", err);
+        }
+      }
+
+      console.log("[whatsapp] instance reassigned", {
+        instance_id,
+        from_client: inst.client_id,
+        to_client: target_client_id,
+        by_user: user!.id,
+        webhookRebound,
+      });
+      return jsonResponse({ success: true, instance_id, target_client_id, webhookRebound });
     }
 
     if (action === "update_instance_record") {
