@@ -678,11 +678,11 @@ export default function Eleicao() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
+        <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] p-0 gap-0 flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
             <DialogTitle>{editing ? "Editar cadastro" : "Novo cadastro"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 px-6 py-2 overflow-y-auto flex-1 min-h-0">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Tipo *</Label>
