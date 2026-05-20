@@ -678,11 +678,11 @@ export default function Eleicao() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
+        <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] p-0 gap-0 flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
             <DialogTitle>{editing ? "Editar cadastro" : "Novo cadastro"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-3 px-6 py-2 overflow-y-auto flex-1 min-h-0">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Tipo *</Label>
@@ -795,7 +795,7 @@ export default function Eleicao() {
               <Textarea rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={save}>{editing ? "Salvar" : "Cadastrar"}</Button>
           </DialogFooter>
@@ -804,7 +804,7 @@ export default function Eleicao() {
 
       {/* Dialog credenciais */}
       <Dialog open={credOpen} onOpenChange={setCredOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader><DialogTitle>Acesso ao portal — {credPessoa?.nome}</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">Defina email e senha para salvar o acesso e enviar pelo WhatsApp conectado.</p>
           <div className="space-y-3 mt-2">
@@ -820,7 +820,7 @@ export default function Eleicao() {
 
       {/* Dialog resultado de credenciais geradas */}
       <Dialog open={!!credResult} onOpenChange={(o) => !o && setCredResult(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {credResult?.sent ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5 text-primary" />}
