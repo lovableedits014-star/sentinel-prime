@@ -752,7 +752,7 @@ Deno.serve(async (req) => {
           titulo,
           mensagem_template: mensagem,
           total_destinatarios: recipients.length,
-          media_url: media_url_new,
+          media_url,
           tag_filtro,
           status: shouldQueue ? "enfileirado" : "enviando",
           started_at: shouldQueue ? null : new Date().toISOString(),
