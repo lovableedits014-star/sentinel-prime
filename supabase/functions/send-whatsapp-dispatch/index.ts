@@ -494,6 +494,7 @@ Deno.serve(async (req) => {
     let delay_max: number | undefined;
     let batch_pause: number | undefined;
     let existingDispatchId: string | null = null;
+    let media_url: string | null = null;
 
     if (isResume) {
       const { data: d } = await adminClient
