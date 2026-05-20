@@ -397,6 +397,7 @@ export default function Disparos() {
           client_id: clientId,
           titulo: titulo.trim(),
           mensagem: mensagem.trim(),
+          media_url: mediaUrl,
           tipo: tipoDisparo,
           tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
           eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
