@@ -795,7 +795,7 @@ export default function Eleicao() {
               <Textarea rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={save}>{editing ? "Salvar" : "Cadastrar"}</Button>
           </DialogFooter>
