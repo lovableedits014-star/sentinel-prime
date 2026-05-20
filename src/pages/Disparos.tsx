@@ -376,8 +376,10 @@ export default function Disparos() {
   };
 
   const handleSend = async () => {
-    if (!titulo.trim() || !mensagem.trim()) {
-      toast.error("Preencha título e mensagem");
+    const hasText = !!mensagem.trim();
+    const hasMedia = !!mediaUrl;
+    if (!hasText && !hasMedia) {
+      toast.error("Escreva uma mensagem ou anexe uma imagem");
       return;
     }
     if (recipientCount === 0) {
@@ -392,10 +394,11 @@ export default function Disparos() {
     setSending(true);
     try {
       const pol = POLICIES[politica];
+      const tituloFinal = titulo.trim() || (hasMedia && !hasText ? "Imagem" : (mensagem.trim().slice(0, 60) || "Disparo"));
       const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
         body: {
           client_id: clientId,
-          titulo: titulo.trim(),
+          titulo: tituloFinal,
           mensagem: mensagem.trim(),
           media_url: mediaUrl,
           tipo: tipoDisparo,

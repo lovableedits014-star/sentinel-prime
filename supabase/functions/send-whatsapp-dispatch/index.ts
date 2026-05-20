@@ -47,14 +47,21 @@ const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
 async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string; phone: string; message: string; mediaUrl?: string | null }) {
   const { bridgeUrl, bridgeApiKey, phone, message, mediaUrl } = params;
   const isGroup = typeof phone === "string" && phone.endsWith("@g.us");
-  const hasMedia = !!mediaUrl && !isGroup;
+  const hasMedia = !!mediaUrl;
+  const caption = message || "";
 
   // Para grupos, montamos uma cadeia de tentativas com formatos diferentes
   // pois bridges variam: algumas aceitam `action:"send_group"` com `group_jid`,
   // outras aceitam o JID direto em `to` ou `phone` no `action:"send"`.
   // A primeira que NÃO devolver "unsupported"/"número inválido" vence.
   const attempts: Array<Record<string, unknown>> = hasMedia
-    ? [{ action: "send_media", phone, media_url: mediaUrl, caption: message }]
+    ? (isGroup
+        ? [
+            { action: "send_media", phone, media_url: mediaUrl, caption, is_group: true, isGroup: true },
+            { action: "send_media", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, media_url: mediaUrl, caption },
+            { action: "send_media", to: phone, media_url: mediaUrl, caption, is_group: true },
+          ]
+        : [{ action: "send_media", phone, media_url: mediaUrl, caption }])
     : isGroup
     ? [
         { action: "send_group", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, message },
