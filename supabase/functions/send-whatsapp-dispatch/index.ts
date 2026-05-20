@@ -512,6 +512,7 @@ Deno.serve(async (req) => {
       client_id = d.client_id;
       titulo = d.titulo;
       mensagem = d.mensagem_template;
+      var media_url_resume = (d.media_url as string | null) || null;
       tipo = d.tipo;
       tag_filtro = d.tag_filtro;
       batch_size = d.batch_size;
