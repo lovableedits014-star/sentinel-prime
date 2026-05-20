@@ -29,6 +29,38 @@ const Settings = () => {
         </p>
       </div>
 
+      {isLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Carregando contexto...
+        </div>
+      )}
+
+      {!isLoading && needsClientSelection && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-4 flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold text-amber-900 dark:text-amber-200">Selecione um cliente</p>
+            <p className="text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+              Você está como Super Admin sem nenhum cliente selecionado. Use o seletor de gerente no menu lateral antes de configurar instâncias — caso contrário, as alterações ficariam em um cliente errado.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && isImpersonating && clientId && (
+        <div className="rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-4 flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold text-amber-900 dark:text-amber-200">Modo Super Admin — atuando em nome de outro cliente</p>
+            <p className="text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+              Tudo que você criar aqui (instâncias de WhatsApp, integrações, equipe) ficará vinculado ao cliente atualmente selecionado no seletor lateral. Confirme se é o cliente correto antes de prosseguir.
+            </p>
+          </div>
+        </div>
+      )}
+
+
       {/* Pool de Instâncias WhatsApp (anti-banimento) */}
       {clientId && <CampaignIdentityCard clientId={clientId} />}
 
