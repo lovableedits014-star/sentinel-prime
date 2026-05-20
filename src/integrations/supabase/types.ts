@@ -7259,7 +7259,12 @@ export type Database = {
       whatsapp_phone_variants: { Args: { p_phone: string }; Returns: string[] }
     }
     Enums: {
-      app_role: "admin" | "client" | "funcionario" | "platform_user"
+      app_role:
+        | "admin"
+        | "client"
+        | "funcionario"
+        | "platform_user"
+        | "portal_pessoa"
       comment_status: "pending" | "responded" | "ignored"
       eleicao_escopo: "campo_grande" | "interior"
       eleicao_regiao:
@@ -7442,7 +7447,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "client", "funcionario", "platform_user"],
+      app_role: [
+        "admin",
+        "client",
+        "funcionario",
+        "platform_user",
+        "portal_pessoa",
+      ],
       comment_status: ["pending", "responded", "ignored"],
       eleicao_escopo: ["campo_grande", "interior"],
       eleicao_regiao: [
