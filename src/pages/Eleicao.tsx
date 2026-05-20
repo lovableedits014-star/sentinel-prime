@@ -820,7 +820,7 @@ export default function Eleicao() {
 
       {/* Dialog resultado de credenciais geradas */}
       <Dialog open={!!credResult} onOpenChange={(o) => !o && setCredResult(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {credResult?.sent ? <CheckCircle2 className="w-5 h-5 text-emerald-600" /> : <Copy className="w-5 h-5 text-primary" />}
