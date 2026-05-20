@@ -1,42 +1,69 @@
-## Objetivo
-Permitir anexar imagem (opcional) ao criar um disparo de WhatsApp, e enviá-la via `action: "send_media"` na bridge da VPS, com `caption` igual à mensagem personalizada.
+# Corrigir erro de RLS no upload de imagem em Disparos
 
-## Estrutura atual (resumo)
-- Tabela `whatsapp_dispatches` guarda `mensagem_template` (texto). Não tem coluna de mídia.
-- Edge function `send-whatsapp-dispatch` envia tudo com `{ action: "send", phone, message }` via `fetchBridgeSend()`.
-- Bucket `whatsapp-media` já existe (público, com policies de upload por cliente).
-- Página `src/pages/Disparos.tsx` tem formulário com `titulo` + `mensagem` e cria o registro em `whatsapp_dispatches`.
+## Diagnóstico
 
-## Mudanças
+O erro `new row violates row-level security policy` vem das políticas de INSERT no bucket `whatsapp-media` (Storage).
 
-### 1. Migration (banco)
-Adicionar à `whatsapp_dispatches`:
-- `media_url text` (nullable) — URL pública da imagem
-- `media_type text` (nullable, default `'image'`) — futuro: video/audio
+**Caminho do arquivo enviado** (`src/pages/Disparos.tsx`):
+```
+dispatches/{clientId}/{timestamp}-{rand}.{ext}
+```
 
-### 2. UI — `src/pages/Disparos.tsx`
-- Novo campo "Anexar imagem (opcional)" no formulário:
-  - Input `type="file"` (accept `image/*`)
-  - Upload imediato para bucket `whatsapp-media` em `dispatches/{client_id}/{timestamp}-{nome}.ext`
-  - Preview da imagem + botão "Remover"
-  - Guarda a URL pública em estado (`mediaUrl`)
-- Ao criar o dispatch, incluir `media_url` no insert.
-- Mostrar pequeno ícone/thumb na lista de disparos (`d.media_url`).
+**Política atual** (migration `20260503132542...sql`):
+```sql
+CREATE POLICY "whatsapp-media client write"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'whatsapp-media'
+  AND (storage.foldername(name))[1] = 'dispatches'
+  AND public.is_client_member( ((storage.foldername(name))[2])::uuid )
+);
+```
 
-### 3. Edge function — `supabase/functions/send-whatsapp-dispatch/index.ts`
-- Ao carregar o dispatch, ler também `media_url`.
-- Estender `fetchBridgeSend()` para aceitar `mediaUrl?: string`:
-  - Se `mediaUrl` presente → payload `{ action: "send_media", phone, media_url, caption: message }`
-  - Senão → payload atual `{ action: "send", phone, message }`
-- Aplicar nos pontos que chamam `fetchBridgeSend` (loop principal de envio do dispatch e retry queue).
-- Sem mídia em grupos por enquanto (mantém fluxo atual de grupos só com texto) — pode ser estendido depois.
+**Função `is_client_member` atual:**
+```sql
+SELECT EXISTS (
+  SELECT 1 FROM public.team_members
+  WHERE client_id = _client_id AND user_id = auth.uid()
+);
+```
 
-### 4. Cobertura
-- Disparo manual com imagem ✅
-- Reenviar falhas reaproveita o `media_url` do dispatch ✅
-- Retry queue: incluir `media_url` no payload enfileirado (campo extra opcional).
+Ela só reconhece membros da `team_members`. **Não reconhece:**
+1. O **dono do cliente** (`clients.user_id = auth.uid()`).
+2. O **super admin** impersonando outro cliente (caso atual — você está logado como `lovableedits014@gmail.com` operando como "Junior Coringa").
+
+Por isso o upload falha mesmo o usuário sendo legítimo.
+
+## Plano de correção (migration única)
+
+Atualizar `public.is_client_member` para retornar `true` também quando o usuário for:
+- dono do cliente (`clients.user_id = auth.uid()`), OU
+- super admin (`is_super_admin()`).
+
+```sql
+CREATE OR REPLACE FUNCTION public.is_client_member(_client_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT
+    public.is_super_admin()
+    OR EXISTS (SELECT 1 FROM public.clients      WHERE id = _client_id AND user_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.team_members WHERE client_id = _client_id AND user_id = auth.uid());
+$$;
+```
+
+### Impacto colateral (positivo)
+
+Essa função é usada por várias outras políticas (storage de `campaign-frame-assets`, tabelas `llm_alerts`, etc.). Hoje, qualquer dono de cliente que não esteja também em `team_members`, e qualquer super admin impersonando, sofre o mesmo bloqueio silencioso. A correção alinha o comportamento ao restante do sistema, que já trata super admin e owner como autorizados em outras camadas.
+
+### Verificação
+
+1. Aplicar migration.
+2. Em `/disparos`, anexar uma imagem JPG/PNG < 8MB → upload deve concluir e mostrar preview.
+3. Enviar disparo de teste (não-grupo) com imagem → bridge recebe `send_media` com `media_url`.
+4. Confirmar que grupos continuam ignorando imagem (regra já existente).
 
 ## Fora de escopo
-- Múltiplas imagens, vídeo/áudio, documentos
-- Envio de mídia para grupos
-- Mídia em mensagens de aniversário / boas-vindas de coordenador (podem ser feitas em iterações seguintes seguindo o mesmo padrão)
+
+- Nenhuma mudança em UI, edge function ou tipos. Só RLS.
+- Permissões dos outros buckets ficam iguais — apenas ganham a mesma cobertura para owner/super-admin via função compartilhada.
