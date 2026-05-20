@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
           email: normalizedEmail,
           password,
           email_confirm: true,
-          user_metadata: { full_name: name },
+          user_metadata: { full_name: name, account_type: "funcionario" },
         });
         if (createErr) return json({ error: createErr.message }, 400);
         userId = created!.user!.id;

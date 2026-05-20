@@ -215,13 +215,13 @@ Deno.serve(async (req) => {
         email: emailNorm,
         password,
         email_confirm: true,
-        user_metadata: { full_name: pessoa.nome, role: "coordenador" },
+        user_metadata: { full_name: pessoa.nome, role: "coordenador", account_type: "portal_pessoa" },
       });
       if (uErr) throw uErr;
     } else {
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
         email: emailNorm, password, email_confirm: true,
-        user_metadata: { full_name: pessoa.nome, role: "coordenador" },
+        user_metadata: { full_name: pessoa.nome, role: "coordenador", account_type: "portal_pessoa" },
       });
       if (cErr) throw cErr;
       userId = created.user!.id;

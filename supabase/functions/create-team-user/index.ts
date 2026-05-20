@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: name },
+      user_metadata: { full_name: name, account_type: "funcionario" },
     });
 
     if (createError) {
