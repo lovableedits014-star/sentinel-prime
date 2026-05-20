@@ -1048,6 +1048,56 @@ export default function Disparos() {
             </p>
           </div>
 
+          <div className="space-y-2">
+            <Label>Imagem (opcional)</Label>
+            {mediaUrl ? (
+              <div className="flex items-start gap-3 p-2 border rounded-md bg-muted/30">
+                <img src={mediaUrl} alt="anexo" className="w-20 h-20 object-cover rounded" />
+                <div className="flex-1 text-xs text-muted-foreground break-all">
+                  Imagem anexada — será enviada como mídia com a mensagem acima como legenda.
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMediaUrl(null)}
+                  disabled={sending}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Input
+                  id="dispatch-media-input"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={sending || mediaUploading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleMediaUpload(f);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={sending || mediaUploading}
+                  onClick={() => document.getElementById("dispatch-media-input")?.click()}
+                >
+                  {mediaUploading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
+                  ) : (
+                    <><ImagePlus className="w-4 h-4 mr-2" /> Anexar imagem</>
+                  )}
+                </Button>
+                <span className="text-xs text-muted-foreground">JPG/PNG até 8MB. Não é enviado para grupos.</span>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between gap-4 pt-2">
             <div className="flex items-center gap-2 text-sm">
               <Users className="w-4 h-4 text-muted-foreground" />
