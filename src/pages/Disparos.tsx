@@ -419,6 +419,7 @@ export default function Disparos() {
       }
       setTitulo("");
       setMensagem("");
+      setMediaUrl(null);
       setTagFiltro("_all");
       setSelectedGroupJids([]);
       refetch();
