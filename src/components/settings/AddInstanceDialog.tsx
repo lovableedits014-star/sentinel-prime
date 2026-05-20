@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
 
 interface Props {
   open: boolean;
@@ -17,8 +18,15 @@ interface Props {
 export default function AddInstanceDialog({ open, onOpenChange, clientId, onCreated }: Props) {
   const [apelido, setApelido] = useState("");
   const [saving, setSaving] = useState(false);
+  const { clientId: activeClientId, isImpersonating } = useActiveClientId();
 
   const submit = async () => {
+    // Guarda: o clientId recebido por prop tem que ser igual ao client ativo no momento.
+    // Sem isso, super admin que troca de cliente sem refresh pode criar instância no client_id errado.
+    if (activeClientId && activeClientId !== clientId) {
+      toast.error("Cliente ativo foi alterado — recarregue a página e tente novamente.");
+      return;
+    }
     const nome = apelido.trim() || "Novo Chip";
     setSaving(true);
     const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
