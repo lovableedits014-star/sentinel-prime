@@ -6600,6 +6600,8 @@ export type Database = {
           connected_since: string | null
           consecutive_failures: number
           created_at: string
+          created_by: string | null
+          created_by_role: string | null
           id: string
           instance_name: string | null
           instance_token: string | null
@@ -6626,6 +6628,8 @@ export type Database = {
           connected_since?: string | null
           consecutive_failures?: number
           created_at?: string
+          created_by?: string | null
+          created_by_role?: string | null
           id?: string
           instance_name?: string | null
           instance_token?: string | null
@@ -6652,6 +6656,8 @@ export type Database = {
           connected_since?: string | null
           consecutive_failures?: number
           created_at?: string
+          created_by?: string | null
+          created_by_role?: string | null
           id?: string
           instance_name?: string | null
           instance_token?: string | null
