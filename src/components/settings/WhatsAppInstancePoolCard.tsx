@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useWhatsAppGroups } from "@/hooks/useWhatsAppGroups";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
+import ReassignInstanceDialog from "./ReassignInstanceDialog";
 
 export interface PoolInstance {
   id: string;
