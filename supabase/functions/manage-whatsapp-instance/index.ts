@@ -46,11 +46,6 @@ async function assertCanActOnClient(
     }
   } catch {}
   try {
-    const { data: emailRow } = await adminClient
-      .from("clients")
-      .select("id")
-      .limit(1); // só p/ confirmar conexão; super_admin real abaixo
-    void emailRow;
     const { data: superRow } = await adminClient.auth.admin.getUserById(user.id);
     if (superRow?.user?.email === "lovableedits014@gmail.com") {
       return { ok: true, role: "super_admin" };
