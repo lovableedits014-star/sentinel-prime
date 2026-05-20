@@ -488,6 +488,15 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
           </Button>
         </div>
       )}
+
+      <ReassignInstanceDialog
+        open={reassignOpen}
+        onOpenChange={setReassignOpen}
+        instanceId={instance.id}
+        instanceLabel={instance.apelido}
+        currentClientId={clientId}
+        onReassigned={onChange}
+      />
     </div>
   );
 }
