@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
-import { resolveClientId } from "@/lib/resolveClientId";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon, Loader2, ShieldAlert } from "lucide-react";
 import TeamUsersPanel from "@/components/team/TeamUsersPanel";
 import WhatsAppConfigCard from "@/components/settings/WhatsAppConfigCard";
 import WhatsAppPoolManager from "@/components/settings/WhatsAppPoolManager";
@@ -16,17 +15,10 @@ import CandidateAssetsCard from "@/components/settings/CandidateAssetsCard";
 import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 const Settings = () => {
-  const [clientId, setClientId] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const { clientId, isLoading, isSuperAdmin: isSA, isImpersonating, needsClientSelection } = useActiveClientId();
   const { isSuperAdmin } = useIsSuperAdmin();
-
-  useEffect(() => {
-    (async () => {
-      const id = await resolveClientId();
-      if (id) setClientId(id);
-      setLoading(false);
-    })();
-  }, []);
+  void isSuperAdmin;
+  void isSA;
 
   return (
     <div className="p-8 space-y-6">
