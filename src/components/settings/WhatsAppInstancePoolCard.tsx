@@ -11,10 +11,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import {
-  Loader2, QrCode, Send, Trash2, Wifi, WifiOff, Pencil, Check, X, RefreshCw, Power, Star, Phone, Webhook, Users
+  Loader2, QrCode, Send, Trash2, Wifi, WifiOff, Pencil, Check, X, RefreshCw, Power, Star, Phone, Webhook, Users, ArrowRightLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useWhatsAppGroups } from "@/hooks/useWhatsAppGroups";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
+import ReassignInstanceDialog from "./ReassignInstanceDialog";
 
 export interface PoolInstance {
   id: string;
@@ -81,8 +83,10 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
   const [polling, setPolling] = useState(false);
   const [showTest, setShowTest] = useState(false);
   const [testPhone, setTestPhone] = useState("");
+  const [reassignOpen, setReassignOpen] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { groups, isSyncing, syncFromInstance } = useWhatsAppGroups(clientId);
+  const { isSuperAdmin } = useActiveClientId();
   const groupsForThisInstance = groups.filter((g) => g.instance_id === instance.id).length;
 
   useEffect(() => setName(instance.apelido), [instance.apelido]);
@@ -435,6 +439,18 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
           </>
         )}
 
+        {isSuperAdmin && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-amber-700 hover:text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+            onClick={() => setReassignOpen(true)}
+            title="Mover esta instância para outro cliente (super admin)"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+          </Button>
+        )}
+
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 ml-auto">
@@ -472,6 +488,15 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
           </Button>
         </div>
       )}
+
+      <ReassignInstanceDialog
+        open={reassignOpen}
+        onOpenChange={setReassignOpen}
+        instanceId={instance.id}
+        instanceLabel={instance.apelido}
+        currentClientId={clientId}
+        onReassigned={onChange}
+      />
     </div>
   );
 }

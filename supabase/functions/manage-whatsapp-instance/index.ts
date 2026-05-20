@@ -4,6 +4,7 @@ import { validateInput, z } from "../_shared/validate.ts";
 const ManageWhatsappSchema = z.object({
   action: z.string().min(1).max(80),
   client_id: z.string().uuid().optional(),
+  target_client_id: z.string().uuid().optional(),
   instance_id: z.string().max(120).optional(),
   phone: z.string().max(40).optional(),
   message: z.string().max(8000).optional(),
@@ -17,6 +18,61 @@ const ManageWhatsappSchema = z.object({
   filename: z.string().max(255).optional(),
   caption: z.string().max(2000).optional(),
 }).passthrough();
+
+/**
+ * Verifica se o `user` autenticado pode operar sobre `clientId`:
+ *  - dono do cliente (clients.user_id), OU
+ *  - membro ativo de team_members daquele cliente, OU
+ *  - super admin (is_super_admin()).
+ * Retorna { ok, role } com o papel efetivo, ou { ok: false }.
+ */
+async function assertCanActOnClient(
+  adminClient: any,
+  user: { id: string } | null,
+  clientId: string,
+): Promise<{ ok: boolean; role?: "owner" | "team_member" | "super_admin" }> {
+  if (!user) return { ok: false };
+
+  // 1) super admin
+  try {
+    const { data: rolesData } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+    const roles = (rolesData || []).map((r: any) => r.role);
+    if (roles.includes("super_admin") || roles.includes("admin")) {
+      // is_super_admin() na DB é por e-mail, mas user_roles tem precedência
+      return { ok: true, role: "super_admin" };
+    }
+  } catch {}
+  try {
+    const { data: superRow } = await adminClient.auth.admin.getUserById(user.id);
+    if (superRow?.user?.email === "lovableedits014@gmail.com") {
+      return { ok: true, role: "super_admin" };
+    }
+  } catch {}
+
+  // 2) dono
+  const { data: ownerRow } = await adminClient
+    .from("clients")
+    .select("id")
+    .eq("id", clientId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (ownerRow) return { ok: true, role: "owner" };
+
+  // 3) team_member ativo
+  const { data: tmRow } = await adminClient
+    .from("team_members")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (tmRow) return { ok: true, role: "team_member" };
+
+  return { ok: false };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -427,7 +483,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const body = await req.json();
     validateInput(ManageWhatsappSchema, body, { fn: "manage-whatsapp-instance" });
-    const { action, phone, message, client_id, name, instance_id, apelido, bridge_url, bridge_api_key, is_active, status: newStatus, media, mimetype, filename, caption } = body;
+    const { action, phone, message, client_id, target_client_id, name, instance_id, apelido, bridge_url, bridge_api_key, is_active, status: newStatus, media, mimetype, filename, caption } = body;
     const cronRequested = action === "health_check_all";
     if (!authHeader && !cronRequested) {
       return jsonResponse({ error: "Unauthorized" }, 401);
@@ -510,6 +566,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // === AUTORIZAÇÃO: garantir que o usuário pode operar nesse client_id ===
+    // (dono OU team_member ativo OU super admin). Sem isso, qualquer usuário
+    // autenticado poderia enviar o UUID de outro cliente no body. Também
+    // garante que o super admin impersonando é detectado e registrado.
+    const authz = await assertCanActOnClient(adminClient, user, resolvedClientId);
+    if (!authz.ok) {
+      return jsonResponse({
+        success: false,
+        error: "Usuário não autorizado a operar nesse cliente",
+      }, 403);
+    }
+    const callerRole = authz.role!;
+    const isSuperAdminCaller = callerRole === "super_admin";
+
     // Get per-client bridge config
     const { data: clientConfig } = await adminClient
       .from("clients")
@@ -560,11 +630,86 @@ Deno.serve(async (req) => {
           status: "disconnected",
           is_active: true,
           is_primary: isFirst,
+          created_by: user!.id,
+          created_by_role: callerRole,
         })
         .select()
         .single();
       if (error) return jsonResponse({ success: false, error: error.message }, 500);
+      console.log("[whatsapp] instance created", {
+        instance_id: data.id,
+        client_id: resolvedClientId,
+        created_by: user!.id,
+        created_by_role: callerRole,
+        acting_as_super_admin: isSuperAdminCaller,
+      });
       return jsonResponse({ success: true, instance: data });
+    }
+
+    // === REASSIGN INSTANCE (super admin only) ===
+    // Move uma instância de um cliente para outro sem precisar re-parear o QR.
+    // Útil quando uma instância foi criada no client_id errado (ex.: super
+    // admin esqueceu de impersonar antes de criar).
+    if (action === "reassign_instance") {
+      if (!isSuperAdminCaller) {
+        return jsonResponse({ success: false, error: "Apenas super admin pode mover instâncias entre clientes" }, 403);
+      }
+      if (!instance_id) return jsonResponse({ success: false, error: "instance_id obrigatório" }, 400);
+      if (!target_client_id) return jsonResponse({ success: false, error: "target_client_id obrigatório" }, 400);
+
+      const { data: targetClient } = await adminClient
+        .from("clients")
+        .select("id, name")
+        .eq("id", target_client_id)
+        .maybeSingle();
+      if (!targetClient) return jsonResponse({ success: false, error: "Cliente destino não encontrado" }, 404);
+
+      const { data: inst } = await adminClient
+        .from("whatsapp_instances")
+        .select("id, client_id, bridge_api_key")
+        .eq("id", instance_id)
+        .maybeSingle();
+      if (!inst) return jsonResponse({ success: false, error: "Instância não encontrada" }, 404);
+
+      const { count: targetExisting } = await adminClient
+        .from("whatsapp_instances")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", target_client_id);
+      const shouldBePrimary = (targetExisting || 0) === 0;
+
+      const { error: updErr } = await adminClient
+        .from("whatsapp_instances")
+        .update({
+          client_id: target_client_id,
+          is_primary: shouldBePrimary,
+        })
+        .eq("id", instance_id);
+      if (updErr) return jsonResponse({ success: false, error: updErr.message }, 500);
+
+      // Re-aponta o webhook da bridge para o client_id novo, se possível.
+      let webhookRebound = false;
+      if (inst.bridge_api_key) {
+        try {
+          const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${target_client_id}`;
+          const bridgeRes = await fetch(BRIDGE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Api-Key": inst.bridge_api_key },
+            body: JSON.stringify({ action: "set_webhook", instance_id, webhook_url: webhookUrl }),
+          });
+          webhookRebound = bridgeRes.ok;
+        } catch (err) {
+          console.warn("[whatsapp] reassign webhook error", err);
+        }
+      }
+
+      console.log("[whatsapp] instance reassigned", {
+        instance_id,
+        from_client: inst.client_id,
+        to_client: target_client_id,
+        by_user: user!.id,
+        webhookRebound,
+      });
+      return jsonResponse({ success: true, instance_id, target_client_id, webhookRebound });
     }
 
     if (action === "update_instance_record") {
