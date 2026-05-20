@@ -571,6 +571,20 @@ Deno.serve(async (req) => {
       );
     }
 
+    // === AUTORIZAÇÃO: garantir que o usuário pode operar nesse client_id ===
+    // (dono OU team_member ativo OU super admin). Sem isso, qualquer usuário
+    // autenticado poderia enviar o UUID de outro cliente no body. Também
+    // garante que o super admin impersonando é detectado e registrado.
+    const authz = await assertCanActOnClient(adminClient, user, resolvedClientId);
+    if (!authz.ok) {
+      return jsonResponse({
+        success: false,
+        error: "Usuário não autorizado a operar nesse cliente",
+      }, 403);
+    }
+    const callerRole = authz.role!;
+    const isSuperAdminCaller = callerRole === "super_admin";
+
     // Get per-client bridge config
     const { data: clientConfig } = await adminClient
       .from("clients")
