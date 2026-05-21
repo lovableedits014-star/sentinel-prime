@@ -417,6 +417,11 @@ const Dashboard = () => {
           `IED atual: ${iedData.score}/100 (sentimento ${iedData.sentiment} · crescimento ${iedData.growth} · engajamento ${iedData.engagement} · check-ins ${iedData.checkin}).`,
         );
       }
+      if (eleicaoSummary && eleicaoSummary.total > 0) {
+        highlights.push(
+          `Estrutura eleitoral: ${eleicaoSummary.coord} coordenador(es), ${eleicaoSummary.lider} líder(es) e ${eleicaoSummary.cabo} cabo(s) eleitoral(is).`,
+        );
+      }
 
       await exportDashboardPdf({
         clientName,
