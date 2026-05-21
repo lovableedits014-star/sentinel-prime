@@ -366,6 +366,20 @@ const Dashboard = () => {
         }
       }
 
+      // Estrutura eleitoral (aba Eleição) — coordenadores / líderes / cabos
+      let eleicaoSummary: { coord: number; lider: number; cabo: number; total: number } | null = null;
+      if (clientId) {
+        const [coordR, liderR, caboR] = await Promise.all([
+          supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "coordenador"),
+          supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "lider"),
+          supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "cabo"),
+        ]);
+        const coord = coordR.count || 0;
+        const lider = liderR.count || 0;
+        const cabo = caboR.count || 0;
+        eleicaoSummary = { coord, lider, cabo, total: coord + lider + cabo };
+      }
+
       // Construir insights a partir dos dados em tela
       const highlights: string[] = [];
       if (stats.total > 0) {
