@@ -903,6 +903,10 @@ const Comments = () => {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="negative" className="gap-1.5">
+              <Flame className="w-4 h-4 text-destructive" />
+              <span>Negativos</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Filters inline */}
