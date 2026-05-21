@@ -73,7 +73,24 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         template_coordenador_boas_vindas: d.template_coordenador_boas_vindas || DEFAULT_TPL_COORD_BV,
         template_cabo_boas_vindas: d.template_cabo_boas_vindas || DEFAULT_TPL_CABO_BV,
         grupos_links: d.grupos_links || {},
+        grupos_jids: d.grupos_jids || {},
       });
+    }
+    // Carrega grupos do WhatsApp disponíveis
+    const { data: gs } = await supabase
+      .from("whatsapp_groups" as any)
+      .select("group_jid, name")
+      .eq("client_id", clientId)
+      .eq("is_active", true)
+      .order("name", { ascending: true });
+    if (gs) {
+      // Dedupe por group_jid
+      const seen = new Set<string>();
+      const uniq: GroupOption[] = [];
+      for (const g of gs as any[]) {
+        if (!seen.has(g.group_jid)) { seen.add(g.group_jid); uniq.push(g); }
+      }
+      setGrupos(uniq);
     }
     setLoading(false);
   }
