@@ -20,6 +20,41 @@ function cleanPhoneForBridge(raw: string): string {
   return digits;
 }
 
+function firstDefined(...values: unknown[]) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+}
+
+function normalizeRawJid(value: unknown): string {
+  return String(value || "").replace(/:\d+(?=@)/, "").trim().toLowerCase();
+}
+
+function phoneFromJid(value: unknown): string | null {
+  const jid = normalizeRawJid(value);
+  if (!jid.includes("@s.whatsapp.net") && !jid.includes("@c.us")) return null;
+  const digits = jid.split("@")[0].replace(/\D/g, "");
+  return digits ? cleanPhoneForBridge(digits) : null;
+}
+
+function extractParticipantPhone(p: any): string | null {
+  const direct = firstDefined(
+    p?.phone_e164,
+    p?.phoneE164,
+    p?.phone_number,
+    p?.phoneNumber,
+    p?.number,
+    p?.msisdn,
+    p?.participant?.phone_e164,
+    p?.participant?.phone,
+    p?.contact?.phone_e164,
+    p?.contact?.phone,
+  );
+  const cleanedDirect = cleanPhoneForBridge(String(direct || ""));
+  if (cleanedDirect && cleanedDirect.length >= 12) return cleanedDirect;
+
+  const jidPhone = phoneFromJid(firstDefined(p?.id, p?.jid, p?.participant, p?.user, p?.phone));
+  return jidPhone && jidPhone.length >= 12 ? jidPhone : null;
+}
+
 function jsonResp(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -124,17 +159,21 @@ Deno.serve(async (req: Request) => {
       const participants: any[] = Array.isArray(data?.participants) ? data.participants : [];
 
       // Upsert
-      const rows = participants.map((p) => ({
-        client_id: clientId,
-        instance_id: bridge.id,
-        group_jid: groupJid,
-        phone_e164: p.phone_e164 ?? null,
-        raw_jid: String(p.id || p.jid || ""),
-        is_lid_only: !!p.lid_only,
-        is_admin: !!p.admin,
-        last_seen_at: nowIso,
-        left_seen_at: null,
-      })).filter((r) => r.raw_jid);
+      const rows = participants.map((p) => {
+        const rawJid = normalizeRawJid(firstDefined(p?.id, p?.jid, p?.participant, p?.user, p?.phone));
+        const phone = extractParticipantPhone(p);
+        return {
+          client_id: clientId,
+          instance_id: bridge.id,
+          group_jid: groupJid,
+          phone_e164: phone,
+          raw_jid: rawJid,
+          is_lid_only: !phone && (Boolean(p?.lid_only) || rawJid.endsWith("@lid")),
+          is_admin: Boolean(p?.admin) && String(p.admin).toLowerCase() !== "false",
+          last_seen_at: nowIso,
+          left_seen_at: null,
+        };
+      }).filter((r) => r.raw_jid);
 
       if (rows.length > 0) {
         await admin.from("whatsapp_group_participants")
