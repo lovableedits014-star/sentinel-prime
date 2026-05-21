@@ -1,13 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, TrendingDown, Minus, Calendar, Facebook, Instagram, Loader2, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calendar, Facebook, Instagram, Loader2, ExternalLink, Ban } from "lucide-react";
 import { MilitantBadge } from "./MilitantBadge";
 import { Button } from "@/components/ui/button";
 import { getSocialProfileUrl } from "@/lib/social-url";
+import { toast } from "sonner";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { MilitantRow } from "@/hooks/useMilitants";
 
 interface Props {
@@ -31,6 +36,9 @@ export function AuthorHistoryDrawer({
   open, onOpenChange, clientId, platform, platformUserId, authorName, avatarUrl, militant,
 }: Props) {
   const profileUrl = getSocialProfileUrl(platform, platformUserId);
+  const [blocking, setBlocking] = useState(false);
+  const isInstagram = platform === "instagram";
+
   const { data, isLoading } = useQuery({
     queryKey: ["author-history", clientId, platform, platformUserId],
     queryFn: async () => {
@@ -51,10 +59,32 @@ export function AuthorHistoryDrawer({
     staleTime: 1000 * 60 * 2,
   });
 
+  async function handleBlock() {
+    const latest = data?.[0];
+    if (!latest?.id) {
+      toast.error("Nenhum comentário disponível para usar como referência de bloqueio.");
+      return;
+    }
+    setBlocking(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("manage-comment", {
+        body: { commentId: latest.id, clientId, action: "block_user" },
+      });
+      if (error) throw error;
+      if (!res?.success) throw new Error(res?.error || "Falha ao bloquear");
+      toast.success(res.message || "Usuário bloqueado!");
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao bloquear usuário");
+    } finally {
+      setBlocking(false);
+    }
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader className="space-y-3">
+      <SheetContent className="w-full sm:max-w-md flex flex-col p-0">
+        <SheetHeader className="space-y-3 p-6 pb-3 border-b shrink-0">
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12">
               {avatarUrl && <AvatarImage src={avatarUrl} alt={authorName || ""} />}
@@ -63,7 +93,7 @@ export function AuthorHistoryDrawer({
             <div className="flex-1 min-w-0">
               <SheetTitle className="text-base flex items-center gap-2">
                 <span className="truncate">{authorName || "Autor desconhecido"}</span>
-                {platform === "instagram"
+                {isInstagram
                   ? <Instagram className="w-4 h-4 text-pink-500 shrink-0" />
                   : <Facebook className="w-4 h-4 text-blue-600 shrink-0" />}
               </SheetTitle>
@@ -91,17 +121,43 @@ export function AuthorHistoryDrawer({
               </div>
             </div>
           )}
-          {profileUrl && (
-            <Button asChild size="sm" variant="outline" className="w-full gap-2">
-              <a href={profileUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-3.5 h-3.5" />
-                Abrir perfil no {platform === "instagram" ? "Instagram" : "Facebook"}
-              </a>
-            </Button>
-          )}
+          <div className="grid grid-cols-2 gap-2">
+            {profileUrl ? (
+              <Button asChild size="sm" variant="outline" className="gap-2">
+                <a href={profileUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Abrir perfil
+                </a>
+              </Button>
+            ) : <div />}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive" className="gap-2" disabled={blocking}>
+                  {blocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                  Bloquear
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Bloquear {authorName || "este usuário"}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {isInstagram
+                      ? "O Instagram não permite bloqueio via API. Você será notificado e precisará bloquear manualmente pelo app do Instagram."
+                      : "O usuário será bloqueado da sua página no Facebook e não poderá mais comentar ou interagir. O comentário mais recente também será ocultado."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleBlock} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Confirmar bloqueio
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </SheetHeader>
 
-        <div className="mt-6">
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
             Histórico (últimos 20)
           </h4>
@@ -114,32 +170,30 @@ export function AuthorHistoryDrawer({
               Nenhum comentário encontrado.
             </p>
           ) : (
-            <ScrollArea className="max-h-[60vh] pr-3">
-              <div className="space-y-3">
-                {data.map((c: any) => (
-                  <div key={c.id} className="rounded-lg border border-border bg-card p-3 space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <Calendar className="w-3 h-3" />
-                        {c.comment_created_time
-                          ? new Date(c.comment_created_time).toLocaleString("pt-BR")
-                          : new Date(c.created_at).toLocaleString("pt-BR")}
-                      </div>
-                      <Badge variant="outline" className="gap-1 text-[10px] h-5 px-1.5">
-                        {sentimentIcon(c.sentiment)}
-                        {c.sentiment === "positive" ? "Positivo" : c.sentiment === "negative" ? "Negativo" : "Neutro"}
-                      </Badge>
+            <div className="space-y-3">
+              {data.map((c: any) => (
+                <div key={c.id} className="rounded-lg border border-border bg-card p-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <Calendar className="w-3 h-3" />
+                      {c.comment_created_time
+                        ? new Date(c.comment_created_time).toLocaleString("pt-BR")
+                        : new Date(c.created_at).toLocaleString("pt-BR")}
                     </div>
-                    <p className="text-sm leading-relaxed">{c.text}</p>
-                    {c.post_message && (
-                      <p className="text-[10px] text-muted-foreground italic line-clamp-1 pt-1 border-t border-border/40">
-                        em: {c.post_message.substring(0, 80)}{c.post_message.length > 80 ? "…" : ""}
-                      </p>
-                    )}
+                    <Badge variant="outline" className="gap-1 text-[10px] h-5 px-1.5">
+                      {sentimentIcon(c.sentiment)}
+                      {c.sentiment === "positive" ? "Positivo" : c.sentiment === "negative" ? "Negativo" : "Neutro"}
+                    </Badge>
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
+                  <p className="text-sm leading-relaxed">{c.text}</p>
+                  {c.post_message && (
+                    <p className="text-[10px] text-muted-foreground italic line-clamp-1 pt-1 border-t border-border/40">
+                      em: {c.post_message.substring(0, 80)}{c.post_message.length > 80 ? "…" : ""}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </SheetContent>
