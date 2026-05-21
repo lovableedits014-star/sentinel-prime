@@ -242,6 +242,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
           onChange={e => setCfg(c => ({ ...c, template_cabo_boas_vindas: e.target.value }))} />
       </Card>
 
+      <div className="flex justify-end">
         <Button onClick={save} disabled={saving} className="w-full sm:w-auto">
           {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
           Salvar configurações
