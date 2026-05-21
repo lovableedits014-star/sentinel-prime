@@ -108,6 +108,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       template_coordenador_boas_vindas: cfg.template_coordenador_boas_vindas,
       template_cabo_boas_vindas: cfg.template_cabo_boas_vindas,
       grupos_links: cfg.grupos_links,
+      grupos_jids: cfg.grupos_jids,
     };
     const q = cfg.id
       ? supabase.from("eleicao_notif_config" as any).update(payload).eq("id", cfg.id)
