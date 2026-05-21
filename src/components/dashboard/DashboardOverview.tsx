@@ -332,7 +332,82 @@ export function DashboardOverview({ clientId }: DashboardOverviewProps) {
         </Card>
       </div>
 
+      {/* ── Estrutura da Campanha Eleitoral ── */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-primary" />
+              <CardTitle className="text-base">Estrutura da Campanha Eleitoral</CardTitle>
+            </div>
+            <Link to="/eleicao" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+              Gerenciar <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <CardDescription>Coordenadores, líderes e cabos eleitorais cadastrados na aba Eleição</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!eleicaoKpis || eleicaoKpis.total === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Crown className="w-8 h-8 mx-auto mb-2 opacity-20" />
+              <p className="text-xs">Nenhum cadastro eleitoral ainda</p>
+              <Link to="/eleicao" className="text-xs text-primary hover:underline mt-2 inline-block">
+                Começar pela aba Eleição →
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Mini-KPIs por tipo */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg border bg-card p-3">
+                  <Crown className="w-4 h-4 text-red-500 mb-1" />
+                  <p className="text-xl font-bold">{eleicaoKpis.coordenadores}</p>
+                  <p className="text-[10px] text-muted-foreground">Coordenadores</p>
+                </div>
+                <div className="rounded-lg border bg-card p-3">
+                  <Users className="w-4 h-4 text-blue-500 mb-1" />
+                  <p className="text-xl font-bold">{eleicaoKpis.lideres}</p>
+                  <p className="text-[10px] text-muted-foreground">Líderes</p>
+                </div>
+                <div className="rounded-lg border bg-card p-3">
+                  <UserCheck className="w-4 h-4 text-emerald-500 mb-1" />
+                  <p className="text-xl font-bold">{eleicaoKpis.cabos}</p>
+                  <p className="text-[10px] text-muted-foreground">Cabos eleitorais</p>
+                </div>
+              </div>
+
+              {/* Distribuição por região / cidade */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                  <p className="text-xs font-medium text-muted-foreground">Top 5 por região / cidade</p>
+                </div>
+                {!eleicaoRegioes || eleicaoRegioes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">Sem distribuição territorial</p>
+                ) : (
+                  <ChartContainer
+                    config={{ total: { label: "Cadastros", color: "hsl(var(--primary))" } }}
+                    className="h-[160px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={eleicaoRegioes} layout="vertical" margin={{ left: 80 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis type="number" allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                        <YAxis type="category" dataKey="local" stroke="hsl(var(--muted-foreground))" fontSize={11} width={75} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="total" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Gráficos ── */}
+
       <div className="grid gap-4 md:grid-cols-2">
         {/* Crescimento da base */}
         <Card>
