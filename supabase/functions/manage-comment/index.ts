@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
 
     const { data: comment, error: commentError } = await supabaseClient
       .from('comments')
-      .select('comment_id, platform, author_id, platform_user_id, author_name, avatar_url')
+      .select('comment_id, platform, author_id, platform_user_id, author_name, author_profile_picture')
       .eq('id', commentId)
       .eq('client_id', clientId)
       .single();
