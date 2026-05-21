@@ -203,24 +203,49 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
             <p className="text-xs text-muted-foreground italic">Nenhuma região cadastrada. Clique em "Nova região" para começar.</p>
           )}
           {regioes.map(r => (
-            <div key={r.id} className="flex flex-col sm:grid sm:grid-cols-[160px_1fr_auto] gap-2 sm:items-center">
-              <Label className="text-xs sm:text-sm font-medium truncate">{r.label}</Label>
-              <Input
-                placeholder="https://chat.whatsapp.com/..."
-                value={cfg.grupos_links[r.value] || ""}
-                onChange={e => setCfg(c => ({ ...c, grupos_links: { ...c.grupos_links, [r.value]: e.target.value } }))}
-              />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 self-end sm:self-auto text-muted-foreground hover:text-destructive"
-                onClick={() => remove({ id: r.id, value: r.value })}
-                disabled={isRemoving}
-                title="Remover região"
-              >
-                <X className="w-4 h-4" />
-              </Button>
+            <div key={r.id} className="flex flex-col gap-2 p-2 rounded-md border">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs sm:text-sm font-medium truncate">{r.label}</Label>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => remove({ id: r.id, value: r.value })}
+                  disabled={isRemoving}
+                  title="Remover região"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-muted-foreground">Link de convite</Label>
+                  <Input
+                    placeholder="https://chat.whatsapp.com/..."
+                    value={cfg.grupos_links[r.value] || ""}
+                    onChange={e => setCfg(c => ({ ...c, grupos_links: { ...c.grupos_links, [r.value]: e.target.value } }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-muted-foreground">Grupo no WhatsApp (rastreamento)</Label>
+                  <Select
+                    value={cfg.grupos_jids[r.value] || ""}
+                    onValueChange={(v) => setCfg(c => ({ ...c, grupos_jids: { ...c.grupos_jids, [r.value]: v } }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={grupos.length ? "Selecione um grupo" : "Sincronize grupos em Configurações"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {grupos.map(g => (
+                        <SelectItem key={g.group_jid} value={g.group_jid}>
+                          {g.name || g.group_jid}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           ))}
         </div>
