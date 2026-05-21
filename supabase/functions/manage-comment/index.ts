@@ -7,9 +7,10 @@ const corsHeaders = {
 };
 
 const RequestSchema = z.object({
-  commentId: z.string().uuid(),
   clientId: z.string().uuid(),
-  action: z.enum(['delete', 'hide', 'unhide', 'block_user']),
+  action: z.enum(['delete', 'hide', 'unhide', 'block_user', 'unblock_user']),
+  commentId: z.string().uuid().optional(),
+  blockedUserId: z.string().uuid().optional(),
 });
 
 Deno.serve(async (req) => {
@@ -25,63 +26,37 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const body = RequestSchema.parse(await req.json());
-    const { commentId, clientId, action } = body;
+    const { commentId, clientId, action, blockedUserId } = body;
 
-    // Verify user has access (owner OR active team member)
     const { data: hasAccess } = await supabaseClient.rpc('user_has_client_access', {
       _client_id: clientId, _user_id: user.id,
     });
     if (!hasAccess) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Acesso não autorizado' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'Acesso não autorizado' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get comment
-    const { data: comment, error: commentError } = await supabaseClient
-      .from('comments')
-      .select('comment_id, platform, author_id, platform_user_id')
-      .eq('id', commentId)
-      .eq('client_id', clientId)
-      .single();
-
-    if (commentError || !comment) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Comentário não encontrado' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get integration
+    // Get integration (needed for all actions)
     const { data: integration, error: intError } = await supabaseClient
       .from('integrations')
       .select('meta_access_token, meta_page_id')
       .eq('client_id', clientId)
       .single();
-
     if (intError || !integration?.meta_access_token) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Integração Meta não configurada' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'Integração Meta não configurada' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Derive page access token
@@ -92,220 +67,203 @@ Deno.serve(async (req) => {
       );
       if (pageTokenResp.ok) {
         const pageInfo = await pageTokenResp.json();
-        if (pageInfo.access_token) {
-          pageAccessToken = pageInfo.access_token;
-        }
+        if (pageInfo.access_token) pageAccessToken = pageInfo.access_token;
       }
-    } catch (e) {
-      console.warn('Could not derive page token:', e);
+    } catch (e) { console.warn('Could not derive page token:', e); }
+
+    let result: { success: boolean; message: string };
+
+    // === UNBLOCK USER (uses blockedUserId, no commentId) ===
+    if (action === 'unblock_user') {
+      if (!blockedUserId) {
+        return new Response(JSON.stringify({ success: false, error: 'blockedUserId é obrigatório' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const { data: blocked, error: bErr } = await supabaseClient
+        .from('blocked_users')
+        .select('id, platform, platform_user_id, author_name')
+        .eq('id', blockedUserId)
+        .eq('client_id', clientId)
+        .single();
+      if (bErr || !blocked) {
+        return new Response(JSON.stringify({ success: false, error: 'Bloqueio não encontrado' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      let apiMsg = '';
+      if (blocked.platform === 'facebook') {
+        const unblockUrl = `https://graph.facebook.com/v21.0/${integration.meta_page_id}/blocked?user=${blocked.platform_user_id}&access_token=${pageAccessToken}`;
+        const resp = await fetch(unblockUrl, { method: 'DELETE' });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          console.warn('Unblock Meta error:', err);
+          apiMsg = ` (Meta: ${err?.error?.message || 'falha'})`;
+        }
+      } else {
+        apiMsg = ' (Instagram não suporta desbloqueio via API — remova manualmente pelo app)';
+      }
+
+      await supabaseClient.from('blocked_users').delete().eq('id', blockedUserId);
+      result = { success: true, message: `Usuário desbloqueado!${apiMsg}` };
+
+      await supabaseClient.from('action_logs').insert({
+        client_id: clientId, user_id: user.id,
+        action: `comment_${action}`, status: 'success',
+        details: { blocked_user_id: blockedUserId, platform: blocked.platform },
+      });
+      return new Response(JSON.stringify(result),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // === ACTIONS THAT NEED A COMMENT ===
+    if (!commentId) {
+      return new Response(JSON.stringify({ success: false, error: 'commentId é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const { data: comment, error: commentError } = await supabaseClient
+      .from('comments')
+      .select('comment_id, platform, author_id, platform_user_id, author_name, avatar_url')
+      .eq('id', commentId)
+      .eq('client_id', clientId)
+      .single();
+    if (commentError || !comment) {
+      return new Response(JSON.stringify({ success: false, error: 'Comentário não encontrado' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const isInstagram = comment.platform === 'instagram';
-    let result: { success: boolean; message: string };
 
     switch (action) {
       case 'delete': {
-        const deleteUrl = `https://graph.facebook.com/v21.0/${comment.comment_id}?access_token=${pageAccessToken}`;
-        const resp = await fetch(deleteUrl, { method: 'DELETE' });
-        
+        const resp = await fetch(`https://graph.facebook.com/v21.0/${comment.comment_id}?access_token=${pageAccessToken}`, { method: 'DELETE' });
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
-          const errCode = err?.error?.code;
-          console.error('Delete comment error:', err);
-
-          // Comment not found - already deleted on Meta, just clean up locally
-          if (errCode === 100) {
+          if (err?.error?.code === 100) {
             await supabaseClient.from('comments').delete().eq('id', commentId);
             result = { success: true, message: 'Comentário já foi removido da plataforma. Registro local removido.' };
             break;
           }
-
-          const errMsg = err?.error?.message || 'Falha ao excluir comentário';
-          return new Response(
-            JSON.stringify({ success: false, error: `Erro Meta API: ${errMsg}` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return new Response(JSON.stringify({ success: false, error: `Erro Meta API: ${err?.error?.message || 'Falha ao excluir'}` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-
         await supabaseClient.from('comments').delete().eq('id', commentId);
         result = { success: true, message: 'Comentário excluído com sucesso!' };
         break;
       }
 
-      case 'hide': {
-        const hideUrl = `https://graph.facebook.com/v21.0/${comment.comment_id}`;
-        const hideBody = isInstagram 
-          ? { hide: true, access_token: pageAccessToken }
-          : { is_hidden: true, access_token: pageAccessToken };
-        
-        const resp = await fetch(hideUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(hideBody),
-        });
-
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          const errCode = err?.error?.code;
-          const errSubcode = err?.error?.error_subcode;
-          console.error('Hide comment error:', err);
-
-          // Comment not found (already deleted on Meta) - sync local state
-          if (errCode === 100) {
-            await supabaseClient.from('comments').delete().eq('id', commentId);
-            result = { success: true, message: 'Comentário já foi removido da plataforma. Registro local atualizado.' };
-            break;
-          }
-          // Already hidden/spam (subcode 1446036) - sync local state
-          if (errSubcode === 1446036) {
-            await supabaseClient.from('comments').update({ is_hidden: true }).eq('id', commentId);
-            result = { success: true, message: 'Comentário já estava ocultado. Status atualizado.' };
-            break;
-          }
-
-          const errMsg = err?.error?.message || 'Falha ao ocultar comentário';
-          return new Response(
-            JSON.stringify({ success: false, error: `Erro Meta API: ${errMsg}` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        await supabaseClient.from('comments').update({ is_hidden: true }).eq('id', commentId);
-        result = { success: true, message: 'Comentário ocultado!' };
-        break;
-      }
-
+      case 'hide':
       case 'unhide': {
-        const unhideUrl = `https://graph.facebook.com/v21.0/${comment.comment_id}`;
-        const unhideBody = isInstagram
-          ? { hide: false, access_token: pageAccessToken }
-          : { is_hidden: false, access_token: pageAccessToken };
-        
-        const resp = await fetch(unhideUrl, {
+        const isHide = action === 'hide';
+        const body = isInstagram
+          ? { hide: isHide, access_token: pageAccessToken }
+          : { is_hidden: isHide, access_token: pageAccessToken };
+        const resp = await fetch(`https://graph.facebook.com/v21.0/${comment.comment_id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(unhideBody),
+          body: JSON.stringify(body),
         });
-
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
-          const errMsg = err?.error?.message || 'Falha ao desocultar comentário';
-          console.error('Unhide comment error:', err);
-          return new Response(
-            JSON.stringify({ success: false, error: `Erro Meta API: ${errMsg}` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          if (err?.error?.code === 100 && isHide) {
+            await supabaseClient.from('comments').delete().eq('id', commentId);
+            result = { success: true, message: 'Comentário já removido da plataforma. Registro atualizado.' };
+            break;
+          }
+          if (err?.error?.error_subcode === 1446036 && isHide) {
+            await supabaseClient.from('comments').update({ is_hidden: true }).eq('id', commentId);
+            result = { success: true, message: 'Comentário já estava ocultado.' };
+            break;
+          }
+          return new Response(JSON.stringify({ success: false, error: `Erro Meta API: ${err?.error?.message || 'Falha'}` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-
-        await supabaseClient.from('comments').update({ is_hidden: false }).eq('id', commentId);
-        result = { success: true, message: 'Comentário desocultado!' };
+        await supabaseClient.from('comments').update({ is_hidden: isHide }).eq('id', commentId);
+        result = { success: true, message: isHide ? 'Comentário ocultado!' : 'Comentário desocultado!' };
         break;
       }
 
       case 'block_user': {
-        // Block user from the page
-        // Facebook: POST /{page-id}/blocked with user=PSID
-        // Instagram: Not directly supported via API - we can only delete comments
-        
         const userId = comment.author_id || comment.platform_user_id;
         if (!userId) {
-          return new Response(
-            JSON.stringify({ success: false, error: 'ID do usuário não disponível para bloqueio' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return new Response(JSON.stringify({ success: false, error: 'ID do usuário não disponível' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
-        if (isInstagram) {
-          // Instagram doesn't have a direct block API for pages
-          // We can use the comment moderation to hide all comments
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: 'O Instagram não permite bloqueio de usuários via API. Use o app do Instagram para bloquear este usuário.' 
-            }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        let apiMsg = '';
+        let apiSuccess = false;
 
-        const blockUrl = `https://graph.facebook.com/v21.0/${integration.meta_page_id}/blocked`;
-        const resp = await fetch(blockUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user: userId,
-            access_token: pageAccessToken,
-          }),
-        });
-
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          const errMsg = err?.error?.message || 'Falha ao bloquear usuário';
-          console.error('Block user error:', err);
-          return new Response(
-            JSON.stringify({ success: false, error: `Erro Meta API: ${errMsg}` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Auto-hide the comment after blocking the user
-        let autoHideMsg = '';
-        try {
-          const hideResp = await fetch(`https://graph.facebook.com/v21.0/${comment.comment_id}`, {
+        if (!isInstagram) {
+          const resp = await fetch(`https://graph.facebook.com/v21.0/${integration.meta_page_id}/blocked`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ is_hidden: true, access_token: pageAccessToken }),
+            body: JSON.stringify({ user: userId, access_token: pageAccessToken }),
           });
-          if (hideResp.ok) {
-            await supabaseClient.from('comments').update({ is_hidden: true }).eq('id', commentId);
-            autoHideMsg = ' Comentário ocultado automaticamente.';
+          if (resp.ok) {
+            apiSuccess = true;
+            apiMsg = 'Usuário bloqueado da página!';
+            // Auto-hide
+            try {
+              const hideResp = await fetch(`https://graph.facebook.com/v21.0/${comment.comment_id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_hidden: true, access_token: pageAccessToken }),
+              });
+              if (hideResp.ok) {
+                await supabaseClient.from('comments').update({ is_hidden: true }).eq('id', commentId);
+                apiMsg += ' Comentário ocultado.';
+              }
+            } catch (_) { /* ignore */ }
           } else {
-            const hideErr = await hideResp.json().catch(() => ({}));
-            // If already hidden or comment gone, still mark locally
-            if (hideErr?.error?.error_subcode === 1446036) {
-              await supabaseClient.from('comments').update({ is_hidden: true }).eq('id', commentId);
-              autoHideMsg = ' Comentário já estava ocultado.';
-            } else {
-              console.warn('Auto-hide after block failed:', hideErr);
-            }
+            const err = await resp.json().catch(() => ({}));
+            console.error('Block error:', err);
+            apiMsg = `Erro Meta API: ${err?.error?.message || 'Falha ao bloquear'}`;
           }
-        } catch (e) {
-          console.warn('Auto-hide after block exception:', e);
+        } else {
+          // Instagram - no API support, but still register locally
+          apiMsg = 'Instagram não permite bloqueio via API. Registrado localmente — bloqueie manualmente pelo app.';
+          apiSuccess = true; // allow local record
         }
 
-        result = { success: true, message: `Usuário bloqueado da página!${autoHideMsg}` };
+        if (apiSuccess) {
+          // Insert/upsert into blocked_users
+          await supabaseClient.from('blocked_users').upsert({
+            client_id: clientId,
+            platform: comment.platform,
+            platform_user_id: userId,
+            author_name: comment.author_name,
+            avatar_url: comment.avatar_url,
+            blocked_by: user.id,
+            reason: isInstagram ? 'instagram_manual' : 'facebook_api',
+          }, { onConflict: 'client_id,platform,platform_user_id' });
+          result = { success: true, message: apiMsg };
+        } else {
+          return new Response(JSON.stringify({ success: false, error: apiMsg }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
         break;
       }
 
       default:
-        return new Response(
-          JSON.stringify({ success: false, error: 'Ação inválida' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ success: false, error: 'Ação inválida' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Log action
     await supabaseClient.from('action_logs').insert({
-      client_id: clientId,
-      user_id: user.id,
-      action: `comment_${action}`,
-      status: 'success',
-      details: { comment_id: commentId, platform: comment.platform }
+      client_id: clientId, user_id: user.id,
+      action: `comment_${action}`, status: 'success',
+      details: { comment_id: commentId, platform: comment.platform },
     });
 
-    return new Response(
-      JSON.stringify(result),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify(result),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('Error in manage-comment:', error);
-    const errorMessage = error instanceof z.ZodError 
+    const errorMessage = error instanceof z.ZodError
       ? 'Dados inválidos: ' + error.errors.map(e => e.message).join(', ')
       : error instanceof Error ? error.message : 'Erro desconhecido';
-    
-    return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success: false, error: errorMessage }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
