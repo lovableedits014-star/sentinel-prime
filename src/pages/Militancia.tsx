@@ -755,6 +755,10 @@ const Militancia = () => {
             <Flame className="w-4 h-4 text-destructive" />
             <span>Ranking Negativos</span>
           </TabsTrigger>
+          <TabsTrigger value="blocked" className="gap-1.5">
+            <ShieldOff className="w-4 h-4 text-amber-600" />
+            <span>Bloqueados</span>
+          </TabsTrigger>
           <TabsTrigger value="report" className="gap-1.5">
             <FileText className="w-4 h-4 text-amber-600" />
             <span>Relatório</span>
