@@ -16,6 +16,8 @@ const DEFAULT_TPL_LIDER =
   "Olá {nome}! Você foi cadastrado como líder na região *{regiao}*.\n\nEntre no grupo da região para receber as orientações:\n{link_grupo}";
 const DEFAULT_TPL_COORD_BV =
   "Olá {nome}! Você foi cadastrado como coordenador da região *{regiao}*.\n\nEntre no grupo da sua região e aguarde as próximas instruções:\n{link_grupo}";
+const DEFAULT_TPL_CABO_BV =
+  "Olá {nome}! Você foi cadastrado como cabo eleitoral na região *{regiao}*.\n\nEntre no grupo da sua região para receber as próximas instruções:\n{link_grupo}";
 
 interface Cfg {
   id?: string;
