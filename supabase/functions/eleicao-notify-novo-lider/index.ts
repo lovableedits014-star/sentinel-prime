@@ -531,11 +531,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    async function runCaboBoasVindas() {
+      results.cabo_boas_vindas = await sendTo({
+        ...baseSendCtx,
+        destinatarioTipo: "cabo_boas_vindas", destinatarioNome: pessoa.nome,
+        destinatarioTelefone: pessoa.telefone, message: msgCaboBoasVindas,
+      });
+    }
+
     if (target) {
       if (target === "coordenador") await runCoordenador();
       else if (target === "secretaria") await runSecretaria();
       else if (target === "lider") await runLider();
       else if (target === "coordenador_boas_vindas") await runCoordBoasVindas();
+      else if (target === "cabo_boas_vindas") await runCaboBoasVindas();
       return new Response(
         JSON.stringify({ success: true, preflight: pre, target, result: results[target] }),
         { headers: { ...cors, "Content-Type": "application/json" } },
