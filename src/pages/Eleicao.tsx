@@ -79,6 +79,38 @@ async function sendCoordBoasVindas(pessoaId: string) {
   }
 }
 
+async function sendCaboBoasVindas(pessoaId: string) {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+    if (!accessToken) { toast.error("Sessão expirada"); return; }
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/eleicao-notify-novo-lider`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || (import.meta.env as any).VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ pessoa_id: pessoaId, target: "cabo_boas_vindas" }),
+      },
+    );
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data?.error) {
+      toast.warning("Não foi possível enviar a mensagem ao cabo eleitoral", { description: data?.error });
+      return;
+    }
+    const r = data?.result;
+    if (r?.sent) toast.success("Mensagem de boas-vindas enviada ao cabo eleitoral no WhatsApp");
+    else if (r?.reason) toast.info(`Boas-vindas não enviada: ${r.reason}`);
+    else if (r?.error) toast.warning(`Falha na boas-vindas: ${r.error}`);
+    else toast.info("Solicitação processada");
+  } catch (e: any) {
+    toast.warning("Falha ao enviar boas-vindas ao cabo eleitoral", { description: e?.message });
+  }
+}
+
 async function gerarContratosLote(
   pessoas: Pessoa[],
   clientId: string,
