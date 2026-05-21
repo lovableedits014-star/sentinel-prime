@@ -506,7 +506,7 @@ export default function Eleicao() {
       </div>
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -516,6 +516,7 @@ export default function Eleicao() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
@@ -525,6 +526,8 @@ export default function Eleicao() {
         <PrevisaoCustos pessoas={pessoas as any} />
       ) : view === "pendentes" ? (
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
+      ) : view === "grupo" ? (
+        clientId ? <EntradaGrupoPanel clientId={clientId} /> : null
       ) : view === "config" ? (
         clientId ? <EleicaoConfigPanel clientId={clientId} /> : null
       ) : (
