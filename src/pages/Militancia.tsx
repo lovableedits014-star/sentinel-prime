@@ -121,6 +121,18 @@ function MilitantList({
   );
 }
 
+type NegComment = {
+  id: string;
+  comment_id: string;
+  text: string;
+  sentiment: string | null;
+  comment_created_time: string | null;
+  post_message: string | null;
+  post_permalink_url: string | null;
+  platform: string;
+  platform_user_id: string | null;
+};
+
 function NegativeRanking({
   militants, clientId, onOpen,
 }: {
@@ -128,7 +140,46 @@ function NegativeRanking({
   clientId: string | null | undefined;
   onOpen: (m: MilitantRow) => void;
 }) {
+  const queryClient = useQueryClient();
   const [blocking, setBlocking] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [reclassifying, setReclassifying] = useState<string | null>(null);
+
+  // Load all negative comments for this client (one query, then group by author)
+  const { data: negativeComments = [], isLoading: loadingNeg } = useQuery({
+    queryKey: ["negative-comments-by-author", clientId],
+    queryFn: async () => {
+      if (!clientId) return [] as NegComment[];
+      const { data, error } = await (supabase as any)
+        .from("comments")
+        .select("id, comment_id, text, sentiment, comment_created_time, post_message, post_permalink_url, platform, platform_user_id")
+        .eq("client_id", clientId)
+        .eq("sentiment", "negative")
+        .eq("is_page_owner", false)
+        .neq("text", "__post_stub__")
+        .order("comment_created_time", { ascending: false })
+        .limit(5000);
+      if (error) {
+        console.warn("[negative-comments-by-author] error:", error.message);
+        return [];
+      }
+      return (data ?? []) as NegComment[];
+    },
+    enabled: !!clientId,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const commentsByAuthor = useMemo(() => {
+    const map = new Map<string, NegComment[]>();
+    for (const c of negativeComments) {
+      if (!c.platform_user_id) continue;
+      const key = `${c.platform}:${c.platform_user_id}`;
+      const arr = map.get(key) || [];
+      arr.push(c);
+      map.set(key, arr);
+    }
+    return map;
+  }, [negativeComments]);
 
   const ranking = useMemo(() => {
     return [...militants]
@@ -136,6 +187,70 @@ function NegativeRanking({
       .sort((a, b) => (b.total_negative || 0) - (a.total_negative || 0))
       .slice(0, 200);
   }, [militants]);
+
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleReclassify = async (
+    comment: NegComment,
+    newSentiment: "positive" | "neutral" | "negative",
+  ) => {
+    if (!clientId) return;
+    setReclassifying(comment.id);
+    try {
+      const { error } = await (supabase as any)
+        .from("comments")
+        .update({
+          sentiment: newSentiment,
+          sentiment_source: "human",
+          sentiment_confidence: 1,
+          needs_review: false,
+        })
+        .eq("id", comment.id);
+      if (error) throw error;
+
+      // Log correction for AI few-shot learning
+      if (comment.sentiment && comment.sentiment !== newSentiment) {
+        (supabase as any)
+          .from("sentiment_corrections")
+          .insert({
+            client_id: clientId,
+            comment_id: comment.id,
+            text: comment.text,
+            post_message: comment.post_message,
+            ai_sentiment: comment.sentiment,
+            human_sentiment: newSentiment,
+          })
+          .then(({ error: insErr }: any) => {
+            if (insErr) console.warn("[sentiment_corrections] insert error:", insErr.message);
+          });
+      }
+
+      // Optimistic: remove from negative list if reclassified away
+      queryClient.setQueryData(["negative-comments-by-author", clientId], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return newSentiment === "negative"
+          ? old
+          : (old as NegComment[]).filter(c => c.id !== comment.id);
+      });
+      // Refresh militants (badges + counts will recompute)
+      queryClient.invalidateQueries({ queryKey: ["militants-all", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["militants-map", clientId] });
+
+      toast.success(
+        `Reclassificado como ${newSentiment === "positive" ? "positivo" : newSentiment === "neutral" ? "neutro" : "negativo"}`
+      );
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao reclassificar");
+    } finally {
+      setReclassifying(null);
+    }
+  };
 
   const handleBlock = async (m: MilitantRow) => {
     if (!clientId) return;
@@ -146,7 +261,6 @@ function NegativeRanking({
     if (!confirm(`Bloquear ${m.author_name || "este autor"} da página? Esta ação remove a capacidade de comentar.`)) return;
     setBlocking(m.id);
     try {
-      // Find the most recent negative comment from this author to drive the block call
       const { data: c, error: cErr } = await (supabase as any)
         .from("comments")
         .select("id")
@@ -195,53 +309,138 @@ function NegativeRanking({
     <div className="bg-card rounded-xl border shadow-sm divide-y overflow-hidden">
       {ranking.map((m, idx) => {
         const url = getSocialProfileUrl(m.platform, m.platform_user_id, null, m.author_name);
+        const key = `${m.platform}:${m.platform_user_id}`;
+        const isOpen = expanded.has(m.id);
+        const authorComments = commentsByAuthor.get(key) || [];
         return (
-          <div key={m.id} className="px-3 py-3 flex items-center gap-3 hover:bg-muted/50">
-            <div className="w-6 text-center text-sm font-bold text-muted-foreground shrink-0">
-              {idx + 1}
-            </div>
-            <button onClick={() => onOpen(m)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-              <Avatar className="h-10 w-10 shrink-0">
-                {m.avatar_url && <AvatarImage src={m.avatar_url} alt={m.author_name || ""} />}
-                <AvatarFallback className={m.platform === 'instagram' ? 'bg-gradient-to-br from-pink-500 to-purple-600 text-white text-xs' : 'bg-primary/10 text-primary text-xs'}>
-                  {m.author_name?.charAt(0).toUpperCase() || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium truncate">{m.author_name || "Autor desconhecido"}</span>
-                  <MilitantBadge militant={m} />
-                  {m.platform === 'facebook'
-                    ? <Facebook className="w-3.5 h-3.5 text-blue-600" />
-                    : <Instagram className="w-3.5 h-3.5 text-pink-500" />}
-                </div>
-                <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
-                  <span className="inline-flex items-center gap-1 text-destructive font-semibold">
-                    <TrendingDown className="w-3 h-3" />{m.total_negative} negativos
-                  </span>
-                  <span className="inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{m.total_comments} total</span>
-                  <span className="inline-flex items-center gap-1 text-green-600"><TrendingUp className="w-3 h-3" />{m.total_positive}</span>
-                </div>
+          <div key={m.id}>
+            <div className="px-3 py-3 flex items-center gap-3 hover:bg-muted/50">
+              <button
+                onClick={() => toggleExpand(m.id)}
+                className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded hover:bg-muted text-muted-foreground"
+                title={isOpen ? "Recolher comentários" : "Ver comentários negativos"}
+              >
+                {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              <div className="w-6 text-center text-sm font-bold text-muted-foreground shrink-0">
+                {idx + 1}
               </div>
-            </button>
-            {url && (
-              <a href={url} target="_blank" rel="noopener noreferrer"
-                className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                title="Abrir perfil">
-                <ExternalLink className="w-4 h-4" />
-              </a>
+              <button onClick={() => onOpen(m)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                <Avatar className="h-10 w-10 shrink-0">
+                  {m.avatar_url && <AvatarImage src={m.avatar_url} alt={m.author_name || ""} />}
+                  <AvatarFallback className={m.platform === 'instagram' ? 'bg-gradient-to-br from-pink-500 to-purple-600 text-white text-xs' : 'bg-primary/10 text-primary text-xs'}>
+                    {m.author_name?.charAt(0).toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium truncate">{m.author_name || "Autor desconhecido"}</span>
+                    <MilitantBadge militant={m} />
+                    {m.platform === 'facebook'
+                      ? <Facebook className="w-3.5 h-3.5 text-blue-600" />
+                      : <Instagram className="w-3.5 h-3.5 text-pink-500" />}
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+                    <span className="inline-flex items-center gap-1 text-destructive font-semibold">
+                      <TrendingDown className="w-3 h-3" />{m.total_negative} negativos
+                    </span>
+                    <span className="inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{m.total_comments} total</span>
+                    <span className="inline-flex items-center gap-1 text-green-600"><TrendingUp className="w-3 h-3" />{m.total_positive}</span>
+                  </div>
+                </div>
+              </button>
+              {url && (
+                <a href={url} target="_blank" rel="noopener noreferrer"
+                  className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                  title="Abrir perfil">
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={blocking === m.id}
+                onClick={() => handleBlock(m)}
+                className="shrink-0 h-8 gap-1.5"
+                title={m.platform === 'instagram' ? 'Instagram não permite bloqueio via API' : 'Bloquear autor da página'}
+              >
+                {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">Bloquear</span>
+              </Button>
+            </div>
+
+            {isOpen && (
+              <div className="bg-muted/30 px-3 py-3 space-y-2 border-t">
+                {loadingNeg ? (
+                  <p className="text-xs text-muted-foreground py-2 text-center">Carregando comentários...</p>
+                ) : authorComments.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2 text-center">
+                    Nenhum comentário negativo encontrado para este autor (pode ter sido reclassificado).
+                  </p>
+                ) : (
+                  authorComments.map(c => (
+                    <div key={c.id} className="bg-card border rounded-lg p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm whitespace-pre-wrap break-words">{c.text}</p>
+                          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1.5">
+                            {c.comment_created_time && (
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(c.comment_created_time).toLocaleString("pt-BR")}
+                              </span>
+                            )}
+                            {c.post_permalink_url && (
+                              <a
+                                href={c.post_permalink_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 hover:text-foreground"
+                              >
+                                <ExternalLink className="w-3 h-3" /> ver post
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t">
+                        <span className="text-[11px] text-muted-foreground mr-1">Reclassificar:</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={reclassifying === c.id}
+                          onClick={() => handleReclassify(c, "positive")}
+                          className="h-7 gap-1 text-xs border-green-500/40 text-green-700 hover:bg-green-500/10"
+                        >
+                          {reclassifying === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ThumbsUp className="w-3 h-3" />}
+                          Positivo
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={reclassifying === c.id}
+                          onClick={() => handleReclassify(c, "neutral")}
+                          className="h-7 gap-1 text-xs"
+                        >
+                          {reclassifying === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Minus className="w-3 h-3" />}
+                          Neutro
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={reclassifying === c.id}
+                          onClick={() => handleReclassify(c, "negative")}
+                          className="h-7 gap-1 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+                        >
+                          <TrendingDown className="w-3 h-3" />
+                          Negativo
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             )}
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={blocking === m.id}
-              onClick={() => handleBlock(m)}
-              className="shrink-0 h-8 gap-1.5"
-              title={m.platform === 'instagram' ? 'Instagram não permite bloqueio via API' : 'Bloquear autor da página'}
-            >
-              {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">Bloquear</span>
-            </Button>
           </div>
         );
       })}
