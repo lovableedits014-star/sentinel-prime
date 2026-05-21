@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Search, Facebook, Instagram, TrendingUp, TrendingDown,
   Users, Calendar, Loader2, MessageSquare, Eye, BarChart3, FileText, ExternalLink,
-  Flame, Ban,
+  Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { BADGE_META, getBadgeMeta } from "@/lib/militant-badges";
