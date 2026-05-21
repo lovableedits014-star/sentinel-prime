@@ -131,7 +131,9 @@ type NegComment = {
   post_permalink_url: string | null;
   platform: string;
   platform_user_id: string | null;
+  sentiment_reason?: string | null;
 };
+
 
 function NegativeRanking({
   militants, clientId, onOpen,
@@ -152,7 +154,7 @@ function NegativeRanking({
       if (!clientId) return [] as NegComment[];
       const { data, error } = await (supabase as any)
         .from("comments")
-        .select("id, comment_id, text, sentiment, comment_created_time, post_message, post_permalink_url, platform, platform_user_id")
+        .select("id, comment_id, text, sentiment, sentiment_reason, comment_created_time, post_message, post_permalink_url, platform, platform_user_id")
         .eq("client_id", clientId)
         .eq("sentiment", "negative")
         .eq("is_page_owner", false)
@@ -225,6 +227,7 @@ function NegativeRanking({
             post_message: comment.post_message,
             ai_sentiment: comment.sentiment,
             human_sentiment: newSentiment,
+            ai_reason: comment.sentiment_reason ?? null,
           })
           .then(({ error: insErr }: any) => {
             if (insErr) console.warn("[sentiment_corrections] insert error:", insErr.message);
@@ -383,6 +386,11 @@ function NegativeRanking({
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm whitespace-pre-wrap break-words">{c.text}</p>
+                          {c.sentiment_reason && (
+                            <p className="text-[11px] text-muted-foreground mt-1 italic">
+                              💭 IA: {c.sentiment_reason}
+                            </p>
+                          )}
                           <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1.5">
                             {c.comment_created_time && (
                               <span className="inline-flex items-center gap-1">
@@ -400,9 +408,39 @@ function NegativeRanking({
                                 <ExternalLink className="w-3 h-3" /> ver post
                               </a>
                             )}
+                            <button
+                              onClick={async () => {
+                                if (!clientId) return;
+                                setReclassifying(c.id);
+                                try {
+                                  const { data, error } = await (supabase as any).functions.invoke('analyze-sentiment', {
+                                    body: { commentId: c.id, clientId },
+                                  });
+                                  if (error) throw error;
+                                  if (data?.sentiment && data.sentiment !== 'negative') {
+                                    queryClient.setQueryData(["negative-comments-by-author", clientId], (old: any) =>
+                                      Array.isArray(old) ? (old as NegComment[]).filter(x => x.id !== c.id) : old
+                                    );
+                                    toast.success(`IA reclassificou para ${data.sentiment}`);
+                                  } else {
+                                    toast.info('IA manteve como negativo');
+                                  }
+                                } catch (e: any) {
+                                  toast.error(e.message || 'Erro ao reanalisar');
+                                } finally {
+                                  setReclassifying(null);
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 hover:text-foreground"
+                              disabled={reclassifying === c.id}
+                            >
+                              {reclassifying === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Flame className="w-3 h-3" />}
+                              Reanalisar IA
+                            </button>
                           </div>
                         </div>
                       </div>
+
                       <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t">
                         <span className="text-[11px] text-muted-foreground mr-1">Reclassificar:</span>
                         <Button
