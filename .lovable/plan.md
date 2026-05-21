@@ -1,98 +1,65 @@
+## Objetivo
 
-## O erro que cometi
+1. **Remover a seção "Gestão de Crise"** do Dashboard (a lista de comentários negativos pendentes).
+2. **Atualizar a "Visão Executiva da Campanha"** para refletir os cadastros da aba **Eleição** — Coordenadores, Líderes e Cabos eleitorais — que hoje não aparecem nos KPIs.
 
-Você está absolutamente certo — pisei na bola. Eu li o banco e vi "36 usuários com `role='client'`", e assumi que todos eram gerentes do SaaS. Errado. A maioria são pessoas do CRM (coordenadores/líderes/cabos) que ganharam conta `auth.users` só pra acessar o **portal**, não pra usar o sistema como gerente.
+## Diagnóstico
 
-**O que eu confirmei agora no banco:**
+- `src/pages/Dashboard.tsx` (linhas ~787–890) tem o bloco **Gestão de Crise** com `negativeComments`, checkboxes, "Ocultar selecionados", etc. Também referencia o tema na linha 437–440 do export de PDF.
+- `src/components/dashboard/DashboardOverview.tsx` ("Visão Executiva da Campanha") consulta apenas as tabelas `pessoas`, `contratados` (com `is_lider`) e `funcionarios`. **Não lê `eleicao_pessoas`**, onde estão os perfis cadastrados na aba Eleição com `tipo ∈ { 'coordenador', 'lider', 'cabo' }`.
+- Em `src/pages/Eleicao.tsx` confirmamos a estrutura: a tabela `eleicao_pessoas` é a fonte da estrutura eleitoral (escopo `campo_grande`/`interior`, hierarquia coordenador → líder → cabo).
 
-- Há **37 usuários** em `auth.users`.
-- **25 deles** existem também na tabela `public.pessoas` — ou seja, são contatos do CRM (eleitores/coordenadores) que receberam credencial de portal via a função `eleicao-create-account`. Foram criados em lote no dia 26/04.
-- **3 são funcionários/team_members** (`mayer014@*`, `antoniolobato.adm`).
-- **Apenas 2 são gerentes legítimos** do SaaS:
-  - **Junior Coringa** (super admin)
-  - **Wellington Kester**
-- O resto (alguns avulsos como `jacinto.alves004`, `helioalvesvaz`, `decaosales`, `rodferros`) parecem casos de pessoa cadastrada e depois removida do CRM, mas com `auth.users` órfão.
+## Plano de execução
 
-E o que minha última migração fez de errado:
+### 1. Remover "Gestão de Crise" do Dashboard
+- Em `src/pages/Dashboard.tsx`:
+  - Excluir todo o `Card` "Gestão de Crise" (≈ linhas 787–890), incluindo a barra de bulk actions, a lista renderizada e o estado vazio.
+  - Remover estados/handlers que ficam órfãos: `selectedCrisis`, `toggleCrisisSelection`, `toggleAllCrisis`, `handleBulkHide`, `bulkHiding` e imports não utilizados (`Checkbox`, `EyeOff`, `Shield`, `ShieldAlert`, etc., conforme uso restante).
+  - Manter o cálculo de `negativeComments` apenas se ainda for usado pelo IED/PDF; caso contrário, remover. Atualizar o highlight do PDF (linhas 437–441) para refletir apenas "comentários negativos no período" sem mencionar "gestão de crise".
+- A operacionalização de comentários negativos continua disponível na página **Comentários** (não vamos duplicar lá nenhuma funcionalidade — só removendo o atalho do dashboard).
 
-1. Criou **35 fichas de gerente bobas** em `public.clients` — uma pra cada um desses usuários do portal/CRM. Eles agora aparecem todos no seletor de "Gerente" do super admin como se fossem clientes SaaS.
-2. Mantive o trigger `handle_new_user` criando `clients` automaticamente — o que significa que toda nova pessoa cadastrada via portal viraria "gerente" também.
+### 2. Refletir Coordenadores / Líderes / Cabos na Visão Executiva
+Em `src/components/dashboard/DashboardOverview.tsx`:
 
-A raiz do problema vinha de antes inclusive: o trigger `handle_new_user` já vinha marcando **todo mundo** com `role='client'`, sem distinguir gerente de pessoa-com-portal.
+a) **Novos KPIs vindos de `eleicao_pessoas`** (filtrados por `client_id`):
+   - `coordenadoresTotal` — `tipo = 'coordenador'`
+   - `lideresEleicaoTotal` — `tipo = 'lider'`
+   - `cabosTotal` — `tipo = 'cabo'`
+   - `equipeEleicaoTotal` = soma dos três (usar como métrica principal "Estrutura Eleitoral").
 
----
+b) **Reorganizar a grade de KPIs** (hoje 6 cartões) para acomodar a estrutura eleitoral sem poluir:
+   ```text
+   [Base Política] [Apoio comprometido] [Estrutura Eleitoral] [Contratados] [Funcionários] [Check-ins hoje]
+   ```
+   - O cartão "Estrutura Eleitoral" mostra o total e, em texto pequeno, o breakdown: `X coord · Y líderes · Z cabos`.
+   - Ícone sugerido: `Crown` (já importado) ou `Network`.
+   - Clique leva para `/eleicao`.
 
-## Plano de correção
+c) **Novo bloco "Estrutura da Campanha Eleitoral"** abaixo do gráfico "Crescimento da base":
+   - Card com 3 mini-KPIs (Coordenadores, Líderes, Cabos) lado a lado, cada um com seu ícone (`Crown`, `Users`, `UserCheck`) e link para a aba Eleição com filtro pré-aplicado por tipo.
+   - Mini gráfico de barras (recharts) com a distribuição por **região/cidade** (top 5) usando `regiao` ou `cidade` de `eleicao_pessoas` agrupada.
+   - Estado vazio: "Nenhum cadastro eleitoral ainda — comece pela aba Eleição".
 
-### 1. Limpar as fichas de gerente criadas por engano
+d) **Adaptar "Top Líderes por Equipe"**:
+   - Hoje conta `contratados.is_lider`. Adicionar um seletor (ou um segundo card) "Top Coordenadores por Equipe Eleitoral" baseado em `eleicao_pessoas` (coordenadores com mais líderes vinculados por `parent_id`).
 
-Manter em `public.clients` **somente**:
-- Junior Coringa (`lovableedits014@gmail.com`)
-- Wellington Kester (`wellington.advogado2013@gmail.com`)
+e) **Inclusão no export de PDF (`Dashboard.tsx → exportDashboardPdf`)**:
+   - Adicionar highlight: `Estrutura eleitoral: X coordenadores, Y líderes, Z cabos.`
+   - (Sem mudanças no PDF se o usuário preferir manter mínimo — confirmo depois se necessário.)
 
-Apagar as outras 35 fichas que minha migração criou. Como nenhuma delas tem dados reais (foram criadas em branco há poucos minutos), a deleção é segura. As pessoas em `public.pessoas` continuam intactas — só estou removendo o "rótulo de gerente" indevido.
+### 3. Pós-mudança
+- Verificar `src/components/dashboard/SuggestedActions.tsx` e `AlertasWidget.tsx` para não referenciarem "Gestão de Crise" como destino (sugestões existentes apontam para `/comments` — manter).
+- Rodar build/typecheck.
 
-### 2. Separar os papéis no `user_roles`
+## Detalhes técnicos
 
-Criar um novo valor de role mais honesto, **`portal_pessoa`** (no enum `app_role`), pra contas que existem só pra acessar o portal do coordenador/líder.
+- Sem alterações de schema: `eleicao_pessoas` já existe com colunas `tipo`, `client_id`, `parent_id`, `regiao`, `cidade`.
+- Todas as queries novas usam `supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", X)` — mesmo padrão atual do arquivo.
+- RLS já valida acesso por cliente (consistente com o uso em `src/pages/Eleicao.tsx`).
+- Manter `staleTime` de 2 min nos KPIs novos.
 
-Reclassificar:
-- Os **25 usuários que estão em `pessoas`** → `role = 'portal_pessoa'` (não são clientes SaaS, têm acesso só ao portal deles).
-- Os **funcionários/team_members** → manter como `funcionario` (já está certo).
-- **Junior + Wellington** → manter como `client` (são gerentes de verdade).
-- Os ~4 "auth.users órfãos" (sem pessoa, sem cliente, sem time) → vou listar pra você decidir caso a caso (provavelmente bagunça de testes; podem virar `portal_pessoa` inativo ou ser apagados).
+## Itens fora de escopo (a confirmar se quiser)
 
-### 3. Corrigir o trigger `handle_new_user` para nunca mais "auto-promover" alguém a gerente
-
-Reescrever pra:
-
-- **Sempre** criar `profiles` (continua igual).
-- **Não** atribuir `role='client'` automaticamente.
-- Em vez disso, ler `raw_user_meta_data->>'account_type'` na criação:
-  - `'gerente'` → cria `user_roles.role='client'` **e** a ficha em `public.clients`.
-  - `'portal_pessoa'` → cria `user_roles.role='portal_pessoa'`, nada em `clients`.
-  - `'funcionario'` → cria `user_roles.role='funcionario'`, nada em `clients`.
-  - Sem metadata → fica sem role (seguro: ninguém vira gerente por engano).
-- Atualizar `eleicao-create-account` e `register-funcionario` pra passarem o `account_type` certo no `signUp`/`admin.createUser`.
-
-### 4. Criar fluxo explícito "Novo gerente" no painel do super admin
-
-Hoje não existe UI pra super admin criar um gerente "do zero" — Junior foi cadastrado manualmente no banco, Wellington também. Vou adicionar uma ação **"Cadastrar novo gerente"** no `SuperAdminClientSwitcher` que:
-
-1. Chama uma server function nova (`createGerente`) que: cria `auth.user` com `account_type='gerente'`, gera senha, cria a ficha em `clients` e o `user_roles.role='client'` (de forma atômica via service role).
-2. Devolve as credenciais pra você compartilhar com o novo gerente.
-
-Assim, "criar gerente" deixa de ser implícito e passa a ser uma ação consciente.
-
-### 5. Após a correção — fluxo final
-
-- Super admin (Junior) abre o seletor "Gerente" → vê **apenas** Wellington (e qualquer outro que ele criar pelo botão novo).
-- Seleciona Wellington → cria instância WhatsApp pra ele → Wellington loga e usa.
-- Cadastrar um coordenador/líder/cabo no CRM continua gerando conta de portal, mas essa conta **nunca** mais vira gerente do SaaS.
-
----
-
-## Detalhes técnicos (referência)
-
-- **Migração** única com: `DELETE FROM clients WHERE user_id NOT IN (junior, wellington)`; `ALTER TYPE app_role ADD VALUE 'portal_pessoa'`; `UPDATE user_roles SET role='portal_pessoa' WHERE user_id IN (select user_id where in pessoas)`; `CREATE OR REPLACE FUNCTION handle_new_user` com a lógica baseada em `account_type`.
-- **Código edge**: ajustar `eleicao-create-account/index.ts` pra passar `user_metadata: { account_type: 'portal_pessoa' }` no `admin.createUser`. Mesmo pra `register-funcionario` (`account_type: 'funcionario'`).
-- **Nova server function** `src/lib/admin.functions.ts → createGerente` + dialog no `SuperAdminClientSwitcher`.
-- **Sem alteração** na instância existente de WhatsApp do Junior.
-
----
-
-### Antes de eu rodar, preciso de uma confirmação
-
-Os ~4 auth.users **órfãos** (existem em `auth.users`, têm `role='client'`, mas NÃO existem em `pessoas`, `team_members` ou `funcionarios`) são:
-
-- `jacinto.alves004@gmail.com`
-- `helioalvesvaz@gmail.com`
-- `decaosales@gmail.com`
-- `rodferros@hotmail.com`
-- (mais alguns possíveis — listo todos na execução)
-
-**O que faço com eles?**
-- (A) Deixar como `portal_pessoa` desativado (não vira gerente, mas conta segue existindo).
-- (B) Deletar a conta `auth.users` deles também (limpa de vez).
-
-Me diz qual prefere — se não responder, vou de (A) por ser o caminho menos destrutivo.
+- Não vou mexer no funcionamento da página de Comentários (continua sendo o lugar para gestão real de negativos).
+- Não vou mover a "Gestão de Crise" para outra página — apenas remover do dashboard, como pedido.
+- Não vou criar novos relatórios PDF — apenas ajustar os highlights existentes.
