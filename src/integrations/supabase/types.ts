@@ -1644,6 +1644,7 @@ export type Database = {
           grupos_links: Json
           id: string
           secretaria_telefone: string | null
+          template_cabo_boas_vindas: string | null
           template_coordenador: string
           template_coordenador_boas_vindas: string | null
           template_lider: string
@@ -1656,6 +1657,7 @@ export type Database = {
           grupos_links?: Json
           id?: string
           secretaria_telefone?: string | null
+          template_cabo_boas_vindas?: string | null
           template_coordenador?: string
           template_coordenador_boas_vindas?: string | null
           template_lider?: string
@@ -1668,6 +1670,7 @@ export type Database = {
           grupos_links?: Json
           id?: string
           secretaria_telefone?: string | null
+          template_cabo_boas_vindas?: string | null
           template_coordenador?: string
           template_coordenador_boas_vindas?: string | null
           template_lider?: string
