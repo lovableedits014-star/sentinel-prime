@@ -130,6 +130,35 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     } catch { /* toast já exibido */ }
   }
 
+  function normalize(s: string) {
+    return (s || "")
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  function autoVincular() {
+    if (!grupos.length) { toast.error("Nenhum grupo sincronizado. Vá em Configurações → WhatsApp e sincronize."); return; }
+    const next: Record<string, string> = { ...cfg.grupos_jids };
+    let vinculados = 0;
+    for (const r of regioes) {
+      if (next[r.value]) continue;
+      const nr = normalize(r.label);
+      const tokens = nr.split(" ").filter(Boolean);
+      const hit = grupos.find(g => {
+        const ng = normalize(g.name || "");
+        if (!ng) return false;
+        if (ng.includes(nr) || nr.includes(ng)) return true;
+        return tokens.some(t => t.length >= 4 && ng.includes(t));
+      });
+      if (hit) { next[r.value] = hit.group_jid; vinculados++; }
+    }
+    setCfg(c => ({ ...c, grupos_jids: next }));
+    if (vinculados === 0) toast.info("Nenhuma região casou com algum grupo pelo nome. Vincule manualmente.");
+    else toast.success(`${vinculados} região(ões) vinculada(s). Clique em Salvar para confirmar.`);
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-10"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
@@ -166,15 +195,28 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
           <div className="flex items-center gap-2 font-medium text-sm">
             <LinkIcon className="w-4 h-4" />Regiões e links de grupos (Campo Grande)
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={() => setShowAdd(v => !v)}
-          >
-            <Plus className="w-4 h-4 mr-1" /> Nova região
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="w-full sm:w-auto"
+              onClick={autoVincular}
+              disabled={!regioes.length || !grupos.length}
+              title="Tenta casar cada região com um grupo do WhatsApp pelo nome"
+            >
+              Vincular grupos por nome
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setShowAdd(v => !v)}
+            >
+              <Plus className="w-4 h-4 mr-1" /> Nova região
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">
           Adicione regiões personalizadas. O link configurado é enviado ao líder cadastrado naquela região.
