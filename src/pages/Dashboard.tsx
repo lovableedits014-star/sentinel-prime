@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   MessageSquare, TrendingUp, TrendingDown, Minus, AlertCircle,
-  RefreshCw, Loader2, Users, Shield, Sparkles, Activity, ShieldAlert,
+  RefreshCw, Loader2, Users, Sparkles, Activity,
 } from "lucide-react";
 import { FileDown } from "lucide-react";
 import { toast } from "sonner";
@@ -21,8 +21,6 @@ import { AuditPanel } from "@/components/dashboard/AuditPanel";
 import { DataHealthAlerts } from "@/components/dashboard/DataHealthAlerts";
 import { SuggestedActions } from "@/components/dashboard/SuggestedActions";
 import { FeriadosWidget } from "@/components/dashboard/FeriadosWidget";
-import { Checkbox } from "@/components/ui/checkbox";
-import { EyeOff } from "lucide-react";
 import { exportDashboardPdf } from "@/lib/dashboard-pdf-export";
 // sync-throttle removido
 
