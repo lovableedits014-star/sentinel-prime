@@ -255,8 +255,23 @@ export function DashboardOverview({ clientId }: DashboardOverviewProps) {
         <h2 className="text-lg font-bold">Visão Executiva da Campanha</h2>
       </div>
 
-      {/* ── KPIs em 3 pilares ── */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      {/* ── KPIs em pilares ── */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
+        <Link to="/eleicao" className="contents">
+          <Card className="h-full hover:border-primary/40 transition-colors cursor-pointer">
+            <CardContent className="pt-4 pb-3 px-4">
+              <Network className="w-4 h-4 text-primary mb-1" />
+              <p className="text-2xl font-bold">{eleicaoKpis?.total ?? 0}</p>
+              <p className="text-[10px] text-muted-foreground">Estrutura Eleitoral</p>
+              {eleicaoKpis && eleicaoKpis.total > 0 && (
+                <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                  {eleicaoKpis.coordenadores} coord · {eleicaoKpis.lideres} líd · {eleicaoKpis.cabos} cabos
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
+
         <Card className="h-full">
           <CardContent className="pt-4 pb-3 px-4">
             <BookUser className="w-4 h-4 text-primary mb-1" />
