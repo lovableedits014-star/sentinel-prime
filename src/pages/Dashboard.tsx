@@ -579,6 +579,9 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Meta token expiry reminder */}
+      {clientId && <MetaTokenStatusCard clientId={clientId} />}
+
       {/* Unanalyzed alert */}
       {stats.unanalyzed > 0 && (
         <div className="flex items-center gap-3 p-3 rounded-lg border border-warning/30 bg-warning/5">
