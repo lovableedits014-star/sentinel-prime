@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import {
   Users, UserCheck, CalendarCheck, PhoneCall, Sparkles, Crown, ArrowRight,
   Flame, BookUser, ShieldCheck, AlertTriangle, TrendingUp, Briefcase, Cake, MessageCircle,
+  Network, MapPin,
 } from "lucide-react";
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent,
@@ -156,6 +157,50 @@ export function DashboardOverview({ clientId }: DashboardOverviewProps) {
     staleTime: 1000 * 60 * 5,
   });
 
+  // ─────────── Estrutura eleitoral (Coordenadores / Líderes / Cabos) ───────────
+  const { data: eleicaoKpis } = useQuery({
+    queryKey: ["overview-eleicao-kpis", clientId],
+    queryFn: async () => {
+      const [coord, lider, cabo] = await Promise.all([
+        supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "coordenador"),
+        supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "lider"),
+        supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "cabo"),
+      ]);
+      const coordenadores = coord.count || 0;
+      const lideres = lider.count || 0;
+      const cabos = cabo.count || 0;
+      return { coordenadores, lideres, cabos, total: coordenadores + lideres + cabos };
+    },
+    enabled: !!clientId,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  // ─────────── Distribuição da estrutura eleitoral por região/cidade ───────────
+  const { data: eleicaoRegioes } = useQuery({
+    queryKey: ["overview-eleicao-regioes", clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("eleicao_pessoas" as any)
+        .select("regiao, cidade, escopo")
+        .eq("client_id", clientId);
+      const buckets: Record<string, number> = {};
+      (data || []).forEach((p: any) => {
+        const key =
+          p.escopo === "campo_grande"
+            ? (p.regiao ? `CG · ${p.regiao}` : "CG · sem região")
+            : (p.cidade ? p.cidade : "Sem cidade");
+        buckets[key] = (buckets[key] || 0) + 1;
+      });
+      return Object.entries(buckets)
+        .map(([local, total]) => ({ local, total }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+    },
+    enabled: !!clientId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+
   // ─────────── Aniversariantes hoje ───────────
   const { data: aniversariantes } = useQuery({
     queryKey: ["overview-aniversariantes", clientId],
@@ -210,8 +255,23 @@ export function DashboardOverview({ clientId }: DashboardOverviewProps) {
         <h2 className="text-lg font-bold">Visão Executiva da Campanha</h2>
       </div>
 
-      {/* ── KPIs em 3 pilares ── */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      {/* ── KPIs em pilares ── */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
+        <Link to="/eleicao" className="contents">
+          <Card className="h-full hover:border-primary/40 transition-colors cursor-pointer">
+            <CardContent className="pt-4 pb-3 px-4">
+              <Network className="w-4 h-4 text-primary mb-1" />
+              <p className="text-2xl font-bold">{eleicaoKpis?.total ?? 0}</p>
+              <p className="text-[10px] text-muted-foreground">Estrutura Eleitoral</p>
+              {eleicaoKpis && eleicaoKpis.total > 0 && (
+                <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                  {eleicaoKpis.coordenadores} coord · {eleicaoKpis.lideres} líd · {eleicaoKpis.cabos} cabos
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
+
         <Card className="h-full">
           <CardContent className="pt-4 pb-3 px-4">
             <BookUser className="w-4 h-4 text-primary mb-1" />
@@ -272,7 +332,82 @@ export function DashboardOverview({ clientId }: DashboardOverviewProps) {
         </Card>
       </div>
 
+      {/* ── Estrutura da Campanha Eleitoral ── */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-primary" />
+              <CardTitle className="text-base">Estrutura da Campanha Eleitoral</CardTitle>
+            </div>
+            <Link to="/eleicao" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+              Gerenciar <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <CardDescription>Coordenadores, líderes e cabos eleitorais cadastrados na aba Eleição</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!eleicaoKpis || eleicaoKpis.total === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Crown className="w-8 h-8 mx-auto mb-2 opacity-20" />
+              <p className="text-xs">Nenhum cadastro eleitoral ainda</p>
+              <Link to="/eleicao" className="text-xs text-primary hover:underline mt-2 inline-block">
+                Começar pela aba Eleição →
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Mini-KPIs por tipo */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg border bg-card p-3">
+                  <Crown className="w-4 h-4 text-red-500 mb-1" />
+                  <p className="text-xl font-bold">{eleicaoKpis.coordenadores}</p>
+                  <p className="text-[10px] text-muted-foreground">Coordenadores</p>
+                </div>
+                <div className="rounded-lg border bg-card p-3">
+                  <Users className="w-4 h-4 text-blue-500 mb-1" />
+                  <p className="text-xl font-bold">{eleicaoKpis.lideres}</p>
+                  <p className="text-[10px] text-muted-foreground">Líderes</p>
+                </div>
+                <div className="rounded-lg border bg-card p-3">
+                  <UserCheck className="w-4 h-4 text-emerald-500 mb-1" />
+                  <p className="text-xl font-bold">{eleicaoKpis.cabos}</p>
+                  <p className="text-[10px] text-muted-foreground">Cabos eleitorais</p>
+                </div>
+              </div>
+
+              {/* Distribuição por região / cidade */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                  <p className="text-xs font-medium text-muted-foreground">Top 5 por região / cidade</p>
+                </div>
+                {!eleicaoRegioes || eleicaoRegioes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">Sem distribuição territorial</p>
+                ) : (
+                  <ChartContainer
+                    config={{ total: { label: "Cadastros", color: "hsl(var(--primary))" } }}
+                    className="h-[160px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={eleicaoRegioes} layout="vertical" margin={{ left: 80 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis type="number" allowDecimals={false} stroke="hsl(var(--muted-foreground))" fontSize={11} />
+                        <YAxis type="category" dataKey="local" stroke="hsl(var(--muted-foreground))" fontSize={11} width={75} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="total" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Gráficos ── */}
+
       <div className="grid gap-4 md:grid-cols-2">
         {/* Crescimento da base */}
         <Card>

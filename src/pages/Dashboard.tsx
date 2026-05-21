@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   MessageSquare, TrendingUp, TrendingDown, Minus, AlertCircle,
-  RefreshCw, Loader2, Users, Shield, Sparkles, Activity, ShieldAlert,
+  RefreshCw, Loader2, Users, Sparkles, Activity,
 } from "lucide-react";
 import { FileDown } from "lucide-react";
 import { toast } from "sonner";
@@ -21,8 +21,6 @@ import { AuditPanel } from "@/components/dashboard/AuditPanel";
 import { DataHealthAlerts } from "@/components/dashboard/DataHealthAlerts";
 import { SuggestedActions } from "@/components/dashboard/SuggestedActions";
 import { FeriadosWidget } from "@/components/dashboard/FeriadosWidget";
-import { Checkbox } from "@/components/ui/checkbox";
-import { EyeOff } from "lucide-react";
 import { exportDashboardPdf } from "@/lib/dashboard-pdf-export";
 // sync-throttle removido
 
@@ -73,8 +71,6 @@ const Dashboard = () => {
   const [managingComment, setManagingComment] = useState<string | null>(null);
   const [reactingComment, setReactingComment] = useState<string | null>(null);
   const [classifyingComment, setClassifyingComment] = useState<string | null>(null);
-  const [selectedCrisis, setSelectedCrisis] = useState<Set<string>>(new Set());
-  const [bulkHiding, setBulkHiding] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const queryClient = useQueryClient();
 
@@ -329,48 +325,6 @@ const Dashboard = () => {
     }
   };
 
-  // Bulk hide selected negative comments
-  const handleBulkHide = async () => {
-    if (selectedCrisis.size === 0 || bulkHiding) return;
-    setBulkHiding(true);
-    const ids = Array.from(selectedCrisis);
-    let success = 0;
-    let failed = 0;
-    try {
-      for (const id of ids) {
-        try {
-          const { data, error } = await supabase.functions.invoke('manage-comment', {
-            body: { commentId: id, clientId, action: 'hide' }
-          });
-          if (error || !data?.success) failed++;
-          else success++;
-        } catch {
-          failed++;
-        }
-      }
-      if (success > 0) toast.success(`${success} comentário(s) ocultado(s)`);
-      if (failed > 0) toast.error(`${failed} falha(s) ao ocultar`);
-      setSelectedCrisis(new Set());
-      reloadData();
-    } finally {
-      setBulkHiding(false);
-    }
-  };
-
-  const toggleCrisisSelection = (id: string) => {
-    setSelectedCrisis(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAllCrisis = (allIds: string[]) => {
-    setSelectedCrisis(prev => {
-      if (prev.size === allIds.length) return new Set();
-      return new Set(allIds);
-    });
-  };
 
   const handleExportPdf = async () => {
     if (exportingPdf) return;
@@ -412,6 +366,20 @@ const Dashboard = () => {
         }
       }
 
+      // Estrutura eleitoral (aba Eleição) — coordenadores / líderes / cabos
+      let eleicaoSummary: { coord: number; lider: number; cabo: number; total: number } | null = null;
+      if (clientId) {
+        const [coordR, liderR, caboR] = await Promise.all([
+          supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "coordenador"),
+          supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "lider"),
+          supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "cabo"),
+        ]);
+        const coord = coordR.count || 0;
+        const lider = liderR.count || 0;
+        const cabo = caboR.count || 0;
+        eleicaoSummary = { coord, lider, cabo, total: coord + lider + cabo };
+      }
+
       // Construir insights a partir dos dados em tela
       const highlights: string[] = [];
       if (stats.total > 0) {
@@ -434,9 +402,9 @@ const Dashboard = () => {
           `${stats.pendingCount} comentários pendentes de resposta (${stats.respondedCount} já respondidos).`,
         );
       }
-      if (negativeComments.length > 0) {
+      if (stats.negative > 0) {
         highlights.push(
-          `${negativeComments.length} comentários negativos pendentes em gestão de crise — priorize a resposta.`,
+          `${stats.negative} comentários negativos no período — acompanhe na aba Comentários.`,
         );
       }
       if (platformStats.facebook + platformStats.instagram > 0) {
@@ -447,6 +415,11 @@ const Dashboard = () => {
       if (iedData) {
         highlights.push(
           `IED atual: ${iedData.score}/100 (sentimento ${iedData.sentiment} · crescimento ${iedData.growth} · engajamento ${iedData.engagement} · check-ins ${iedData.checkin}).`,
+        );
+      }
+      if (eleicaoSummary && eleicaoSummary.total > 0) {
+        highlights.push(
+          `Estrutura eleitoral: ${eleicaoSummary.coord} coordenador(es), ${eleicaoSummary.lider} líder(es) e ${eleicaoSummary.cabo} cabo(s) eleitoral(is).`,
         );
       }
 
@@ -495,13 +468,6 @@ const Dashboard = () => {
     return { total, positive, neutral, negative, unanalyzed, posPercent, negPercent, neuPercent, respondedCount, pendingCount };
   }, [filteredComments]);
 
-  // Negative comments for crisis section
-  const negativeComments = useMemo(() => {
-    return filteredComments
-      .filter(c => c.sentiment === "negative" && c.status !== "responded")
-      .sort((a, b) => (b.comment_created_time || b.created_at || '').localeCompare(a.comment_created_time || a.created_at || ''))
-      .slice(0, 20);
-  }, [filteredComments]);
 
   // Timeline data
   const timelineData: TimelineData[] = useMemo(() => {
@@ -784,99 +750,6 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Crisis Management Section */}
-      <Card className="border-destructive/30">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-destructive" />
-              <CardTitle className="text-base">Gestão de Crise</CardTitle>
-            </div>
-            <Badge variant="destructive" className="text-xs">
-              {negativeComments.length} negativos pendentes
-            </Badge>
-          </div>
-          <CardDescription>
-            Comentários negativos que precisam de atenção — responda, reclassifique o sentimento ou selecione vários para ocultar de uma vez
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {negativeComments.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Shield className="w-10 h-10 mx-auto mb-3 opacity-20" />
-              <p className="text-sm font-medium">Nenhum comentário negativo pendente!</p>
-              <p className="text-xs mt-1">Sua reputação está protegida.</p>
-            </div>
-          ) : (
-            <>
-              {/* Bulk action bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2.5 rounded-lg bg-muted/40 border border-border">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={selectedCrisis.size === negativeComments.length && negativeComments.length > 0}
-                    onCheckedChange={() => toggleAllCrisis(negativeComments.map(c => c.id))}
-                    aria-label="Selecionar todos"
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {selectedCrisis.size > 0
-                      ? `${selectedCrisis.size} selecionado(s)`
-                      : 'Selecionar todos'}
-                  </span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={handleBulkHide}
-                  disabled={selectedCrisis.size === 0 || bulkHiding}
-                >
-                  {bulkHiding ? (
-                    <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Ocultando...</>
-                  ) : (
-                    <><EyeOff className="w-3.5 h-3.5 mr-1.5" />Ocultar selecionados</>
-                  )}
-                </Button>
-              </div>
-
-              <div className="divide-y divide-border rounded-lg border overflow-hidden">
-                {negativeComments.map((comment) => (
-                  <div key={comment.id} className="flex items-start gap-2 bg-background">
-                    <div className="pt-4 pl-3">
-                      <Checkbox
-                        checked={selectedCrisis.has(comment.id)}
-                        onCheckedChange={() => toggleCrisisSelection(comment.id)}
-                        aria-label="Selecionar comentário"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <CommentItem
-                        comment={comment as CommentData}
-                        onGenerateResponse={handleGenerateResponse}
-                        onSendResponse={handleSendResponse}
-                        onManageComment={handleManageComment}
-                        onReactToComment={handleReactToComment}
-                        onClassifySentiment={handleClassifySentiment}
-                        isGenerating={generatingResponse === comment.id}
-                        isResponding={responding === comment.id}
-                        isManaging={managingComment === comment.id}
-                        isReacting={reactingComment === comment.id}
-                        isClassifying={classifyingComment === comment.id}
-                        showPostInfo={true}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {stats.negative > negativeComments.length && (
-            <p className="text-xs text-muted-foreground mt-3 text-center">
-              Mostrando os {negativeComments.length} mais recentes de {stats.negative} negativos no período.
-              Acesse Comentários para ver todos.
-            </p>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Re-analyze all button */}
       <div className="flex justify-center">
