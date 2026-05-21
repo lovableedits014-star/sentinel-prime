@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import {
   Users, UserCheck, CalendarCheck, PhoneCall, Sparkles, Crown, ArrowRight,
   Flame, BookUser, ShieldCheck, AlertTriangle, TrendingUp, Briefcase, Cake, MessageCircle,
+  Network, MapPin,
 } from "lucide-react";
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent,
