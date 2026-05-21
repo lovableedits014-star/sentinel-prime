@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   MessageSquare, Search, TrendingUp, TrendingDown,
   Instagram, Facebook, RefreshCw, LayoutGrid, List,
-  EyeOff, Eye, Sparkles, SkipForward,
+  EyeOff, Eye, Sparkles, SkipForward, Flame,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PostCard } from "@/components/PostCard";
@@ -268,7 +268,7 @@ const Comments = () => {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
-    enabled: activeTab === "recent",
+    enabled: activeTab === "recent" || activeTab === "negative",
   });
 
   const recentCommentsIndependent = recentCommentsData ?? [];
@@ -678,6 +678,26 @@ const Comments = () => {
     return { topLevel, repliesByParent, totalCount, pendingTopLevel, respondedCount, ignoredCount };
   }, [recentComments, hideResponded, showIgnored]);
 
+  // Negative comments view (sentiment = 'negative', top-level only, latest first)
+  const negativeCommentsList = useMemo(() => {
+    const negs = recentCommentsIndependent.filter(c =>
+      !c.is_page_owner &&
+      c.sentiment === 'negative' &&
+      !c.parent_comment_id &&
+      c.text !== '__post_stub__'
+    );
+    const filtered = negs.filter(c => {
+      const matchesSearch = !searchTerm ||
+        c.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.author_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPlatform = platformFilter === "all" || c.platform === platformFilter;
+      return matchesSearch && matchesPlatform;
+    });
+    return filtered.sort((a, b) =>
+      (b.comment_created_time || b.created_at || '').localeCompare(a.comment_created_time || a.created_at || '')
+    );
+  }, [recentCommentsIndependent, searchTerm, platformFilter]);
+
   const postGroups = useMemo((): PostGroup[] => {
     const groups = new Map<string, PostGroup>();
     // Track the post publication date per post (from stub: comment_created_time = post created_time)
@@ -882,6 +902,10 @@ const Comments = () => {
                   {reviewQueue.length}
                 </Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="negative" className="gap-1.5">
+              <Flame className="w-4 h-4 text-destructive" />
+              <span>Negativos</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1149,6 +1173,62 @@ const Comments = () => {
           ) : (
             <div className="space-y-0 bg-card rounded-xl border shadow-sm overflow-hidden divide-y">
               {filteredReviewQueue.map((comment) => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  authorStats={authorStats}
+                  registeredSupporters={registeredSupportersMap}
+                  militants={militantsMap}
+                  onOpenAuthorHistory={openAuthorHistory}
+                  onGenerateResponse={handleGenerateResponse}
+                  onSendResponse={handleSendResponse}
+                  onManageComment={handleManageComment}
+                  onReactToComment={handleReactToComment}
+                  onClassifySentiment={handleClassifySentiment}
+                  onIgnoreComment={handleIgnoreComment}
+                  onUnignoreComment={handleUnignoreComment}
+                  isGenerating={generatingResponse === comment.id}
+                  isResponding={responding === comment.id}
+                  isManaging={managingComment === comment.id}
+                  isReacting={reactingComment === comment.id}
+                  isClassifying={classifyingSentiment === comment.id}
+                  showPostInfo
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Tab: Negativos */}
+        <TabsContent value="negative">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <Flame className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-destructive mb-1">Comentários negativos</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  Todos os comentários classificados como negativos pela IA ou manualmente. Use os filtros acima para refinar por plataforma ou autor. Responda, oculte ou bloqueie o autor diretamente.
+                </p>
+              </div>
+            </div>
+          </div>
+          {loadingRecent ? (
+            <div className="animate-pulse space-y-4">
+              {[1, 2, 3].map(i => <div key={i} className="h-20 bg-muted rounded-xl"></div>)}
+            </div>
+          ) : negativeCommentsList.length === 0 ? (
+            <Card>
+              <CardContent className="py-16">
+                <div className="text-center text-muted-foreground">
+                  <Flame className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  <p className="font-medium">Nenhum comentário negativo 🎉</p>
+                  <p className="text-sm mt-1">Sua audiência está engajada de forma positiva.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-0 bg-card rounded-xl border shadow-sm overflow-hidden divide-y">
+              {negativeCommentsList.map((comment) => (
                 <CommentItem
                   key={comment.id}
                   comment={comment}
