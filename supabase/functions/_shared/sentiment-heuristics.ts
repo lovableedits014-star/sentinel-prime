@@ -41,6 +41,18 @@ function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
 
+const DENUNCIATION_HINTS = [
+  'defesa de', 'fiz a defesa', 'em defesa', 'luta contra', 'lutar por',
+  'nao podemos aceitar', 'absurdo que', 'denuncio', 'denunciei', 'denuncia',
+  'querem fechar', 'querem tirar', 'querem acabar', 'retiram', 'retirar',
+  'descaso', 'abandono', 'cade', 'inadmissivel',
+];
+
+function isPostDenunciation(postMessage?: string | null): boolean {
+  const norm = normalize(postMessage);
+  return DENUNCIATION_HINTS.some(h => norm.includes(h));
+}
+
 export function inferHeuristicSentiment(text: string, postMessage?: string | null): SentimentLabel | null {
   const normalizedText = normalize(text);
   const normalizedPost = normalize(postMessage);
@@ -49,7 +61,13 @@ export function inferHeuristicSentiment(text: string, postMessage?: string | nul
   if (TAG_ONLY_PATTERN.test(normalizedText)) return 'neutral';
 
   const hasDirectNegative = matchesAny(normalizedText, DIRECT_NEGATIVE_PATTERNS) || matchesAny(text, DIRECT_NEGATIVE_PATTERNS);
-  if (hasDirectNegative) return 'negative';
+  if (hasDirectNegative) {
+    // Se o POST é uma denúncia do próprio candidato, palavras de indignação
+    // no comentário provavelmente reforçam a denúncia ao invés de atacar o candidato.
+    // Não retornamos 'positive' (cautela) — apenas deixamos a IA decidir.
+    if (isPostDenunciation(postMessage)) return null;
+    return 'negative';
+  }
 
   const isPracticalQuestion = matchesAny(normalizedText, PRACTICAL_QUESTION_PATTERNS) && matchesAny(normalizedPost, EVENT_POST_PATTERNS);
   if (isPracticalQuestion) return 'neutral';
