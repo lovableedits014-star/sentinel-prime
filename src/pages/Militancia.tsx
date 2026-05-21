@@ -121,6 +121,134 @@ function MilitantList({
   );
 }
 
+function NegativeRanking({
+  militants, clientId, onOpen,
+}: {
+  militants: MilitantRow[];
+  clientId: string | null | undefined;
+  onOpen: (m: MilitantRow) => void;
+}) {
+  const [blocking, setBlocking] = useState<string | null>(null);
+
+  const ranking = useMemo(() => {
+    return [...militants]
+      .filter(m => (m.total_negative || 0) > 0)
+      .sort((a, b) => (b.total_negative || 0) - (a.total_negative || 0))
+      .slice(0, 200);
+  }, [militants]);
+
+  const handleBlock = async (m: MilitantRow) => {
+    if (!clientId) return;
+    if (m.platform === 'instagram') {
+      toast.error("O Instagram não permite bloqueio via API. Bloqueie pelo app do Instagram.");
+      return;
+    }
+    if (!confirm(`Bloquear ${m.author_name || "este autor"} da página? Esta ação remove a capacidade de comentar.`)) return;
+    setBlocking(m.id);
+    try {
+      // Find the most recent negative comment from this author to drive the block call
+      const { data: c, error: cErr } = await (supabase as any)
+        .from("comments")
+        .select("id")
+        .eq("client_id", clientId)
+        .eq("platform", m.platform)
+        .eq("platform_user_id", m.platform_user_id)
+        .order("comment_created_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cErr) throw cErr;
+      if (!c?.id) {
+        toast.error("Nenhum comentário deste autor encontrado para vincular o bloqueio.");
+        return;
+      }
+      const { data, error } = await supabase.functions.invoke('manage-comment', {
+        body: { commentId: c.id, clientId, action: 'block_user' },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(data.message || "Autor bloqueado!");
+      } else {
+        toast.error(data?.error || "Falha ao bloquear");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao bloquear autor");
+    } finally {
+      setBlocking(null);
+    }
+  };
+
+  if (ranking.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-16">
+          <div className="text-center text-muted-foreground">
+            <Flame className="w-12 h-12 mx-auto mb-4 opacity-20" />
+            <p className="font-medium">Nenhum hater identificado 🎉</p>
+            <p className="text-sm mt-1">Quando alguém deixar comentários negativos, aparece aqui.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="bg-card rounded-xl border shadow-sm divide-y overflow-hidden">
+      {ranking.map((m, idx) => {
+        const url = getSocialProfileUrl(m.platform, m.platform_user_id, null, m.author_name);
+        return (
+          <div key={m.id} className="px-3 py-3 flex items-center gap-3 hover:bg-muted/50">
+            <div className="w-6 text-center text-sm font-bold text-muted-foreground shrink-0">
+              {idx + 1}
+            </div>
+            <button onClick={() => onOpen(m)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+              <Avatar className="h-10 w-10 shrink-0">
+                {m.avatar_url && <AvatarImage src={m.avatar_url} alt={m.author_name || ""} />}
+                <AvatarFallback className={m.platform === 'instagram' ? 'bg-gradient-to-br from-pink-500 to-purple-600 text-white text-xs' : 'bg-primary/10 text-primary text-xs'}>
+                  {m.author_name?.charAt(0).toUpperCase() || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium truncate">{m.author_name || "Autor desconhecido"}</span>
+                  <MilitantBadge militant={m} />
+                  {m.platform === 'facebook'
+                    ? <Facebook className="w-3.5 h-3.5 text-blue-600" />
+                    : <Instagram className="w-3.5 h-3.5 text-pink-500" />}
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+                  <span className="inline-flex items-center gap-1 text-destructive font-semibold">
+                    <TrendingDown className="w-3 h-3" />{m.total_negative} negativos
+                  </span>
+                  <span className="inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{m.total_comments} total</span>
+                  <span className="inline-flex items-center gap-1 text-green-600"><TrendingUp className="w-3 h-3" />{m.total_positive}</span>
+                </div>
+              </div>
+            </button>
+            {url && (
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                title="Abrir perfil">
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={blocking === m.id}
+              onClick={() => handleBlock(m)}
+              className="shrink-0 h-8 gap-1.5"
+              title={m.platform === 'instagram' ? 'Instagram não permite bloqueio via API' : 'Bloquear autor da página'}
+            >
+              {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">Bloquear</span>
+            </Button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const Militancia = () => {
   const [search, setSearch] = useState("");
   const [badgeFilter, setBadgeFilter] = useState<string>("all");
