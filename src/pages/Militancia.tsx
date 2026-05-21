@@ -815,6 +815,10 @@ const Militancia = () => {
           <NegativeRanking militants={militants} clientId={clientId} onOpen={setDrawer} />
         </TabsContent>
 
+        <TabsContent value="blocked" className="space-y-4 mt-4">
+          {clientId && <BlockedUsersTab clientId={clientId} />}
+        </TabsContent>
+
         <TabsContent value="report" className="mt-4">
           <MilitanciaReport militants={militants} />
         </TabsContent>
