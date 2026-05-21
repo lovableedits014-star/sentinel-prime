@@ -27,6 +27,7 @@ interface Cfg {
   template_coordenador: string;
   template_lider: string;
   template_coordenador_boas_vindas: string;
+  template_cabo_boas_vindas: string;
   grupos_links: Record<string, string>;
 }
 
