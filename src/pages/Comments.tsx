@@ -268,7 +268,7 @@ const Comments = () => {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
-    enabled: activeTab === "recent",
+    enabled: activeTab === "recent" || activeTab === "negative",
   });
 
   const recentCommentsIndependent = recentCommentsData ?? [];
