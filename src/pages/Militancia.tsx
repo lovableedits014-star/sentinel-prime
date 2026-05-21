@@ -227,6 +227,7 @@ function NegativeRanking({
             post_message: comment.post_message,
             ai_sentiment: comment.sentiment,
             human_sentiment: newSentiment,
+            ai_reason: comment.sentiment_reason ?? null,
           })
           .then(({ error: insErr }: any) => {
             if (insErr) console.warn("[sentiment_corrections] insert error:", insErr.message);
