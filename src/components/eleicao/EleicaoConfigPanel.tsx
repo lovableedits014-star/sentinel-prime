@@ -130,6 +130,35 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     } catch { /* toast já exibido */ }
   }
 
+  function normalize(s: string) {
+    return (s || "")
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  function autoVincular() {
+    if (!grupos.length) { toast.error("Nenhum grupo sincronizado. Vá em Configurações → WhatsApp e sincronize."); return; }
+    const next: Record<string, string> = { ...cfg.grupos_jids };
+    let vinculados = 0;
+    for (const r of regioes) {
+      if (next[r.value]) continue;
+      const nr = normalize(r.label);
+      const tokens = nr.split(" ").filter(Boolean);
+      const hit = grupos.find(g => {
+        const ng = normalize(g.name || "");
+        if (!ng) return false;
+        if (ng.includes(nr) || nr.includes(ng)) return true;
+        return tokens.some(t => t.length >= 4 && ng.includes(t));
+      });
+      if (hit) { next[r.value] = hit.group_jid; vinculados++; }
+    }
+    setCfg(c => ({ ...c, grupos_jids: next }));
+    if (vinculados === 0) toast.info("Nenhuma região casou com algum grupo pelo nome. Vincule manualmente.");
+    else toast.success(`${vinculados} região(ões) vinculada(s). Clique em Salvar para confirmar.`);
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-10"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
