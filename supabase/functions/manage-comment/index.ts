@@ -184,7 +184,10 @@ Deno.serve(async (req) => {
       }
 
       case 'block_user': {
-        const userId = comment.author_id || comment.platform_user_id;
+        // Facebook Page blocking requires the Page-scoped ID (PSID).
+        // In our comments table this is stored as platform_user_id; author_id can be
+        // a different/global author identifier and causes Meta (#100) Invalid parameter.
+        const userId = comment.platform_user_id || comment.author_id;
         if (!userId) {
           return new Response(JSON.stringify({ success: false, error: 'ID do usuário não disponível' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -230,7 +233,7 @@ Deno.serve(async (req) => {
           await supabaseClient.from('blocked_users').upsert({
             client_id: clientId,
             platform: comment.platform,
-            platform_user_id: userId,
+            platform_user_id: comment.platform_user_id || userId,
             author_name: comment.author_name,
             avatar_url: comment.author_profile_picture,
             blocked_by: user.id,
