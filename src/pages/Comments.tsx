@@ -678,6 +678,26 @@ const Comments = () => {
     return { topLevel, repliesByParent, totalCount, pendingTopLevel, respondedCount, ignoredCount };
   }, [recentComments, hideResponded, showIgnored]);
 
+  // Negative comments view (sentiment = 'negative', top-level only, latest first)
+  const negativeCommentsList = useMemo(() => {
+    const negs = recentCommentsIndependent.filter(c =>
+      !c.is_page_owner &&
+      c.sentiment === 'negative' &&
+      !c.parent_comment_id &&
+      c.text !== '__post_stub__'
+    );
+    const filtered = negs.filter(c => {
+      const matchesSearch = !searchTerm ||
+        c.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.author_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPlatform = platformFilter === "all" || c.platform === platformFilter;
+      return matchesSearch && matchesPlatform;
+    });
+    return filtered.sort((a, b) =>
+      (b.comment_created_time || b.created_at || '').localeCompare(a.comment_created_time || a.created_at || '')
+    );
+  }, [recentCommentsIndependent, searchTerm, platformFilter]);
+
   const postGroups = useMemo((): PostGroup[] => {
     const groups = new Map<string, PostGroup>();
     // Track the post publication date per post (from stub: comment_created_time = post created_time)
