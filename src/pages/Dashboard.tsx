@@ -71,8 +71,6 @@ const Dashboard = () => {
   const [managingComment, setManagingComment] = useState<string | null>(null);
   const [reactingComment, setReactingComment] = useState<string | null>(null);
   const [classifyingComment, setClassifyingComment] = useState<string | null>(null);
-  const [selectedCrisis, setSelectedCrisis] = useState<Set<string>>(new Set());
-  const [bulkHiding, setBulkHiding] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const queryClient = useQueryClient();
 
