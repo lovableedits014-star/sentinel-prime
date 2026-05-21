@@ -1198,6 +1198,62 @@ const Comments = () => {
             </div>
           )}
         </TabsContent>
+
+        {/* Tab: Negativos */}
+        <TabsContent value="negative">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <Flame className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-destructive mb-1">Comentários negativos</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  Todos os comentários classificados como negativos pela IA ou manualmente. Use os filtros acima para refinar por plataforma ou autor. Responda, oculte ou bloqueie o autor diretamente.
+                </p>
+              </div>
+            </div>
+          </div>
+          {loadingRecent ? (
+            <div className="animate-pulse space-y-4">
+              {[1, 2, 3].map(i => <div key={i} className="h-20 bg-muted rounded-xl"></div>)}
+            </div>
+          ) : negativeCommentsList.length === 0 ? (
+            <Card>
+              <CardContent className="py-16">
+                <div className="text-center text-muted-foreground">
+                  <Flame className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  <p className="font-medium">Nenhum comentário negativo 🎉</p>
+                  <p className="text-sm mt-1">Sua audiência está engajada de forma positiva.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-0 bg-card rounded-xl border shadow-sm overflow-hidden divide-y">
+              {negativeCommentsList.map((comment) => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  authorStats={authorStats}
+                  registeredSupporters={registeredSupportersMap}
+                  militants={militantsMap}
+                  onOpenAuthorHistory={openAuthorHistory}
+                  onGenerateResponse={handleGenerateResponse}
+                  onSendResponse={handleSendResponse}
+                  onManageComment={handleManageComment}
+                  onReactToComment={handleReactToComment}
+                  onClassifySentiment={handleClassifySentiment}
+                  onIgnoreComment={handleIgnoreComment}
+                  onUnignoreComment={handleUnignoreComment}
+                  isGenerating={generatingResponse === comment.id}
+                  isResponding={responding === comment.id}
+                  isManaging={managingComment === comment.id}
+                  isReacting={reactingComment === comment.id}
+                  isClassifying={classifyingSentiment === comment.id}
+                  showPostInfo
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       {authorDrawer && (
