@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
-import { ShieldCheck, ShieldAlert, ShieldX, Clock, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShieldCheck, ShieldAlert, ShieldX, Clock } from "lucide-react";
 
 interface Props {
   clientId: string;
@@ -86,20 +84,12 @@ export function MetaTokenStatusCard({ clientId }: Props) {
   }[variant];
 
   return (
-    <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border ${styles}`}>
-      <div className="flex items-start gap-3">
-        <Icon className="w-5 h-5 shrink-0 mt-0.5" />
-        <div className="text-sm">
-          <p className="font-semibold">{title}</p>
-          <p className="opacity-90">{description}</p>
-        </div>
+    <div className={`flex items-start gap-3 p-3 rounded-lg border ${styles}`}>
+      <Icon className="w-5 h-5 shrink-0 mt-0.5" />
+      <div className="text-sm">
+        <p className="font-semibold">{title}</p>
+        <p className="opacity-90">{description}</p>
       </div>
-      <Button asChild size="sm" variant={variant === "success" ? "outline" : "default"} className="shrink-0">
-        <Link to="/integrations">
-          <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-          Renovar token
-        </Link>
-      </Button>
     </div>
   );
 }
