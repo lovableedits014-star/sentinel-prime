@@ -322,7 +322,7 @@ Deno.serve(async (req) => {
     const pessoa_id = body?.pessoa_id;
     const target = (body?.target as string | undefined)?.toLowerCase();
     if (!pessoa_id) throw new Error("pessoa_id obrigatório");
-    if (target && !["coordenador", "secretaria", "lider", "coordenador_boas_vindas"].includes(target)) {
+    if (target && !["coordenador", "secretaria", "lider", "coordenador_boas_vindas", "cabo_boas_vindas"].includes(target)) {
       throw new Error("target inválido");
     }
 
@@ -345,9 +345,14 @@ Deno.serve(async (req) => {
     if (!pessoa) throw new Error("Pessoa não encontrada");
 
     const isWelcomeCoord = target === "coordenador_boas_vindas";
+    const isWelcomeCabo = target === "cabo_boas_vindas";
     if (isWelcomeCoord) {
       if (pessoa.tipo !== "coordenador") {
         return new Response(JSON.stringify({ success: true, skipped: "Não é coordenador" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      }
+    } else if (isWelcomeCabo) {
+      if (pessoa.tipo !== "cabo") {
+        return new Response(JSON.stringify({ success: true, skipped: "Não é cabo eleitoral" }), { headers: { ...cors, "Content-Type": "application/json" } });
       }
     } else if (pessoa.tipo !== "lider") {
       return new Response(JSON.stringify({ success: true, skipped: "Não é líder" }), { headers: { ...cors, "Content-Type": "application/json" } });
