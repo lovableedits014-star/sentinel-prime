@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
             platform: comment.platform,
             platform_user_id: userId,
             author_name: comment.author_name,
-            avatar_url: comment.avatar_url,
+            avatar_url: comment.author_profile_picture,
             blocked_by: user.id,
             reason: isInstagram ? 'instagram_manual' : 'facebook_api',
           }, { onConflict: 'client_id,platform,platform_user_id' });
