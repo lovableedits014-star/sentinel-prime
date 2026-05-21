@@ -430,7 +430,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "pendentes" | "custos" | "config">("cadastros");
+  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
