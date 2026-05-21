@@ -11,8 +11,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Search, Facebook, Instagram, TrendingUp, TrendingDown,
   Users, Calendar, Loader2, MessageSquare, Eye, BarChart3, FileText, ExternalLink,
-  Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus,
+  Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus, ShieldOff, Unlock,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { BADGE_META, getBadgeMeta } from "@/lib/militant-badges";
 import { MilitantBadge } from "@/components/comments/MilitantBadge";
