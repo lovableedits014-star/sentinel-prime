@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   MessageSquare, Search, TrendingUp, TrendingDown,
   Instagram, Facebook, RefreshCw, LayoutGrid, List,
-  EyeOff, Eye, Sparkles, SkipForward,
+  EyeOff, Eye, Sparkles, SkipForward, Flame,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PostCard } from "@/components/PostCard";
