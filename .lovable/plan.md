@@ -1,52 +1,31 @@
-## Objetivo
+## Card de validade do token Meta no Dashboard
 
-Trazer para a aba **Bloqueados** todos os perfis que já foram bloqueados na página do Facebook — inclusive os que foram bloqueados manualmente pelo gestor antes do sistema existir.
+Adicionar um aviso visível no topo do Dashboard que mostra quantos dias faltam para o token da Meta expirar, com cores conforme a urgência e um botão para renovar.
 
-## Como funciona
+### Estados visuais
 
-O Facebook expõe o endpoint `GET /{page-id}/blocked` que lista todos os perfis bloqueados da página. Vamos consumir esse endpoint, paginar até o fim e inserir/atualizar cada registro na tabela `blocked_users`.
+- **Verde** (>30 dias): "Token Meta válido — X dias restantes"
+- **Amarelo** (8–30 dias): "Token Meta expira em X dias — renove em breve"
+- **Vermelho** (≤7 dias): "Token Meta expira em X dias — renove agora"
+- **Vermelho** (vencido): "Token Meta vencido há X dias"
+- **Cinza** (sem data salva): "Validade do token Meta desconhecida — reconecte para registrar a data"
 
-Para Instagram não há API equivalente, então essa sincronização cobre apenas Facebook (o Instagram continua sendo registro manual).
+Todos os estados incluem botão "Renovar token" que leva para `/integrations`.
 
-## O que será feito
+O card só aparece se o cliente tiver integração Meta configurada (`meta_page_id` preenchido).
 
-1. **Nova edge function `sync-blocked-users`**
-   - Recebe `clientId`.
-   - Busca o token da página em `integrations`.
-   - Chama `GET /{page-id}/blocked?fields=id,name,picture&limit=100` e segue a paginação (`paging.next`) até trazer todos.
-   - Faz `upsert` na tabela `blocked_users` (chave `client_id + platform + platform_user_id`), com `platform = 'facebook'` e `reason = 'facebook_synced'`.
-   - Detecta bloqueios que existem localmente mas sumiram do Facebook (foram desbloqueados fora do sistema) e remove esses registros locais — para a lista refletir a realidade.
-   - Retorna `{ added, updated, removed, total }`.
+### Arquivos
 
-2. **Botão "Sincronizar do Facebook" na aba Bloqueados**
-   - Posicionado ao lado do campo de busca.
-   - Mostra spinner enquanto roda.
-   - Ao concluir, exibe toast (`X bloqueados sincronizados, Y removidos`) e invalida a query da lista.
+1. **Novo:** `src/components/dashboard/MetaTokenStatusCard.tsx`
+   - Recebe `clientId` como prop
+   - Busca `meta_page_id`, `meta_token_expires_at`, `meta_token_type` da tabela `integrations`
+   - Calcula dias restantes e escolhe variante (success/warning/destructive/muted)
+   - Usa tokens semânticos do `src/styles.css` (`success`, `warning`, `destructive`)
 
-3. **Sincronização automática na primeira abertura**
-   - Quando o usuário entra na aba Bloqueados pela primeira vez na sessão e a tabela está vazia (ou tem só registros do Instagram), dispara a sync automaticamente uma vez — para a aba já vir populada sem o usuário precisar clicar.
+2. **Editar:** `src/pages/Dashboard.tsx`
+   - Importar `MetaTokenStatusCard`
+   - Renderizar logo antes do alerta de "comentários sem análise" (linha ~581), passando `clientId`
 
-## Pontos de atenção
+### Sem mudanças no banco
 
-- **Permissões Meta**: o endpoint `/blocked` exige `pages_manage_engagement` (que a integração já usa para bloquear). Se faltar permissão, a função retorna erro claro: *"Reconecte a página com a permissão pages_manage_engagement"*.
-- **Avatar**: o campo `picture` do Graph API retorna o avatar do bloqueado — vamos guardar em `avatar_url`.
-- **Não duplica**: o `upsert` garante que rodar a sync várias vezes é seguro.
-- **Não afeta Instagram**: registros manuais de IG na tabela permanecem intactos.
-
-## Detalhes técnicos
-
-```text
-sync-blocked-users (edge function)
- ├─ valida auth + acesso ao cliente
- ├─ pega meta_access_token + meta_page_id
- ├─ deriva page access token
- ├─ loop paginado em /{page_id}/blocked?fields=id,name,picture
- ├─ upsert em blocked_users
- ├─ delete registros FB locais ausentes na resposta
- └─ retorna contagens
-```
-
-Frontend (`BlockedUsersTab` em `src/pages/Militancia.tsx`):
-- nova mutation `useMutation` chamando `supabase.functions.invoke('sync-blocked-users')`
-- botão `<Button variant="outline">` com ícone `RefreshCw`
-- efeito `useEffect` que dispara a sync uma vez quando a tab monta e ainda não foi sincronizada
+A coluna `integrations.meta_token_expires_at` já existe e é populada pelo fluxo de conexão Meta. Integrações antigas que nunca tiveram o campo preenchido mostrarão o estado cinza até a próxima reconexão (comportamento intencional).
