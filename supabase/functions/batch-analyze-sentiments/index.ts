@@ -3,6 +3,15 @@ import { z } from 'npm:zod@3.23.8';
 import { getClientLLMConfig, callLLM, type LLMMessage } from '../_shared/llm-router.ts';
 import { getCorrelationId, getRequestId, type TelemetryContext } from '../_shared/telemetry.ts';
 import { applyHeuristicGuard } from '../_shared/sentiment-heuristics.ts';
+import {
+  buildMessages as buildCotMessages,
+  parseAnalysisResponse,
+  softenNegativeOnDenunciation,
+  isDenunciationPost,
+  type Sentiment,
+  type CandidateCtx,
+} from '../_shared/sentiment-prompts.ts';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
