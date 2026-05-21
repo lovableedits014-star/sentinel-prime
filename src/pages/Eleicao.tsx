@@ -19,6 +19,7 @@ import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
+import EntradaGrupoPanel from "@/components/eleicao/EntradaGrupoPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package } from "lucide-react";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
@@ -429,7 +430,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "pendentes" | "custos" | "config">("cadastros");
+  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
@@ -505,7 +506,7 @@ export default function Eleicao() {
       </div>
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -515,6 +516,7 @@ export default function Eleicao() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
@@ -524,6 +526,8 @@ export default function Eleicao() {
         <PrevisaoCustos pessoas={pessoas as any} />
       ) : view === "pendentes" ? (
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
+      ) : view === "grupo" ? (
+        clientId ? <EntradaGrupoPanel clientId={clientId} /> : null
       ) : view === "config" ? (
         clientId ? <EleicaoConfigPanel clientId={clientId} /> : null
       ) : (

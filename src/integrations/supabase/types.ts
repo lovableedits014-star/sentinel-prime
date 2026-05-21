@@ -1641,6 +1641,7 @@ export type Database = {
           auto_enviar: boolean
           client_id: string
           created_at: string
+          grupos_jids: Json
           grupos_links: Json
           id: string
           secretaria_telefone: string | null
@@ -1654,6 +1655,7 @@ export type Database = {
           auto_enviar?: boolean
           client_id: string
           created_at?: string
+          grupos_jids?: Json
           grupos_links?: Json
           id?: string
           secretaria_telefone?: string | null
@@ -1667,6 +1669,7 @@ export type Database = {
           auto_enviar?: boolean
           client_id?: string
           created_at?: string
+          grupos_jids?: Json
           grupos_links?: Json
           id?: string
           secretaria_telefone?: string | null
@@ -1747,6 +1750,44 @@ export type Database = {
             foreignKeyName: "eleicao_notif_log_pessoa_id_fkey"
             columns: ["pessoa_id"]
             isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eleicao_pessoa_grupo_status: {
+        Row: {
+          client_id: string
+          entrou_visto_em: string | null
+          group_jid: string | null
+          pessoa_id: string
+          saiu_visto_em: string | null
+          status: string
+          verificado_em: string
+        }
+        Insert: {
+          client_id: string
+          entrou_visto_em?: string | null
+          group_jid?: string | null
+          pessoa_id: string
+          saiu_visto_em?: string | null
+          status: string
+          verificado_em?: string
+        }
+        Update: {
+          client_id?: string
+          entrou_visto_em?: string | null
+          group_jid?: string | null
+          pessoa_id?: string
+          saiu_visto_em?: string | null
+          status?: string
+          verificado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_pessoa_grupo_status_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: true
             referencedRelation: "eleicao_pessoas"
             referencedColumns: ["id"]
           },
@@ -6528,6 +6569,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_group_participants: {
+        Row: {
+          client_id: string
+          first_seen_at: string
+          group_jid: string
+          id: string
+          instance_id: string
+          is_admin: boolean
+          is_lid_only: boolean
+          last_seen_at: string
+          left_seen_at: string | null
+          phone_e164: string | null
+          raw_jid: string
+        }
+        Insert: {
+          client_id: string
+          first_seen_at?: string
+          group_jid: string
+          id?: string
+          instance_id: string
+          is_admin?: boolean
+          is_lid_only?: boolean
+          last_seen_at?: string
+          left_seen_at?: string | null
+          phone_e164?: string | null
+          raw_jid: string
+        }
+        Update: {
+          client_id?: string
+          first_seen_at?: string
+          group_jid?: string
+          id?: string
+          instance_id?: string
+          is_admin?: boolean
+          is_lid_only?: boolean
+          last_seen_at?: string
+          left_seen_at?: string | null
+          phone_e164?: string | null
+          raw_jid?: string
+        }
+        Relationships: []
       }
       whatsapp_groups: {
         Row: {

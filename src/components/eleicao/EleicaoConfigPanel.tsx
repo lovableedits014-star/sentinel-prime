@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Save, MessageSquare, Phone, Link as LinkIcon, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const DEFAULT_TPL_COORD =
   "Foi adicionado novo líder na região: *{regiao}*\n\nNome: {nome}\nTelefone: {telefone}\nRua: {rua}, {numero}\nBairro: {bairro}";
@@ -29,7 +30,10 @@ interface Cfg {
   template_coordenador_boas_vindas: string;
   template_cabo_boas_vindas: string;
   grupos_links: Record<string, string>;
+  grupos_jids: Record<string, string>;
 }
+
+type GroupOption = { group_jid: string; name: string | null };
 
 export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
@@ -46,7 +50,9 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     template_coordenador_boas_vindas: DEFAULT_TPL_COORD_BV,
     template_cabo_boas_vindas: DEFAULT_TPL_CABO_BV,
     grupos_links: {},
+    grupos_jids: {},
   });
+  const [grupos, setGrupos] = useState<GroupOption[]>([]);
 
   async function load() {
     setLoading(true);
@@ -67,7 +73,24 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         template_coordenador_boas_vindas: d.template_coordenador_boas_vindas || DEFAULT_TPL_COORD_BV,
         template_cabo_boas_vindas: d.template_cabo_boas_vindas || DEFAULT_TPL_CABO_BV,
         grupos_links: d.grupos_links || {},
+        grupos_jids: d.grupos_jids || {},
       });
+    }
+    // Carrega grupos do WhatsApp disponíveis
+    const { data: gs } = await supabase
+      .from("whatsapp_groups" as any)
+      .select("group_jid, name")
+      .eq("client_id", clientId)
+      .eq("is_active", true)
+      .order("name", { ascending: true });
+    if (gs) {
+      // Dedupe por group_jid
+      const seen = new Set<string>();
+      const uniq: GroupOption[] = [];
+      for (const g of gs as any[]) {
+        if (!seen.has(g.group_jid)) { seen.add(g.group_jid); uniq.push(g); }
+      }
+      setGrupos(uniq);
     }
     setLoading(false);
   }
@@ -85,6 +108,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       template_coordenador_boas_vindas: cfg.template_coordenador_boas_vindas,
       template_cabo_boas_vindas: cfg.template_cabo_boas_vindas,
       grupos_links: cfg.grupos_links,
+      grupos_jids: cfg.grupos_jids,
     };
     const q = cfg.id
       ? supabase.from("eleicao_notif_config" as any).update(payload).eq("id", cfg.id)
@@ -179,24 +203,49 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
             <p className="text-xs text-muted-foreground italic">Nenhuma região cadastrada. Clique em "Nova região" para começar.</p>
           )}
           {regioes.map(r => (
-            <div key={r.id} className="flex flex-col sm:grid sm:grid-cols-[160px_1fr_auto] gap-2 sm:items-center">
-              <Label className="text-xs sm:text-sm font-medium truncate">{r.label}</Label>
-              <Input
-                placeholder="https://chat.whatsapp.com/..."
-                value={cfg.grupos_links[r.value] || ""}
-                onChange={e => setCfg(c => ({ ...c, grupos_links: { ...c.grupos_links, [r.value]: e.target.value } }))}
-              />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 self-end sm:self-auto text-muted-foreground hover:text-destructive"
-                onClick={() => remove({ id: r.id, value: r.value })}
-                disabled={isRemoving}
-                title="Remover região"
-              >
-                <X className="w-4 h-4" />
-              </Button>
+            <div key={r.id} className="flex flex-col gap-2 p-2 rounded-md border">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs sm:text-sm font-medium truncate">{r.label}</Label>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => remove({ id: r.id, value: r.value })}
+                  disabled={isRemoving}
+                  title="Remover região"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-muted-foreground">Link de convite</Label>
+                  <Input
+                    placeholder="https://chat.whatsapp.com/..."
+                    value={cfg.grupos_links[r.value] || ""}
+                    onChange={e => setCfg(c => ({ ...c, grupos_links: { ...c.grupos_links, [r.value]: e.target.value } }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase text-muted-foreground">Grupo no WhatsApp (rastreamento)</Label>
+                  <Select
+                    value={cfg.grupos_jids[r.value] || ""}
+                    onValueChange={(v) => setCfg(c => ({ ...c, grupos_jids: { ...c.grupos_jids, [r.value]: v } }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={grupos.length ? "Selecione um grupo" : "Sincronize grupos em Configurações"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {grupos.map(g => (
+                        <SelectItem key={g.group_jid} value={g.group_jid}>
+                          {g.name || g.group_jid}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           ))}
         </div>
