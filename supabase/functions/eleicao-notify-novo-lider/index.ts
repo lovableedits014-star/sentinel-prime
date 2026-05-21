@@ -322,7 +322,7 @@ Deno.serve(async (req) => {
     const pessoa_id = body?.pessoa_id;
     const target = (body?.target as string | undefined)?.toLowerCase();
     if (!pessoa_id) throw new Error("pessoa_id obrigatório");
-    if (target && !["coordenador", "secretaria", "lider", "coordenador_boas_vindas"].includes(target)) {
+    if (target && !["coordenador", "secretaria", "lider", "coordenador_boas_vindas", "cabo_boas_vindas"].includes(target)) {
       throw new Error("target inválido");
     }
 
@@ -345,9 +345,14 @@ Deno.serve(async (req) => {
     if (!pessoa) throw new Error("Pessoa não encontrada");
 
     const isWelcomeCoord = target === "coordenador_boas_vindas";
+    const isWelcomeCabo = target === "cabo_boas_vindas";
     if (isWelcomeCoord) {
       if (pessoa.tipo !== "coordenador") {
         return new Response(JSON.stringify({ success: true, skipped: "Não é coordenador" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      }
+    } else if (isWelcomeCabo) {
+      if (pessoa.tipo !== "cabo") {
+        return new Response(JSON.stringify({ success: true, skipped: "Não é cabo eleitoral" }), { headers: { ...cors, "Content-Type": "application/json" } });
       }
     } else if (pessoa.tipo !== "lider") {
       return new Response(JSON.stringify({ success: true, skipped: "Não é líder" }), { headers: { ...cors, "Content-Type": "application/json" } });
@@ -384,19 +389,32 @@ Deno.serve(async (req) => {
     }
     if (pre.reconnected) await sleep(1500);
 
+    // Resolve a região: se a pessoa não tiver, tenta subir pela cadeia parent_id
+    let regiaoValue: string | null = pessoa.regiao || null;
+    if (!regiaoValue && pessoa.parent_id) {
+      let currentParentId: string | null = pessoa.parent_id;
+      for (let i = 0; i < 3 && currentParentId; i++) {
+        const { data: parentRow } = await admin.from("eleicao_pessoas")
+          .select("regiao, parent_id").eq("id", currentParentId).maybeSingle();
+        if (!parentRow) break;
+        if (parentRow.regiao) { regiaoValue = parentRow.regiao; break; }
+        currentParentId = parentRow.parent_id || null;
+      }
+    }
+
     let regiaoLabel = "—";
-    if (pessoa.regiao) {
+    if (regiaoValue) {
       const { data: regRow } = await admin
         .from("eleicao_regioes")
         .select("label")
         .eq("client_id", pessoa.client_id)
-        .eq("value", pessoa.regiao)
+        .eq("value", regiaoValue)
         .maybeSingle();
       regiaoLabel = (regRow as any)?.label
-        || REGIAO_LABELS[pessoa.regiao]
-        || pessoa.regiao.charAt(0).toUpperCase() + pessoa.regiao.slice(1);
+        || REGIAO_LABELS[regiaoValue]
+        || regiaoValue.charAt(0).toUpperCase() + regiaoValue.slice(1);
     }
-    const linkGrupo = (cfg.grupos_links && pessoa.regiao) ? (cfg.grupos_links[pessoa.regiao] || "") : "";
+    const linkGrupo = (cfg.grupos_links && regiaoValue) ? (cfg.grupos_links[regiaoValue] || "") : "";
     const vars = {
       nome: pessoa.nome,
       regiao: regiaoLabel,
@@ -412,6 +430,11 @@ Deno.serve(async (req) => {
     const msgCoordBoasVindas = applyTemplate(
       cfg.template_coordenador_boas_vindas
         || "Olá {nome}! Você foi cadastrado como coordenador da região *{regiao}*.\n\nEntre no grupo da sua região e aguarde as próximas instruções:\n{link_grupo}",
+      vars,
+    );
+    const msgCaboBoasVindas = applyTemplate(
+      cfg.template_cabo_boas_vindas
+        || "Olá {nome}! Você foi cadastrado como cabo eleitoral na região *{regiao}*.\n\nEntre no grupo da sua região para receber as próximas instruções:\n{link_grupo}",
       vars,
     );
 
@@ -508,11 +531,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    async function runCaboBoasVindas() {
+      results.cabo_boas_vindas = await sendTo({
+        ...baseSendCtx,
+        destinatarioTipo: "cabo_boas_vindas", destinatarioNome: pessoa.nome,
+        destinatarioTelefone: pessoa.telefone, message: msgCaboBoasVindas,
+      });
+    }
+
     if (target) {
       if (target === "coordenador") await runCoordenador();
       else if (target === "secretaria") await runSecretaria();
       else if (target === "lider") await runLider();
       else if (target === "coordenador_boas_vindas") await runCoordBoasVindas();
+      else if (target === "cabo_boas_vindas") await runCaboBoasVindas();
       return new Response(
         JSON.stringify({ success: true, preflight: pre, target, result: results[target] }),
         { headers: { ...cors, "Content-Type": "application/json" } },
