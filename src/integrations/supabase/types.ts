@@ -302,6 +302,42 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_users: {
+        Row: {
+          author_name: string | null
+          avatar_url: string | null
+          blocked_at: string
+          blocked_by: string | null
+          client_id: string
+          id: string
+          platform: string
+          platform_user_id: string
+          reason: string | null
+        }
+        Insert: {
+          author_name?: string | null
+          avatar_url?: string | null
+          blocked_at?: string
+          blocked_by?: string | null
+          client_id: string
+          id?: string
+          platform: string
+          platform_user_id: string
+          reason?: string | null
+        }
+        Update: {
+          author_name?: string | null
+          avatar_url?: string | null
+          blocked_at?: string
+          blocked_by?: string | null
+          client_id?: string
+          id?: string
+          platform?: string
+          platform_user_id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       campaign_frames: {
         Row: {
           client_id: string

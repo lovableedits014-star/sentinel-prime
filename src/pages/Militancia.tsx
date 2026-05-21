@@ -11,8 +11,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Search, Facebook, Instagram, TrendingUp, TrendingDown,
   Users, Calendar, Loader2, MessageSquare, Eye, BarChart3, FileText, ExternalLink,
-  Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus,
+  Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus, ShieldOff, Unlock,
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { BADGE_META, getBadgeMeta } from "@/lib/militant-badges";
 import { MilitantBadge } from "@/components/comments/MilitantBadge";
@@ -133,6 +137,157 @@ type NegComment = {
   platform_user_id: string | null;
   sentiment_reason?: string | null;
 };
+
+
+interface BlockedUserRow {
+  id: string;
+  client_id: string;
+  platform: string;
+  platform_user_id: string;
+  author_name: string | null;
+  avatar_url: string | null;
+  reason: string | null;
+  blocked_at: string;
+}
+
+function BlockedUsersTab({ clientId }: { clientId: string }) {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [unblockingId, setUnblockingId] = useState<string | null>(null);
+
+  const { data: blocked = [], isLoading } = useQuery({
+    queryKey: ["blocked-users", clientId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("blocked_users")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("blocked_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as BlockedUserRow[];
+    },
+    enabled: !!clientId,
+  });
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return blocked;
+    return blocked.filter(b =>
+      (b.author_name || "").toLowerCase().includes(q) ||
+      (b.platform_user_id || "").toLowerCase().includes(q)
+    );
+  }, [blocked, search]);
+
+  async function handleUnblock(id: string) {
+    setUnblockingId(id);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("manage-comment", {
+        body: { blockedUserId: id, clientId, action: "unblock_user" },
+      });
+      if (error) throw error;
+      if (!res?.success) throw new Error(res?.error || "Falha ao desbloquear");
+      toast.success(res.message || "Usuário desbloqueado!");
+      qc.invalidateQueries({ queryKey: ["blocked-users", clientId] });
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao desbloquear");
+    } finally {
+      setUnblockingId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="flex items-start gap-3">
+          <ShieldOff className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">Usuários bloqueados</p>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Lista de todos os perfis bloqueados na sua página. Use o botão <strong>Desbloquear</strong> para liberar novamente.
+              Bloqueios do Instagram são apenas registros locais — devem ser feitos manualmente pelo app.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar bloqueado por nome ou ID..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="animate-pulse space-y-2">
+          {[1,2,3].map(i => <div key={i} className="h-16 bg-muted rounded-lg" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-16 text-center text-muted-foreground">
+            <ShieldOff className="w-12 h-12 mx-auto mb-4 opacity-20" />
+            <p className="font-medium">{blocked.length === 0 ? "Nenhum usuário bloqueado" : "Nenhum resultado para a busca"}</p>
+            {blocked.length === 0 && (
+              <p className="text-sm mt-1">Quando você bloquear alguém pelos comentários, aparecerá aqui.</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="bg-card rounded-xl border shadow-sm divide-y overflow-hidden">
+          {filtered.map((b) => (
+            <div key={b.id} className="px-3 py-3 flex items-center gap-3">
+              <Avatar className="h-10 w-10 shrink-0">
+                {b.avatar_url && <AvatarImage src={b.avatar_url} alt={b.author_name || ""} />}
+                <AvatarFallback className={b.platform === 'instagram' ? 'bg-gradient-to-br from-pink-500 to-purple-600 text-white text-xs' : 'bg-primary/10 text-primary text-xs'}>
+                  {b.author_name?.charAt(0).toUpperCase() || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-sm truncate">{b.author_name || "Sem nome"}</p>
+                  {b.platform === 'instagram'
+                    ? <Instagram className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                    : <Facebook className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Bloqueado em {new Date(b.blocked_at).toLocaleString("pt-BR")}
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-1.5" disabled={unblockingId === b.id}>
+                    {unblockingId === b.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Unlock className="w-3.5 h-3.5" />}
+                    Desbloquear
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Desbloquear {b.author_name || "este usuário"}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {b.platform === 'instagram'
+                        ? "O Instagram não permite desbloqueio via API. O registro será removido daqui, mas você precisa desbloquear manualmente pelo app."
+                        : "O usuário voltará a poder comentar e interagir com sua página no Facebook."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleUnblock(b.id)}>
+                      Confirmar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 
 function NegativeRanking({
@@ -600,6 +755,10 @@ const Militancia = () => {
             <Flame className="w-4 h-4 text-destructive" />
             <span>Ranking Negativos</span>
           </TabsTrigger>
+          <TabsTrigger value="blocked" className="gap-1.5">
+            <ShieldOff className="w-4 h-4 text-amber-600" />
+            <span>Bloqueados</span>
+          </TabsTrigger>
           <TabsTrigger value="report" className="gap-1.5">
             <FileText className="w-4 h-4 text-amber-600" />
             <span>Relatório</span>
@@ -654,6 +813,10 @@ const Militancia = () => {
             </div>
           </div>
           <NegativeRanking militants={militants} clientId={clientId} onOpen={setDrawer} />
+        </TabsContent>
+
+        <TabsContent value="blocked" className="space-y-4 mt-4">
+          {clientId && <BlockedUsersTab clientId={clientId} />}
         </TabsContent>
 
         <TabsContent value="report" className="mt-4">
