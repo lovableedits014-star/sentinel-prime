@@ -449,13 +449,6 @@ const Dashboard = () => {
     return { total, positive, neutral, negative, unanalyzed, posPercent, negPercent, neuPercent, respondedCount, pendingCount };
   }, [filteredComments]);
 
-  // Negative comments for crisis section
-  const negativeComments = useMemo(() => {
-    return filteredComments
-      .filter(c => c.sentiment === "negative" && c.status !== "responded")
-      .sort((a, b) => (b.comment_created_time || b.created_at || '').localeCompare(a.comment_created_time || a.created_at || ''))
-      .slice(0, 20);
-  }, [filteredComments]);
 
   // Timeline data
   const timelineData: TimelineData[] = useMemo(() => {
