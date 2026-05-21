@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Save, MessageSquare, Phone, Link as LinkIcon, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const DEFAULT_TPL_COORD =
   "Foi adicionado novo líder na região: *{regiao}*\n\nNome: {nome}\nTelefone: {telefone}\nRua: {rua}, {numero}\nBairro: {bairro}";
@@ -29,7 +30,10 @@ interface Cfg {
   template_coordenador_boas_vindas: string;
   template_cabo_boas_vindas: string;
   grupos_links: Record<string, string>;
+  grupos_jids: Record<string, string>;
 }
+
+type GroupOption = { group_jid: string; name: string | null };
 
 export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
