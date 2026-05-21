@@ -157,6 +157,50 @@ export function DashboardOverview({ clientId }: DashboardOverviewProps) {
     staleTime: 1000 * 60 * 5,
   });
 
+  // ─────────── Estrutura eleitoral (Coordenadores / Líderes / Cabos) ───────────
+  const { data: eleicaoKpis } = useQuery({
+    queryKey: ["overview-eleicao-kpis", clientId],
+    queryFn: async () => {
+      const [coord, lider, cabo] = await Promise.all([
+        supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "coordenador"),
+        supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "lider"),
+        supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", "cabo"),
+      ]);
+      const coordenadores = coord.count || 0;
+      const lideres = lider.count || 0;
+      const cabos = cabo.count || 0;
+      return { coordenadores, lideres, cabos, total: coordenadores + lideres + cabos };
+    },
+    enabled: !!clientId,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  // ─────────── Distribuição da estrutura eleitoral por região/cidade ───────────
+  const { data: eleicaoRegioes } = useQuery({
+    queryKey: ["overview-eleicao-regioes", clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("eleicao_pessoas" as any)
+        .select("regiao, cidade, escopo")
+        .eq("client_id", clientId);
+      const buckets: Record<string, number> = {};
+      (data || []).forEach((p: any) => {
+        const key =
+          p.escopo === "campo_grande"
+            ? (p.regiao ? `CG · ${p.regiao}` : "CG · sem região")
+            : (p.cidade ? p.cidade : "Sem cidade");
+        buckets[key] = (buckets[key] || 0) + 1;
+      });
+      return Object.entries(buckets)
+        .map(([local, total]) => ({ local, total }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+    },
+    enabled: !!clientId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+
   // ─────────── Aniversariantes hoje ───────────
   const { data: aniversariantes } = useQuery({
     queryKey: ["overview-aniversariantes", clientId],
