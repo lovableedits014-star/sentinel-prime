@@ -3,6 +3,15 @@ import { z } from 'npm:zod@3.23.8';
 import { getClientLLMConfig, callLLM, type LLMMessage } from '../_shared/llm-router.ts';
 import { getCorrelationId, getRequestId, type TelemetryContext } from '../_shared/telemetry.ts';
 import { applyHeuristicGuard } from '../_shared/sentiment-heuristics.ts';
+import {
+  buildMessages,
+  parseAnalysisResponse,
+  softenNegativeOnDenunciation,
+  isDenunciationPost,
+  type Sentiment,
+  type CandidateCtx,
+  type SentimentAnalysisResult,
+} from '../_shared/sentiment-prompts.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,37 +36,31 @@ Deno.serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'No authorization header' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const body = RequestSchema.parse(await req.json());
     const { commentId, clientId } = body;
 
-    // Verify user has access (owner OR active team member)
     const { data: hasAccess } = await supabaseClient.rpc('user_has_client_access', {
       _client_id: clientId, _user_id: user.id,
     });
     if (!hasAccess) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Acesso não autorizado a este cliente' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'Acesso não autorizado a este cliente' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Get comment (verify it belongs to this client)
     const { data: comment, error: commentError } = await supabaseClient
       .from('comments')
       .select('text, post_message')
@@ -66,17 +69,15 @@ Deno.serve(async (req) => {
       .single();
 
     if (commentError || !comment) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Comentário não encontrado' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ success: false, error: 'Comentário não encontrado' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Get LLM config for this client
     const llmConfig = await getClientLLMConfig(supabaseClient, clientId);
     const telemetryCtx: TelemetryContext = {
       admin: supabaseClient,
-      clientId: clientId,
+      clientId,
       userId: user?.id ?? null,
       functionName: 'analyze-sentiment',
       correlationId: getCorrelationId(req),
@@ -84,164 +85,100 @@ Deno.serve(async (req) => {
     };
     console.log(`📡 Using LLM provider: ${llmConfig.provider} for sentiment analysis`);
 
-    // Get political context
     const { data: clientCtx } = await supabaseClient
       .from('clients')
       .select('name, cargo')
       .eq('id', clientId)
       .single();
-    const ctx = {
+    const ctx: CandidateCtx = {
       candidato: clientCtx?.name || 'o político',
       cargo: clientCtx?.cargo || 'político',
     };
 
-    // Few-shot learning: load last 20 manual corrections for this client to calibrate the model
+    // Few-shot: prioriza correções onde IA errou negative -> positive/neutral
     const { data: corrections } = await supabaseClient
       .from('sentiment_corrections')
       .select('text, post_message, ai_sentiment, human_sentiment')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(30);
 
-    let { sentiment, confidence } = await analyzeSentiment(
-      llmConfig, comment.text, comment.post_message, ctx, corrections ?? []
+    let analysis = await analyzeWithReasoning(
+      llmConfig, comment.text, comment.post_message, ctx, corrections ?? [], telemetryCtx,
     );
-    sentiment = applyHeuristicGuard(sentiment as 'positive' | 'negative' | 'neutral', comment.text, comment.post_message);
 
-    // Double-check negatives
-    if (sentiment === 'negative') {
-      const verdict = await verifyNegative(llmConfig, comment.text, comment.post_message, ctx);
-      if (verdict !== 'negative') {
-        console.log(`✅ Reclassified: negative → ${verdict}`);
-        sentiment = verdict;
-        // Lower confidence if the verifier disagreed
-        confidence = Math.min(confidence, 0.5);
+    // Guarda heurística clássica (palavras explícitas de ataque)
+    analysis.sentiment = applyHeuristicGuard(analysis.sentiment, comment.text, comment.post_message);
+
+    // Guarda nova: se post é denúncia, suaviza falso negativo
+    analysis.sentiment = softenNegativeOnDenunciation(
+      analysis.sentiment, comment.text, comment.post_message, analysis.target, analysis.alignment,
+    );
+
+    // Verificador duplo só roda se ainda for negative E não houver alta confiança
+    if (analysis.sentiment === 'negative' && analysis.confidence < 0.85) {
+      const verdict = await verifyNegative(llmConfig, comment.text, comment.post_message, ctx, telemetryCtx);
+      if (verdict.sentiment !== 'negative') {
+        console.log(`✅ Reclassified: negative → ${verdict.sentiment} (${verdict.reason})`);
+        analysis.sentiment = verdict.sentiment;
+        analysis.reason = verdict.reason || analysis.reason;
+        analysis.confidence = Math.min(analysis.confidence, 0.6);
       }
     }
 
-    const needsReview = confidence < 0.7;
+    const needsReview = analysis.confidence < 0.7;
 
-    // Update comment (only if not already human-classified — protected by trigger anyway)
     await supabaseClient
       .from('comments')
       .update({
-        sentiment,
+        sentiment: analysis.sentiment,
         sentiment_source: 'ai',
-        sentiment_confidence: confidence,
+        sentiment_confidence: analysis.confidence,
+        sentiment_reason: analysis.reason || null,
         needs_review: needsReview,
       })
       .eq('id', commentId);
 
-    return new Response(
-      JSON.stringify({ success: true, sentiment, confidence, needs_review: needsReview, provider: llmConfig.provider }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      success: true,
+      sentiment: analysis.sentiment,
+      confidence: analysis.confidence,
+      reason: analysis.reason,
+      post_stance: analysis.postStance,
+      target: analysis.target,
+      alignment: analysis.alignment,
+      needs_review: needsReview,
+      provider: llmConfig.provider,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('Error analyzing sentiment:', error);
-    const errorMessage = error instanceof z.ZodError 
+    const errorMessage = error instanceof z.ZodError
       ? 'Dados inválidos: ' + error.errors.map(e => e.message).join(', ')
-      : error instanceof Error
-      ? error.message
-      : 'Erro desconhecido';
-    
-    return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      : error instanceof Error ? error.message : 'Erro desconhecido';
+    return new Response(JSON.stringify({ success: false, error: errorMessage }), {
+      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
 
-async function analyzeSentiment(
+async function analyzeWithReasoning(
   llmConfig: { provider: string; apiKey: string; model: string },
   text: string,
   postMessage: string | null,
-  ctx: { candidato: string; cargo: string }
-  ,
-  corrections: Array<{ text: string; post_message: string | null; ai_sentiment: string; human_sentiment: string }> = [],
-): Promise<{ sentiment: string; confidence: number }> {
-  const postCtx = postMessage
-    ? postMessage.substring(0, 200).replace(/\s+/g, ' ').trim()
-    : '(sem contexto do post)';
-
-  // Build few-shot examples block from past human corrections
-  let fewShot = '';
-  if (corrections.length > 0) {
-    const examples = corrections.slice(0, 12).map((c, i) => {
-      const post = c.post_message ? c.post_message.substring(0, 120).replace(/\s+/g, ' ').trim() : '(sem post)';
-      const txt = c.text.substring(0, 200).replace(/\s+/g, ' ').trim();
-      return `Exemplo ${i + 1}:
-POST: "${post}"
-COMENTÁRIO: "${txt}"
-❌ IA tinha dito: ${c.ai_sentiment}
-✅ Resposta correta: ${c.human_sentiment}`;
-    }).join('\n\n');
-    fewShot = `\n\n📚 APRENDIZADOS COM CORREÇÕES MANUAIS DO USUÁRIO (siga este padrão):\n${examples}\n\nUse esses exemplos para calibrar sua próxima classificação.`;
-  }
-
-  const messages: LLMMessage[] = [
-    {
-      role: 'system',
-      content: `Você classifica sentimentos de comentários no perfil de "${ctx.candidato}" (${ctx.cargo}). Sempre interprete do ponto de vista do dono do perfil.
-
-⚠️ USE O CONTEXTO DO POST: você recebe POST + COMENTÁRIO. Perguntas factuais sobre o post (ex: "Como fazer?", "Onde é?", "Tem link?", "Que horas?") em posts de evento/inscrição/anúncio = NEUTRAL, NUNCA negative.
-
-⚠️ COBRANÇA CÍVICA NÃO É ATAQUE: pedidos coletivos, reivindicações territoriais e expectativa por melhoria sem ofensa direta (ex: "queremos melhorias", "esperamos resultados", "precisamos disso no bairro") = NEUTRAL.
-
-Menções a aliados/candidatos da mesma corrente em tom otimista = POSITIVE.
-- positive: elogio, apoio, incentivo, gratidão, emojis positivos (❤️👏🙏💪)
-- negative: crítica hostil, ironia destrutiva, deboche, xingamento, emojis negativos (🤡🤮)
-- neutral: marcações puras, perguntas factuais sobre o post, pedidos de informação prática, demandas cívicas sem hostilidade
-Na dúvida entre neutral e negative, escolha neutral se não houver ataque direto.${fewShot}
-
-FORMATO DE RESPOSTA OBRIGATÓRIO (JSON em uma linha):
-{"s":"positive|negative|neutral","c":0.0-1.0}
-Onde "c" é sua confiança (1.0 = certeza absoluta, 0.5 = incerto, 0.3 = chute). Se você está em dúvida, use c<0.7.`,
-    },
-    {
-      role: 'user',
-      content: `Classifique o sentimento e responda APENAS o JSON {"s":"...","c":0.x}:
-
-POST: "${postCtx}"
-COMENTÁRIO: "${text}"`,
-    },
-  ];
-
+  ctx: CandidateCtx,
+  corrections: Array<{ text: string; post_message: string | null; ai_sentiment: string; human_sentiment: string }>,
+  telemetryCtx: TelemetryContext,
+): Promise<SentimentAnalysisResult> {
+  const messages = buildMessages(text, postMessage, ctx, corrections);
   try {
     const response = await callLLM(llmConfig as any, {
-      messages,
-      maxTokens: 40,
-      temperature: 0,
+      messages, maxTokens: 200, temperature: 0,
     }, telemetryCtx);
-
-    const raw = response.content.trim();
-    // Try parsing JSON first
-    let sentiment: string = 'neutral';
-    let confidence = 0.6;
-    try {
-      const match = raw.match(/\{[^}]+\}/);
-      if (match) {
-        const parsed = JSON.parse(match[0]);
-        if (typeof parsed.s === 'string') sentiment = parsed.s.toLowerCase().trim();
-        if (typeof parsed.c === 'number') confidence = Math.max(0, Math.min(1, parsed.c));
-      }
-    } catch { /* fallthrough to text parsing */ }
-
-    if (!['positive', 'negative', 'neutral'].includes(sentiment)) {
-      const lower = raw.toLowerCase();
-      if (lower.includes('positive')) sentiment = 'positive';
-      else if (lower.includes('negative')) sentiment = 'negative';
-      else sentiment = 'neutral';
-      confidence = Math.min(confidence, 0.5);
-    }
-
-    return {
-      sentiment: applyHeuristicGuard(sentiment as 'positive' | 'negative' | 'neutral', text, postMessage),
-      confidence,
-    };
+    return parseAnalysisResponse(response.content);
   } catch (error) {
     console.error('Sentiment analysis failed:', error);
-    return { sentiment: applyHeuristicGuard('neutral', text, postMessage), confidence: 0.3 };
+    return { sentiment: 'neutral', confidence: 0.3, reason: 'erro na IA', postStance: '', target: '', alignment: '' };
   }
 }
 
@@ -249,37 +186,41 @@ async function verifyNegative(
   llmConfig: { provider: string; apiKey: string; model: string },
   text: string,
   postMessage: string | null,
-  ctx: { candidato: string; cargo: string }
-): Promise<string> {
+  ctx: CandidateCtx,
+  telemetryCtx: TelemetryContext,
+): Promise<{ sentiment: Sentiment; reason: string }> {
   const postCtx = postMessage
-    ? postMessage.substring(0, 200).replace(/\s+/g, ' ').trim()
+    ? postMessage.substring(0, 500).replace(/\s+/g, ' ').trim()
     : '(sem contexto do post)';
+  const denuncia = isDenunciationPost(postMessage);
+
   const messages: LLMMessage[] = [
     {
       role: 'system',
-        content: `Você é um VERIFICADOR. Um analista classificou este comentário como NEGATIVO contra "${ctx.candidato}" (${ctx.cargo}). Confirme ou corrija.
+      content: `Você é um VERIFICADOR. Uma IA classificou o comentário abaixo como NEGATIVO contra "${ctx.candidato}" (${ctx.cargo}).
+Sua tarefa: descobrir se o ALVO da crítica é "${ctx.candidato}" ou se é o PROBLEMA/FATO/TERCEIRO mencionado no post.
 
-⚠️ ATENÇÃO AO POST: Se o POST é anúncio/evento/inscrição e o COMENTÁRIO é só pergunta prática (Como fazer? Onde? Tem link?) → NEUTRAL, não negativo!
+${denuncia ? `⚠️ ATENÇÃO: o POST é uma DENÚNCIA/DEFESA do próprio "${ctx.candidato}" contra algo. Palavras fortes no comentário ("absurdo", "vergonha", "revoltante") provavelmente APOIAM a denúncia, NÃO atacam o candidato.\n\n` : ''}Responda JSON em uma linha (sem markdown):
+{"alvo":"candidato|fato_do_post|terceiro","s":"positive|negative|neutral","reason":"frase curta"}
 
-⚠️ DEMANDA CÍVICA TAMBÉM NÃO É NEGATIVA: "queremos melhorias", "esperamos resultados", "precisamos disso no bairro" = NEUTRAL se não houver ataque direto.
-
-REALMENTE negativo só se: critica/ataca/debocha/ofende "${ctx.candidato}" especificamente, ou faz comparação desfavorável.
-
-NÃO é negativo (responda positive ou neutral) se: elogia/projeta futuro para "${ctx.candidato}" OU ALIADOS, menciona outro candidato da mesma corrente em tom de apoio (ex: "tem futuro com nosso pré-candidato X" = POSITIVE), é pergunta prática sobre o post, ou é neutro/factual.
-
-Responda APENAS: positive, negative ou neutral.`,
+Regras:
+• Se alvo="fato_do_post" e comentário concorda com a posição do candidato → positive
+• Se alvo="fato_do_post" e tom neutro/pergunta → neutral
+• Só responda negative se o ATAQUE é claramente contra "${ctx.candidato}"`,
     },
-    { role: 'user', content: `POST: "${postCtx}"\nCOMENTÁRIO: "${text}"\n\nÉ realmente negativo contra ${ctx.candidato}?` },
+    { role: 'user', content: `POST: "${postCtx}"\nCOMENTÁRIO: "${text}"` },
   ];
 
   try {
-    const response = await callLLM(llmConfig as any, { messages, maxTokens: 10, temperature: 0 }, telemetryCtx);
-    const result = response.content.toLowerCase().trim().replace(/[^a-z]/g, '');
-    if (['positive', 'negative', 'neutral'].includes(result)) return applyHeuristicGuard(result as 'positive' | 'negative' | 'neutral', text, postMessage);
-    if (result.includes('positive')) return applyHeuristicGuard('positive', text, postMessage);
-    if (result.includes('neutral')) return applyHeuristicGuard('neutral', text, postMessage);
-    return applyHeuristicGuard('negative', text, postMessage);
+    const response = await callLLM(llmConfig as any, { messages, maxTokens: 120, temperature: 0 }, telemetryCtx);
+    const raw = response.content.trim();
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match) return { sentiment: 'negative', reason: '' };
+    const parsed = JSON.parse(match[0]);
+    const s = String(parsed.s || '').toLowerCase();
+    const sentiment: Sentiment = (s === 'positive' || s === 'negative' || s === 'neutral') ? s : 'negative';
+    return { sentiment, reason: String(parsed.reason || '').slice(0, 240) };
   } catch {
-    return applyHeuristicGuard('negative', text, postMessage);
+    return { sentiment: 'negative', reason: '' };
   }
 }
