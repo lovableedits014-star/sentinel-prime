@@ -330,6 +330,12 @@ export default function Eleicao() {
       void notifyCoordBoasVindas((savedPessoa as any).id);
     }
 
+    // Cabo eleitoral novo: dispara boas-vindas com link do grupo da região.
+    if (!editing && form.tipo === "cabo" && savedPessoa) {
+      void sendCaboBoasVindas((savedPessoa as any).id);
+    }
+
+
     toast.success(editing ? "Atualizado!" : "Cadastrado!");
     setDialogOpen(false);
     load();
