@@ -131,7 +131,11 @@ type NegComment = {
   post_permalink_url: string | null;
   platform: string;
   platform_user_id: string | null;
+  sentiment_reason?: string | null;
 };
+
+// Header partial (unchanged structure)
+type _NegHeader = {
 
 function NegativeRanking({
   militants, clientId, onOpen,
