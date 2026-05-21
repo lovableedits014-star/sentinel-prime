@@ -195,15 +195,28 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
           <div className="flex items-center gap-2 font-medium text-sm">
             <LinkIcon className="w-4 h-4" />Regiões e links de grupos (Campo Grande)
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={() => setShowAdd(v => !v)}
-          >
-            <Plus className="w-4 h-4 mr-1" /> Nova região
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="w-full sm:w-auto"
+              onClick={autoVincular}
+              disabled={!regioes.length || !grupos.length}
+              title="Tenta casar cada região com um grupo do WhatsApp pelo nome"
+            >
+              Vincular grupos por nome
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setShowAdd(v => !v)}
+            >
+              <Plus className="w-4 h-4 mr-1" /> Nova região
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">
           Adicione regiões personalizadas. O link configurado é enviado ao líder cadastrado naquela região.
