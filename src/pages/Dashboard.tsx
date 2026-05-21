@@ -388,9 +388,9 @@ const Dashboard = () => {
           `${stats.pendingCount} comentários pendentes de resposta (${stats.respondedCount} já respondidos).`,
         );
       }
-      if (negativeComments.length > 0) {
+      if (stats.negative > 0) {
         highlights.push(
-          `${negativeComments.length} comentários negativos pendentes em gestão de crise — priorize a resposta.`,
+          `${stats.negative} comentários negativos no período — acompanhe na aba Comentários.`,
         );
       }
       if (platformStats.facebook + platformStats.instagram > 0) {
