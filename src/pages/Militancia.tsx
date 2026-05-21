@@ -404,6 +404,21 @@ const Militancia = () => {
           </Tabs>
         </TabsContent>
 
+        <TabsContent value="haters" className="space-y-4 mt-4">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+            <div className="flex items-start gap-3">
+              <Flame className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-destructive mb-1">Quem mais ataca a campanha</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  Ranking dos perfis com mais comentários negativos. Clique em <strong>Bloquear</strong> para impedir que o autor continue comentando na página (Facebook apenas — Instagram exige bloqueio manual pelo app).
+                </p>
+              </div>
+            </div>
+          </div>
+          <NegativeRanking militants={militants} clientId={clientId} onOpen={setDrawer} />
+        </TabsContent>
+
         <TabsContent value="report" className="mt-4">
           <MilitanciaReport militants={militants} />
         </TabsContent>
