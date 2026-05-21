@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
-import { ShieldCheck, ShieldAlert, ShieldX, Clock, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShieldCheck, ShieldAlert, ShieldX, Clock } from "lucide-react";
 
 interface Props {
   clientId: string;
