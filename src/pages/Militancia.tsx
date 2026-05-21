@@ -154,6 +154,8 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [unblockingId, setUnblockingId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const autoSyncedRef = useRef(false);
 
   const { data: blocked = [], isLoading } = useQuery({
     queryKey: ["blocked-users", clientId],
@@ -177,6 +179,38 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
       (b.platform_user_id || "").toLowerCase().includes(q)
     );
   }, [blocked, search]);
+
+  async function runSync(silent = false) {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("sync-blocked-users", {
+        body: { clientId },
+      });
+      if (error) throw error;
+      if (!res?.success) throw new Error(res?.error || "Falha na sincronização");
+      if (!silent) toast.success(res.message || "Bloqueados sincronizados!");
+      qc.invalidateQueries({ queryKey: ["blocked-users", clientId] });
+    } catch (e: any) {
+      if (!silent) toast.error(e?.message || "Erro ao sincronizar");
+      else console.warn("[sync-blocked-users auto]:", e?.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  // Auto-sync once on first mount if there are no Facebook records yet
+  useEffect(() => {
+    if (autoSyncedRef.current || isLoading || !clientId) return;
+    const hasFb = blocked.some(b => b.platform === "facebook");
+    if (!hasFb) {
+      autoSyncedRef.current = true;
+      runSync(true);
+    } else {
+      autoSyncedRef.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, clientId, blocked.length]);
 
   async function handleUnblock(id: string) {
     setUnblockingId(id);
@@ -203,22 +237,31 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
           <div className="text-sm">
             <p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">Usuários bloqueados</p>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Lista de todos os perfis bloqueados na sua página. Use o botão <strong>Desbloquear</strong> para liberar novamente.
-              Bloqueios do Instagram são apenas registros locais — devem ser feitos manualmente pelo app.
+              Lista de todos os perfis bloqueados na sua página do Facebook (sincronizados automaticamente) e bloqueios manuais do Instagram.
+              Use <strong>Sincronizar</strong> para atualizar com o que está no Facebook agora.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar bloqueado por nome ou ID..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar bloqueado por nome ou ID..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Button variant="outline" onClick={() => runSync(false)} disabled={syncing} className="gap-2">
+          {syncing
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : <RefreshCw className="w-4 h-4" />}
+          Sincronizar do Facebook
+        </Button>
       </div>
+
 
       {isLoading ? (
         <div className="animate-pulse space-y-2">
