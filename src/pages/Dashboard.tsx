@@ -325,48 +325,6 @@ const Dashboard = () => {
     }
   };
 
-  // Bulk hide selected negative comments
-  const handleBulkHide = async () => {
-    if (selectedCrisis.size === 0 || bulkHiding) return;
-    setBulkHiding(true);
-    const ids = Array.from(selectedCrisis);
-    let success = 0;
-    let failed = 0;
-    try {
-      for (const id of ids) {
-        try {
-          const { data, error } = await supabase.functions.invoke('manage-comment', {
-            body: { commentId: id, clientId, action: 'hide' }
-          });
-          if (error || !data?.success) failed++;
-          else success++;
-        } catch {
-          failed++;
-        }
-      }
-      if (success > 0) toast.success(`${success} comentário(s) ocultado(s)`);
-      if (failed > 0) toast.error(`${failed} falha(s) ao ocultar`);
-      setSelectedCrisis(new Set());
-      reloadData();
-    } finally {
-      setBulkHiding(false);
-    }
-  };
-
-  const toggleCrisisSelection = (id: string) => {
-    setSelectedCrisis(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAllCrisis = (allIds: string[]) => {
-    setSelectedCrisis(prev => {
-      if (prev.size === allIds.length) return new Set();
-      return new Set(allIds);
-    });
-  };
 
   const handleExportPdf = async () => {
     if (exportingPdf) return;
