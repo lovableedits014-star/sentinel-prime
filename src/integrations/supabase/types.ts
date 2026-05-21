@@ -705,6 +705,7 @@ export type Database = {
           responded_at: string | null
           sentiment: Database["public"]["Enums"]["sentiment_type"] | null
           sentiment_confidence: number | null
+          sentiment_reason: string | null
           sentiment_source: string
           social_profile_id: string | null
           status: Database["public"]["Enums"]["comment_status"] | null
@@ -738,6 +739,7 @@ export type Database = {
           responded_at?: string | null
           sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
           sentiment_confidence?: number | null
+          sentiment_reason?: string | null
           sentiment_source?: string
           social_profile_id?: string | null
           status?: Database["public"]["Enums"]["comment_status"] | null
@@ -771,6 +773,7 @@ export type Database = {
           responded_at?: string | null
           sentiment?: Database["public"]["Enums"]["sentiment_type"] | null
           sentiment_confidence?: number | null
+          sentiment_reason?: string | null
           sentiment_source?: string
           social_profile_id?: string | null
           status?: Database["public"]["Enums"]["comment_status"] | null
@@ -5144,6 +5147,7 @@ export type Database = {
       sentiment_corrections: {
         Row: {
           ai_predicted: string | null
+          ai_reason: string | null
           client_id: string
           comment_id: string | null
           comment_text: string
@@ -5151,9 +5155,11 @@ export type Database = {
           created_at: string
           human_corrected: string
           id: string
+          post_stance: string | null
         }
         Insert: {
           ai_predicted?: string | null
+          ai_reason?: string | null
           client_id: string
           comment_id?: string | null
           comment_text: string
@@ -5161,9 +5167,11 @@ export type Database = {
           created_at?: string
           human_corrected: string
           id?: string
+          post_stance?: string | null
         }
         Update: {
           ai_predicted?: string | null
+          ai_reason?: string | null
           client_id?: string
           comment_id?: string | null
           comment_text?: string
@@ -5171,6 +5179,7 @@ export type Database = {
           created_at?: string
           human_corrected?: string
           id?: string
+          post_stance?: string | null
         }
         Relationships: []
       }
