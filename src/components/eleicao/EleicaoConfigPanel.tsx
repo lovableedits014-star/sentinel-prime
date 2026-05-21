@@ -50,7 +50,9 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     template_coordenador_boas_vindas: DEFAULT_TPL_COORD_BV,
     template_cabo_boas_vindas: DEFAULT_TPL_CABO_BV,
     grupos_links: {},
+    grupos_jids: {},
   });
+  const [grupos, setGrupos] = useState<GroupOption[]>([]);
 
   async function load() {
     setLoading(true);
