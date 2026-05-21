@@ -232,7 +232,16 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
           onChange={e => setCfg(c => ({ ...c, template_coordenador_boas_vindas: e.target.value }))} />
       </Card>
 
-      <div className="flex justify-end">
+      <Card className="p-4 space-y-3">
+        <div className="font-medium text-sm">Mensagem de boas-vindas para o cabo eleitoral cadastrado</div>
+        <p className="text-xs text-muted-foreground">
+          Enviada automaticamente ao novo cabo eleitoral, com o link do grupo da região dele. Placeholders: <code className="bg-muted px-1 rounded text-[10px] sm:text-xs">{"{nome} {regiao} {link_grupo}"}</code>
+        </p>
+        <Textarea rows={6} className="font-mono text-xs"
+          value={cfg.template_cabo_boas_vindas}
+          onChange={e => setCfg(c => ({ ...c, template_cabo_boas_vindas: e.target.value }))} />
+      </Card>
+
         <Button onClick={save} disabled={saving} className="w-full sm:w-auto">
           {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
           Salvar configurações
