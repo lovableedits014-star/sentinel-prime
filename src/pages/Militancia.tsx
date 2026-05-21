@@ -134,8 +134,6 @@ type NegComment = {
   sentiment_reason?: string | null;
 };
 
-// Header partial (unchanged structure)
-type _NegHeader = {
 
 function NegativeRanking({
   militants, clientId, onOpen,
