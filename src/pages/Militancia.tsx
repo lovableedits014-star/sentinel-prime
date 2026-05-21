@@ -154,7 +154,7 @@ function NegativeRanking({
       if (!clientId) return [] as NegComment[];
       const { data, error } = await (supabase as any)
         .from("comments")
-        .select("id, comment_id, text, sentiment, comment_created_time, post_message, post_permalink_url, platform, platform_user_id")
+        .select("id, comment_id, text, sentiment, sentiment_reason, comment_created_time, post_message, post_permalink_url, platform, platform_user_id")
         .eq("client_id", clientId)
         .eq("sentiment", "negative")
         .eq("is_page_owner", false)
