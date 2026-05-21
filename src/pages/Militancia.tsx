@@ -359,6 +359,10 @@ const Militancia = () => {
             <BarChart3 className="w-4 h-4 text-violet-600" />
             <span>Análise</span>
           </TabsTrigger>
+          <TabsTrigger value="haters" className="gap-1.5">
+            <Flame className="w-4 h-4 text-destructive" />
+            <span>Ranking Negativos</span>
+          </TabsTrigger>
           <TabsTrigger value="report" className="gap-1.5">
             <FileText className="w-4 h-4 text-amber-600" />
             <span>Relatório</span>
