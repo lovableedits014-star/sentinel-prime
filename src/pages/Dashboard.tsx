@@ -21,6 +21,7 @@ import { AuditPanel } from "@/components/dashboard/AuditPanel";
 import { DataHealthAlerts } from "@/components/dashboard/DataHealthAlerts";
 import { SuggestedActions } from "@/components/dashboard/SuggestedActions";
 import { FeriadosWidget } from "@/components/dashboard/FeriadosWidget";
+import { MetaTokenStatusCard } from "@/components/dashboard/MetaTokenStatusCard";
 import { exportDashboardPdf } from "@/lib/dashboard-pdf-export";
 // sync-throttle removido
 
