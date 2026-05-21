@@ -1,65 +1,103 @@
-## Objetivo
+# Plano: Classificação de Sentimento Inteligente (Target vs Tema)
 
-1. **Remover a seção "Gestão de Crise"** do Dashboard (a lista de comentários negativos pendentes).
-2. **Atualizar a "Visão Executiva da Campanha"** para refletir os cadastros da aba **Eleição** — Coordenadores, Líderes e Cabos eleitorais — que hoje não aparecem nos KPIs.
+## Problema
 
-## Diagnóstico
+A IA está classificando como **negativo** comentários como "É um absurdo isso" em posts que denunciam algo (ex: tirar polo da UEMS). O comentário está **concordando com o vereador** e criticando o **fato denunciado**, não o político. A IA não distingue entre:
 
-- `src/pages/Dashboard.tsx` (linhas ~787–890) tem o bloco **Gestão de Crise** com `negativeComments`, checkboxes, "Ocultar selecionados", etc. Também referencia o tema na linha 437–440 do export de PDF.
-- `src/components/dashboard/DashboardOverview.tsx` ("Visão Executiva da Campanha") consulta apenas as tabelas `pessoas`, `contratados` (com `is_lider`) e `funcionarios`. **Não lê `eleicao_pessoas`**, onde estão os perfis cadastrados na aba Eleição com `tipo ∈ { 'coordenador', 'lider', 'cabo' }`.
-- Em `src/pages/Eleicao.tsx` confirmamos a estrutura: a tabela `eleicao_pessoas` é a fonte da estrutura eleitoral (escopo `campo_grande`/`interior`, hierarquia coordenador → líder → cabo).
+- **Alvo do sentimento = candidato** → classificação real
+- **Alvo do sentimento = fato/terceiro mencionado no post** → muitas vezes alinhado ao candidato
 
-## Plano de execução
+## Solução: Chain-of-Thought + Target Detection
 
-### 1. Remover "Gestão de Crise" do Dashboard
-- Em `src/pages/Dashboard.tsx`:
-  - Excluir todo o `Card` "Gestão de Crise" (≈ linhas 787–890), incluindo a barra de bulk actions, a lista renderizada e o estado vazio.
-  - Remover estados/handlers que ficam órfãos: `selectedCrisis`, `toggleCrisisSelection`, `toggleAllCrisis`, `handleBulkHide`, `bulkHiding` e imports não utilizados (`Checkbox`, `EyeOff`, `Shield`, `ShieldAlert`, etc., conforme uso restante).
-  - Manter o cálculo de `negativeComments` apenas se ainda for usado pelo IED/PDF; caso contrário, remover. Atualizar o highlight do PDF (linhas 437–441) para refletir apenas "comentários negativos no período" sem mencionar "gestão de crise".
-- A operacionalização de comentários negativos continua disponível na página **Comentários** (não vamos duplicar lá nenhuma funcionalidade — só removendo o atalho do dashboard).
+### 1. Novo prompt com raciocínio obrigatório (analyze-sentiment)
 
-### 2. Refletir Coordenadores / Líderes / Cabos na Visão Executiva
-Em `src/components/dashboard/DashboardOverview.tsx`:
+Forçar a IA a responder **3 perguntas estruturadas antes** de classificar, retornando JSON expandido:
 
-a) **Novos KPIs vindos de `eleicao_pessoas`** (filtrados por `client_id`):
-   - `coordenadoresTotal` — `tipo = 'coordenador'`
-   - `lideresEleicaoTotal` — `tipo = 'lider'`
-   - `cabosTotal` — `tipo = 'cabo'`
-   - `equipeEleicaoTotal` = soma dos três (usar como métrica principal "Estrutura Eleitoral").
+```json
+{
+  "post_stance": "denuncia|conquista|convite|opiniao|neutro",
+  "target": "candidato|fato_do_post|terceiro|ambiguo",
+  "alignment": "concorda|discorda|neutro",
+  "s": "positive|neutral|negative",
+  "c": 0.0-1.0,
+  "reason": "1 frase curta"
+}
+```
 
-b) **Reorganizar a grade de KPIs** (hoje 6 cartões) para acomodar a estrutura eleitoral sem poluir:
-   ```text
-   [Base Política] [Apoio comprometido] [Estrutura Eleitoral] [Contratados] [Funcionários] [Check-ins hoje]
-   ```
-   - O cartão "Estrutura Eleitoral" mostra o total e, em texto pequeno, o breakdown: `X coord · Y líderes · Z cabos`.
-   - Ícone sugerido: `Crown` (já importado) ou `Network`.
-   - Clique leva para `/eleicao`.
+Regra-chave nova no system prompt:
 
-c) **Novo bloco "Estrutura da Campanha Eleitoral"** abaixo do gráfico "Crescimento da base":
-   - Card com 3 mini-KPIs (Coordenadores, Líderes, Cabos) lado a lado, cada um com seu ícone (`Crown`, `Users`, `UserCheck`) e link para a aba Eleição com filtro pré-aplicado por tipo.
-   - Mini gráfico de barras (recharts) com a distribuição por **região/cidade** (top 5) usando `regiao` ou `cidade` de `eleicao_pessoas` agrupada.
-   - Estado vazio: "Nenhum cadastro eleitoral ainda — comece pela aba Eleição".
+> Se `post_stance = denuncia/critica_a_algo` e `target = fato_do_post` e `alignment = concorda` (mesmo com palavras fortes como "absurdo", "vergonha", "revoltante"), então **POSITIVE** — o comentarista está apoiando a denúncia do candidato.
 
-d) **Adaptar "Top Líderes por Equipe"**:
-   - Hoje conta `contratados.is_lider`. Adicionar um seletor (ou um segundo card) "Top Coordenadores por Equipe Eleitoral" baseado em `eleicao_pessoas` (coordenadores com mais líderes vinculados por `parent_id`).
+> Só classifique NEGATIVE se `target = candidato` E `alignment = discorda`. Em qualquer outro caso de dúvida sobre o alvo → NEUTRAL.
 
-e) **Inclusão no export de PDF (`Dashboard.tsx → exportDashboardPdf`)**:
-   - Adicionar highlight: `Estrutura eleitoral: X coordenadores, Y líderes, Z cabos.`
-   - (Sem mudanças no PDF se o usuário preferir manter mínimo — confirmo depois se necessário.)
+### 2. Contexto do post enriquecido
 
-### 3. Pós-mudança
-- Verificar `src/components/dashboard/SuggestedActions.tsx` e `AlertasWidget.tsx` para não referenciarem "Gestão de Crise" como destino (sugestões existentes apontam para `/comments` — manter).
-- Rodar build/typecheck.
+- Aumentar `post_message` de 200 → **500 caracteres**
+- Incluir `post_stance` detectado uma vez por post (cachear em `posts.detected_stance`) para não recalcular a cada comentário
+- Passar nome do candidato + cargo + cidade + partido para a IA entender o "lado" político
 
-## Detalhes técnicos
+### 3. Verificador de negativos reformulado
 
-- Sem alterações de schema: `eleicao_pessoas` já existe com colunas `tipo`, `client_id`, `parent_id`, `regiao`, `cidade`.
-- Todas as queries novas usam `supabase.from("eleicao_pessoas" as any).select("id", { count: "exact", head: true }).eq("client_id", clientId).eq("tipo", X)` — mesmo padrão atual do arquivo.
-- RLS já valida acesso por cliente (consistente com o uso em `src/pages/Eleicao.tsx`).
-- Manter `staleTime` de 2 min nos KPIs novos.
+O `verifyNegative` atual já existe mas usa o mesmo viés. Reformular para perguntar explicitamente:
 
-## Itens fora de escopo (a confirmar se quiser)
+> "O alvo da crítica é {candidato} ou é o problema que {candidato} está denunciando/abordando no post?"
 
-- Não vou mexer no funcionamento da página de Comentários (continua sendo o lugar para gestão real de negativos).
-- Não vou mover a "Gestão de Crise" para outra página — apenas remover do dashboard, como pedido.
-- Não vou criar novos relatórios PDF — apenas ajustar os highlights existentes.
+Se o alvo é o problema e o post é uma denúncia → reclassifica para positive/neutral automaticamente.
+
+### 4. Few-shot dinâmico melhorado
+
+Hoje carrega 20 correções genéricas. Mudar para:
+- 10 correções onde IA errou **negative → positive/neutral** (caso mais comum)
+- 5 correções negative confirmados
+- Filtrar por similaridade textual quando possível (mesmo cliente, posts parecidos)
+
+### 5. Heurísticas atualizadas (`sentiment-heuristics.ts`)
+
+Adicionar padrão: palavras fortes ("absurdo", "vergonha", "revoltante", "indignado") em post de **denúncia** do próprio candidato → não força negative.
+
+Hoje qualquer "absurdo"/"vergonha" no texto vira negative direto via `DIRECT_NEGATIVE_PATTERNS`. Precisamos remover essa força quando o post sinaliza denúncia (ex: "defesa", "luta contra", "não podemos aceitar", "absurdo que").
+
+### 6. UI: Reprocessar lote da aba Ranking Negativos
+
+Na aba **Ranking Negativos** (Militância) adicionar:
+- Botão "Reanalisar com IA melhorada" por militante (re-roda `analyze-sentiment` em todos os comentários negativos dele com o novo prompt)
+- Botão global "Reanalisar todos os negativos do cliente" (chama `batch-analyze-sentiments` filtrando `sentiment='negative' AND sentiment_source='ai'`)
+- Mostrar o `reason` da IA ao expandir o comentário (para o usuário entender por que foi classificado assim e corrigir com mais facilidade)
+
+### 7. Aprendizado contínuo
+
+A tabela `sentiment_corrections` já existe. Garantir que a cada reclassificação manual:
+- Salva também o `post_message` completo
+- Salva o `reason` que a IA tinha dado (novo campo `ai_reason`)
+- A próxima análise no mesmo cliente usa esses como few-shot prioritários
+
+## Arquivos afetados
+
+**Backend (edge functions):**
+- `supabase/functions/analyze-sentiment/index.ts` — novo prompt com chain-of-thought e detecção de target
+- `supabase/functions/batch-analyze-sentiments/index.ts` — mesma lógica
+- `supabase/functions/_shared/sentiment-heuristics.ts` — afrouxar gatilhos quando post é denúncia
+
+**Banco:**
+- `sentiment_corrections`: adicionar coluna `ai_reason TEXT` e `post_stance TEXT`
+- `comments`: adicionar coluna `sentiment_reason TEXT` (opcional, para mostrar na UI)
+- `posts`: adicionar coluna `detected_stance TEXT` (cache de stance do post)
+
+**Frontend:**
+- `src/pages/Militancia.tsx` (NegativeRanking): botão "Reanalisar" + exibir `sentiment_reason`
+- Componente reutilizável "Reanalisar negativos" para usar também na aba Negativos de Comments
+
+## Resultado esperado
+
+Comentário "É um absurdo isso" no post da UEMS:
+
+1. IA detecta `post_stance = denuncia` (vereador defendendo manter polo)
+2. IA detecta `target = fato_do_post` (o absurdo é tirar a UEMS)
+3. IA detecta `alignment = concorda` (apoia a defesa)
+4. → Classifica como **POSITIVE** com `reason: "Apoia denúncia do candidato contra remoção da UEMS"`
+
+## Perguntas antes de começar
+
+1. Posso adicionar as 3 colunas novas (`ai_reason`, `sentiment_reason`, `detected_stance`)?
+2. Quer que o botão "Reanalisar todos negativos do cliente" rode em batch agora (pode levar minutos e custar tokens) ou apenas sob demanda por militante?
+3. Quer mostrar o "reason" da IA na UI também na aba Negativos de Comments, ou só na Militância?
