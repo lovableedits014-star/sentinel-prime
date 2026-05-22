@@ -310,7 +310,18 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       </Card>
 
       <Card className="p-4 space-y-3">
-        <div className="font-medium text-sm">Mensagem para coordenador / secretaria</div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="font-medium text-sm">Mensagem para coordenador / secretaria</div>
+          <label className="flex items-center gap-2 text-xs">
+            <Switch
+              checked={cfg.envio_coordenador_ativo}
+              onCheckedChange={(v) => setCfg(c => ({ ...c, envio_coordenador_ativo: v }))}
+            />
+            <span className={cfg.envio_coordenador_ativo ? "" : "text-muted-foreground"}>
+              {cfg.envio_coordenador_ativo ? "Envio ativado" : "Envio desativado"}
+            </span>
+          </label>
+        </div>
         <p className="text-xs text-muted-foreground">
           Placeholders: <code className="bg-muted px-1 rounded text-[10px] sm:text-xs">{"{nome} {regiao} {telefone} {rua} {numero} {bairro}"}</code>
         </p>
@@ -320,7 +331,18 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       </Card>
 
       <Card className="p-4 space-y-3">
-        <div className="font-medium text-sm">Mensagem para o líder cadastrado</div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="font-medium text-sm">Mensagem para o líder cadastrado</div>
+          <label className="flex items-center gap-2 text-xs">
+            <Switch
+              checked={cfg.envio_lider_ativo}
+              onCheckedChange={(v) => setCfg(c => ({ ...c, envio_lider_ativo: v }))}
+            />
+            <span className={cfg.envio_lider_ativo ? "" : "text-muted-foreground"}>
+              {cfg.envio_lider_ativo ? "Envio ativado" : "Envio desativado"}
+            </span>
+          </label>
+        </div>
         <p className="text-xs text-muted-foreground">
           Placeholders: <code className="bg-muted px-1 rounded text-[10px] sm:text-xs">{"{nome} {regiao} {link_grupo}"}</code>
         </p>
@@ -330,7 +352,18 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       </Card>
 
       <Card className="p-4 space-y-3">
-        <div className="font-medium text-sm">Mensagem de boas-vindas para o coordenador cadastrado</div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="font-medium text-sm">Mensagem de boas-vindas para o coordenador cadastrado</div>
+          <label className="flex items-center gap-2 text-xs">
+            <Switch
+              checked={cfg.envio_coord_boas_vindas_ativo}
+              onCheckedChange={(v) => setCfg(c => ({ ...c, envio_coord_boas_vindas_ativo: v }))}
+            />
+            <span className={cfg.envio_coord_boas_vindas_ativo ? "" : "text-muted-foreground"}>
+              {cfg.envio_coord_boas_vindas_ativo ? "Envio ativado" : "Envio desativado"}
+            </span>
+          </label>
+        </div>
         <p className="text-xs text-muted-foreground">
           Enviada automaticamente ao novo coordenador, com o link do grupo da região dele. Placeholders: <code className="bg-muted px-1 rounded text-[10px] sm:text-xs">{"{nome} {regiao} {link_grupo}"}</code>
         </p>
@@ -340,7 +373,18 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       </Card>
 
       <Card className="p-4 space-y-3">
-        <div className="font-medium text-sm">Mensagem de boas-vindas para o cabo eleitoral cadastrado</div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="font-medium text-sm">Mensagem de boas-vindas para o cabo eleitoral cadastrado</div>
+          <label className="flex items-center gap-2 text-xs">
+            <Switch
+              checked={cfg.envio_cabo_boas_vindas_ativo}
+              onCheckedChange={(v) => setCfg(c => ({ ...c, envio_cabo_boas_vindas_ativo: v }))}
+            />
+            <span className={cfg.envio_cabo_boas_vindas_ativo ? "" : "text-muted-foreground"}>
+              {cfg.envio_cabo_boas_vindas_ativo ? "Envio ativado" : "Envio desativado"}
+            </span>
+          </label>
+        </div>
         <p className="text-xs text-muted-foreground">
           Enviada automaticamente ao novo cabo eleitoral, com o link do grupo da região dele. Placeholders: <code className="bg-muted px-1 rounded text-[10px] sm:text-xs">{"{nome} {regiao} {link_grupo}"}</code>
         </p>
