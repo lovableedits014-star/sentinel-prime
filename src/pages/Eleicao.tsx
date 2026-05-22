@@ -516,7 +516,7 @@ export default function Eleicao() {
     const escopoLabel = escopo === "campo_grande" ? "Campo Grande" : "Interior";
     const filtros: { label: string; value: string }[] = [];
     if (search) filtros.push({ label: "Busca", value: search });
-    if (tipoFilter && tipoFilter !== "all") filtros.push({ label: "Tipo", value: tipoFilter });
+    if (tipoFilter && tipoFilter !== "todos") filtros.push({ label: "Tipo", value: tipoFilter });
     if (regiaoFilter && regiaoFilter !== "all") filtros.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
 
     const opts = { escopoLabel, pessoas: items, filtros };
