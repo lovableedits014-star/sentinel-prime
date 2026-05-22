@@ -501,10 +501,32 @@ export default function Eleicao() {
         <div className="flex items-center gap-2">
           {clientId && <EleicaoContractTemplates clientId={clientId} />}
           {view === "cadastros" && (
-            <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <FileDown className="w-4 h-4 mr-2" />Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleExport("pdf")}>
+                    <FileText className="w-4 h-4 mr-2" />Exportar como PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport("print")}>
+                    <Printer className="w-4 h-4 mr-2" />Abrir para imprimir
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleExport("csv")}>
+                    <Package className="w-4 h-4 mr-2" />Exportar como CSV (Excel)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
+            </>
           )}
         </div>
       </div>
+
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
         <TabsList className="grid grid-cols-5 w-full max-w-3xl">
