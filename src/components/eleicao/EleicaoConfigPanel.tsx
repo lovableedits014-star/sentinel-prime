@@ -31,6 +31,10 @@ interface Cfg {
   template_cabo_boas_vindas: string;
   grupos_links: Record<string, string>;
   grupos_jids: Record<string, string>;
+  envio_coordenador_ativo: boolean;
+  envio_lider_ativo: boolean;
+  envio_coord_boas_vindas_ativo: boolean;
+  envio_cabo_boas_vindas_ativo: boolean;
 }
 
 type GroupOption = { group_jid: string; name: string | null };
