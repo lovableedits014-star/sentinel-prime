@@ -539,23 +539,45 @@ Deno.serve(async (req) => {
       });
     }
 
+    function skipped(tipo: string, nome: string | null, phone: string | null): SendOutcome {
+      return {
+        sent: false, reason: "Envio desativado nas configurações",
+        destinatario_nome: nome, destinatario_telefone: phone, destinatario_telefone_fmt: phone ? fmtPhone(phone) : null,
+        instance: { id: bridge.id, apelido: bridge.apelido || null },
+        preflight_status: pre.status,
+      } as SendOutcome;
+    }
+
+    const flagFor = (t: string) => {
+      if (t === "coordenador" || t === "secretaria") return cfg.envio_coordenador_ativo !== false;
+      if (t === "lider") return cfg.envio_lider_ativo !== false;
+      if (t === "coordenador_boas_vindas") return cfg.envio_coord_boas_vindas_ativo !== false;
+      if (t === "cabo_boas_vindas") return cfg.envio_cabo_boas_vindas_ativo !== false;
+      return true;
+    };
+
     if (target) {
-      if (target === "coordenador") await runCoordenador();
-      else if (target === "secretaria") await runSecretaria();
-      else if (target === "lider") await runLider();
-      else if (target === "coordenador_boas_vindas") await runCoordBoasVindas();
-      else if (target === "cabo_boas_vindas") await runCaboBoasVindas();
+      if (!flagFor(target)) {
+        results[target] = skipped(target, pessoa.nome, pessoa.telefone);
+      } else {
+        if (target === "coordenador") await runCoordenador();
+        else if (target === "secretaria") await runSecretaria();
+        else if (target === "lider") await runLider();
+        else if (target === "coordenador_boas_vindas") await runCoordBoasVindas();
+        else if (target === "cabo_boas_vindas") await runCaboBoasVindas();
+      }
       return new Response(
         JSON.stringify({ success: true, preflight: pre, target, result: results[target] }),
         { headers: { ...cors, "Content-Type": "application/json" } },
       );
     }
 
-    await runCoordenador();
-    await sleep(800);
-    await runSecretaria();
-    await sleep(800);
-    await runLider();
+    if (flagFor("coordenador")) { await runCoordenador(); await sleep(800); }
+    else { results.coordenador = skipped("coordenador", null, null); }
+    if (flagFor("secretaria")) { await runSecretaria(); await sleep(800); }
+    else { results.secretaria = skipped("secretaria", "Secretaria", cfg.secretaria_telefone || null); }
+    if (flagFor("lider")) { await runLider(); }
+    else { results.lider = skipped("lider", pessoa.nome, pessoa.telefone); }
 
     return new Response(JSON.stringify({ success: true, preflight: pre, results }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (err: any) {
