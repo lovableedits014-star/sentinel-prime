@@ -1641,6 +1641,10 @@ export type Database = {
           auto_enviar: boolean
           client_id: string
           created_at: string
+          envio_cabo_boas_vindas_ativo: boolean
+          envio_coord_boas_vindas_ativo: boolean
+          envio_coordenador_ativo: boolean
+          envio_lider_ativo: boolean
           grupos_jids: Json
           grupos_links: Json
           id: string
@@ -1655,6 +1659,10 @@ export type Database = {
           auto_enviar?: boolean
           client_id: string
           created_at?: string
+          envio_cabo_boas_vindas_ativo?: boolean
+          envio_coord_boas_vindas_ativo?: boolean
+          envio_coordenador_ativo?: boolean
+          envio_lider_ativo?: boolean
           grupos_jids?: Json
           grupos_links?: Json
           id?: string
@@ -1669,6 +1677,10 @@ export type Database = {
           auto_enviar?: boolean
           client_id?: string
           created_at?: string
+          envio_cabo_boas_vindas_ativo?: boolean
+          envio_coord_boas_vindas_ativo?: boolean
+          envio_coordenador_ativo?: boolean
+          envio_lider_ativo?: boolean
           grupos_jids?: Json
           grupos_links?: Json
           id?: string
