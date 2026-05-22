@@ -81,7 +81,12 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         template_coordenador_boas_vindas: d.template_coordenador_boas_vindas || DEFAULT_TPL_COORD_BV,
         template_cabo_boas_vindas: d.template_cabo_boas_vindas || DEFAULT_TPL_CABO_BV,
         grupos_links: d.grupos_links || {},
+        grupos_links: d.grupos_links || {},
         grupos_jids: d.grupos_jids || {},
+        envio_coordenador_ativo: d.envio_coordenador_ativo ?? true,
+        envio_lider_ativo: d.envio_lider_ativo ?? true,
+        envio_coord_boas_vindas_ativo: d.envio_coord_boas_vindas_ativo ?? true,
+        envio_cabo_boas_vindas_ativo: d.envio_cabo_boas_vindas_ativo ?? true,
       });
     }
     // Carrega grupos do WhatsApp disponíveis
