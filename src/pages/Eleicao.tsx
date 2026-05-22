@@ -490,8 +490,51 @@ export default function Eleicao() {
   }, [pessoas, form.tipo, form.escopo, form.regiao, form.cidade]);
 
 
+  function handleExport(kind: "pdf" | "csv" | "print") {
+    const lista = pessoas.filter(p =>
+      p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p)
+    );
+    if (lista.length === 0) {
+      toast.error("Nenhum cadastro para exportar com os filtros atuais.");
+      return;
+    }
+    const byId = new Map(pessoas.map(p => [p.id, p.nome]));
+    const items: ExportPessoa[] = lista.map(p => ({
+      nome: p.nome,
+      tipo: p.tipo,
+      telefone: p.telefone,
+      regiao: p.regiao,
+      cidade: p.cidade,
+      bairro: p.bairro,
+      rua: p.rua,
+      numero: p.numero,
+      email: p.email,
+      observacoes: p.observacoes,
+      valor_contratacao: p.valor_contratacao,
+      parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
+    }));
+    const escopoLabel = escopo === "campo_grande" ? "Campo Grande" : "Interior";
+    const filtros: { label: string; value: string }[] = [];
+    if (search) filtros.push({ label: "Busca", value: search });
+    if (tipoFilter && tipoFilter !== "all") filtros.push({ label: "Tipo", value: tipoFilter });
+    if (regiaoFilter && regiaoFilter !== "all") filtros.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
+
+    const opts = { escopoLabel, pessoas: items, filtros };
+    if (kind === "csv") {
+      exportEleicaoCsv(opts);
+      toast.success(`CSV exportado (${items.length} registros)`);
+    } else {
+      exportEleicaoPdf(opts);
+      if (kind === "print") {
+        toast.info("PDF gerado — abra o arquivo e use Ctrl+P para imprimir.");
+      } else {
+        toast.success(`PDF exportado (${items.length} registros)`);
+      }
+    }
+  }
 
   return (
+
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
         <div>
