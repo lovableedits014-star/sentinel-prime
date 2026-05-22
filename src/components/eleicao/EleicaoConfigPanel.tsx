@@ -121,6 +121,10 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       template_cabo_boas_vindas: cfg.template_cabo_boas_vindas,
       grupos_links: cfg.grupos_links,
       grupos_jids: cfg.grupos_jids,
+      envio_coordenador_ativo: cfg.envio_coordenador_ativo,
+      envio_lider_ativo: cfg.envio_lider_ativo,
+      envio_coord_boas_vindas_ativo: cfg.envio_coord_boas_vindas_ativo,
+      envio_cabo_boas_vindas_ativo: cfg.envio_cabo_boas_vindas_ativo,
     };
     const q = cfg.id
       ? supabase.from("eleicao_notif_config" as any).update(payload).eq("id", cfg.id)
