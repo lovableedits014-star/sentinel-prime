@@ -1,30 +1,59 @@
-## Objetivo
-Adicionar um interruptor (Switch) em cada card de mensagem na aba **Eleição → Configurações**, para ligar/desligar o envio automático daquele template específico (coordenador interno, líder, boas-vindas coordenador, boas-vindas cabo). Se desligado, a mensagem automática não é enviada para aquele grupo.
+## Garantia
 
-## Mudanças
+**Nada em Eleição é alterado.** Nenhum arquivo de Eleição é tocado, nenhuma migração de banco é feita, e **nenhuma escrita** acontece em `eleicao_pessoas` (nem renomear cidade/bairro, nem preencher cidade padrão). A Territorial passa a **apenas ler** as colunas que já existem em `eleicao_pessoas` (`bairro`, `regiao`, `rua`, `numero`, `tipo`).
 
-### 1. Banco (migration)
-Adicionar 4 colunas booleanas em `eleicao_notif_config` (default `true`, para manter o comportamento atual):
-- `envio_coordenador_ativo`
-- `envio_lider_ativo`
-- `envio_coord_boas_vindas_ativo`
-- `envio_cabo_boas_vindas_ativo`
+## Diagnóstico
 
-Observação: a chavinha geral `auto_enviar` continua existindo como "master switch".
+A Territorial já consulta `eleicao_pessoas` (linhas 444–466 de `src/pages/Territorial.tsx`), mas os cadastros de Eleição quase não aparecem. Causas confirmadas no banco (30 registros atuais):
 
-### 2. UI — `src/components/eleicao/EleicaoConfigPanel.tsx`
-- Adicionar os 4 campos ao state `Cfg` e ao `load()`/`save()`.
-- No header de cada um dos 4 `Card` de mensagem, adicionar um `<Switch>` com label "Enviar automaticamente" / "Desativado".
-- Quando desligado, o `<Textarea>` continua editável (só desativa o envio), e mostra um aviso sutil.
+- **1 tem `cidade`**, **30 têm `bairro`**, **29 têm `regiao`**.
+- A Territorial usa só `cidade` + parser do `endereco` para deduzir bairro, ignorando as colunas dedicadas `bairro` e `regiao`.
+- Os diálogos de detalhe e mesclagem da Territorial não conhecem `eleicao_pessoas`.
 
-### 3. Edge function — `supabase/functions/eleicao-notify-novo-lider/index.ts`
-Respeitar as novas flags antes de chamar cada `runXxx`:
-- `runCoordenador` / `runSecretaria` (mensagem interna) → checa `envio_coordenador_ativo`
-- `runLider` → checa `envio_lider_ativo`
-- `runCoordBoasVindas` → checa `envio_coord_boas_vindas_ativo`
-- `runCaboBoasVindas` → checa `envio_cabo_boas_vindas_ativo`
+## Plano (somente leitura sobre Eleição)
 
-Quando desativado, registra `results.xxx = { sent:false, reason:"Envio desativado nas configurações", ... }` e não chama a bridge. Vale tanto para o fluxo completo quanto para chamadas com `target` específico.
+### 1. Ler os campos certos de `eleicao_pessoas`
+Em `src/pages/Territorial.tsx`, no `useQuery` `territorial-eleicao`, incluir no `select`: `bairro, rua, numero, regiao, tipo` (somam-se aos já lidos: `id, nome, telefone, cidade, endereco, email, created_at`). Apenas SELECT.
 
-## Resultado
-Você pode, por exemplo, desligar só "Mensagem de boas-vindas para o cabo eleitoral" — ao cadastrar um cabo, ele não recebe WhatsApp, mas coordenador/líder continuam recebendo normalmente.
+### 2. Mapear corretamente para o `GeoEntry`
+No `forEach` de `eleicaoRows` (linha 508):
+- `neighborhood` = `e.bairro` (cai para `extractBairroFromEndereco(e.endereco)` só se `bairro` vier vazio);
+- `city` continua sendo `e.cidade` (sem fallback automático — quem está vazio cai no card "Sem localização", como já funciona hoje);
+- novo campo `region` no `GeoEntry`, vindo de `e.regiao`;
+- novo campo `source: 'eleicao'` para o filtro do passo 5.
+
+### 3. Nova dimensão "Região" na Territorial
+Adicionar uma seção/aba **Região** ao lado de UF → Cidade → Bairro:
+- KPI "Pessoas por região" + total;
+- lista colapsável reaproveitando o visual do `CityGroupedList`, com bairros aninhados dentro de cada região;
+- drill-down por região (similar ao `selectedCity`);
+- cruzar com `eleicao_regioes` (read-only) para exibir o `label` bonito em vez do slug e respeitar a `ordem` configurada.
+
+Hoje só Eleição preenche `regiao`, então a seção fica naturalmente útil para esses cadastros sem precisar mudar nada na origem.
+
+### 4. Drill-down: incluir Eleição no diálogo de detalhes
+Em `src/components/territorial/LocalityDetailDialog.tsx`:
+- adicionar `eleicao_pessoas` ao array `TABLES` e ao tipo `Origin` (label "Eleição", badge própria);
+- buscar `id, nome, telefone, cidade, bairro, regiao, tipo` (SELECT) e aplicar o mesmo match canônico de cidade/bairro das demais origens;
+- mostrar badge da `regiao` quando presente.
+
+### 5. Filtro por origem no topo da Territorial
+Chips de filtro: **Todos / CRM / Apoiadores / Contratados / Indicados / Eleição**, usando o `source` adicionado no passo 2. Não refaz queries, só filtra em memória.
+
+### 6. Aviso visual (apenas leitura, sem botão de ação)
+Card informativo: "X cadastros de Eleição estão sem cidade definida — eles aparecem na seção Região e no card 'Sem localização'." Sem nenhum botão que escreva no banco.
+
+### 7. Verificação do botão "Recarregar"
+O `handleReload` (linha 344) já invalida `territorial-eleicao`. Apenas conferir após as mudanças. Sem alteração.
+
+## Arquivos afetados (frontend apenas)
+
+- `src/pages/Territorial.tsx` — passos 1, 2, 3, 5, 6
+- `src/components/territorial/LocalityDetailDialog.tsx` — passo 4
+
+## Explicitamente fora de escopo
+
+- **Nada** em `src/pages/Eleicao.tsx`, `src/components/eleicao/*`, `src/hooks/useRegioesEleicao.ts`, edge functions de Eleição.
+- **Nenhuma** migração de banco.
+- **Nenhum** `UPDATE`/`DELETE`/`INSERT` em `eleicao_pessoas` ou `eleicao_regioes`.
+- **Não** incluir `eleicao_pessoas` no `MergeLocalitiesDialog` (a mesclagem da Territorial continua atuando só nas tabelas atuais — Eleição fica imune mesmo se você clicar em mesclar).
