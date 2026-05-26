@@ -7,8 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Activity, AlertTriangle, CheckCircle2, Clock, Loader2, QrCode,
-  RefreshCw, Wifi, WifiOff, ListRestart, ArrowUpRight,
+  RefreshCw, Wifi, WifiOff, ListRestart, ArrowUpRight, MessageSquarePlus,
+  ExternalLink, Users,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 type Instance = {
@@ -26,7 +28,14 @@ type Instance = {
   total_sent: number | null;
   total_failed: number | null;
   consecutive_failures: number;
+  pending_onboarding?: boolean | null;
+  onboarding_sent_at?: string | null;
+  onboarding_pending_count?: number | null;
+  suspected_banned_at?: string | null;
 };
+
+type RegiaoLinkRow = { value: string; label: string; link: string; jaEhMembro: boolean };
+type PreviewState = { instanceId: string; apelido: string; pendentes: RegiaoLinkRow[]; jaMembros: RegiaoLinkRow[] } | null;
 
 type RetryRow = { status: string; count: number };
 
@@ -58,6 +67,8 @@ export default function StatusWhatsApp() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [autoSentFor, setAutoSentFor] = useState<Set<string>>(new Set()); // anti-loop por sessão
+  const [preview, setPreview] = useState<PreviewState>(null);
 
   const loadAll = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -71,7 +82,7 @@ export default function StatusWhatsApp() {
 
     const [{ data: inst }, { data: queue }] = await Promise.all([
       supabase.from("whatsapp_instances")
-        .select("id,apelido,status,phone_number,is_active,is_primary,last_health_check_at,last_send_at,last_disconnected_at,connected_since,messages_sent_today,total_sent,total_failed,consecutive_failures")
+        .select("id,apelido,status,phone_number,is_active,is_primary,last_health_check_at,last_send_at,last_disconnected_at,connected_since,messages_sent_today,total_sent,total_failed,consecutive_failures,pending_onboarding,onboarding_sent_at,onboarding_pending_count,suspected_banned_at")
         .eq("client_id", client.id)
         .order("is_primary", { ascending: false })
         .order("created_at", { ascending: true }),
@@ -162,6 +173,70 @@ export default function StatusWhatsApp() {
     if (error || data?.error || data?.success === false) toast.error("Falha: " + (error?.message || data?.error || "verificação não concluída"));
     else { toast.success("Verificação completa solicitada."); loadAll(true); }
   };
+
+  // ---------- Onboarding (Frente 7) ----------
+  const callOnboard = async (instanceId: string, action: "send" | "preview") => {
+    if (!clientId) return { data: null as any, error: new Error("client missing") };
+    return await supabase.functions.invoke("onboard-whatsapp-instance", {
+      body: { client_id: clientId, instance_id: instanceId, action },
+    });
+  };
+
+  const handleSendOnboarding = async (instanceId: string, silent = false) => {
+    setBusy(`onboard-${instanceId}`);
+    const { data, error } = await callOnboard(instanceId, "send");
+    setBusy(null);
+    if (error || data?.success === false) {
+      if (!silent) toast.error("Falha ao enviar onboarding: " + (error?.message || data?.error || "erro desconhecido"));
+      return false;
+    }
+    const pend = data?.pending_count ?? 0;
+    toast.success(
+      pend > 0
+        ? `Lista enviada — abra o WhatsApp dessa linha e entre em ${pend} grupo(s).`
+        : "Mensagem enviada — essa linha já é membro de todos os grupos cadastrados.",
+    );
+    loadAll(true);
+    return true;
+  };
+
+  const handlePreviewOnboarding = async (instanceId: string, apelido: string) => {
+    setBusy(`preview-${instanceId}`);
+    const { data, error } = await callOnboard(instanceId, "preview");
+    setBusy(null);
+    if (error || data?.success === false) {
+      toast.error("Falha ao listar grupos: " + (error?.message || data?.error || "erro desconhecido"));
+      return;
+    }
+    setPreview({
+      instanceId,
+      apelido,
+      pendentes: (data?.pendentes as RegiaoLinkRow[]) || [],
+      jaMembros: (data?.ja_membros_de as RegiaoLinkRow[]) || [],
+    });
+  };
+
+  // Auto-disparo: ao detectar pending_onboarding=true em uma instância secundária
+  // conectada, chama o onboarding uma vez por sessão. Idempotência também é
+  // garantida no servidor (limpa pending_onboarding ao concluir).
+  useEffect(() => {
+    if (!clientId || loading) return;
+    const candidatos = instances.filter((i) =>
+      !i.is_primary
+      && i.pending_onboarding === true
+      && CONNECTED.has(i.status)
+      && !!i.phone_number
+      && !autoSentFor.has(i.id)
+    );
+    if (candidatos.length === 0) return;
+    (async () => {
+      for (const inst of candidatos) {
+        setAutoSentFor((prev) => new Set(prev).add(inst.id));
+        await handleSendOnboarding(inst.id, true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instances, clientId, loading]);
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -283,6 +358,7 @@ export default function StatusWhatsApp() {
                     <th className="text-left py-2 px-3">Última verificação</th>
                     <th className="text-left py-2 px-3">Último envio</th>
                     <th className="text-left py-2 px-3">Falhas seguidas</th>
+                    <th className="text-left py-2 px-3">Onboarding<br/><span className="text-[10px] normal-case text-muted-foreground/70">Links dos grupos</span></th>
                     <th className="text-right py-2 pl-3">Ações</th>
                   </tr>
                 </thead>
@@ -340,6 +416,25 @@ export default function StatusWhatsApp() {
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                           )}
                         </td>
+                        <td className="py-3 px-3">
+                          {inst.is_primary ? (
+                            <span className="text-[11px] text-muted-foreground">—</span>
+                          ) : !inst.onboarding_sent_at ? (
+                            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-400 gap-1">
+                              <Users className="w-3 h-3" /> pendente
+                            </Badge>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <Badge variant="outline" className={`text-[10px] gap-1 ${(inst.onboarding_pending_count ?? 0) > 0 ? "border-amber-500/40 text-amber-700" : "border-emerald-500/40 text-emerald-700"}`}>
+                                <Users className="w-3 h-3" />
+                                {(inst.onboarding_pending_count ?? 0) > 0
+                                  ? `${inst.onboarding_pending_count} grupo(s) a entrar`
+                                  : "completo"}
+                              </Badge>
+                              <div className="text-[10px] text-muted-foreground">enviado {timeSince(inst.onboarding_sent_at)}</div>
+                            </div>
+                          )}
+                        </td>
                         <td className="py-3 pl-3">
                           <div className="flex justify-end gap-1 flex-wrap">
                             <Button size="sm" variant="outline" onClick={() => handleHealthCheck(inst.id)} disabled={busy === `check-${inst.id}`}>
@@ -355,6 +450,30 @@ export default function StatusWhatsApp() {
                               {busy === `rescan-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <QrCode className="w-3 h-3 mr-1" />}
                               Re-scan
                             </Button>
+                            {!inst.is_primary && isConn && (
+                              <>
+                                <Button
+                                  size="sm" variant="outline"
+                                  onClick={() => handlePreviewOnboarding(inst.id, inst.apelido)}
+                                  disabled={busy === `preview-${inst.id}`}
+                                  title="Ver lista de grupos faltantes sem enviar mensagem"
+                                >
+                                  {busy === `preview-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Users className="w-3 h-3" />}
+                                </Button>
+                                <Button
+                                  size="sm" variant="outline"
+                                  onClick={() => handleSendOnboarding(inst.id)}
+                                  disabled={busy === `onboard-${inst.id}`}
+                                  title="Enviar para a própria linha a lista de links de grupos a entrar"
+                                  className="border-primary/40 text-primary"
+                                >
+                                  {busy === `onboard-${inst.id}`
+                                    ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                    : <MessageSquarePlus className="w-3 h-3 mr-1" />}
+                                  {inst.onboarding_sent_at ? "Reenviar lista" : "Enviar lista"}
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -365,13 +484,60 @@ export default function StatusWhatsApp() {
             </div>
           )}
 
-          <div className="mt-4 text-xs text-muted-foreground border-t pt-3">
-            <strong>Ações:</strong> <em>Verificar</em> consulta a ponte e atualiza o status agora ·{" "}
-            <em>Reconectar</em> tenta religar sem novo QR (sessão preservada) ·{" "}
-            <em>Re-scan</em> gera novo QR Code (use quando a sessão expirar — abra Configurações para escanear).
+          <div className="mt-4 text-xs text-muted-foreground border-t pt-3 space-y-1">
+            <div>
+              <strong>Ações:</strong> <em>Verificar</em> consulta a ponte e atualiza o status agora ·{" "}
+              <em>Reconectar</em> tenta religar sem novo QR · <em>Re-scan</em> gera novo QR Code.
+            </div>
+            <div>
+              <strong>Onboarding:</strong> ao conectar uma instância secundária, ela recebe automaticamente na própria
+              conversa do WhatsApp a lista de links dos grupos de região para entrar. Use <em>Reenviar lista</em>{" "}
+              para atualizar, ou o ícone de pessoas para visualizar sem enviar.
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Grupos para "{preview?.apelido}"</DialogTitle>
+            <DialogDescription>
+              {preview && preview.pendentes.length === 0
+                ? "Esta instância já é membro de todos os grupos cadastrados em Eleição."
+                : `Faltam ${preview?.pendentes.length} grupo(s). Abra o WhatsApp dessa linha e clique em cada link para entrar.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {(preview?.pendentes || []).map((r) => (
+              <a key={r.value} href={r.link} target="_blank" rel="noreferrer"
+                className="flex items-center justify-between p-2 rounded border hover:bg-muted/40 text-sm">
+                <span className="font-medium">📍 {r.label}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+              </a>
+            ))}
+            {preview && preview.jaMembros.length > 0 && (
+              <div className="pt-2 mt-2 border-t">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Já é membro ({preview.jaMembros.length})</p>
+                <div className="flex flex-wrap gap-1">
+                  {preview.jaMembros.map((r) => (
+                    <Badge key={r.value} variant="outline" className="text-[10px]">✓ {r.label}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            {preview && preview.pendentes.length > 0 && (
+              <Button size="sm" onClick={() => { if (preview) { handleSendOnboarding(preview.instanceId); setPreview(null); } }}>
+                <MessageSquarePlus className="w-3.5 h-3.5 mr-1" />
+                Enviar para a linha
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => setPreview(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

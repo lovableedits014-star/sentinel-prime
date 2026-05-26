@@ -62,3 +62,6 @@ verify_jwt = true
 
 [functions.eleicao-check-grupo-membros]
 verify_jwt = true
+
+[functions.onboard-whatsapp-instance]
+verify_jwt = true
