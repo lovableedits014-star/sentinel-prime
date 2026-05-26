@@ -782,6 +782,24 @@ export default function Disparos() {
                     {groupsNoPostCount} sem permissão de envio
                   </Badge>
                 )}
+                {groupsTotalActive > 0 && (
+                  <Badge
+                    variant="outline"
+                    className={
+                      groupsWithoutBackup === 0
+                        ? "gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                        : groupsBackupPct >= 50
+                          ? "gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                          : "gap-1 border-destructive/40 text-destructive"
+                    }
+                    title={`${groupsWithBackup} de ${groupsTotalActive} grupo(s) também são vistos por uma instância de backup. Se a principal cair, esses continuam recebendo disparo.`}
+                  >
+                    <Users className="h-3 w-3" />
+                    {groupsWithoutBackup === 0
+                      ? `100% com backup`
+                      : `${groupsBackupPct}% com backup · ${groupsWithoutBackup} sem`}
+                  </Badge>
+                )}
                 {groupsInactiveCount > 0 && (
                   <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
                     <XCircle className="h-3 w-3" />
