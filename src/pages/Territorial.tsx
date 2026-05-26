@@ -1458,6 +1458,103 @@ export default function Territorial() {
       <div className="border-t" />
 
       {/* ═══════════════════════════════════════ */}
+      {/* POR REGIÃO (microzonas da campanha)    */}
+      {/* ═══════════════════════════════════════ */}
+      {regionGroups.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" />
+              Por Região
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Microzonas da campanha (cadastradas em Eleição → Configurações).
+              Clique numa região para ver os bairros dela.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MetricCard icon={MapPin} label="Regiões ativas" value={regionGroups.length} description="Com pelo menos 1 cadastro" />
+            <MetricCard icon={Users} label="Pessoas em regiões" value={regionGroups.reduce((s, r) => s + r.count, 0)} accent description="Soma de todas as regiões" />
+            <MetricCard icon={TrendingUp} label="Maior região" value={regionGroups[0]?.count || 0} description={regionGroups[0]?.label || "—"} />
+            <MetricCard icon={Home} label="Bairros mapeados" value={regionGroups.reduce((s, r) => s + Object.keys(r.neighborhoods).length, 0)} description="Em todas as regiões" />
+          </div>
+
+          <Card>
+            <CardContent className="pt-4 space-y-2">
+              {regionGroups.map((r) => {
+                const isOpen = selectedRegion === r.value;
+                const neighList = Object.values(r.neighborhoods).sort((a, b) => b.count - a.count);
+                const maxR = regionGroups[0]?.count || 1;
+                const ratio = r.count / maxR;
+                return (
+                  <Collapsible
+                    key={r.value}
+                    open={isOpen}
+                    onOpenChange={(o) => setSelectedRegion(o ? r.value : null)}
+                  >
+                    <Card className="overflow-hidden">
+                      <CollapsibleTrigger asChild>
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                        >
+                          <MapPin className="w-4 h-4 text-primary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-sm truncate">{r.label}</span>
+                              {r.label !== r.value && (
+                                <Badge variant="outline" className="h-5 text-[10px] font-mono">{r.value}</Badge>
+                              )}
+                            </div>
+                            <div className="h-1.5 mt-1 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(ratio * 100, 3)}%` }} />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              {neighList.length} bairro{neighList.length === 1 ? "" : "s"} · {r.count} pessoa{r.count === 1 ? "" : "s"}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-xs shrink-0">{r.count}</Badge>
+                          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="border-t bg-muted/20 p-3">
+                          {neighList.length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-4">
+                              Nenhum bairro detalhado nesta região.
+                            </p>
+                          ) : (
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              {neighList.map((n) => (
+                                <div key={n.name} className="rounded-lg border bg-card p-3">
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <span className="text-sm font-medium truncate">{n.name}</span>
+                                    <Badge variant="outline" className="text-[10px] shrink-0">{n.count}</Badge>
+                                  </div>
+                                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max((n.count / (neighList[0]?.count || 1)) * 100, 3)}%` }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    </Card>
+                  </Collapsible>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Divider */}
+      <div className="border-t" />
+
+
+      {/* ═══════════════════════════════════════ */}
       {/* ÚLTIMOS CADASTROS                      */}
       {/* ═══════════════════════════════════════ */}
       <div className="space-y-4">
