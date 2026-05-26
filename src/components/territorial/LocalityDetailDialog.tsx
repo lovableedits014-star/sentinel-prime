@@ -101,12 +101,13 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
         return out;
       };
 
-      const [pessoas, contratados, indicados, funcionarios, apoiadores] = await Promise.all([
+      const [pessoas, contratados, indicados, funcionarios, apoiadores, eleicao] = await Promise.all([
         fetchAll("pessoas", "id, nome, telefone, cidade, bairro"),
         fetchAll("contratados", "id, nome, telefone, cidade, bairro"),
         fetchAll("contratado_indicados", "id, nome, telefone, cidade, bairro"),
         fetchAll("funcionarios", "id, nome, telefone, cidade, bairro"),
         fetchAll("supporter_accounts", "id, name, phone, city, neighborhood"),
+        fetchAll("eleicao_pessoas" as any, "id, nome, telefone, cidade, bairro, regiao"),
       ]);
 
       const collected: Row[] = [];
@@ -125,6 +126,7 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
             telefone: r.telefone ?? r.phone,
             cidade: r.cidade ?? r.city,
             bairro,
+            regiao: r.regiao ?? null,
           });
         }
       };
@@ -133,6 +135,7 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
       push("contratado_indicados", indicados);
       push("funcionarios", funcionarios);
       push("supporter_accounts", apoiadores);
+      push("eleicao_pessoas", eleicao);
 
       collected.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
       if (!cancel) {
