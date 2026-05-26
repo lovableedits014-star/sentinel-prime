@@ -131,12 +131,13 @@ const AppRouter = () => {
               <Route path="/militancia" element={<Militancia />} />
               <Route path="/engagement" element={<Engagement />} />
               <Route path="/inteligencia-conteudo" element={<InteligenciaConteudo />} />
-              <Route path="/disparos" element={<Disparos />} />
+              <Route path="/whatsapp" element={<CentralWhatsApp />} />
+              <Route path="/disparos" element={<Navigate to="/whatsapp?tab=disparos" replace />} />
               <Route path="/territorial" element={<Territorial />} />
               <Route path="/pessoas" element={<Pessoas />} />
               <Route path="/pessoas/:id" element={<PessoaPerfil />} />
               <Route path="/recrutamento" element={<Territorial />} />
-              <Route path="/missoes-ia" element={<MissoesIA />} />
+              <Route path="/missoes-ia" element={<Navigate to="/whatsapp?tab=missoes" replace />} />
               <Route path="/funcionarios" element={<Funcionarios />} />
               <Route path="/presenca" element={<ControlePresenca />} />
               <Route path="/contratados" element={<Navigate to="/eleicao" replace />} />
@@ -147,7 +148,7 @@ const AppRouter = () => {
               <Route path="/calendario-politico" element={<CalendarioPolitico />} />
               <Route path="/midia" element={<Midia />} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/status-whatsapp" element={<StatusWhatsApp />} />
+              <Route path="/status-whatsapp" element={<Navigate to="/whatsapp?tab=status" replace />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
