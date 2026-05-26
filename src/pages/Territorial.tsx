@@ -927,6 +927,52 @@ export default function Territorial() {
         </Button>
       </div>
 
+      {/* Filtro de origem (chips) — apenas filtragem em memória, não altera dados */}
+      <Card>
+        <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground mr-1">Mostrar:</span>
+          {([
+            { v: "todos", label: "Todos" },
+            { v: "crm", label: "CRM" },
+            { v: "apoiador", label: "Apoiadores" },
+            { v: "indicado", label: "Indicados" },
+            { v: "eleicao", label: "Eleição" },
+          ] as const).map((opt) => (
+            <Button
+              key={opt.v}
+              size="sm"
+              variant={originFilter === opt.v ? "default" : "outline"}
+              className="h-7 text-xs"
+              onClick={() => setOriginFilter(opt.v)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+          <span className="text-[10px] text-muted-foreground ml-auto">
+            {displayedGeoEntries.length.toLocaleString("pt-BR")} pessoa{displayedGeoEntries.length === 1 ? "" : "s"} na visão atual
+          </span>
+        </CardContent>
+      </Card>
+
+      {/* Aviso: cadastros de Eleição sem cidade definida */}
+      {eleicaoSemCidade > 0 && (originFilter === "todos" || originFilter === "eleicao") && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-3 px-4 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-medium">
+                {eleicaoSemCidade} cadastro{eleicaoSemCidade === 1 ? "" : "s"} de Eleição sem cidade definida
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                Esses registros aparecem na seção <strong>Por Região</strong> abaixo e no contador "Sem localização".
+                A aba de Eleição não é alterada — esta visão é apenas leitura.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+
       {/* ═══════════════════════════════════════ */}
       {/* CRESCIMENTO DA BASE                    */}
       {/* ═══════════════════════════════════════ */}
