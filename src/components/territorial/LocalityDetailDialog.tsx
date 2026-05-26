@@ -167,12 +167,14 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
         if (!existing.origins.includes(r.origin)) existing.origins.push(r.origin);
         if (!existing.telefone && r.telefone) existing.telefone = r.telefone;
         if (!existing.bairro && r.bairro) existing.bairro = r.bairro;
+        if (!existing.regiao && r.regiao) existing.regiao = r.regiao;
       } else {
         map.set(key, {
           key,
           nome: r.nome,
           telefone: r.telefone,
           bairro: r.bairro,
+          regiao: r.regiao ?? null,
           origins: [r.origin],
         });
       }
