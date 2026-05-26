@@ -537,6 +537,51 @@ export default function Territorial() {
     return dedupeByPerson(entries);
   }, [supporters, confirmedIndicados, allPessoas, eleicaoRows]);
 
+  // Aplica filtro por origem (chip). dedupeByPerson pode ter colapsado dois registros da mesma pessoa
+  // em origens diferentes; nesse caso a entrada efetiva carrega o source da primeira ocorrência —
+  // o filtro fica permissivo para origens raras. Isto é intencional: o filtro é exploratório, não auditoria.
+  const displayedGeoEntries = useMemo<GeoEntry[]>(() => {
+    if (originFilter === "todos") return allGeoEntries;
+    return allGeoEntries.filter((e) => e.source === originFilter);
+  }, [allGeoEntries, originFilter]);
+
+  // Contagem de cadastros de Eleição sem cidade (aviso informativo)
+  const eleicaoSemCidade = useMemo(
+    () => (eleicaoRows || []).filter((e) => !e.cidade || !e.cidade.trim()).length,
+    [eleicaoRows],
+  );
+
+  // Agrupamento por Região (campo `regiao` — hoje vem só de Eleição)
+  const regionGroups = useMemo(() => {
+    const labelMap = new Map<string, { label: string; ordem: number }>();
+    (eleicaoRegioes || []).forEach((r) => labelMap.set(r.value, { label: r.label, ordem: r.ordem }));
+    type Bucket = { value: string; label: string; ordem: number; count: number; neighborhoods: Record<string, { name: string; count: number }> };
+    const map: Record<string, Bucket> = {};
+    for (const e of displayedGeoEntries) {
+      if (!e.region) continue;
+      const meta = labelMap.get(e.region);
+      if (!map[e.region]) {
+        map[e.region] = {
+          value: e.region,
+          label: meta?.label || e.region,
+          ordem: meta?.ordem ?? 9999,
+          count: 0,
+          neighborhoods: {},
+        };
+      }
+      map[e.region].count++;
+      const neigh = (e.neighborhood || "").trim();
+      if (neigh) {
+        const key = neigh.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        if (!map[e.region].neighborhoods[key]) {
+          map[e.region].neighborhoods[key] = { name: neigh, count: 0 };
+        }
+        map[e.region].neighborhoods[key].count++;
+      }
+    }
+    return Object.values(map).sort((a, b) => a.ordem - b.ordem || b.count - a.count);
+  }, [displayedGeoEntries, eleicaoRegioes]);
+
   // Heuristic: infer UF from explicit state field, or "Cidade - UF" / "Cidade/UF" suffix in city.
   const inferUF = (e: GeoEntry): string | null => {
     const fromState = resolveUF(e.state);
