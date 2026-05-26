@@ -80,7 +80,6 @@ const MENU_SECTIONS: MenuSection[] = [
   {
     label: "Mobilização",
     items: [
-      { icon: Sparkles, label: "Missões IA", path: "/missoes-ia" },
       { icon: Users, label: "Funcionários", path: "/funcionarios" },
       { icon: CalendarCheck, label: "Controle de Presença", path: "/presenca" },
       { icon: CalendarDays, label: "Calendário Político", path: "/calendario-politico" },
@@ -89,7 +88,7 @@ const MENU_SECTIONS: MenuSection[] = [
   {
     label: "Operacional",
     items: [
-      { icon: Send, label: "Disparos WhatsApp", path: "/disparos" },
+      { icon: Send, label: "Central WhatsApp", path: "/whatsapp" },
       { icon: Vote, label: "Eleição", path: "/eleicao" },
       { icon: MapPin, label: "Territorial", path: "/territorial" },
       { icon: Vote, label: "Inteligência Eleitoral", path: "/inteligencia-eleitoral" },
@@ -99,7 +98,6 @@ const MENU_SECTIONS: MenuSection[] = [
   {
     label: "Sistema",
     items: [
-      { icon: Activity, label: "Status WhatsApp", path: "/status-whatsapp" },
       { icon: Settings, label: "Configurações", path: "/settings" },
     ],
   },
