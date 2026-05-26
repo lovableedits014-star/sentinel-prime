@@ -28,7 +28,14 @@ type Instance = {
   total_sent: number | null;
   total_failed: number | null;
   consecutive_failures: number;
+  pending_onboarding?: boolean | null;
+  onboarding_sent_at?: string | null;
+  onboarding_pending_count?: number | null;
+  suspected_banned_at?: string | null;
 };
+
+type RegiaoLinkRow = { value: string; label: string; link: string; jaEhMembro: boolean };
+type PreviewState = { instanceId: string; apelido: string; pendentes: RegiaoLinkRow[]; jaMembros: RegiaoLinkRow[] } | null;
 
 type RetryRow = { status: string; count: number };
 
