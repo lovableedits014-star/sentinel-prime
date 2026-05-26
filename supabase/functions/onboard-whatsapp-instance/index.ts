@@ -147,19 +147,32 @@ Deno.serve(async (req: Request) => {
       return jsonResp({ success: false, error: "client_id e instance_id são obrigatórios" }, 400);
     }
 
-    // 1) Carrega a instância
+    // 1) Carrega a instância ALVO (a que precisa entrar nos grupos)
     const { data: inst, error: instErr } = await admin
       .from("whatsapp_instances")
-      .select("id, apelido, phone_number, bridge_url, bridge_api_key, is_primary, status, client_id")
+      .select("id, apelido, phone_number, is_primary, status, client_id")
       .eq("id", instanceId)
       .eq("client_id", clientId)
       .maybeSingle();
 
     if (instErr || !inst) return jsonResp({ success: false, error: "Instância não encontrada" }, 404);
     if (!inst.phone_number) return jsonResp({ success: false, error: "Instância ainda sem número associado" }, 400);
-    if (!inst.bridge_url || !inst.bridge_api_key) {
-      return jsonResp({ success: false, error: "Instância sem bridge configurada" }, 400);
-    }
+
+    // 1b) Escolhe a instância REMETENTE (qualquer outra conectada e saudável,
+    //     preferindo a principal). WhatsApp não entrega mensagem da linha pra
+    //     ela mesma, por isso usamos outra instância pra enviar pra essa.
+    const { data: candidatosSender } = await admin
+      .from("whatsapp_instances")
+      .select("id, apelido, phone_number, bridge_url, bridge_api_key, is_primary, status, consecutive_failures, suspected_banned_at")
+      .eq("client_id", clientId)
+      .neq("id", instanceId)
+      .in("status", ["connected", "open"])
+      .order("is_primary", { ascending: false })
+      .order("consecutive_failures", { ascending: true });
+
+    const sender = (candidatosSender || []).find(
+      (s: any) => s.bridge_url && s.bridge_api_key && !s.suspected_banned_at && (s.consecutive_failures ?? 0) < 5,
+    );
 
     // 2) Carrega config de Eleição (apenas leitura) — grupos_links + grupos_jids
     const { data: cfg } = await admin
@@ -231,7 +244,16 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 7) Envia para a própria instância
+    // 7) Envia DE outra instância PARA o número da instância alvo
+    //    (WhatsApp não entrega mensagem da própria linha pra ela mesma.)
+    if (!sender) {
+      return jsonResp({
+        success: false,
+        error: "Nenhuma outra instância conectada disponível para enviar o onboarding. Conecte/recupere a linha principal antes.",
+        pending_count: pendentes.length,
+      }, 409);
+    }
+
     const phoneE164 = cleanPhone(inst.phone_number);
     if (!phoneE164 || phoneE164.length < 12) {
       return jsonResp({ success: false, error: `Número da instância inválido: ${inst.phone_number}` }, 400);
@@ -245,17 +267,18 @@ Deno.serve(async (req: Request) => {
     });
 
     const { ok, status, data: sendData } = await bridgeSend(
-      inst.bridge_url,
-      inst.bridge_api_key,
+      sender.bridge_url,
+      sender.bridge_api_key,
       phoneE164,
       message,
     );
 
     if (!ok) {
-      // Não marca onboarding_sent_at; deixa pending_onboarding=true para retry.
       return jsonResp({
         success: false,
         error: sendData?.error || `Bridge retornou ${status}`,
+        sender_id: sender.id,
+        sender_apelido: sender.apelido,
         pending_count: pendentes.length,
       }, 502);
     }
@@ -275,6 +298,8 @@ Deno.serve(async (req: Request) => {
       already_member_count: jaMembrosDe.length,
       total_with_link: todasRegioesComLink.length,
       phone: phoneE164,
+      sender_id: sender.id,
+      sender_apelido: sender.apelido,
     });
   } catch (err) {
     console.error("[onboard-whatsapp-instance] fatal:", err);
