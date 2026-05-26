@@ -324,6 +324,8 @@ export default function Territorial() {
   const [search, setSearch] = useState("");
   const [selectedUF, setSelectedUF] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  const [originFilter, setOriginFilter] = useState<"todos" | "crm" | "apoiador" | "indicado" | "eleicao">("todos");
 
   // Drill-down dialog state
   const [detailOpen, setDetailOpen] = useState(false);
