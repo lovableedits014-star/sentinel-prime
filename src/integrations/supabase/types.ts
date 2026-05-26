@@ -1822,7 +1822,7 @@ export type Database = {
           numero: string | null
           observacoes: string | null
           parent_id: string | null
-          regiao: Database["public"]["Enums"]["eleicao_regiao"] | null
+          regiao: string | null
           rua: string | null
           telefone: string
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
@@ -1846,7 +1846,7 @@ export type Database = {
           numero?: string | null
           observacoes?: string | null
           parent_id?: string | null
-          regiao?: Database["public"]["Enums"]["eleicao_regiao"] | null
+          regiao?: string | null
           rua?: string | null
           telefone: string
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
@@ -1870,7 +1870,7 @@ export type Database = {
           numero?: string | null
           observacoes?: string | null
           parent_id?: string | null
-          regiao?: Database["public"]["Enums"]["eleicao_regiao"] | null
+          regiao?: string | null
           rua?: string | null
           telefone?: string
           tipo?: Database["public"]["Enums"]["eleicao_tipo"]
@@ -7410,15 +7410,6 @@ export type Database = {
         | "portal_pessoa"
       comment_status: "pending" | "responded" | "ignored"
       eleicao_escopo: "campo_grande" | "interior"
-      eleicao_regiao:
-        | "centro"
-        | "segredo"
-        | "prosa"
-        | "bandeira"
-        | "anhanduizinho"
-        | "lagoa"
-        | "moreninha"
-        | "imbirussu"
       eleicao_tipo: "coordenador" | "lider" | "cabo"
       llm_provider:
         | "groq"
@@ -7599,16 +7590,6 @@ export const Constants = {
       ],
       comment_status: ["pending", "responded", "ignored"],
       eleicao_escopo: ["campo_grande", "interior"],
-      eleicao_regiao: [
-        "centro",
-        "segredo",
-        "prosa",
-        "bandeira",
-        "anhanduizinho",
-        "lagoa",
-        "moreninha",
-        "imbirussu",
-      ],
       eleicao_tipo: ["coordenador", "lider", "cabo"],
       llm_provider: [
         "groq",
