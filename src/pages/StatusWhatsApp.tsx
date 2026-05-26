@@ -484,13 +484,60 @@ export default function StatusWhatsApp() {
             </div>
           )}
 
-          <div className="mt-4 text-xs text-muted-foreground border-t pt-3">
-            <strong>Ações:</strong> <em>Verificar</em> consulta a ponte e atualiza o status agora ·{" "}
-            <em>Reconectar</em> tenta religar sem novo QR (sessão preservada) ·{" "}
-            <em>Re-scan</em> gera novo QR Code (use quando a sessão expirar — abra Configurações para escanear).
+          <div className="mt-4 text-xs text-muted-foreground border-t pt-3 space-y-1">
+            <div>
+              <strong>Ações:</strong> <em>Verificar</em> consulta a ponte e atualiza o status agora ·{" "}
+              <em>Reconectar</em> tenta religar sem novo QR · <em>Re-scan</em> gera novo QR Code.
+            </div>
+            <div>
+              <strong>Onboarding:</strong> ao conectar uma instância secundária, ela recebe automaticamente na própria
+              conversa do WhatsApp a lista de links dos grupos de região para entrar. Use <em>Reenviar lista</em>{" "}
+              para atualizar, ou o ícone de pessoas para visualizar sem enviar.
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Grupos para "{preview?.apelido}"</DialogTitle>
+            <DialogDescription>
+              {preview && preview.pendentes.length === 0
+                ? "Esta instância já é membro de todos os grupos cadastrados em Eleição."
+                : `Faltam ${preview?.pendentes.length} grupo(s). Abra o WhatsApp dessa linha e clique em cada link para entrar.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {(preview?.pendentes || []).map((r) => (
+              <a key={r.value} href={r.link} target="_blank" rel="noreferrer"
+                className="flex items-center justify-between p-2 rounded border hover:bg-muted/40 text-sm">
+                <span className="font-medium">📍 {r.label}</span>
+                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+              </a>
+            ))}
+            {preview && preview.jaMembros.length > 0 && (
+              <div className="pt-2 mt-2 border-t">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Já é membro ({preview.jaMembros.length})</p>
+                <div className="flex flex-wrap gap-1">
+                  {preview.jaMembros.map((r) => (
+                    <Badge key={r.value} variant="outline" className="text-[10px]">✓ {r.label}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            {preview && preview.pendentes.length > 0 && (
+              <Button size="sm" onClick={() => { if (preview) { handleSendOnboarding(preview.instanceId); setPreview(null); } }}>
+                <MessageSquarePlus className="w-3.5 h-3.5 mr-1" />
+                Enviar para a linha
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={() => setPreview(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
