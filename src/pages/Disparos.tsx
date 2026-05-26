@@ -232,6 +232,9 @@ export default function Disparos() {
     inactiveCount: groupsInactiveCount,
     noPostCount: groupsNoPostCount,
     favoriteCount: groupsFavoriteCount,
+    withBackupCount: groupsWithBackup,
+    withoutBackupCount: groupsWithoutBackup,
+    backupCoveragePct: groupsBackupPct,
     lastSyncedAt: groupsLastSyncedAt,
     isSyncing: groupsSyncing,
     syncingInstanceId,
@@ -779,6 +782,24 @@ export default function Disparos() {
                     {groupsNoPostCount} sem permissão de envio
                   </Badge>
                 )}
+                {groupsTotalActive > 0 && (
+                  <Badge
+                    variant="outline"
+                    className={
+                      groupsWithoutBackup === 0
+                        ? "gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                        : groupsBackupPct >= 50
+                          ? "gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                          : "gap-1 border-destructive/40 text-destructive"
+                    }
+                    title={`${groupsWithBackup} de ${groupsTotalActive} grupo(s) também são vistos por uma instância de backup. Se a principal cair, esses continuam recebendo disparo.`}
+                  >
+                    <Users className="h-3 w-3" />
+                    {groupsWithoutBackup === 0
+                      ? `100% com backup`
+                      : `${groupsBackupPct}% com backup · ${groupsWithoutBackup} sem`}
+                  </Badge>
+                )}
                 {groupsInactiveCount > 0 && (
                   <Badge variant="outline" className="gap-1 border-destructive/40 text-destructive">
                     <XCircle className="h-3 w-3" />
@@ -933,13 +954,38 @@ export default function Disparos() {
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm truncate font-medium">{g.name || g.group_jid}</p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-sm truncate font-medium">{g.name || g.group_jid}</p>
+                                  {(() => {
+                                    const backupCount = Math.max(0, (g.instance_ids?.length ?? 1) - 1);
+                                    if (backupCount === 0) {
+                                      return (
+                                        <Badge
+                                          variant="outline"
+                                          className="h-4 px-1 text-[9px] gap-0.5 border-destructive/40 text-destructive"
+                                          title="Apenas a instância principal enxerga este grupo. Se ela cair, ninguém envia para ele."
+                                        >
+                                          <Ban className="h-2.5 w-2.5" />
+                                          sem backup
+                                        </Badge>
+                                      );
+                                    }
+                                    return (
+                                      <Badge
+                                        variant="outline"
+                                        className="h-4 px-1 text-[9px] gap-0.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                                        title={`Coberto por ${g.instance_ids?.length ?? 1} instância(s) — ${backupCount} backup(s) disponível(is).`}
+                                      >
+                                        +{backupCount} backup
+                                      </Badge>
+                                    );
+                                  })()}
+                                </div>
                                 <p className="text-[11px] text-muted-foreground flex items-center gap-1 flex-wrap">
                                   <Users className="h-3 w-3" />
                                   {g.participants_count} membros
                                   {g.is_admin ? " · admin" : ""}
                                   {cantSend ? " · só admins postam" : ""}
-                                  {g.instance_ids && g.instance_ids.length > 1 ? ` · em ${g.instance_ids.length} instâncias` : ""}
                                 </p>
                               </div>
                             </label>

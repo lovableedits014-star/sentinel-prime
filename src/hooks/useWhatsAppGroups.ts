@@ -114,17 +114,22 @@ export function useWhatsAppGroups(clientId: string | undefined) {
 
   // Dedupe por group_jid (mesmo grupo pode existir em várias instâncias).
   // Preferência: primeiro o que é admin, depois o mais recente. Mantém referência
-  // de quais instâncias enxergam o grupo para exibir badge no UI.
+  // de quais instâncias ATIVAS enxergam o grupo — usado pelo badge de redundância.
   const allRawGroups = groupsQuery.data || [];
   const allGroups = (() => {
     const byJid = new Map<string, WhatsAppGroup & { instance_ids: string[] }>();
     for (const g of allRawGroups) {
       const existing = byJid.get(g.group_jid);
+      // Só conta como "instância que enxerga" se a linha do grupo está ativa,
+      // senão um chip que perdeu o grupo continuaria contando como backup.
+      const activeIds = g.is_active ? [g.instance_id] : [];
       if (!existing) {
-        byJid.set(g.group_jid, { ...g, instance_ids: [g.instance_id] });
+        byJid.set(g.group_jid, { ...g, instance_ids: activeIds });
         continue;
       }
-      existing.instance_ids.push(g.instance_id);
+      if (g.is_active && !existing.instance_ids.includes(g.instance_id)) {
+        existing.instance_ids.push(g.instance_id);
+      }
       const better =
         (g.is_admin && !existing.is_admin) ||
         (g.is_admin === existing.is_admin && g.last_synced_at > existing.last_synced_at);
@@ -135,11 +140,18 @@ export function useWhatsAppGroups(clientId: string | undefined) {
   const activeGroups = allGroups.filter((g) => g.is_active);
   const inactiveCount = allGroups.length - activeGroups.length;
   const noPostCount = activeGroups.filter((g) => g.is_announcement && !g.is_admin).length;
+  // KPI de redundância: quantos grupos ativos têm pelo menos 1 backup (2+ instâncias).
+  const withBackupCount = activeGroups.filter((g) => (g.instance_ids?.length ?? 0) >= 2).length;
+  const withoutBackupCount = activeGroups.length - withBackupCount;
+  const backupCoveragePct = activeGroups.length > 0
+    ? Math.round((withBackupCount / activeGroups.length) * 100)
+    : 0;
   const lastSyncedAt = activeGroups.reduce<string | null>((acc, g) => {
     if (!g.last_synced_at) return acc;
     if (!acc || g.last_synced_at > acc) return g.last_synced_at;
     return acc;
   }, null);
+
 
   const primaryConnected = isConnectedStatus(primaryInstance?.status);
 
@@ -335,6 +347,9 @@ export function useWhatsAppGroups(clientId: string | undefined) {
     inactiveCount,
     noPostCount,
     favoriteCount,
+    withBackupCount,
+    withoutBackupCount,
+    backupCoveragePct,
     lastSyncedAt,
     isLoading: groupsQuery.isLoading,
     isSyncing,
