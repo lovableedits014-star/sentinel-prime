@@ -440,18 +440,18 @@ export default function Territorial() {
     enabled: !!client?.id,
   });
 
-  // ── Eleição: pessoas cadastradas no fluxo de coordenadores/contratados ──
+  // ── Eleição: pessoas cadastradas no fluxo de coordenadores/contratados (SOMENTE LEITURA) ──
   const { data: eleicaoRows } = useQuery({
     queryKey: ["territorial-eleicao", client?.id],
     queryFn: async () => {
       if (!client?.id) return [];
       const PAGE = 1000;
-      const result: Array<{ id: string; nome: string; telefone: string | null; cidade: string | null; endereco: string | null; email: string | null; created_at: string }> = [];
+      const result: Array<{ id: string; nome: string; telefone: string | null; cidade: string | null; bairro: string | null; rua: string | null; numero: string | null; regiao: string | null; tipo: string | null; endereco: string | null; email: string | null; created_at: string }> = [];
       let from = 0;
       while (true) {
         const { data } = await supabase
           .from("eleicao_pessoas")
-          .select("id, nome, telefone, cidade, endereco, email, created_at")
+          .select("id, nome, telefone, cidade, bairro, rua, numero, regiao, tipo, endereco, email, created_at")
           .eq("client_id", client.id)
           .order("created_at", { ascending: false })
           .range(from, from + PAGE - 1);
@@ -461,6 +461,21 @@ export default function Territorial() {
         from += PAGE;
       }
       return result;
+    },
+    enabled: !!client?.id,
+  });
+
+  // ── Regiões de Eleição (apenas para label bonito + ordem; somente leitura) ──
+  const { data: eleicaoRegioes } = useQuery({
+    queryKey: ["territorial-eleicao-regioes", client?.id],
+    queryFn: async () => {
+      if (!client?.id) return [] as Array<{ value: string; label: string; ordem: number }>;
+      const { data } = await supabase
+        .from("eleicao_regioes" as any)
+        .select("value, label, ordem")
+        .eq("client_id", client.id)
+        .eq("ativo", true);
+      return (data as any[]) || [];
     },
     enabled: !!client?.id,
   });
