@@ -7,8 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Activity, AlertTriangle, CheckCircle2, Clock, Loader2, QrCode,
-  RefreshCw, Wifi, WifiOff, ListRestart, ArrowUpRight,
+  RefreshCw, Wifi, WifiOff, ListRestart, ArrowUpRight, MessageSquarePlus,
+  ExternalLink, Users,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 type Instance = {
