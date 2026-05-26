@@ -21,7 +21,7 @@ export interface LocalityDetailDialogProps {
   neighborhood?: string | null;
 }
 
-type Origin = "pessoas" | "contratados" | "contratado_indicados" | "funcionarios" | "supporter_accounts";
+type Origin = "pessoas" | "contratados" | "contratado_indicados" | "funcionarios" | "supporter_accounts" | "eleicao_pessoas";
 
 interface Row {
   id: string;
@@ -30,6 +30,7 @@ interface Row {
   telefone: string | null;
   cidade: string | null;
   bairro: string | null;
+  regiao?: string | null;
 }
 
 interface MergedRow {
@@ -37,6 +38,7 @@ interface MergedRow {
   nome: string;
   telefone: string | null;
   bairro: string | null;
+  regiao?: string | null;
   origins: Origin[];
 }
 
@@ -54,6 +56,7 @@ const ORIGIN_LABEL: Record<Origin, string> = {
   contratado_indicados: "Indicado",
   funcionarios: "Funcionário",
   supporter_accounts: "Apoiador",
+  eleicao_pessoas: "Eleição",
 };
 
 const ORIGIN_VARIANT: Record<Origin, "default" | "secondary" | "outline" | "destructive"> = {
@@ -62,6 +65,7 @@ const ORIGIN_VARIANT: Record<Origin, "default" | "secondary" | "outline" | "dest
   contratado_indicados: "outline",
   funcionarios: "destructive",
   supporter_accounts: "default",
+  eleicao_pessoas: "secondary",
 };
 
 export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city, neighborhood }: LocalityDetailDialogProps) {
