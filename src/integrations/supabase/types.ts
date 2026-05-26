@@ -7303,10 +7303,19 @@ export type Database = {
       normalize_person_name: { Args: { p_name: string }; Returns: string }
       normalize_phone: { Args: { p: string }; Returns: string }
       only_digits: { Args: { input: string }; Returns: string }
-      pick_healthy_instance_for_group: {
-        Args: { p_client_id: string; p_group_jid: string }
-        Returns: string
-      }
+      pick_healthy_instance_for_group:
+        | {
+            Args: { p_client_id: string; p_group_jid: string }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_client_id: string
+              p_exclude_instance_ids?: string[]
+              p_group_jid: string
+            }
+            Returns: string
+          }
       pick_healthy_whatsapp_instance: {
         Args: { p_client_id: string }
         Returns: string
