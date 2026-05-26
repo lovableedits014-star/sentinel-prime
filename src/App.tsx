@@ -51,6 +51,7 @@ const InteligenciaEleitoral = lazy(() => import("./pages/InteligenciaEleitoral")
 const CalendarioPolitico = lazy(() => import("./pages/CalendarioPolitico"));
 const Midia = lazy(() => import("./pages/Midia"));
 const StatusWhatsApp = lazy(() => import("./pages/StatusWhatsApp"));
+const CentralWhatsApp = lazy(() => import("./pages/CentralWhatsApp"));
 const Militancia = lazy(() => import("./pages/Militancia"));
 const InteligenciaConteudo = lazy(() => import("./pages/InteligenciaConteudo"));
 const FotoPublica = lazy(() => import("./pages/FotoPublica"));
