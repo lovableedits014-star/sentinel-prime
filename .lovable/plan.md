@@ -1,59 +1,69 @@
-## Garantia
 
-**Nada em Eleição é alterado.** Nenhum arquivo de Eleição é tocado, nenhuma migração de banco é feita, e **nenhuma escrita** acontece em `eleicao_pessoas` (nem renomear cidade/bairro, nem preencher cidade padrão). A Territorial passa a **apenas ler** as colunas que já existem em `eleicao_pessoas` (`bairro`, `regiao`, `rua`, `numero`, `tipo`).
+# Plano: Central WhatsApp (unificação de Missões IA + Disparos + Status)
 
-## Diagnóstico
+## Objetivo
+Juntar três páginas que hoje estão em locais diferentes da sidebar em uma única central, mantendo 100% das funcionalidades atuais e apenas reorganizando navegação. Zero mudança de lógica, banco, edge functions ou componentes internos.
 
-A Territorial já consulta `eleicao_pessoas` (linhas 444–466 de `src/pages/Territorial.tsx`), mas os cadastros de Eleição quase não aparecem. Causas confirmadas no banco (30 registros atuais):
+## Nome proposto
+**"Central WhatsApp"** (rota `/whatsapp`), ícone `Send` ou `MessageSquare`.
 
-- **1 tem `cidade`**, **30 têm `bairro`**, **29 têm `regiao`**.
-- A Territorial usa só `cidade` + parser do `endereco` para deduzir bairro, ignorando as colunas dedicadas `bairro` e `regiao`.
-- Os diálogos de detalhe e mesclagem da Territorial não conhecem `eleicao_pessoas`.
+Alternativas caso prefira: "WhatsApp Hub", "Campanhas WhatsApp", "Comunicação WhatsApp". Posso ajustar antes de implementar.
 
-## Plano (somente leitura sobre Eleição)
+## Estrutura da nova página
 
-### 1. Ler os campos certos de `eleicao_pessoas`
-Em `src/pages/Territorial.tsx`, no `useQuery` `territorial-eleicao`, incluir no `select`: `bairro, rua, numero, regiao, tipo` (somam-se aos já lidos: `id, nome, telefone, cidade, endereco, email, created_at`). Apenas SELECT.
+Página única `src/pages/CentralWhatsApp.tsx` com `Tabs` no topo:
 
-### 2. Mapear corretamente para o `GeoEntry`
-No `forEach` de `eleicaoRows` (linha 508):
-- `neighborhood` = `e.bairro` (cai para `extractBairroFromEndereco(e.endereco)` só se `bairro` vier vazio);
-- `city` continua sendo `e.cidade` (sem fallback automático — quem está vazio cai no card "Sem localização", como já funciona hoje);
-- novo campo `region` no `GeoEntry`, vindo de `e.regiao`;
-- novo campo `source: 'eleicao'` para o filtro do passo 5.
+```
+Central WhatsApp
+├── 📤 Disparos          (conteúdo atual de Disparos.tsx → aba "disparos")
+├── 🎂 Aniversários       (conteúdo atual de Disparos.tsx → aba "aniversario")
+├── ✨ Missões IA         (AIMissionsPanel — Sugestões da IA)
+├── 🎯 Missões Ativas     (PortalMissionsPanel — vinculado ao client)
+└── 📡 Status WhatsApp    (conteúdo atual de StatusWhatsApp.tsx)
+```
 
-### 3. Nova dimensão "Região" na Territorial
-Adicionar uma seção/aba **Região** ao lado de UF → Cidade → Bairro:
-- KPI "Pessoas por região" + total;
-- lista colapsável reaproveitando o visual do `CityGroupedList`, com bairros aninhados dentro de cada região;
-- drill-down por região (similar ao `selectedCity`);
-- cruzar com `eleicao_regioes` (read-only) para exibir o `label` bonito em vez do slug e respeitar a `ordem` configurada.
+Hoje Disparos já tem 2 abas internas (Disparos / Aniversário) e Missões IA tem 2 abas internas (Sugestões / Missões Ativas). Vamos achatar tudo num único `TabsList` de 5 abas para o usuário ter um clique só.
 
-Hoje só Eleição preenche `regiao`, então a seção fica naturalmente útil para esses cadastros sem precisar mudar nada na origem.
+## Arquivos afetados
 
-### 4. Drill-down: incluir Eleição no diálogo de detalhes
-Em `src/components/territorial/LocalityDetailDialog.tsx`:
-- adicionar `eleicao_pessoas` ao array `TABLES` e ao tipo `Origin` (label "Eleição", badge própria);
-- buscar `id, nome, telefone, cidade, bairro, regiao, tipo` (SELECT) e aplicar o mesmo match canônico de cidade/bairro das demais origens;
-- mostrar badge da `regiao` quando presente.
+**Criar:**
+- `src/pages/CentralWhatsApp.tsx` — shell com header + Tabs renderizando os painéis existentes.
 
-### 5. Filtro por origem no topo da Territorial
-Chips de filtro: **Todos / CRM / Apoiadores / Contratados / Indicados / Eleição**, usando o `source` adicionado no passo 2. Não refaz queries, só filtra em memória.
+**Refatorar (extrair conteúdo para componentes reutilizáveis, sem mudar lógica):**
+- `src/pages/Disparos.tsx` → extrair o miolo das duas abas para:
+  - `src/components/whatsapp/DisparosPanel.tsx`
+  - `src/components/whatsapp/AniversariosPanel.tsx` (apenas o `BirthdayConfigPanel` já existe — então pode ser direto).
+- `src/pages/StatusWhatsApp.tsx` → extrair conteúdo para `src/components/whatsapp/StatusPanel.tsx`.
+- `src/pages/MissoesIA.tsx` → já usa `AIMissionsPanel` e `PortalMissionsPanel`; só consumir os mesmos componentes na nova página.
 
-### 6. Aviso visual (apenas leitura, sem botão de ação)
-Card informativo: "X cadastros de Eleição estão sem cidade definida — eles aparecem na seção Região e no card 'Sem localização'." Sem nenhum botão que escreva no banco.
+**Editar:**
+- `src/App.tsx` — adicionar rota `/whatsapp` apontando para `CentralWhatsApp`. Manter rotas antigas (`/disparos`, `/missoes-ia`, `/status-whatsapp`) como **redirects** para `/whatsapp?tab=disparos|missoes|status` para não quebrar links salvos / favoritos / código que aponta pra elas.
+- `src/components/DashboardLayout.tsx` — remover os 3 itens (Missões IA, Disparos WhatsApp, Status WhatsApp) e adicionar **1 item** "Central WhatsApp" no grupo **Operacional**. Os grupos "Mobilização" e "Sistema" perdem esses itens (Sistema fica só com Configurações; Mobilização continua com Funcionários, Presença, Calendário).
 
-### 7. Verificação do botão "Recarregar"
-O `handleReload` (linha 344) já invalida `territorial-eleicao`. Apenas conferir após as mudanças. Sem alteração.
+## Comportamento da URL
 
-## Arquivos afetados (frontend apenas)
+- `/whatsapp` → abre na aba Disparos (default).
+- `/whatsapp?tab=aniversarios|missoes-ia|missoes-ativas|status` → abre direto na aba.
+- Acesso direto preservado via deep-link.
 
-- `src/pages/Territorial.tsx` — passos 1, 2, 3, 5, 6
-- `src/components/territorial/LocalityDetailDialog.tsx` — passo 4
+## Garantias (não muda nada além de organização)
 
-## Explicitamente fora de escopo
+- Nenhum hook, query, mutation, edge function, RLS, tabela ou tipo é alterado.
+- `AIMissionsPanel`, `PortalMissionsPanel`, `SugestoesPanel`, `DispatchLogDialog`, `BirthdayConfigPanel`, `BordoesBairrosWidget` continuam exatamente iguais.
+- `useWhatsAppGroups`, polling de instâncias, lógica de status, política de envio: intocados.
+- `ContratadosDisparos` (`/contratados/disparos`) **não** entra nessa unificação — é fluxo separado de contratados.
+- Permissões via `canAccess`: a nova rota `/whatsapp` herda permissão = união das três antigas (quem podia ver qualquer uma das três passa a ver a Central, mostrando só as abas permitidas).
 
-- **Nada** em `src/pages/Eleicao.tsx`, `src/components/eleicao/*`, `src/hooks/useRegioesEleicao.ts`, edge functions de Eleição.
-- **Nenhuma** migração de banco.
-- **Nenhum** `UPDATE`/`DELETE`/`INSERT` em `eleicao_pessoas` ou `eleicao_regioes`.
-- **Não** incluir `eleicao_pessoas` no `MergeLocalitiesDialog` (a mesclagem da Territorial continua atuando só nas tabelas atuais — Eleição fica imune mesmo se você clicar em mesclar).
+## Detalhes técnicos
+
+- A extração de Disparos.tsx (1369 linhas) é mecânica: mover o JSX dentro de `<TabsContent value="disparos">` para `DisparosPanel.tsx` levando junto seus `useState`/`useQuery`/handlers locais. Mesmas imports.
+- Disparos.tsx e StatusWhatsApp.tsx originais ficam como **wrappers finos** (3-5 linhas) que apenas renderizam os novos painéis — assim qualquer import existente continua funcionando.
+- MissoesIA.tsx vira wrapper igual.
+- Controle de aba ativa via `useSearchParams` (`tab` query string) com fallback "disparos".
+
+## Pontos para você decidir antes de eu implementar
+
+1. **Nome da página**: "Central WhatsApp" serve? Outro?
+2. **Em qual grupo da sidebar?** Sugiro **Operacional** (onde Disparos já estava). Alternativa: criar grupo novo "WhatsApp".
+3. **Achatar para 5 abas** ou manter agrupamento (ex: aba "Missões" com sub-tabs internas)? Recomendo achatar para minimizar cliques, como você pediu.
+4. **Manter rotas antigas como redirect** (recomendado) ou remover de vez?
