@@ -6756,9 +6756,13 @@ export type Database = {
           messages_sent_today: number
           messages_sent_today_date: string
           notes: string | null
+          onboarding_pending_count: number | null
+          onboarding_sent_at: string | null
+          pending_onboarding: boolean
           phone_number: string | null
           qr_code: string | null
           status: string
+          suspected_banned_at: string | null
           total_failed: number
           total_sent: number
           updated_at: string
@@ -6784,9 +6788,13 @@ export type Database = {
           messages_sent_today?: number
           messages_sent_today_date?: string
           notes?: string | null
+          onboarding_pending_count?: number | null
+          onboarding_sent_at?: string | null
+          pending_onboarding?: boolean
           phone_number?: string | null
           qr_code?: string | null
           status?: string
+          suspected_banned_at?: string | null
           total_failed?: number
           total_sent?: number
           updated_at?: string
@@ -6812,9 +6820,13 @@ export type Database = {
           messages_sent_today?: number
           messages_sent_today_date?: string
           notes?: string | null
+          onboarding_pending_count?: number | null
+          onboarding_sent_at?: string | null
+          pending_onboarding?: boolean
           phone_number?: string | null
           qr_code?: string | null
           status?: string
+          suspected_banned_at?: string | null
           total_failed?: number
           total_sent?: number
           updated_at?: string
@@ -7291,6 +7303,10 @@ export type Database = {
       normalize_person_name: { Args: { p_name: string }; Returns: string }
       normalize_phone: { Args: { p: string }; Returns: string }
       only_digits: { Args: { input: string }; Returns: string }
+      pick_healthy_instance_for_group: {
+        Args: { p_client_id: string; p_group_jid: string }
+        Returns: string
+      }
       pick_healthy_whatsapp_instance: {
         Args: { p_client_id: string }
         Returns: string
