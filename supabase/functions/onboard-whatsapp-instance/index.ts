@@ -244,7 +244,16 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 7) Envia para a própria instância
+    // 7) Envia DE outra instância PARA o número da instância alvo
+    //    (WhatsApp não entrega mensagem da própria linha pra ela mesma.)
+    if (!sender) {
+      return jsonResp({
+        success: false,
+        error: "Nenhuma outra instância conectada disponível para enviar o onboarding. Conecte/recupere a linha principal antes.",
+        pending_count: pendentes.length,
+      }, 409);
+    }
+
     const phoneE164 = cleanPhone(inst.phone_number);
     if (!phoneE164 || phoneE164.length < 12) {
       return jsonResp({ success: false, error: `Número da instância inválido: ${inst.phone_number}` }, 400);
@@ -258,17 +267,18 @@ Deno.serve(async (req: Request) => {
     });
 
     const { ok, status, data: sendData } = await bridgeSend(
-      inst.bridge_url,
-      inst.bridge_api_key,
+      sender.bridge_url,
+      sender.bridge_api_key,
       phoneE164,
       message,
     );
 
     if (!ok) {
-      // Não marca onboarding_sent_at; deixa pending_onboarding=true para retry.
       return jsonResp({
         success: false,
         error: sendData?.error || `Bridge retornou ${status}`,
+        sender_id: sender.id,
+        sender_apelido: sender.apelido,
         pending_count: pendentes.length,
       }, 502);
     }
@@ -288,6 +298,8 @@ Deno.serve(async (req: Request) => {
       already_member_count: jaMembrosDe.length,
       total_with_link: todasRegioesComLink.length,
       phone: phoneE164,
+      sender_id: sender.id,
+      sender_apelido: sender.apelido,
     });
   } catch (err) {
     console.error("[onboard-whatsapp-instance] fatal:", err);
