@@ -599,12 +599,12 @@ export default function Territorial() {
   // UF aggregation for the map
   const ufCounts = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
-    for (const e of allGeoEntries) {
+    for (const e of displayedGeoEntries) {
       const uf = inferUF(e);
       if (uf) map[uf] = (map[uf] || 0) + 1;
     }
     return map;
-  }, [allGeoEntries]);
+  }, [displayedGeoEntries]);
 
   const totalWithUF = useMemo(() => Object.values(ufCounts).reduce((a, b) => a + b, 0), [ufCounts]);
   const ufWithData = useMemo(() => Object.keys(ufCounts).length, [ufCounts]);
@@ -612,8 +612,8 @@ export default function Territorial() {
   // City/neighborhood aggregation, optionally filtered by selected UF
   const { groups, totalWithLocation, totalWithout } = useMemo(() => {
     const filtered = selectedUF
-      ? allGeoEntries.filter(e => inferUF(e) === selectedUF)
-      : allGeoEntries;
+      ? displayedGeoEntries.filter(e => inferUF(e) === selectedUF)
+      : displayedGeoEntries;
     const withLoc = filtered.filter(s => s.city || s.neighborhood);
     const withoutLoc = filtered.filter(s => !s.city && !s.neighborhood);
     // Canonical key: lowercase + sem acento + espaços colapsados (defensivo p/ dados antigos)
@@ -670,7 +670,7 @@ export default function Territorial() {
       neighVariants: b.neighVariants,
     }));
     return { groups: result.sort((a, b) => b.count - a.count), totalWithLocation: withLoc.length, totalWithout: withoutLoc.length };
-  }, [allGeoEntries, selectedUF]);
+  }, [displayedGeoEntries, selectedUF]);
 
   // City-only aggregation for selected UF (drill-down level 2)
   // Mantém variantes brutas (com casing/acento original) por chave canônica
@@ -678,8 +678,8 @@ export default function Territorial() {
   const cityGroups = useMemo(() => {
     const canon = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
     const filtered = selectedUF
-      ? allGeoEntries.filter((e) => inferUF(e) === selectedUF)
-      : allGeoEntries;
+      ? displayedGeoEntries.filter((e) => inferUF(e) === selectedUF)
+      : displayedGeoEntries;
     type B = { city: string; count: number; variants: Record<string, number> };
     const map: Record<string, B> = {};
     for (const e of filtered) {
@@ -697,7 +697,7 @@ export default function Territorial() {
         return { city: top ? top[0] : b.city, count: b.count, variants: b.variants };
       })
       .sort((a, b) => b.count - a.count);
-  }, [allGeoEntries, selectedUF]);
+  }, [displayedGeoEntries, selectedUF]);
 
   // Marcadores de cidade pro mapa: usa cityGroups + lookup de coordenadas IBGE.
   // Quando há UF selecionada, usa essa UF; senão deduz do grupo.
@@ -706,7 +706,7 @@ export default function Territorial() {
     for (const g of cityGroups) {
       const uf = selectedUF || (() => {
         // tenta inferir UF a partir das pessoas dessa cidade
-        const sample = allGeoEntries.find(e => (e.city || "").toLowerCase().includes(g.city.toLowerCase()));
+        const sample = displayedGeoEntries.find(e => (e.city || "").toLowerCase().includes(g.city.toLowerCase()));
         return sample ? inferUF(sample) : null;
       })();
       if (!uf) continue;
@@ -714,14 +714,14 @@ export default function Territorial() {
       if (coords) out.push({ city: g.city, count: g.count, coords });
     }
     return out;
-  }, [cityGroups, selectedUF, allGeoEntries]);
+  }, [cityGroups, selectedUF, displayedGeoEntries]);
   const neighborhoodGroups = useMemo(() => {
     if (!selectedCity) return [];
     const canon = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
     const cityKey = canon(selectedCity);
     const filtered = selectedUF
-      ? allGeoEntries.filter((e) => inferUF(e) === selectedUF)
-      : allGeoEntries;
+      ? displayedGeoEntries.filter((e) => inferUF(e) === selectedUF)
+      : displayedGeoEntries;
     type B = { key: string; neighborhood: string; count: number; variants: Record<string, number> };
     const map: Record<string, B> = {};
     for (const e of filtered) {
@@ -741,18 +741,18 @@ export default function Territorial() {
         return { key: b.key, neighborhood: top ? top[0] : b.neighborhood, count: b.count, variants: b.variants };
       })
       .sort((a, b) => b.count - a.count);
-  }, [allGeoEntries, selectedUF, selectedCity]);
+  }, [displayedGeoEntries, selectedUF, selectedCity]);
 
   const growthStats = useMemo(() => {
-    if (!allGeoEntries) return null;
+    if (!displayedGeoEntries) return null;
     const now = Date.now();
     const d30 = 30 * 24 * 60 * 60 * 1000;
-    const withLoc = allGeoEntries.filter(s => s.city || s.neighborhood);
+    const withLoc = displayedGeoEntries.filter(s => s.city || s.neighborhood);
     const last30 = withLoc.filter(s => now - new Date(s.created_at).getTime() < d30).length;
     const prev30 = withLoc.filter(s => { const diff = now - new Date(s.created_at).getTime(); return diff >= d30 && diff < d30 * 2; }).length;
     const change = prev30 > 0 ? Math.round(((last30 - prev30) / prev30) * 100) : last30 > 0 ? 100 : 0;
     return { last30, prev30, change };
-  }, [allGeoEntries]);
+  }, [displayedGeoEntries]);
 
   const maxCount = groups.length > 0 ? groups[0].count : 1;
 
