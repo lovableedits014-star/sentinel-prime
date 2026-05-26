@@ -416,6 +416,25 @@ export default function StatusWhatsApp() {
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                           )}
                         </td>
+                        <td className="py-3 px-3">
+                          {inst.is_primary ? (
+                            <span className="text-[11px] text-muted-foreground">—</span>
+                          ) : !inst.onboarding_sent_at ? (
+                            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-400 gap-1">
+                              <Users className="w-3 h-3" /> pendente
+                            </Badge>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <Badge variant="outline" className={`text-[10px] gap-1 ${(inst.onboarding_pending_count ?? 0) > 0 ? "border-amber-500/40 text-amber-700" : "border-emerald-500/40 text-emerald-700"}`}>
+                                <Users className="w-3 h-3" />
+                                {(inst.onboarding_pending_count ?? 0) > 0
+                                  ? `${inst.onboarding_pending_count} grupo(s) a entrar`
+                                  : "completo"}
+                              </Badge>
+                              <div className="text-[10px] text-muted-foreground">enviado {timeSince(inst.onboarding_sent_at)}</div>
+                            </div>
+                          )}
+                        </td>
                         <td className="py-3 pl-3">
                           <div className="flex justify-end gap-1 flex-wrap">
                             <Button size="sm" variant="outline" onClick={() => handleHealthCheck(inst.id)} disabled={busy === `check-${inst.id}`}>
@@ -431,6 +450,30 @@ export default function StatusWhatsApp() {
                               {busy === `rescan-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <QrCode className="w-3 h-3 mr-1" />}
                               Re-scan
                             </Button>
+                            {!inst.is_primary && isConn && (
+                              <>
+                                <Button
+                                  size="sm" variant="outline"
+                                  onClick={() => handlePreviewOnboarding(inst.id, inst.apelido)}
+                                  disabled={busy === `preview-${inst.id}`}
+                                  title="Ver lista de grupos faltantes sem enviar mensagem"
+                                >
+                                  {busy === `preview-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Users className="w-3 h-3" />}
+                                </Button>
+                                <Button
+                                  size="sm" variant="outline"
+                                  onClick={() => handleSendOnboarding(inst.id)}
+                                  disabled={busy === `onboard-${inst.id}`}
+                                  title="Enviar para a própria linha a lista de links de grupos a entrar"
+                                  className="border-primary/40 text-primary"
+                                >
+                                  {busy === `onboard-${inst.id}`
+                                    ? <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                    : <MessageSquarePlus className="w-3 h-3 mr-1" />}
+                                  {inst.onboarding_sent_at ? "Reenviar lista" : "Enviar lista"}
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
