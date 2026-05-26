@@ -358,6 +358,7 @@ export default function StatusWhatsApp() {
                     <th className="text-left py-2 px-3">Última verificação</th>
                     <th className="text-left py-2 px-3">Último envio</th>
                     <th className="text-left py-2 px-3">Falhas seguidas</th>
+                    <th className="text-left py-2 px-3">Onboarding<br/><span className="text-[10px] normal-case text-muted-foreground/70">Links dos grupos</span></th>
                     <th className="text-right py-2 pl-3">Ações</th>
                   </tr>
                 </thead>
