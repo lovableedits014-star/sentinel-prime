@@ -218,6 +218,9 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
                       {r.bairro && level === "city" && (
                         <span className="truncate">· {r.bairro}</span>
                       )}
+                      {r.regiao && (
+                        <Badge variant="outline" className="h-4 text-[9px] px-1 font-normal">{r.regiao}</Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1 shrink-0 justify-end">
