@@ -174,6 +174,70 @@ export default function StatusWhatsApp() {
     else { toast.success("Verificação completa solicitada."); loadAll(true); }
   };
 
+  // ---------- Onboarding (Frente 7) ----------
+  const callOnboard = async (instanceId: string, action: "send" | "preview") => {
+    if (!clientId) return { data: null as any, error: new Error("client missing") };
+    return await supabase.functions.invoke("onboard-whatsapp-instance", {
+      body: { client_id: clientId, instance_id: instanceId, action },
+    });
+  };
+
+  const handleSendOnboarding = async (instanceId: string, silent = false) => {
+    setBusy(`onboard-${instanceId}`);
+    const { data, error } = await callOnboard(instanceId, "send");
+    setBusy(null);
+    if (error || data?.success === false) {
+      if (!silent) toast.error("Falha ao enviar onboarding: " + (error?.message || data?.error || "erro desconhecido"));
+      return false;
+    }
+    const pend = data?.pending_count ?? 0;
+    toast.success(
+      pend > 0
+        ? `Lista enviada — abra o WhatsApp dessa linha e entre em ${pend} grupo(s).`
+        : "Mensagem enviada — essa linha já é membro de todos os grupos cadastrados.",
+    );
+    loadAll(true);
+    return true;
+  };
+
+  const handlePreviewOnboarding = async (instanceId: string, apelido: string) => {
+    setBusy(`preview-${instanceId}`);
+    const { data, error } = await callOnboard(instanceId, "preview");
+    setBusy(null);
+    if (error || data?.success === false) {
+      toast.error("Falha ao listar grupos: " + (error?.message || data?.error || "erro desconhecido"));
+      return;
+    }
+    setPreview({
+      instanceId,
+      apelido,
+      pendentes: (data?.pendentes as RegiaoLinkRow[]) || [],
+      jaMembros: (data?.ja_membros_de as RegiaoLinkRow[]) || [],
+    });
+  };
+
+  // Auto-disparo: ao detectar pending_onboarding=true em uma instância secundária
+  // conectada, chama o onboarding uma vez por sessão. Idempotência também é
+  // garantida no servidor (limpa pending_onboarding ao concluir).
+  useEffect(() => {
+    if (!clientId || loading) return;
+    const candidatos = instances.filter((i) =>
+      !i.is_primary
+      && i.pending_onboarding === true
+      && CONNECTED.has(i.status)
+      && !!i.phone_number
+      && !autoSentFor.has(i.id)
+    );
+    if (candidatos.length === 0) return;
+    (async () => {
+      for (const inst of candidatos) {
+        setAutoSentFor((prev) => new Set(prev).add(inst.id));
+        await handleSendOnboarding(inst.id, true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instances, clientId, loading]);
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
