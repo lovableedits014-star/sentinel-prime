@@ -878,164 +878,212 @@ Deno.serve(async (req) => {
             return;
           }
 
-          // ==== Escolhe instância saudável (pool) com fallback legado ====
-          let bridgeUrl: string | null = null;
-          let bridgeApiKey: string | null = null;
-          let instanceId: string | null = null;
-
-          const { data: pickedId } = await adminClient.rpc("pick_healthy_whatsapp_instance", { p_client_id: client_id });
-          if (pickedId) {
-            const { data: inst } = await adminClient
-              .from("whatsapp_instances")
-              .select("id, bridge_url, bridge_api_key")
-              .eq("id", pickedId)
-              .maybeSingle();
-            if (inst?.bridge_url && inst?.bridge_api_key) {
-              bridgeUrl = inst.bridge_url;
-              bridgeApiKey = inst.bridge_api_key;
-              instanceId = inst.id;
-            }
-          }
-
-          // Fallback 1: se o RPC não escolheu (ex.: health-check atrasado),
-          // mas existe uma instância conectada e ativa do pool, use-a direto.
-          // A chave legada salva em clients.* costuma estar vencida, então
-          // SÓ caímos no legado quando NÃO há instância ativa no pool.
-          if (!bridgeUrl) {
-            const { data: anyActive } = await adminClient
-              .from("whatsapp_instances")
-              .select("id, bridge_url, bridge_api_key, status")
-              .eq("client_id", client_id)
-              .eq("is_active", true)
-              .not("bridge_api_key", "is", null)
-              .order("status", { ascending: true }) // 'connected' < 'connecting' alfabeticamente
-              .limit(1)
-              .maybeSingle();
-            if (anyActive?.bridge_url && anyActive?.bridge_api_key) {
-              bridgeUrl = anyActive.bridge_url;
-              bridgeApiKey = anyActive.bridge_api_key;
-              instanceId = anyActive.id;
-            }
-          }
-
-          // Fallback 2 (legado): só se NÃO existe nenhuma instância no pool
-          if (!bridgeUrl && hasLegacyBridge && (poolCount ?? 0) === 0) {
-            bridgeUrl = clientData.whatsapp_bridge_url!;
-            bridgeApiKey = clientData.whatsapp_bridge_api_key!;
-          }
-
-          if (!bridgeUrl || !bridgeApiKey) {
-            // Nenhuma instância disponível agora — pausa pra retomar depois
-            await adminClient.from("whatsapp_dispatches").update({
-              status: "pausado_sem_instancia",
-              pause_reason: "Nenhuma instância conectada disponível — retomado automaticamente quando reconectar",
-              enviados: sent,
-              falhas: failed,
-              updated_at: new Date().toISOString(),
-            }).eq("id", dispatch.id);
-            return;
-          }
-
-          // Delay extra ao trocar de chip (humaniza)
-          if (lastInstanceId && instanceId && lastInstanceId !== instanceId) {
-            await sleep(randomDelay(interMin, interMax));
-          }
-          lastInstanceId = instanceId;
-
-          // ===== PREFLIGHT: garante instância conectada antes de enviar =====
-          // Roda uma vez por instância no ciclo. Se reconexão silenciosa falha,
-          // marca a instância como desconectada e pula pra próxima rodada (que
-          // escolherá outra via pick_healthy_whatsapp_instance).
-          let preflight: PreflightResult = { status: "skipped", reconnected: false };
-          if (instanceId && bridgeUrl && bridgeApiKey) {
-            const cached = preflightByInstance[instanceId];
-            if (cached && cached.status === "connected") {
-              preflight = cached;
-            } else {
-              preflight = await preflightInstance({
-                bridgeUrl, bridgeApiKey, instanceId,
-              });
-              preflightByInstance[instanceId] = preflight;
-            }
-
-            if (preflight.status === "disconnected") {
-              // Marca como desconectada e força nova escolha de instância
-              await adminClient.from("whatsapp_instances")
-                .update({ status: "disconnected" })
-                .eq("id", instanceId);
-              await adminClient.rpc("log_whatsapp_send", {
-                p_instance_id: instanceId, p_client_id: client_id,
-                p_dispatch_id: dispatch.id, p_success: false,
-                p_error_message: `Preflight: instância offline (${preflight.detail || "sem status"})`,
-                p_preflight_status: preflight.status,
-                p_preflight_reconnected: preflight.reconnected,
-              });
-              // invalida cache pra reavaliar e pula esse destinatário no próximo loop
-              delete preflightByInstance[instanceId];
-              continue;
-            }
-          }
-
-          // Para grupos, o "destino" é o JID e a mensagem não tem {nome} de pessoa.
+          // Tipo do destino: grupo ou telefone individual
           const isGroup = !!recipient.group_jid;
+          const groupJid = recipient.group_jid || "";
           const destination = isGroup
-            ? recipient.group_jid!
+            ? groupJid
             : cleanPhoneForBridge(recipient.telefone || "");
           // Helper para localizar este item específico no banco
           const itemMatch = (q: any) => {
             const base = q.eq("dispatch_id", dispatch.id);
             return isGroup
-              ? base.eq("group_jid", recipient.group_jid)
+              ? base.eq("group_jid", groupJid)
               : base.eq("telefone", recipient.telefone);
           };
 
-          try {
-            const personalizedMsg = isGroup
-              ? mensagem // sem personalização individual em grupo
-              : mensagem.replace(/{nome}/g, recipient.nome);
-            console.log(`[dispatch] inst=${instanceId ?? "legacy"} preflight=${preflight.status}${preflight.reconnected ? "(reconectado)" : ""} ${isGroup ? "group" : "phone"}=${destination}`);
+          // Failover: para grupos tentamos até MAX tentativas excluindo a
+          // instância que acabou de falhar. Para telefones, 1 tentativa.
+          const MAX_ATTEMPTS = isGroup ? 5 : 1;
+          let recipientResolved = false;
+          let attempt = 0;
 
-            const { res: sendRes, data: sendData } = await fetchBridgeSend({
-              bridgeUrl,
-              bridgeApiKey,
-              phone: destination,
-              message: personalizedMsg,
-              mediaUrl: media_url,
-            });
+          while (!recipientResolved && attempt < MAX_ATTEMPTS) {
+            attempt++;
 
-            const failure = getSendFailure(sendRes, sendData);
+            // ==== Escolhe instância saudável ====
+            let bridgeUrl: string | null = null;
+            let bridgeApiKey: string | null = null;
+            let instanceId: string | null = null;
 
-            if (!failure) {
-              sent++;
-              await itemMatch(adminClient.from("whatsapp_dispatch_items")
-                .update({ status: "enviado", enviado_em: new Date().toISOString() }));
-              if (instanceId) {
+            if (isGroup) {
+              // Para grupos, escolhe SÓ entre instâncias que são membros
+              const excludeArr = Array.from(excludedByGroup[groupJid] ?? []);
+              const { data: pickedId } = await adminClient.rpc(
+                "pick_healthy_instance_for_group",
+                {
+                  p_client_id: client_id,
+                  p_group_jid: groupJid,
+                  p_exclude_instance_ids: excludeArr,
+                },
+              );
+              if (pickedId) {
+                const { data: inst } = await adminClient
+                  .from("whatsapp_instances")
+                  .select("id, bridge_url, bridge_api_key")
+                  .eq("id", pickedId)
+                  .maybeSingle();
+                if (inst?.bridge_url && inst?.bridge_api_key) {
+                  bridgeUrl = inst.bridge_url;
+                  bridgeApiKey = inst.bridge_api_key;
+                  instanceId = inst.id;
+                }
+              }
+            } else {
+              // Telefone individual: pool padrão
+              const { data: pickedId } = await adminClient.rpc(
+                "pick_healthy_whatsapp_instance",
+                { p_client_id: client_id },
+              );
+              if (pickedId) {
+                const { data: inst } = await adminClient
+                  .from("whatsapp_instances")
+                  .select("id, bridge_url, bridge_api_key")
+                  .eq("id", pickedId)
+                  .maybeSingle();
+                if (inst?.bridge_url && inst?.bridge_api_key) {
+                  bridgeUrl = inst.bridge_url;
+                  bridgeApiKey = inst.bridge_api_key;
+                  instanceId = inst.id;
+                }
+              }
+              if (!bridgeUrl) {
+                const { data: anyActive } = await adminClient
+                  .from("whatsapp_instances")
+                  .select("id, bridge_url, bridge_api_key, status")
+                  .eq("client_id", client_id)
+                  .eq("is_active", true)
+                  .not("bridge_api_key", "is", null)
+                  .order("status", { ascending: true })
+                  .limit(1)
+                  .maybeSingle();
+                if (anyActive?.bridge_url && anyActive?.bridge_api_key) {
+                  bridgeUrl = anyActive.bridge_url;
+                  bridgeApiKey = anyActive.bridge_api_key;
+                  instanceId = anyActive.id;
+                }
+              }
+              if (!bridgeUrl && hasLegacyBridge && (poolCount ?? 0) === 0) {
+                bridgeUrl = clientData.whatsapp_bridge_url!;
+                bridgeApiKey = clientData.whatsapp_bridge_api_key!;
+              }
+            }
+
+            if (!bridgeUrl || !bridgeApiKey) {
+              if (isGroup && attempt > 1) {
+                // Já tentamos com outras instâncias e esgotamos os membros do grupo
+                failed++;
+                await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                  .update({
+                    status: "falha",
+                    erro: "Nenhuma outra instância membro deste grupo está disponível (todas as tentativas falharam).",
+                  }));
+                recipientResolved = true;
+                break;
+              }
+              if (isGroup) {
+                // Primeira tentativa e nenhuma instância membro do grupo disponível
+                failed++;
+                await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                  .update({
+                    status: "falha",
+                    erro: "Nenhuma instância conectada é membro deste grupo. Adicione uma instância ao grupo e sincronize.",
+                  }));
+                recipientResolved = true;
+                break;
+              }
+              // Sem instância para telefone individual → pausa o disparo
+              await adminClient.from("whatsapp_dispatches").update({
+                status: "pausado_sem_instancia",
+                pause_reason: "Nenhuma instância conectada disponível — retomado automaticamente quando reconectar",
+                enviados: sent,
+                falhas: failed,
+                updated_at: new Date().toISOString(),
+              }).eq("id", dispatch.id);
+              return;
+            }
+
+            // Delay extra ao trocar de chip (humaniza)
+            if (lastInstanceId && instanceId && lastInstanceId !== instanceId) {
+              await sleep(randomDelay(interMin, interMax));
+            }
+            lastInstanceId = instanceId;
+
+            // ===== PREFLIGHT =====
+            let preflight: PreflightResult = { status: "skipped", reconnected: false };
+            if (instanceId && bridgeUrl && bridgeApiKey) {
+              const cached = preflightByInstance[instanceId];
+              if (cached && cached.status === "connected") {
+                preflight = cached;
+              } else {
+                preflight = await preflightInstance({
+                  bridgeUrl, bridgeApiKey, instanceId,
+                });
+                preflightByInstance[instanceId] = preflight;
+              }
+
+              if (preflight.status === "disconnected") {
+                await adminClient.from("whatsapp_instances")
+                  .update({ status: "disconnected" })
+                  .eq("id", instanceId);
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
-                  p_dispatch_id: dispatch.id, p_success: true, p_error_message: null,
+                  p_dispatch_id: dispatch.id, p_success: false,
+                  p_error_message: `Preflight: instância offline (${preflight.detail || "sem status"})`,
                   p_preflight_status: preflight.status,
                   p_preflight_reconnected: preflight.reconnected,
                 });
+                delete preflightByInstance[instanceId];
+                if (isGroup) {
+                  // Exclui esta instância para este grupo e tenta outra
+                  (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
+                  continue;
+                }
+                // Telefone: deixa pra próxima rodada (próximo recipient)
+                break;
               }
-            } else {
-              // Falha de envio: se a instância caiu, marca como desconectada e re-tenta com outra
-              if (instanceId && isInstanceDisconnectedError(sendRes, sendData)) {
+            }
+
+            try {
+              const personalizedMsg = isGroup
+                ? mensagem
+                : mensagem.replace(/{nome}/g, recipient.nome);
+              console.log(`[dispatch] inst=${instanceId ?? "legacy"} attempt=${attempt} preflight=${preflight.status}${preflight.reconnected ? "(reconectado)" : ""} ${isGroup ? "group" : "phone"}=${destination}`);
+
+              const { res: sendRes, data: sendData } = await fetchBridgeSend({
+                bridgeUrl,
+                bridgeApiKey,
+                phone: destination,
+                message: personalizedMsg,
+                mediaUrl: media_url,
+              });
+
+              const failure = getSendFailure(sendRes, sendData);
+
+              if (!failure) {
+                sent++;
+                await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                  .update({ status: "enviado", enviado_em: new Date().toISOString() }));
+                if (instanceId) {
+                  await adminClient.rpc("log_whatsapp_send", {
+                    p_instance_id: instanceId, p_client_id: client_id,
+                    p_dispatch_id: dispatch.id, p_success: true, p_error_message: null,
+                    p_preflight_status: preflight.status,
+                    p_preflight_reconnected: preflight.reconnected,
+                  });
+                }
+                recipientResolved = true;
+                break;
+              }
+
+              // Falha de envio
+              const disconnectErr = isInstanceDisconnectedError(sendRes, sendData);
+              if (instanceId && disconnectErr) {
                 await adminClient.from("whatsapp_instances")
                   .update({ status: "disconnected" })
                   .eq("id", instanceId);
                 delete preflightByInstance[instanceId];
-                await adminClient.rpc("log_whatsapp_send", {
-                  p_instance_id: instanceId, p_client_id: client_id,
-                  p_dispatch_id: dispatch.id, p_success: false, p_error_message: String(failure).slice(0, 200),
-                  p_preflight_status: preflight.status,
-                  p_preflight_reconnected: preflight.reconnected,
-                });
-                // Não conta como falha do destinatário; tenta de novo no próximo loop
-                continue;
               }
-              failed++;
-              await itemMatch(adminClient.from("whatsapp_dispatch_items")
-                .update({ status: "falha", erro: String(failure).slice(0, 200) }));
               if (instanceId) {
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
@@ -1044,19 +1092,54 @@ Deno.serve(async (req) => {
                   p_preflight_reconnected: preflight.reconnected,
                 });
               }
+
+              if (isGroup && instanceId) {
+                // Failover dentro do mesmo grupo: exclui essa instância e tenta a próxima
+                (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
+                await sleep(randomDelay(800, 1800));
+                continue;
+              }
+              if (!isGroup && disconnectErr) {
+                // Telefone individual: deixa pra próxima rodada
+                break;
+              }
+
+              // Falha terminal (telefone ou grupo sem mais alternativas)
+              failed++;
+              await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                .update({ status: "falha", erro: String(failure).slice(0, 200) }));
+              recipientResolved = true;
+              break;
+            } catch (err) {
+              if (instanceId) {
+                await adminClient.rpc("log_whatsapp_send", {
+                  p_instance_id: instanceId, p_client_id: client_id,
+                  p_dispatch_id: dispatch.id, p_success: false, p_error_message: String(err).slice(0, 200),
+                  p_preflight_status: preflight.status,
+                  p_preflight_reconnected: preflight.reconnected,
+                });
+              }
+              if (isGroup && instanceId) {
+                (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
+                await sleep(randomDelay(800, 1800));
+                continue;
+              }
+              failed++;
+              await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                .update({ status: "falha", erro: String(err).slice(0, 200) }));
+              recipientResolved = true;
+              break;
             }
-          } catch (err) {
+          }
+
+          // Se grupo esgotou MAX_ATTEMPTS sem resolver, marca falha
+          if (!recipientResolved && isGroup) {
             failed++;
             await itemMatch(adminClient.from("whatsapp_dispatch_items")
-              .update({ status: "falha", erro: String(err).slice(0, 200) }));
-            if (instanceId) {
-              await adminClient.rpc("log_whatsapp_send", {
-                p_instance_id: instanceId, p_client_id: client_id,
-                p_dispatch_id: dispatch.id, p_success: false, p_error_message: String(err).slice(0, 200),
-                p_preflight_status: preflight.status,
-                p_preflight_reconnected: preflight.reconnected,
-              });
-            }
+              .update({
+                status: "falha",
+                erro: `Falhou após ${MAX_ATTEMPTS} tentativas com instâncias diferentes membros do grupo.`,
+              }));
           }
 
           if ((sent + failed) % 5 === 0) {
