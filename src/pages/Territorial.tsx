@@ -504,7 +504,8 @@ export default function Territorial() {
   // ═══════════════════════════════════════
   // TERRITORIAL computed (uma pessoa só: CRM + Apoiador/Contratado/Indicado não duplicam)
   // ═══════════════════════════════════════
-  type GeoEntry = { id: string; name: string | null; phone: string | null; cpf?: string | null; supporter_id?: string | null; city: string | null; neighborhood: string | null; state: string | null; created_at: string };
+  type Source = "crm" | "apoiador" | "indicado" | "eleicao";
+  type GeoEntry = { id: string; name: string | null; phone: string | null; cpf?: string | null; supporter_id?: string | null; city: string | null; neighborhood: string | null; state: string | null; region?: string | null; source: Source; created_at: string };
 
   // Tenta extrair bairro do endereço livre (formato comum: "Rua X, 123 - Bairro, Cidade/UF")
   const extractBairroFromEndereco = (endereco: string | null | undefined): string | null => {
@@ -517,10 +518,20 @@ export default function Territorial() {
 
   const allGeoEntries = useMemo<GeoEntry[]>(() => {
     const entries: GeoEntry[] = [];
-    (allPessoas || []).forEach(p => entries.push({ id: `pessoa:${p.id}`, name: p.nome, phone: p.telefone, cpf: p.cpf, supporter_id: p.supporter_id, city: p.cidade, neighborhood: p.bairro, state: null, created_at: p.created_at }));
-    (supporters || []).forEach(s => entries.push({ id: `supporter:${s.id}`, name: s.name, phone: s.phone, cpf: s.cpf, supporter_id: s.supporter_id, city: s.city, neighborhood: s.neighborhood, state: s.state, created_at: s.created_at }));
-    (confirmedIndicados || []).forEach(i => entries.push({ id: `indicado:${i.id}`, name: i.nome, phone: i.telefone, city: i.cidade, neighborhood: i.bairro, state: null, created_at: i.created_at }));
-    (eleicaoRows || []).forEach(e => entries.push({ id: `eleicao:${e.id}`, name: e.nome, phone: e.telefone, city: e.cidade, neighborhood: extractBairroFromEndereco(e.endereco), state: null, created_at: e.created_at }));
+    (allPessoas || []).forEach(p => entries.push({ id: `pessoa:${p.id}`, name: p.nome, phone: p.telefone, cpf: p.cpf, supporter_id: p.supporter_id, city: p.cidade, neighborhood: p.bairro, state: null, source: "crm", created_at: p.created_at }));
+    (supporters || []).forEach(s => entries.push({ id: `supporter:${s.id}`, name: s.name, phone: s.phone, cpf: s.cpf, supporter_id: s.supporter_id, city: s.city, neighborhood: s.neighborhood, state: s.state, source: "apoiador", created_at: s.created_at }));
+    (confirmedIndicados || []).forEach(i => entries.push({ id: `indicado:${i.id}`, name: i.nome, phone: i.telefone, city: i.cidade, neighborhood: i.bairro, state: null, source: "indicado", created_at: i.created_at }));
+    (eleicaoRows || []).forEach(e => entries.push({
+      id: `eleicao:${e.id}`,
+      name: e.nome,
+      phone: e.telefone,
+      city: e.cidade,
+      neighborhood: (e.bairro && e.bairro.trim()) || extractBairroFromEndereco(e.endereco),
+      state: null,
+      region: e.regiao,
+      source: "eleicao",
+      created_at: e.created_at,
+    }));
     return dedupeByPerson(entries);
   }, [supporters, confirmedIndicados, allPessoas, eleicaoRows]);
 
