@@ -21,7 +21,7 @@ export interface LocalityDetailDialogProps {
   neighborhood?: string | null;
 }
 
-type Origin = "pessoas" | "contratados" | "contratado_indicados" | "funcionarios" | "supporter_accounts";
+type Origin = "pessoas" | "contratados" | "contratado_indicados" | "funcionarios" | "supporter_accounts" | "eleicao_pessoas";
 
 interface Row {
   id: string;
@@ -30,6 +30,7 @@ interface Row {
   telefone: string | null;
   cidade: string | null;
   bairro: string | null;
+  regiao?: string | null;
 }
 
 interface MergedRow {
@@ -37,6 +38,7 @@ interface MergedRow {
   nome: string;
   telefone: string | null;
   bairro: string | null;
+  regiao?: string | null;
   origins: Origin[];
 }
 
@@ -54,6 +56,7 @@ const ORIGIN_LABEL: Record<Origin, string> = {
   contratado_indicados: "Indicado",
   funcionarios: "Funcionário",
   supporter_accounts: "Apoiador",
+  eleicao_pessoas: "Eleição",
 };
 
 const ORIGIN_VARIANT: Record<Origin, "default" | "secondary" | "outline" | "destructive"> = {
@@ -62,6 +65,7 @@ const ORIGIN_VARIANT: Record<Origin, "default" | "secondary" | "outline" | "dest
   contratado_indicados: "outline",
   funcionarios: "destructive",
   supporter_accounts: "default",
+  eleicao_pessoas: "secondary",
 };
 
 export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city, neighborhood }: LocalityDetailDialogProps) {
@@ -97,12 +101,13 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
         return out;
       };
 
-      const [pessoas, contratados, indicados, funcionarios, apoiadores] = await Promise.all([
+      const [pessoas, contratados, indicados, funcionarios, apoiadores, eleicao] = await Promise.all([
         fetchAll("pessoas", "id, nome, telefone, cidade, bairro"),
         fetchAll("contratados", "id, nome, telefone, cidade, bairro"),
         fetchAll("contratado_indicados", "id, nome, telefone, cidade, bairro"),
         fetchAll("funcionarios", "id, nome, telefone, cidade, bairro"),
         fetchAll("supporter_accounts", "id, name, phone, city, neighborhood"),
+        fetchAll("eleicao_pessoas" as any, "id, nome, telefone, cidade, bairro, regiao"),
       ]);
 
       const collected: Row[] = [];
@@ -121,6 +126,7 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
             telefone: r.telefone ?? r.phone,
             cidade: r.cidade ?? r.city,
             bairro,
+            regiao: r.regiao ?? null,
           });
         }
       };
@@ -129,6 +135,7 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
       push("contratado_indicados", indicados);
       push("funcionarios", funcionarios);
       push("supporter_accounts", apoiadores);
+      push("eleicao_pessoas", eleicao);
 
       collected.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
       if (!cancel) {
@@ -160,12 +167,14 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
         if (!existing.origins.includes(r.origin)) existing.origins.push(r.origin);
         if (!existing.telefone && r.telefone) existing.telefone = r.telefone;
         if (!existing.bairro && r.bairro) existing.bairro = r.bairro;
+        if (!existing.regiao && r.regiao) existing.regiao = r.regiao;
       } else {
         map.set(key, {
           key,
           nome: r.nome,
           telefone: r.telefone,
           bairro: r.bairro,
+          regiao: r.regiao ?? null,
           origins: [r.origin],
         });
       }
@@ -208,6 +217,9 @@ export function LocalityDetailDialog({ open, onOpenChange, clientId, level, city
                       )}
                       {r.bairro && level === "city" && (
                         <span className="truncate">· {r.bairro}</span>
+                      )}
+                      {r.regiao && (
+                        <Badge variant="outline" className="h-4 text-[9px] px-1 font-normal">{r.regiao}</Badge>
                       )}
                     </div>
                   </div>

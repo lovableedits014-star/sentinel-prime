@@ -324,6 +324,8 @@ export default function Territorial() {
   const [search, setSearch] = useState("");
   const [selectedUF, setSelectedUF] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+  const [originFilter, setOriginFilter] = useState<"todos" | "crm" | "apoiador" | "indicado" | "eleicao">("todos");
 
   // Drill-down dialog state
   const [detailOpen, setDetailOpen] = useState(false);
@@ -440,18 +442,18 @@ export default function Territorial() {
     enabled: !!client?.id,
   });
 
-  // ── Eleição: pessoas cadastradas no fluxo de coordenadores/contratados ──
+  // ── Eleição: pessoas cadastradas no fluxo de coordenadores/contratados (SOMENTE LEITURA) ──
   const { data: eleicaoRows } = useQuery({
     queryKey: ["territorial-eleicao", client?.id],
     queryFn: async () => {
       if (!client?.id) return [];
       const PAGE = 1000;
-      const result: Array<{ id: string; nome: string; telefone: string | null; cidade: string | null; endereco: string | null; email: string | null; created_at: string }> = [];
+      const result: Array<{ id: string; nome: string; telefone: string | null; cidade: string | null; bairro: string | null; rua: string | null; numero: string | null; regiao: string | null; tipo: string | null; endereco: string | null; email: string | null; created_at: string }> = [];
       let from = 0;
       while (true) {
         const { data } = await supabase
           .from("eleicao_pessoas")
-          .select("id, nome, telefone, cidade, endereco, email, created_at")
+          .select("id, nome, telefone, cidade, bairro, rua, numero, regiao, tipo, endereco, email, created_at")
           .eq("client_id", client.id)
           .order("created_at", { ascending: false })
           .range(from, from + PAGE - 1);
@@ -461,6 +463,21 @@ export default function Territorial() {
         from += PAGE;
       }
       return result;
+    },
+    enabled: !!client?.id,
+  });
+
+  // ── Regiões de Eleição (apenas para label bonito + ordem; somente leitura) ──
+  const { data: eleicaoRegioes } = useQuery({
+    queryKey: ["territorial-eleicao-regioes", client?.id],
+    queryFn: async () => {
+      if (!client?.id) return [] as Array<{ value: string; label: string; ordem: number }>;
+      const { data } = await supabase
+        .from("eleicao_regioes" as any)
+        .select("value, label, ordem")
+        .eq("client_id", client.id)
+        .eq("ativo", true);
+      return (data as any[]) || [];
     },
     enabled: !!client?.id,
   });
@@ -489,7 +506,8 @@ export default function Territorial() {
   // ═══════════════════════════════════════
   // TERRITORIAL computed (uma pessoa só: CRM + Apoiador/Contratado/Indicado não duplicam)
   // ═══════════════════════════════════════
-  type GeoEntry = { id: string; name: string | null; phone: string | null; cpf?: string | null; supporter_id?: string | null; city: string | null; neighborhood: string | null; state: string | null; created_at: string };
+  type Source = "crm" | "apoiador" | "indicado" | "eleicao";
+  type GeoEntry = { id: string; name: string | null; phone: string | null; cpf?: string | null; supporter_id?: string | null; city: string | null; neighborhood: string | null; state: string | null; region?: string | null; source: Source; created_at: string };
 
   // Tenta extrair bairro do endereço livre (formato comum: "Rua X, 123 - Bairro, Cidade/UF")
   const extractBairroFromEndereco = (endereco: string | null | undefined): string | null => {
@@ -502,12 +520,67 @@ export default function Territorial() {
 
   const allGeoEntries = useMemo<GeoEntry[]>(() => {
     const entries: GeoEntry[] = [];
-    (allPessoas || []).forEach(p => entries.push({ id: `pessoa:${p.id}`, name: p.nome, phone: p.telefone, cpf: p.cpf, supporter_id: p.supporter_id, city: p.cidade, neighborhood: p.bairro, state: null, created_at: p.created_at }));
-    (supporters || []).forEach(s => entries.push({ id: `supporter:${s.id}`, name: s.name, phone: s.phone, cpf: s.cpf, supporter_id: s.supporter_id, city: s.city, neighborhood: s.neighborhood, state: s.state, created_at: s.created_at }));
-    (confirmedIndicados || []).forEach(i => entries.push({ id: `indicado:${i.id}`, name: i.nome, phone: i.telefone, city: i.cidade, neighborhood: i.bairro, state: null, created_at: i.created_at }));
-    (eleicaoRows || []).forEach(e => entries.push({ id: `eleicao:${e.id}`, name: e.nome, phone: e.telefone, city: e.cidade, neighborhood: extractBairroFromEndereco(e.endereco), state: null, created_at: e.created_at }));
+    (allPessoas || []).forEach(p => entries.push({ id: `pessoa:${p.id}`, name: p.nome, phone: p.telefone, cpf: p.cpf, supporter_id: p.supporter_id, city: p.cidade, neighborhood: p.bairro, state: null, source: "crm", created_at: p.created_at }));
+    (supporters || []).forEach(s => entries.push({ id: `supporter:${s.id}`, name: s.name, phone: s.phone, cpf: s.cpf, supporter_id: s.supporter_id, city: s.city, neighborhood: s.neighborhood, state: s.state, source: "apoiador", created_at: s.created_at }));
+    (confirmedIndicados || []).forEach(i => entries.push({ id: `indicado:${i.id}`, name: i.nome, phone: i.telefone, city: i.cidade, neighborhood: i.bairro, state: null, source: "indicado", created_at: i.created_at }));
+    (eleicaoRows || []).forEach(e => entries.push({
+      id: `eleicao:${e.id}`,
+      name: e.nome,
+      phone: e.telefone,
+      city: e.cidade,
+      neighborhood: (e.bairro && e.bairro.trim()) || extractBairroFromEndereco(e.endereco),
+      state: null,
+      region: e.regiao,
+      source: "eleicao",
+      created_at: e.created_at,
+    }));
     return dedupeByPerson(entries);
   }, [supporters, confirmedIndicados, allPessoas, eleicaoRows]);
+
+  // Aplica filtro por origem (chip). dedupeByPerson pode ter colapsado dois registros da mesma pessoa
+  // em origens diferentes; nesse caso a entrada efetiva carrega o source da primeira ocorrência —
+  // o filtro fica permissivo para origens raras. Isto é intencional: o filtro é exploratório, não auditoria.
+  const displayedGeoEntries = useMemo<GeoEntry[]>(() => {
+    if (originFilter === "todos") return allGeoEntries;
+    return allGeoEntries.filter((e) => e.source === originFilter);
+  }, [allGeoEntries, originFilter]);
+
+  // Contagem de cadastros de Eleição sem cidade (aviso informativo)
+  const eleicaoSemCidade = useMemo(
+    () => (eleicaoRows || []).filter((e) => !e.cidade || !e.cidade.trim()).length,
+    [eleicaoRows],
+  );
+
+  // Agrupamento por Região (campo `regiao` — hoje vem só de Eleição)
+  const regionGroups = useMemo(() => {
+    const labelMap = new Map<string, { label: string; ordem: number }>();
+    (eleicaoRegioes || []).forEach((r) => labelMap.set(r.value, { label: r.label, ordem: r.ordem }));
+    type Bucket = { value: string; label: string; ordem: number; count: number; neighborhoods: Record<string, { name: string; count: number }> };
+    const map: Record<string, Bucket> = {};
+    for (const e of displayedGeoEntries) {
+      if (!e.region) continue;
+      const meta = labelMap.get(e.region);
+      if (!map[e.region]) {
+        map[e.region] = {
+          value: e.region,
+          label: meta?.label || e.region,
+          ordem: meta?.ordem ?? 9999,
+          count: 0,
+          neighborhoods: {},
+        };
+      }
+      map[e.region].count++;
+      const neigh = (e.neighborhood || "").trim();
+      if (neigh) {
+        const key = neigh.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        if (!map[e.region].neighborhoods[key]) {
+          map[e.region].neighborhoods[key] = { name: neigh, count: 0 };
+        }
+        map[e.region].neighborhoods[key].count++;
+      }
+    }
+    return Object.values(map).sort((a, b) => a.ordem - b.ordem || b.count - a.count);
+  }, [displayedGeoEntries, eleicaoRegioes]);
 
   // Heuristic: infer UF from explicit state field, or "Cidade - UF" / "Cidade/UF" suffix in city.
   const inferUF = (e: GeoEntry): string | null => {
@@ -526,12 +599,12 @@ export default function Territorial() {
   // UF aggregation for the map
   const ufCounts = useMemo<Record<string, number>>(() => {
     const map: Record<string, number> = {};
-    for (const e of allGeoEntries) {
+    for (const e of displayedGeoEntries) {
       const uf = inferUF(e);
       if (uf) map[uf] = (map[uf] || 0) + 1;
     }
     return map;
-  }, [allGeoEntries]);
+  }, [displayedGeoEntries]);
 
   const totalWithUF = useMemo(() => Object.values(ufCounts).reduce((a, b) => a + b, 0), [ufCounts]);
   const ufWithData = useMemo(() => Object.keys(ufCounts).length, [ufCounts]);
@@ -539,8 +612,8 @@ export default function Territorial() {
   // City/neighborhood aggregation, optionally filtered by selected UF
   const { groups, totalWithLocation, totalWithout } = useMemo(() => {
     const filtered = selectedUF
-      ? allGeoEntries.filter(e => inferUF(e) === selectedUF)
-      : allGeoEntries;
+      ? displayedGeoEntries.filter(e => inferUF(e) === selectedUF)
+      : displayedGeoEntries;
     const withLoc = filtered.filter(s => s.city || s.neighborhood);
     const withoutLoc = filtered.filter(s => !s.city && !s.neighborhood);
     // Canonical key: lowercase + sem acento + espaços colapsados (defensivo p/ dados antigos)
@@ -597,7 +670,7 @@ export default function Territorial() {
       neighVariants: b.neighVariants,
     }));
     return { groups: result.sort((a, b) => b.count - a.count), totalWithLocation: withLoc.length, totalWithout: withoutLoc.length };
-  }, [allGeoEntries, selectedUF]);
+  }, [displayedGeoEntries, selectedUF]);
 
   // City-only aggregation for selected UF (drill-down level 2)
   // Mantém variantes brutas (com casing/acento original) por chave canônica
@@ -605,8 +678,8 @@ export default function Territorial() {
   const cityGroups = useMemo(() => {
     const canon = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
     const filtered = selectedUF
-      ? allGeoEntries.filter((e) => inferUF(e) === selectedUF)
-      : allGeoEntries;
+      ? displayedGeoEntries.filter((e) => inferUF(e) === selectedUF)
+      : displayedGeoEntries;
     type B = { city: string; count: number; variants: Record<string, number> };
     const map: Record<string, B> = {};
     for (const e of filtered) {
@@ -624,7 +697,7 @@ export default function Territorial() {
         return { city: top ? top[0] : b.city, count: b.count, variants: b.variants };
       })
       .sort((a, b) => b.count - a.count);
-  }, [allGeoEntries, selectedUF]);
+  }, [displayedGeoEntries, selectedUF]);
 
   // Marcadores de cidade pro mapa: usa cityGroups + lookup de coordenadas IBGE.
   // Quando há UF selecionada, usa essa UF; senão deduz do grupo.
@@ -633,7 +706,7 @@ export default function Territorial() {
     for (const g of cityGroups) {
       const uf = selectedUF || (() => {
         // tenta inferir UF a partir das pessoas dessa cidade
-        const sample = allGeoEntries.find(e => (e.city || "").toLowerCase().includes(g.city.toLowerCase()));
+        const sample = displayedGeoEntries.find(e => (e.city || "").toLowerCase().includes(g.city.toLowerCase()));
         return sample ? inferUF(sample) : null;
       })();
       if (!uf) continue;
@@ -641,14 +714,14 @@ export default function Territorial() {
       if (coords) out.push({ city: g.city, count: g.count, coords });
     }
     return out;
-  }, [cityGroups, selectedUF, allGeoEntries]);
+  }, [cityGroups, selectedUF, displayedGeoEntries]);
   const neighborhoodGroups = useMemo(() => {
     if (!selectedCity) return [];
     const canon = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
     const cityKey = canon(selectedCity);
     const filtered = selectedUF
-      ? allGeoEntries.filter((e) => inferUF(e) === selectedUF)
-      : allGeoEntries;
+      ? displayedGeoEntries.filter((e) => inferUF(e) === selectedUF)
+      : displayedGeoEntries;
     type B = { key: string; neighborhood: string; count: number; variants: Record<string, number> };
     const map: Record<string, B> = {};
     for (const e of filtered) {
@@ -668,18 +741,18 @@ export default function Territorial() {
         return { key: b.key, neighborhood: top ? top[0] : b.neighborhood, count: b.count, variants: b.variants };
       })
       .sort((a, b) => b.count - a.count);
-  }, [allGeoEntries, selectedUF, selectedCity]);
+  }, [displayedGeoEntries, selectedUF, selectedCity]);
 
   const growthStats = useMemo(() => {
-    if (!allGeoEntries) return null;
+    if (!displayedGeoEntries) return null;
     const now = Date.now();
     const d30 = 30 * 24 * 60 * 60 * 1000;
-    const withLoc = allGeoEntries.filter(s => s.city || s.neighborhood);
+    const withLoc = displayedGeoEntries.filter(s => s.city || s.neighborhood);
     const last30 = withLoc.filter(s => now - new Date(s.created_at).getTime() < d30).length;
     const prev30 = withLoc.filter(s => { const diff = now - new Date(s.created_at).getTime(); return diff >= d30 && diff < d30 * 2; }).length;
     const change = prev30 > 0 ? Math.round(((last30 - prev30) / prev30) * 100) : last30 > 0 ? 100 : 0;
     return { last30, prev30, change };
-  }, [allGeoEntries]);
+  }, [displayedGeoEntries]);
 
   const maxCount = groups.length > 0 ? groups[0].count : 1;
 
@@ -853,6 +926,52 @@ export default function Territorial() {
           {reloading ? "Recarregando…" : "Recarregar dados"}
         </Button>
       </div>
+
+      {/* Filtro de origem (chips) — apenas filtragem em memória, não altera dados */}
+      <Card>
+        <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground mr-1">Mostrar:</span>
+          {([
+            { v: "todos", label: "Todos" },
+            { v: "crm", label: "CRM" },
+            { v: "apoiador", label: "Apoiadores" },
+            { v: "indicado", label: "Indicados" },
+            { v: "eleicao", label: "Eleição" },
+          ] as const).map((opt) => (
+            <Button
+              key={opt.v}
+              size="sm"
+              variant={originFilter === opt.v ? "default" : "outline"}
+              className="h-7 text-xs"
+              onClick={() => setOriginFilter(opt.v)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+          <span className="text-[10px] text-muted-foreground ml-auto">
+            {displayedGeoEntries.length.toLocaleString("pt-BR")} pessoa{displayedGeoEntries.length === 1 ? "" : "s"} na visão atual
+          </span>
+        </CardContent>
+      </Card>
+
+      {/* Aviso: cadastros de Eleição sem cidade definida */}
+      {eleicaoSemCidade > 0 && (originFilter === "todos" || originFilter === "eleicao") && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-3 px-4 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-medium">
+                {eleicaoSemCidade} cadastro{eleicaoSemCidade === 1 ? "" : "s"} de Eleição sem cidade definida
+              </p>
+              <p className="text-muted-foreground mt-0.5">
+                Esses registros aparecem na seção <strong>Por Região</strong> abaixo e no contador "Sem localização".
+                A aba de Eleição não é alterada — esta visão é apenas leitura.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* ═══════════════════════════════════════ */}
       {/* CRESCIMENTO DA BASE                    */}
@@ -1337,6 +1456,103 @@ export default function Territorial() {
 
       {/* Divider */}
       <div className="border-t" />
+
+      {/* ═══════════════════════════════════════ */}
+      {/* POR REGIÃO (microzonas da campanha)    */}
+      {/* ═══════════════════════════════════════ */}
+      {regionGroups.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" />
+              Por Região
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Microzonas da campanha (cadastradas em Eleição → Configurações).
+              Clique numa região para ver os bairros dela.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MetricCard icon={MapPin} label="Regiões ativas" value={regionGroups.length} description="Com pelo menos 1 cadastro" />
+            <MetricCard icon={Users} label="Pessoas em regiões" value={regionGroups.reduce((s, r) => s + r.count, 0)} accent description="Soma de todas as regiões" />
+            <MetricCard icon={TrendingUp} label="Maior região" value={regionGroups[0]?.count || 0} description={regionGroups[0]?.label || "—"} />
+            <MetricCard icon={Home} label="Bairros mapeados" value={regionGroups.reduce((s, r) => s + Object.keys(r.neighborhoods).length, 0)} description="Em todas as regiões" />
+          </div>
+
+          <Card>
+            <CardContent className="pt-4 space-y-2">
+              {regionGroups.map((r) => {
+                const isOpen = selectedRegion === r.value;
+                const neighList = Object.values(r.neighborhoods).sort((a, b) => b.count - a.count);
+                const maxR = regionGroups[0]?.count || 1;
+                const ratio = r.count / maxR;
+                return (
+                  <Collapsible
+                    key={r.value}
+                    open={isOpen}
+                    onOpenChange={(o) => setSelectedRegion(o ? r.value : null)}
+                  >
+                    <Card className="overflow-hidden">
+                      <CollapsibleTrigger asChild>
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                        >
+                          <MapPin className="w-4 h-4 text-primary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-sm truncate">{r.label}</span>
+                              {r.label !== r.value && (
+                                <Badge variant="outline" className="h-5 text-[10px] font-mono">{r.value}</Badge>
+                              )}
+                            </div>
+                            <div className="h-1.5 mt-1 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(ratio * 100, 3)}%` }} />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              {neighList.length} bairro{neighList.length === 1 ? "" : "s"} · {r.count} pessoa{r.count === 1 ? "" : "s"}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-xs shrink-0">{r.count}</Badge>
+                          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="border-t bg-muted/20 p-3">
+                          {neighList.length === 0 ? (
+                            <p className="text-xs text-muted-foreground text-center py-4">
+                              Nenhum bairro detalhado nesta região.
+                            </p>
+                          ) : (
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              {neighList.map((n) => (
+                                <div key={n.name} className="rounded-lg border bg-card p-3">
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <span className="text-sm font-medium truncate">{n.name}</span>
+                                    <Badge variant="outline" className="text-[10px] shrink-0">{n.count}</Badge>
+                                  </div>
+                                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max((n.count / (neighList[0]?.count || 1)) * 100, 3)}%` }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CollapsibleContent>
+                    </Card>
+                  </Collapsible>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Divider */}
+      <div className="border-t" />
+
 
       {/* ═══════════════════════════════════════ */}
       {/* ÚLTIMOS CADASTROS                      */}
