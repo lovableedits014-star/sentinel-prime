@@ -624,32 +624,22 @@ export const CommentItem = memo(function CommentItem({
               <div className="flex justify-end gap-2">
                 <Button
                   size="sm"
-                  variant="outline"
                   className="h-8 text-xs"
                   onClick={() => {
-                    onGenerateResponse(comment.id, !!comment.ai_response);
+                    const g = guidanceText.trim();
+                    onGenerateResponse(comment.id, !!comment.ai_response, g || undefined);
                     setShowGuidance(false);
                     setGuidanceText("");
                   }}
                   disabled={isGenerating}
                 >
                   <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                  {isGenerating ? "Gerando..." : "Gerar resposta"}
+                  {isGenerating
+                    ? "Gerando..."
+                    : guidanceText.trim()
+                      ? "Gerar com orientação"
+                      : "Gerar resposta"}
                 </Button>
-                {guidanceText.trim() && (
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => {
-                      onGenerateResponse(comment.id, !!comment.ai_response, guidanceText.trim());
-                      setShowGuidance(false);
-                    }}
-                    disabled={isGenerating}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                    {isGenerating ? "Gerando..." : "Gerar com orientação"}
-                  </Button>
-                )}
               </div>
             </div>
           )}
