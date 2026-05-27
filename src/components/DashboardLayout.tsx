@@ -13,7 +13,7 @@ import SuperAdminClientSwitcher from "@/components/SuperAdminClientSwitcher";
 import RequireClient from "@/components/RequireClient";
 
 
-const AUTH_CHECK_TIMEOUT_MS = 12000;
+const AUTH_CHECK_TIMEOUT_MS = 6000;
 
 const hasStoredAuthSession = () => {
   try {
@@ -141,74 +141,61 @@ const DashboardLayout = () => {
         if (!session) { navigate("/auth", { replace: true }); return; }
         setUser(session.user);
 
-        // Super admin gets full access regardless of clients/team_members
-        const { data: isSuperAdmin } = await withTimeout(
-          supabase.rpc("is_super_admin"),
-          "Tempo esgotado ao verificar super admin"
-        );
-        if (!mounted) return;
-
-        if (isSuperAdmin === true) {
-          setIsSuperAdmin(true);
-          setIsClientOwner(true);
-          setAccessProfile(null); // full access
-        } else {
-          setIsSuperAdmin(false);
-          // Check if user is a client owner
-          const { data: clientData, error: clientError } = await withTimeout(
+        // Roda checagens de permissão em paralelo para evitar timeouts encadeados
+        const [superAdminRes, clientRes, teamRes] = await withTimeout(
+          Promise.all([
+            supabase.rpc("is_super_admin"),
             supabase
               .from("clients")
               .select("id")
               .eq("user_id", session.user.id)
               .limit(1)
               .maybeSingle(),
-            "Tempo esgotado ao carregar suas permissões"
-          );
-          if (!mounted) return;
-          if (clientError) throw clientError;
+            supabase
+              .from("team_members")
+              .select("role, status, allowed_paths, is_manager")
+              .eq("user_id", session.user.id)
+              .eq("status", "active")
+              .limit(1)
+              .maybeSingle(),
+          ]),
+          "Tempo esgotado ao carregar suas permissões"
+        );
+        if (!mounted) return;
 
+        const isSuperAdmin = superAdminRes?.data;
+        const clientData = clientRes?.data;
+        const teamData = teamRes?.data;
+
+        if (isSuperAdmin === true) {
+          setIsSuperAdmin(true);
+          setIsClientOwner(true);
+          setAccessProfile(null);
+        } else {
+          setIsSuperAdmin(false);
           if (clientData) {
             setIsClientOwner(true);
-            setAccessProfile(null); // full access
+            setAccessProfile(null);
             setPlatformPaths(null);
-          } else {
-            // team_members é a fonte única: vínculo ao client + abas liberadas
-            const { data: teamData, error: teamError } = await withTimeout(
-              supabase
-                .from("team_members")
-                .select("role, status, allowed_paths, is_manager")
-                .eq("user_id", session.user.id)
-                .eq("status", "active")
-                .limit(1)
-                .maybeSingle(),
-              "Tempo esgotado ao carregar suas permissões"
-            );
-            if (!mounted) return;
-            if (teamError) throw teamError;
-
-            if (!teamData) {
-              toast.error("Você não tem permissão para acessar o painel");
-              await supabase.auth.signOut();
-              navigate("/auth", { replace: true });
-              return;
-            }
-
+          } else if (teamData) {
             const row = teamData as any;
             const paths: string[] = row.allowed_paths || [];
             const isManager = !!row.is_manager;
-
             setIsClientOwner(false);
             if (isManager || paths.includes("*")) {
-              // gerente do cliente: acesso total
               setPlatformPaths(null);
               setAccessProfile(null);
             } else if (paths.length > 0) {
               setPlatformPaths([...paths, ...ALWAYS_ALLOWED_PATHS]);
               setAccessProfile(null);
             } else {
-              // sem allowed_paths definidos -> usar perfil legado
               setAccessProfile(row.role as AccessProfile);
             }
+          } else {
+            toast.error("Você não tem permissão para acessar o painel");
+            await supabase.auth.signOut();
+            navigate("/auth", { replace: true });
+            return;
           }
         }
 
