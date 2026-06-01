@@ -615,12 +615,13 @@ export default function Eleicao() {
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
-            {pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length > 0 && (
+            {stats.semValor > 0 && (
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                {pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length}
+                {stats.semValor}
               </Badge>
             )}
           </TabsTrigger>
+
           <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
