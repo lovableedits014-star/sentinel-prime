@@ -378,6 +378,9 @@ export default function Eleicao() {
       toast.error(error.message);
       setPessoas(prev => prev.map(x => x.id === p.id ? { ...x, [field]: !novoValor } : x));
       return;
+    }
+    const label = field === "pode_cadastrar_lider" ? "Líderes" : "Cabos";
+    toast.success(novoValor ? `${p.nome} pode cadastrar ${label}` : `${p.nome} bloqueado para cadastrar ${label}`);
   }
 
   function openResendLiderFlow(p: Pessoa) {
@@ -385,6 +388,8 @@ export default function Eleicao() {
     setNotifyPessoaId(p.id);
     setNotifyOpen(true);
   }
+
+
 
 
 
