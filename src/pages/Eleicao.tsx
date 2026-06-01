@@ -885,17 +885,38 @@ export default function Eleicao() {
             )}
 
             {form.tipo !== "coordenador" && (
-              <div>
-                <Label>Indicado por ({form.tipo === "lider" ? "Coordenador" : "Líder"})</Label>
-                <Select value={form.parent_id || "none"} onValueChange={(v) => setForm(f => ({ ...f, parent_id: v === "none" ? "" : v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Sem vínculo —</SelectItem>
-                    {possibleParents.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {possibleParents.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">Nenhum {form.tipo === "lider" ? "coordenador" : "líder"} cadastrado nesta {form.escopo === "campo_grande" ? "região" : "cidade"} ainda.</p>
+              <div className="space-y-2">
+                {form.tipo === "lider" && (
+                  <label className="flex items-start gap-2 text-sm font-medium rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 cursor-pointer">
+                    <Checkbox
+                      checked={form.liderAvulso}
+                      onCheckedChange={(c) => setForm(f => ({ ...f, liderAvulso: !!c, parent_id: c ? "" : f.parent_id }))}
+                    />
+                    <div className="flex-1">
+                      <div className="text-amber-700 dark:text-amber-400">⚡ Líder avulso (sem coordenador vinculado)</div>
+                      <p className="text-[11px] font-normal text-muted-foreground mt-0.5">
+                        Use para líderes que vieram diretamente ao gabinete ou foram cadastrados sem indicação. Aparecerão na seção "Líderes avulsos" e contam nos relatórios.
+                      </p>
+                    </div>
+                  </label>
+                )}
+                {!(form.tipo === "lider" && form.liderAvulso) && (
+                  <div>
+                    <Label>Indicado por ({form.tipo === "lider" ? "Coordenador" : "Líder"})</Label>
+                    <Select value={form.parent_id || "none"} onValueChange={(v) => setForm(f => ({ ...f, parent_id: v === "none" ? "" : v }))}>
+                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Sem vínculo —</SelectItem>
+                        {possibleParents.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {possibleParents.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Nenhum {form.tipo === "lider" ? "coordenador" : "líder"} cadastrado nesta {form.escopo === "campo_grande" ? "região" : "cidade"} ainda.
+                        {form.tipo === "lider" && " Marque acima como avulso para prosseguir."}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}
