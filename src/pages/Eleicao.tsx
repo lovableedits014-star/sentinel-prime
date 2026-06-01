@@ -162,6 +162,8 @@ interface Pessoa {
   user_id: string | null;
   valor_contratacao: number | null;
   is_favorito_regiao?: boolean | null;
+  pode_cadastrar_lider?: boolean | null;
+  pode_cadastrar_cabo?: boolean | null;
   created_at: string;
 }
 
