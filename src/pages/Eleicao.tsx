@@ -1425,6 +1425,17 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, onTogglePermiss
               <DropdownMenuItem onClick={() => sendCoordBoasVindas(p.id)}>
                 <BellRing className="w-3.5 h-3.5 mr-2" />Enviar boas-vindas (grupo)
               </DropdownMenuItem>
+              {onTogglePermissao && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onTogglePermissao(p, "pode_cadastrar_lider")}>
+                    {p.pode_cadastrar_lider === false ? "✅ Permitir" : "🚫 Bloquear"} cadastro de Líderes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onTogglePermissao(p, "pode_cadastrar_cabo")}>
+                    {p.pode_cadastrar_cabo === false ? "✅ Permitir" : "🚫 Bloquear"} cadastro de Cabos
+                  </DropdownMenuItem>
+                </>
+              )}
             </>
           )}
           <DropdownMenuSeparator />
