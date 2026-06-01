@@ -1289,6 +1289,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
 }) {
   const actions = React.useContext(EleicaoActionsContext);
   const onTogglePermissao = actions?.onTogglePermissao;
+  const onResendLiderFlow = actions?.onResendLiderFlow;
+
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
