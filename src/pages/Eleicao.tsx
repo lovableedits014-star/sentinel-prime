@@ -180,6 +180,12 @@ function genLocalPassword(len = 10) {
   return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
+// Contexto p/ ações que aparecem em várias linhas/níveis sem precisar passar props
+type EleicaoActions = {
+  onTogglePermissao: (p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") => void;
+};
+const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
+
 export default function Eleicao() {
   const { data: clientId } = useCurrentClientId();
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
