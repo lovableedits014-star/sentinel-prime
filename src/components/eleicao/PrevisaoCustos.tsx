@@ -47,6 +47,8 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
       const list = byTipo(t);
       const total = list.reduce((s, p) => s + valor(p), 0);
       const pagos = list.filter(p => valor(p) > 0).length;
+      const avulsos = t === "lider" ? list.filter(p => !p.parent_id) : [];
+      const avulsosTotal = avulsos.reduce((s, p) => s + valor(p), 0);
       return {
         tipo: t,
         label: TIPO_LABEL[t],
@@ -55,6 +57,8 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
         pagos,
         gratis: list.length - pagos,
         media: pagos > 0 ? total / pagos : 0,
+        avulsosQtd: avulsos.length,
+        avulsosTotal,
       };
     });
 
