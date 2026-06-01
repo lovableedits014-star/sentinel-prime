@@ -1137,8 +1137,29 @@ function RegionBlock({
             <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} interior={interior} />
           ))}
           {lideresOrfaos.length > 0 && (
-            <div className="px-3 py-2 border-t border-dashed">
-              <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">Líderes sem coordenador</p>
+            <div className="px-3 py-2 border-t border-dashed bg-amber-500/5">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Star className="w-3 h-3 text-amber-600 shrink-0" />
+                  <p className="text-[10px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400 truncate">
+                    Líderes avulsos (sem coordenador) · {lideresOrfaos.length}
+                    {(() => {
+                      const tot = lideresOrfaos.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+                      const sv = lideresOrfaos.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
+                      return <span className="font-normal text-muted-foreground normal-case ml-1">· {fmtBRL(tot)}{sv > 0 ? ` · ${sv} sem valor` : ""}</span>;
+                    })()}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px] gap-1 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); gerarContratosLote(lideresOrfaos, lideresOrfaos[0].client_id, `Líderes avulsos - ${title}`); }}
+                  title="Gerar contratos só dos líderes avulsos desta região"
+                >
+                  <Package className="w-3 h-3" />Contratos avulsos
+                </Button>
+              </div>
               {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} />)}
             </div>
           )}
