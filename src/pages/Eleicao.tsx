@@ -1496,7 +1496,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
 // ─── KPI Card visual ────────────────────────────────────────────
 function KpiCard({ label, value, icon: Icon, tone, small }: {
   label: string; value: number | string; icon: any;
-  tone: "neutral" | "red" | "blue" | "green" | "emerald"; small?: boolean;
+  tone: "neutral" | "red" | "blue" | "green" | "emerald" | "amber"; small?: boolean;
 }) {
   const tones: Record<string, string> = {
     neutral: "from-muted/40 to-muted/10 text-foreground border-border/50",
@@ -1504,6 +1504,7 @@ function KpiCard({ label, value, icon: Icon, tone, small }: {
     blue: "from-blue-500/15 to-blue-500/5 text-blue-700 dark:text-blue-400 border-blue-500/20",
     green: "from-green-500/15 to-green-500/5 text-green-700 dark:text-green-400 border-green-500/20",
     emerald: "from-emerald-500/15 to-emerald-500/5 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
+    amber: "from-amber-500/15 to-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/20",
   };
   return (
     <div className={cn("relative rounded-xl border bg-gradient-to-br p-3 overflow-hidden", tones[tone])}>
