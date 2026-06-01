@@ -478,13 +478,14 @@ export default function Eleicao() {
 
   const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
   const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
 
   const matchesStatus = (p: Pessoa) => {
     if (statusFilter === "sem_valor") return !p.valor_contratacao || p.valor_contratacao === 0;
     if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
+    if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id;
     return true;
   };
   const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
