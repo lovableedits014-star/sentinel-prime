@@ -1,66 +1,54 @@
-# Bloqueio de cadastros de Líderes e Cabos
+## Diagnóstico
 
-## Objetivo
-Permitir que o administrador controle, no painel **Eleição**, se coordenadores podem cadastrar **Líderes** e **Cabos eleitorais** no portal — com chave **global** (afeta todos) e **chave individual** por coordenador (para travar caso a caso quando o limite estourar).
+### 1. Divergência Total 72 vs Pendentes 73
 
-## Mudanças
+Em `src/pages/Eleicao.tsx`:
 
-### 1. Banco de dados (migração)
+- O KPI **"Total: 72"** (linha 501) usa `stats.total`, que é filtrado pelo escopo atual (`p.escopo === escopo`, ex.: Campo Grande).
+- O badge **"Pendentes de valor: 73"** (linhas 606-609) conta `pessoas.filter(...)` **sem filtrar por escopo** — soma Campo Grande + Interior.
 
-**Tabela `eleicao_notif_config`** (controles globais — convive com a config existente):
-- `cadastro_lider_ativo` boolean default true
-- `cadastro_cabo_ativo` boolean default true
+Resultado: existe ao menos 1 pessoa no outro escopo (Interior) sem valor definido, que entra no badge mas não no Total exibido. Não é bug de dados — é inconsistência visual.
 
-**Tabela `eleicao_pessoas`** (controles por coordenador):
-- `pode_cadastrar_lider` boolean default true
-- `pode_cadastrar_cabo` boolean default true
+**Correção:** o badge da aba "Pendentes de valor" deve respeitar o mesmo escopo do KPI "Total" (ou pelo menos deixar isso explícito). Vou alinhar o badge ao escopo ativo, e o painel `PendentesValorPanel` continua mostrando todos com um sub-filtro por escopo.
 
-> Aplicáveis apenas a linhas com `tipo = 'coordenador'`. Para os demais tipos o valor é ignorado.
+### 2. Não há como reenviar o fluxo de cadastro do líder após editar o telefone
 
-### 2. Painel admin — `src/pages/Eleicao.tsx` / `EleicaoConfigPanel.tsx`
+Hoje o dialog `NotifyProgressDialog` (Coordenador → Secretaria → Líder) só é aberto no `save()` quando é criação nova de líder (linhas 318-325). Se o telefone estava errado e foi corrigido depois, não existe ação para retomar o envio.
 
-**Card novo "Controle de cadastros" no `EleicaoConfigPanel`** (logo abaixo do card de notificações):
-- Switch **"Permitir cadastro de novos Líderes"** (global)
-- Switch **"Permitir cadastro de novos Cabos Eleitorais"** (global)
-- Texto explicativo: quando desligado, nenhum coordenador consegue cadastrar; mesmo se a chave global estiver ligada, é possível travar individualmente abaixo.
+No menu de ações da linha (`PessoaRow`, linhas 1395-1455), existem ações de envio só para `tipo === "coordenador"`. Para `lider` não há nada equivalente.
 
-**Por coordenador** — na listagem de pessoas (aba/lista de coordenadores em `Eleicao.tsx`), adicionar no menu de ações (DropdownMenu já existente) duas opções com toggle visual:
-- "Permitir cadastrar Líderes" ✓/✗
-- "Permitir cadastrar Cabos" ✓/✗
+---
 
-E um badge discreto ao lado do nome do coordenador quando algum dos dois estiver desligado (ex: "🔒 Líderes" / "🔒 Cabos"), para o admin enxergar rapidamente quem está bloqueado.
+## Plano de mudanças (UI apenas, sem alterar lógica do backend)
 
-### 3. Portal do coordenador — `src/pages/PortalCoordenador.tsx`
+### A) Corrigir contador "Pendentes de valor"
+Em `src/pages/Eleicao.tsx`, fazer o badge da aba `pendentes` contar apenas pessoas do escopo ativo:
 
-No `load()`, buscar também:
-- `eleicao_notif_config` do client (campos `cadastro_lider_ativo`, `cadastro_cabo_ativo`)
-- Já tem o `me` (coordenador) — lê `pode_cadastrar_lider` / `pode_cadastrar_cabo`
+```text
+pessoas.filter(p => p.escopo === escopo && (!p.valor_contratacao || p.valor_contratacao === 0)).length
+```
 
-Regras (calculadas no front, mas a barreira real é RLS — ver item 4):
-- `permiteLider = config.cadastro_lider_ativo && me.pode_cadastrar_lider`
-- `permiteCabo  = config.cadastro_cabo_ativo  && me.pode_cadastrar_cabo`
+Assim o número bate visualmente com o KPI "Total" da mesma aba. Reaproveitar `stats.semValor` (já calculado).
 
-UI:
-- Esconder/desabilitar botão **"Novo Líder"** quando `!permiteLider`, com tooltip "Cadastros temporariamente bloqueados pela administração da campanha".
-- Mesma coisa para **"Novo Cabo eleitoral"** e o botão "Cabo deste líder" dentro do líder expandido.
-- Banner discreto no topo do painel quando algum cadastro estiver bloqueado, com a razão (global vs. individual).
+### B) Botão "Reenviar fluxo de cadastro" para líderes
 
-### 4. RLS — barreira real no banco
+No `PessoaRow` (`src/pages/Eleicao.tsx`), adicionar um bloco análogo ao do coordenador, mas para `p.tipo === "lider"`:
 
-Atualizar a policy de **INSERT** em `eleicao_pessoas` para coordenadores: além das checagens atuais, exigir que o switch correspondente esteja ligado tanto em `eleicao_notif_config` quanto no próprio coordenador (`pode_cadastrar_lider` / `pode_cadastrar_cabo` conforme `tipo` sendo inserido). Isso garante que mesmo um request manipulado no front não passe.
+- Novo prop opcional `onResendLiderFlow?: (p: Pessoa) => void` no `PessoaRow` / `LiderBlock` / `CoordBlock` / `Section` / `ListaPlana`.
+- Item no DropdownMenu da linha do líder:
+  - **"🔁 Reenviar fluxo de cadastro"** → abre o `NotifyProgressDialog` para esse líder (seta `notifyPessoaId = p.id` e `notifyOpen = true`), exatamente como acontece hoje na criação.
+  - O `NotifyProgressDialog` re-executa as etapas (Coordenador → Secretaria → Líder) usando o telefone atualizado.
+- Pequeno ajuste em `NotifyProgressDialog`: hoje o `ranRef` impede rodar de novo para o mesmo `pessoaId`. Vou permitir re-execução manual quando o dialog é reaberto explicitamente (resetar `ranRef.current` no `onClose` ou comparar com um `runKey` incremental, sem mexer no fluxo de criação).
 
-## Detalhes técnicos
+Sem alterações de banco de dados.
 
-- **Migração** roda primeiro (precisa de aprovação do usuário). Defaults `true` para não quebrar fluxo atual.
-- Tipos do Supabase (`src/integrations/supabase/types.ts`) serão regenerados automaticamente após a migração.
-- `EleicaoConfigPanel.tsx` carrega/salva os 2 novos campos junto com os existentes — adicionar ao `interface Cfg`, `setCfg` inicial, leitura no `load()` e payload do `save()`.
-- Atualização individual do coordenador: simples `UPDATE eleicao_pessoas SET pode_cadastrar_* = ... WHERE id = ?` via dropdown na lista de coordenadores.
+---
 
-## Fora de escopo
-- Bloqueio com data/horário programado (pode entrar em iteração futura se quiser).
-- Limites numéricos automáticos (ex: bloquear ao atingir N cabos) — por enquanto é manual via essas chaves.
+## Resumo do que será alterado
 
-## Pergunta antes de implementar
-Confirma esses 2 pontos?
-1. Quando você desligar a chave global, ela **sobrescreve** as individuais (ninguém cadastra), mesmo que alguém esteja individualmente liberado — correto?
-2. Os defaults devem começar **ligados** (todos podem cadastrar até você desligar) ou prefere começar tudo **desligado** e ir liberando coordenador por coordenador?
+- `src/pages/Eleicao.tsx`
+  - Badge da aba "Pendentes de valor" passa a respeitar o escopo ativo.
+  - DropdownMenu da linha de líder ganha "Reenviar fluxo de cadastro".
+  - Propagação do handler `onResendLiderFlow` pelos componentes intermediários.
+- `src/components/eleicao/NotifyProgressDialog.tsx`
+  - Permitir reabrir o dialog para o mesmo `pessoa_id` e disparar novamente as etapas.

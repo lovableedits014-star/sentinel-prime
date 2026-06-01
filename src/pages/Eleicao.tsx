@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star, BellRing } from "lucide-react";
+import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star, BellRing, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -183,8 +183,10 @@ function genLocalPassword(len = 10) {
 // Contexto p/ ações que aparecem em várias linhas/níveis sem precisar passar props
 type EleicaoActions = {
   onTogglePermissao: (p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") => void;
+  onResendLiderFlow: (p: Pessoa) => void;
 };
 const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
+
 
 export default function Eleicao() {
   const { data: clientId } = useCurrentClientId();
@@ -381,6 +383,16 @@ export default function Eleicao() {
     toast.success(novoValor ? `${p.nome} pode cadastrar ${label}` : `${p.nome} bloqueado para cadastrar ${label}`);
   }
 
+  function openResendLiderFlow(p: Pessoa) {
+    if (p.tipo !== "lider") return;
+    setNotifyPessoaId(p.id);
+    setNotifyOpen(true);
+  }
+
+
+
+
+
 
   // ─── Credenciais de Coordenador ────────────────────────────────
   const [credOpen, setCredOpen] = useState(false);
@@ -560,7 +572,7 @@ export default function Eleicao() {
   }
 
   return (
-    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro }}>
+    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow }}>
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
@@ -603,12 +615,13 @@ export default function Eleicao() {
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
-            {pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length > 0 && (
+            {stats.semValor > 0 && (
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                {pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length}
+                {stats.semValor}
               </Badge>
             )}
           </TabsTrigger>
+
           <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
@@ -1276,6 +1289,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
 }) {
   const actions = React.useContext(EleicaoActionsContext);
   const onTogglePermissao = actions?.onTogglePermissao;
+  const onResendLiderFlow = actions?.onResendLiderFlow;
+
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
@@ -1447,6 +1462,15 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               )}
             </>
           )}
+          {p.tipo === "lider" && onResendLiderFlow && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onResendLiderFlow(p)}>
+                <RefreshCw className="w-3.5 h-3.5 mr-2" />Reenviar fluxo de cadastro
+              </DropdownMenuItem>
+            </>
+          )}
+
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => onDelete(p.id)} className="text-destructive focus:text-destructive">
             <Trash2 className="w-3.5 h-3.5 mr-2" />Excluir
