@@ -143,6 +143,12 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
                 <span>{item.pagos} pagos · {item.gratis} sem custo</span>
                 {item.media > 0 && <span>Média {fmt(item.media)}</span>}
               </div>
+              {item.tipo === "lider" && item.avulsosQtd > 0 && (
+                <div className="mt-2 pt-2 border-t border-dashed border-border/60 text-[11px] text-muted-foreground flex items-center justify-between">
+                  <span>↳ dos quais <strong className="text-foreground">avulsos</strong> (sem coordenador): {item.avulsosQtd}</span>
+                  <span className="tabular-nums">{fmt(item.avulsosTotal)}</span>
+                </div>
+              )}
             </Card>
           );
         })}
