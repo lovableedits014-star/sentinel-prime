@@ -248,7 +248,7 @@ export default function Eleicao() {
     setForm({
       tipo: "coordenador", escopo, regiao: "centro", cidade: "",
       nome: "", telefone: "", rua: "", numero: "", bairro: "",
-      parent_id: "", observacoes: "",
+      parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
       ...presets,
@@ -269,6 +269,7 @@ export default function Eleicao() {
       numero: p.numero || "",
       bairro: p.bairro || "",
       parent_id: p.parent_id || "",
+      liderAvulso: p.tipo === "lider" && !p.parent_id,
       observacoes: p.observacoes || "",
       email: p.email || "",
       password: "",
