@@ -1479,6 +1479,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           )}
           <DropdownMenuItem
             disabled={semValor}
+            title={semValor ? "Defina o valor em 'Pendentes de valor' para liberar o contrato" : "Gerar contrato em .docx"}
             onClick={async () => {
               try {
                 await gerarContratoIndividual(p as any, p.client_id);
@@ -1486,7 +1487,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               } catch (e: any) { toast.error(e.message); }
             }}
           >
-            <FileDown className="w-3.5 h-3.5 mr-2" />Baixar contrato (.docx)
+            <FileDown className="w-3.5 h-3.5 mr-2" />Baixar contrato (.docx){semValor && <span className="ml-auto text-[10px] opacity-60">sem valor</span>}
           </DropdownMenuItem>
           {p.tipo === "coordenador" && onSend && (
             <>
