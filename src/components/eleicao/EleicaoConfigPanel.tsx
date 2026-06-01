@@ -35,6 +35,8 @@ interface Cfg {
   envio_lider_ativo: boolean;
   envio_coord_boas_vindas_ativo: boolean;
   envio_cabo_boas_vindas_ativo: boolean;
+  cadastro_lider_ativo: boolean;
+  cadastro_cabo_ativo: boolean;
 }
 
 type GroupOption = { group_jid: string; name: string | null };
