@@ -654,11 +654,12 @@ export default function Eleicao() {
         </TabsList>
 
         {/* KPIs com cards visuais */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
           <KpiCard label="Total" value={stats.total} icon={Users} tone="neutral" />
           <KpiCard label="Coordenadores" value={stats.coord} icon={Crown} tone="red" />
           <KpiCard label="Líderes" value={stats.lider} icon={Users} tone="blue" />
           <KpiCard label="Cabos" value={stats.cabo} icon={UserCheck} tone="green" />
+          <KpiCard label="Avulsos" value={stats.avulsos} icon={Star} tone="amber" />
           <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" small />
         </div>
 
