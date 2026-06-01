@@ -201,6 +201,7 @@ export default function Eleicao() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyPessoaId, setNotifyPessoaId] = useState<string | null>(null);
+  const [notifySkip, setNotifySkip] = useState<("coordenador" | "secretaria" | "lider")[]>([]);
   const [editing, setEditing] = useState<Pessoa | null>(null);
   const [form, setForm] = useState({
     tipo: "coordenador" as Tipo,
@@ -213,6 +214,7 @@ export default function Eleicao() {
     numero: "",
     bairro: "",
     parent_id: "" as string,
+    liderAvulso: false,
     observacoes: "",
     email: "",
     password: "",
@@ -247,7 +249,7 @@ export default function Eleicao() {
     setForm({
       tipo: "coordenador", escopo, regiao: "centro", cidade: "",
       nome: "", telefone: "", rua: "", numero: "", bairro: "",
-      parent_id: "", observacoes: "",
+      parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
       ...presets,
@@ -268,6 +270,7 @@ export default function Eleicao() {
       numero: p.numero || "",
       bairro: p.bairro || "",
       parent_id: p.parent_id || "",
+      liderAvulso: p.tipo === "lider" && !p.parent_id,
       observacoes: p.observacoes || "",
       email: p.email || "",
       password: "",
@@ -304,7 +307,7 @@ export default function Eleicao() {
       telefone: form.telefone.trim(),
       rua, numero: numero || null, bairro,
       endereco: enderecoConcat,
-      parent_id: form.parent_id || null,
+      parent_id: form.tipo === "lider" && form.liderAvulso ? null : (form.parent_id || null),
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
@@ -317,9 +320,12 @@ export default function Eleicao() {
 
     // Disparo automático de notificações ao criar novo líder.
     // Abre o dialog visual de progresso por etapa (Coordenador → Secretaria → Líder).
+    // Para líder avulso (sem coordenador), pula as etapas Coordenador e Secretaria.
     if (!editing && form.tipo === "lider" && savedPessoa) {
       toast.success("Líder cadastrado!");
       setDialogOpen(false);
+      const isAvulso = !payload.parent_id;
+      setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
       setNotifyPessoaId((savedPessoa as any).id);
       setNotifyOpen(true);
       load();
@@ -385,6 +391,7 @@ export default function Eleicao() {
 
   function openResendLiderFlow(p: Pessoa) {
     if (p.tipo !== "lider") return;
+    setNotifySkip(!p.parent_id ? ["coordenador", "secretaria"] : []);
     setNotifyPessoaId(p.id);
     setNotifyOpen(true);
   }
@@ -471,13 +478,14 @@ export default function Eleicao() {
 
   const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
   const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
 
   const matchesStatus = (p: Pessoa) => {
     if (statusFilter === "sem_valor") return !p.valor_contratacao || p.valor_contratacao === 0;
     if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
+    if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id;
     return true;
   };
   const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
@@ -506,6 +514,7 @@ export default function Eleicao() {
     const f = pessoas.filter(p => p.escopo === escopo);
     const valorTotal = f.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
     const semValor = f.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
+    const avulsos = f.filter(p => p.tipo === "lider" && !p.parent_id).length;
     return {
       coord: f.filter(p => p.tipo === "coordenador").length,
       lider: f.filter(p => p.tipo === "lider").length,
@@ -513,6 +522,7 @@ export default function Eleicao() {
       total: f.length,
       valorTotal,
       semValor,
+      avulsos,
     };
   }, [pessoas, escopo]);
 
@@ -644,11 +654,12 @@ export default function Eleicao() {
         </TabsList>
 
         {/* KPIs com cards visuais */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
           <KpiCard label="Total" value={stats.total} icon={Users} tone="neutral" />
           <KpiCard label="Coordenadores" value={stats.coord} icon={Crown} tone="red" />
           <KpiCard label="Líderes" value={stats.lider} icon={Users} tone="blue" />
           <KpiCard label="Cabos" value={stats.cabo} icon={UserCheck} tone="green" />
+          <KpiCard label="Avulsos" value={stats.avulsos} icon={Star} tone="amber" />
           <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" small />
         </div>
 
@@ -674,11 +685,12 @@ export default function Eleicao() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="sem_valor">⚠ Sem valor</SelectItem>
                 <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
+                <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
@@ -873,17 +885,38 @@ export default function Eleicao() {
             )}
 
             {form.tipo !== "coordenador" && (
-              <div>
-                <Label>Indicado por ({form.tipo === "lider" ? "Coordenador" : "Líder"})</Label>
-                <Select value={form.parent_id || "none"} onValueChange={(v) => setForm(f => ({ ...f, parent_id: v === "none" ? "" : v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">— Sem vínculo —</SelectItem>
-                    {possibleParents.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {possibleParents.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">Nenhum {form.tipo === "lider" ? "coordenador" : "líder"} cadastrado nesta {form.escopo === "campo_grande" ? "região" : "cidade"} ainda.</p>
+              <div className="space-y-2">
+                {form.tipo === "lider" && (
+                  <label className="flex items-start gap-2 text-sm font-medium rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 cursor-pointer">
+                    <Checkbox
+                      checked={form.liderAvulso}
+                      onCheckedChange={(c) => setForm(f => ({ ...f, liderAvulso: !!c, parent_id: c ? "" : f.parent_id }))}
+                    />
+                    <div className="flex-1">
+                      <div className="text-amber-700 dark:text-amber-400">⚡ Líder avulso (sem coordenador vinculado)</div>
+                      <p className="text-[11px] font-normal text-muted-foreground mt-0.5">
+                        Use para líderes que vieram diretamente ao gabinete ou foram cadastrados sem indicação. Aparecerão na seção "Líderes avulsos" e contam nos relatórios.
+                      </p>
+                    </div>
+                  </label>
+                )}
+                {!(form.tipo === "lider" && form.liderAvulso) && (
+                  <div>
+                    <Label>Indicado por ({form.tipo === "lider" ? "Coordenador" : "Líder"})</Label>
+                    <Select value={form.parent_id || "none"} onValueChange={(v) => setForm(f => ({ ...f, parent_id: v === "none" ? "" : v }))}>
+                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Sem vínculo —</SelectItem>
+                        {possibleParents.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {possibleParents.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Nenhum {form.tipo === "lider" ? "coordenador" : "líder"} cadastrado nesta {form.escopo === "campo_grande" ? "região" : "cidade"} ainda.
+                        {form.tipo === "lider" && " Marque acima como avulso para prosseguir."}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -1023,7 +1056,8 @@ export default function Eleicao() {
       <NotifyProgressDialog
         open={notifyOpen}
         pessoaId={notifyPessoaId}
-        onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); }}
+        skipSteps={notifySkip}
+        onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); setNotifySkip([]); }}
       />
     </div>
     </EleicaoActionsContext.Provider>
@@ -1103,8 +1137,29 @@ function RegionBlock({
             <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} interior={interior} />
           ))}
           {lideresOrfaos.length > 0 && (
-            <div className="px-3 py-2 border-t border-dashed">
-              <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">Líderes sem coordenador</p>
+            <div className="px-3 py-2 border-t border-dashed bg-amber-500/5">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Star className="w-3 h-3 text-amber-600 shrink-0" />
+                  <p className="text-[10px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400 truncate">
+                    Líderes avulsos (sem coordenador) · {lideresOrfaos.length}
+                    {(() => {
+                      const tot = lideresOrfaos.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+                      const sv = lideresOrfaos.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
+                      return <span className="font-normal text-muted-foreground normal-case ml-1">· {fmtBRL(tot)}{sv > 0 ? ` · ${sv} sem valor` : ""}</span>;
+                    })()}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px] gap-1 shrink-0"
+                  onClick={(e) => { e.stopPropagation(); gerarContratosLote(lideresOrfaos, lideresOrfaos[0].client_id, `Líderes avulsos - ${title}`); }}
+                  title="Gerar contratos só dos líderes avulsos desta região"
+                >
+                  <Package className="w-3 h-3" />Contratos avulsos
+                </Button>
+              </div>
               {lideresOrfaos.map(l => <PessoaRow key={l.id} p={l} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} />)}
             </div>
           )}
@@ -1424,6 +1479,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           )}
           <DropdownMenuItem
             disabled={semValor}
+            title={semValor ? "Defina o valor em 'Pendentes de valor' para liberar o contrato" : "Gerar contrato em .docx"}
             onClick={async () => {
               try {
                 await gerarContratoIndividual(p as any, p.client_id);
@@ -1431,7 +1487,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               } catch (e: any) { toast.error(e.message); }
             }}
           >
-            <FileDown className="w-3.5 h-3.5 mr-2" />Baixar contrato (.docx)
+            <FileDown className="w-3.5 h-3.5 mr-2" />Baixar contrato (.docx){semValor && <span className="ml-auto text-[10px] opacity-60">sem valor</span>}
           </DropdownMenuItem>
           {p.tipo === "coordenador" && onSend && (
             <>
@@ -1484,7 +1540,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
 // ─── KPI Card visual ────────────────────────────────────────────
 function KpiCard({ label, value, icon: Icon, tone, small }: {
   label: string; value: number | string; icon: any;
-  tone: "neutral" | "red" | "blue" | "green" | "emerald"; small?: boolean;
+  tone: "neutral" | "red" | "blue" | "green" | "emerald" | "amber"; small?: boolean;
 }) {
   const tones: Record<string, string> = {
     neutral: "from-muted/40 to-muted/10 text-foreground border-border/50",
@@ -1492,6 +1548,7 @@ function KpiCard({ label, value, icon: Icon, tone, small }: {
     blue: "from-blue-500/15 to-blue-500/5 text-blue-700 dark:text-blue-400 border-blue-500/20",
     green: "from-green-500/15 to-green-500/5 text-green-700 dark:text-green-400 border-green-500/20",
     emerald: "from-emerald-500/15 to-emerald-500/5 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
+    amber: "from-amber-500/15 to-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/20",
   };
   return (
     <div className={cn("relative rounded-xl border bg-gradient-to-br p-3 overflow-hidden", tones[tone])}>

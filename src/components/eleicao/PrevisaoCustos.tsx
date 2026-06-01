@@ -13,6 +13,7 @@ interface Pessoa {
   regiao: string | null;
   cidade: string | null;
   nome: string;
+  parent_id?: string | null;
   valor_contratacao?: number | null;
 }
 
@@ -46,6 +47,8 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
       const list = byTipo(t);
       const total = list.reduce((s, p) => s + valor(p), 0);
       const pagos = list.filter(p => valor(p) > 0).length;
+      const avulsos = t === "lider" ? list.filter(p => !p.parent_id) : [];
+      const avulsosTotal = avulsos.reduce((s, p) => s + valor(p), 0);
       return {
         tipo: t,
         label: TIPO_LABEL[t],
@@ -54,6 +57,8 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
         pagos,
         gratis: list.length - pagos,
         media: pagos > 0 ? total / pagos : 0,
+        avulsosQtd: avulsos.length,
+        avulsosTotal,
       };
     });
 
@@ -138,6 +143,12 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
                 <span>{item.pagos} pagos · {item.gratis} sem custo</span>
                 {item.media > 0 && <span>Média {fmt(item.media)}</span>}
               </div>
+              {item.tipo === "lider" && item.avulsosQtd > 0 && (
+                <div className="mt-2 pt-2 border-t border-dashed border-border/60 text-[11px] text-muted-foreground flex items-center justify-between">
+                  <span>↳ dos quais <strong className="text-foreground">avulsos</strong> (sem coordenador): {item.avulsosQtd}</span>
+                  <span className="tabular-nums">{fmt(item.avulsosTotal)}</span>
+                </div>
+              )}
             </Card>
           );
         })}

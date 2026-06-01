@@ -152,7 +152,7 @@ export function exportEleicaoPdf(opts: ExportOptions) {
       fmtPhone(p.telefone),
       cap(p.cidade || p.regiao),
       enderecoOf(p),
-      p.parent_nome || "—",
+      p.parent_nome || (p.tipo === "lider" ? "— AVULSO —" : "—"),
       p.valor_contratacao && p.valor_contratacao > 0 ? fmtBRL(p.valor_contratacao) : "—",
     ]);
 
@@ -237,7 +237,7 @@ export function exportEleicaoCsv(opts: ExportOptions) {
         p.rua || "",
         p.numero || "",
         p.email || "",
-        p.parent_nome || "",
+        p.parent_nome || (p.tipo === "lider" ? "AVULSO" : ""),
         (p.valor_contratacao || 0).toFixed(2).replace(".", ","),
         (p.observacoes || "").replace(/\n/g, " "),
       ]

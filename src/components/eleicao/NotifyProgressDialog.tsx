@@ -33,9 +33,11 @@ interface Props {
   open: boolean;
   pessoaId: string | null;
   onClose: () => void;
+  /** Etapas que devem ser marcadas como "skipped" antes de rodar (ex.: líder avulso sem coordenador). */
+  skipSteps?: StepKey[];
 }
 
-export function NotifyProgressDialog({ open, pessoaId, onClose }: Props) {
+export function NotifyProgressDialog({ open, pessoaId, onClose, skipSteps }: Props) {
   const [steps, setSteps] = useState<Step[]>(INITIAL_STEPS);
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [paused, setPaused] = useState(false);
@@ -44,12 +46,19 @@ export function NotifyProgressDialog({ open, pessoaId, onClose }: Props) {
   // Reset ao abrir
   useEffect(() => {
     if (open && pessoaId && ranRef.current !== pessoaId) {
-      setSteps(INITIAL_STEPS.map(s => ({ ...s })));
+      const skips = new Set(skipSteps || []);
+      const initial: Step[] = INITIAL_STEPS.map(s => ({
+        ...s,
+        status: skips.has(s.key) ? ("skipped" as StepStatus) : s.status,
+        reason: skips.has(s.key) ? "Líder avulso — sem coordenador vinculado" : undefined,
+      }));
+      setSteps(initial);
       setCurrentIdx(0);
       setPaused(false);
       ranRef.current = pessoaId;
-      // dispara primeira etapa
-      void runStep(0, INITIAL_STEPS.map(s => ({ ...s })));
+      // dispara primeira etapa não-skipada
+      const firstIdx = initial.findIndex(s => s.status !== "skipped");
+      if (firstIdx >= 0) void runStep(firstIdx, initial);
     }
     if (!open) {
       ranRef.current = null;
@@ -70,6 +79,13 @@ export function NotifyProgressDialog({ open, pessoaId, onClose }: Props) {
     const list = base || steps;
     if (idx >= list.length) return;
     const step = list[idx];
+    // Se a etapa foi pré-marcada como skipped (ex.: líder avulso), pula direto
+    if ((skipSteps || []).includes(step.key)) {
+      updateStep(idx, { status: "skipped", reason: "Líder avulso — sem coordenador vinculado" });
+      await sleep(150);
+      if (idx + 1 < INITIAL_STEPS.length) await runStep(idx + 1);
+      return;
+    }
     setCurrentIdx(idx);
     setPaused(false);
     updateStep(idx, { status: "sending", error: undefined, reason: undefined });
