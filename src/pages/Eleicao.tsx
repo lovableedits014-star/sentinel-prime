@@ -391,6 +391,7 @@ export default function Eleicao() {
 
   function openResendLiderFlow(p: Pessoa) {
     if (p.tipo !== "lider") return;
+    setNotifySkip(!p.parent_id ? ["coordenador", "secretaria"] : []);
     setNotifyPessoaId(p.id);
     setNotifyOpen(true);
   }
