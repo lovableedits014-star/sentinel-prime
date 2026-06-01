@@ -1035,7 +1035,8 @@ export default function Eleicao() {
       <NotifyProgressDialog
         open={notifyOpen}
         pessoaId={notifyPessoaId}
-        onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); }}
+        skipSteps={notifySkip}
+        onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); setNotifySkip([]); }}
       />
     </div>
     </EleicaoActionsContext.Provider>
