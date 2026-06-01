@@ -79,6 +79,13 @@ export function NotifyProgressDialog({ open, pessoaId, onClose, skipSteps }: Pro
     const list = base || steps;
     if (idx >= list.length) return;
     const step = list[idx];
+    // Se a etapa foi pré-marcada como skipped (ex.: líder avulso), pula direto
+    if ((skipSteps || []).includes(step.key)) {
+      updateStep(idx, { status: "skipped", reason: "Líder avulso — sem coordenador vinculado" });
+      await sleep(150);
+      if (idx + 1 < INITIAL_STEPS.length) await runStep(idx + 1);
+      return;
+    }
     setCurrentIdx(idx);
     setPaused(false);
     updateStep(idx, { status: "sending", error: undefined, reason: undefined });
