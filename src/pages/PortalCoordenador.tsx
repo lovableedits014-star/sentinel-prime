@@ -355,7 +355,7 @@ export default function PortalCoordenador() {
                           {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small />)}
                         </div>
                         <div className="flex gap-2 mt-2">
-                          <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)}>
+                          <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)} disabled={!permiteCabo} title={motivoCabo || undefined}>
                             <Plus className="w-3 h-3 mr-1" />Cabo deste líder
                           </Button>
                           <Button size="sm" variant="ghost" className="text-destructive ml-auto" onClick={() => remove(l.id)}>
