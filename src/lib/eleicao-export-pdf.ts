@@ -237,7 +237,7 @@ export function exportEleicaoCsv(opts: ExportOptions) {
         p.rua || "",
         p.numero || "",
         p.email || "",
-        p.parent_nome || "",
+        p.parent_nome || (p.tipo === "lider" ? "AVULSO" : ""),
         (p.valor_contratacao || 0).toFixed(2).replace(".", ","),
         (p.observacoes || "").replace(/\n/g, " "),
       ]
