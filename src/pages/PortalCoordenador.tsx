@@ -40,6 +40,8 @@ interface Pessoa {
   regiao: string | null; cidade: string | null;
   nome: string; telefone: string; endereco: string;
   parent_id: string | null; user_id: string | null;
+  pode_cadastrar_lider?: boolean | null;
+  pode_cadastrar_cabo?: boolean | null;
 }
 
 const TIPO_META: Record<Tipo, { label: string; color: string; icon: any }> = {
