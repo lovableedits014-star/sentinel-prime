@@ -319,9 +319,12 @@ export default function Eleicao() {
 
     // Disparo automático de notificações ao criar novo líder.
     // Abre o dialog visual de progresso por etapa (Coordenador → Secretaria → Líder).
+    // Para líder avulso (sem coordenador), pula as etapas Coordenador e Secretaria.
     if (!editing && form.tipo === "lider" && savedPessoa) {
       toast.success("Líder cadastrado!");
       setDialogOpen(false);
+      const isAvulso = !payload.parent_id;
+      setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
       setNotifyPessoaId((savedPessoa as any).id);
       setNotifyOpen(true);
       load();
