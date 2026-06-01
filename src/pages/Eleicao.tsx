@@ -358,6 +358,24 @@ export default function Eleicao() {
     load();
   }
 
+  async function togglePermissaoCadastro(p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") {
+    const novoValor = !(p[field] ?? true);
+    // Otimismo: atualiza local antes do retorno do banco
+    setPessoas(prev => prev.map(x => x.id === p.id ? { ...x, [field]: novoValor } : x));
+    const { error } = await supabase
+      .from("eleicao_pessoas" as any)
+      .update({ [field]: novoValor })
+      .eq("id", p.id);
+    if (error) {
+      toast.error(error.message);
+      setPessoas(prev => prev.map(x => x.id === p.id ? { ...x, [field]: !novoValor } : x));
+      return;
+    }
+    const label = field === "pode_cadastrar_lider" ? "Líderes" : "Cabos";
+    toast.success(novoValor ? `${p.nome} pode cadastrar ${label}` : `${p.nome} bloqueado para cadastrar ${label}`);
+  }
+
+
   // ─── Credenciais de Coordenador ────────────────────────────────
   const [credOpen, setCredOpen] = useState(false);
   const [credPessoa, setCredPessoa] = useState<Pessoa | null>(null);
