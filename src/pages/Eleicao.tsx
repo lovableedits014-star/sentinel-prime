@@ -684,11 +684,12 @@ export default function Eleicao() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger className="h-9 w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="sem_valor">⚠ Sem valor</SelectItem>
                 <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
+                <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
