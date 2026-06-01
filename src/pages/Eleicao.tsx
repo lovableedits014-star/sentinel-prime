@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { Card } from "@/components/ui/card";
@@ -162,6 +162,8 @@ interface Pessoa {
   user_id: string | null;
   valor_contratacao: number | null;
   is_favorito_regiao?: boolean | null;
+  pode_cadastrar_lider?: boolean | null;
+  pode_cadastrar_cabo?: boolean | null;
   created_at: string;
 }
 
@@ -177,6 +179,12 @@ function genLocalPassword(len = 10) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
+
+// Contexto p/ ações que aparecem em várias linhas/níveis sem precisar passar props
+type EleicaoActions = {
+  onTogglePermissao: (p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") => void;
+};
+const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
 
 export default function Eleicao() {
   const { data: clientId } = useCurrentClientId();
@@ -356,6 +364,24 @@ export default function Eleicao() {
     load();
   }
 
+  async function togglePermissaoCadastro(p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") {
+    const novoValor = !(p[field] ?? true);
+    // Otimismo: atualiza local antes do retorno do banco
+    setPessoas(prev => prev.map(x => x.id === p.id ? { ...x, [field]: novoValor } : x));
+    const { error } = await supabase
+      .from("eleicao_pessoas" as any)
+      .update({ [field]: novoValor })
+      .eq("id", p.id);
+    if (error) {
+      toast.error(error.message);
+      setPessoas(prev => prev.map(x => x.id === p.id ? { ...x, [field]: !novoValor } : x));
+      return;
+    }
+    const label = field === "pode_cadastrar_lider" ? "Líderes" : "Cabos";
+    toast.success(novoValor ? `${p.nome} pode cadastrar ${label}` : `${p.nome} bloqueado para cadastrar ${label}`);
+  }
+
+
   // ─── Credenciais de Coordenador ────────────────────────────────
   const [credOpen, setCredOpen] = useState(false);
   const [credPessoa, setCredPessoa] = useState<Pessoa | null>(null);
@@ -534,8 +560,9 @@ export default function Eleicao() {
   }
 
   return (
-
+    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro }}>
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Eleição</h1>
@@ -986,6 +1013,7 @@ export default function Eleicao() {
         onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); }}
       />
     </div>
+    </EleicaoActionsContext.Provider>
   );
 }
 
@@ -1246,6 +1274,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   onToggle?: () => void;
   bulkAction?: { label: string; onClick: () => void };
 }) {
+  const actions = React.useContext(EleicaoActionsContext);
+  const onTogglePermissao = actions?.onTogglePermissao;
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
@@ -1303,6 +1333,16 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           )}
           {p.tipo === "coordenador" && p.user_id && (
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
+          )}
+          {p.tipo === "coordenador" && p.pode_cadastrar_lider === false && (
+            <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-700 bg-amber-500/10 shrink-0 gap-0.5" title="Bloqueado para cadastrar líderes">
+              🔒 Líderes
+            </Badge>
+          )}
+          {p.tipo === "coordenador" && p.pode_cadastrar_cabo === false && (
+            <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-700 bg-amber-500/10 shrink-0 gap-0.5" title="Bloqueado para cadastrar cabos">
+              🔒 Cabos
+            </Badge>
           )}
           {semValor ? (
             <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-600 bg-amber-500/10 shrink-0 gap-0.5">
@@ -1394,6 +1434,17 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               <DropdownMenuItem onClick={() => sendCoordBoasVindas(p.id)}>
                 <BellRing className="w-3.5 h-3.5 mr-2" />Enviar boas-vindas (grupo)
               </DropdownMenuItem>
+              {onTogglePermissao && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onTogglePermissao(p, "pode_cadastrar_lider")}>
+                    {p.pode_cadastrar_lider === false ? "✅ Permitir" : "🚫 Bloquear"} cadastro de Líderes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onTogglePermissao(p, "pode_cadastrar_cabo")}>
+                    {p.pode_cadastrar_cabo === false ? "✅ Permitir" : "🚫 Bloquear"} cadastro de Cabos
+                  </DropdownMenuItem>
+                </>
+              )}
             </>
           )}
           <DropdownMenuSeparator />

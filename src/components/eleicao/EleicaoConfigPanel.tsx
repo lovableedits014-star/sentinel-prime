@@ -35,6 +35,8 @@ interface Cfg {
   envio_lider_ativo: boolean;
   envio_coord_boas_vindas_ativo: boolean;
   envio_cabo_boas_vindas_ativo: boolean;
+  cadastro_lider_ativo: boolean;
+  cadastro_cabo_ativo: boolean;
 }
 
 type GroupOption = { group_jid: string; name: string | null };
@@ -59,6 +61,8 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     envio_lider_ativo: true,
     envio_coord_boas_vindas_ativo: true,
     envio_cabo_boas_vindas_ativo: true,
+    cadastro_lider_ativo: true,
+    cadastro_cabo_ativo: true,
   });
   const [grupos, setGrupos] = useState<GroupOption[]>([]);
 
@@ -86,6 +90,8 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         envio_lider_ativo: d.envio_lider_ativo ?? true,
         envio_coord_boas_vindas_ativo: d.envio_coord_boas_vindas_ativo ?? true,
         envio_cabo_boas_vindas_ativo: d.envio_cabo_boas_vindas_ativo ?? true,
+        cadastro_lider_ativo: d.cadastro_lider_ativo ?? true,
+        cadastro_cabo_ativo: d.cadastro_cabo_ativo ?? true,
       });
     }
     // Carrega grupos do WhatsApp disponíveis
@@ -125,6 +131,8 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       envio_lider_ativo: cfg.envio_lider_ativo,
       envio_coord_boas_vindas_ativo: cfg.envio_coord_boas_vindas_ativo,
       envio_cabo_boas_vindas_ativo: cfg.envio_cabo_boas_vindas_ativo,
+      cadastro_lider_ativo: cfg.cadastro_lider_ativo,
+      cadastro_cabo_ativo: cfg.cadastro_cabo_ativo,
     };
     const q = cfg.id
       ? supabase.from("eleicao_notif_config" as any).update(payload).eq("id", cfg.id)
@@ -194,6 +202,34 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
             <span>{cfg.auto_enviar ? "Ativado" : "Desativado"}</span>
           </label>
         </div>
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold flex items-center gap-2">🔒 Controle de cadastros no portal do coordenador</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Quando uma chave estiver <strong>desativada</strong>, nenhum coordenador conseguirá cadastrar pessoas daquele tipo no portal — mesmo que esteja individualmente liberado. Use para travar cadastros antes do início da campanha ou quando atingir o limite.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="flex items-center justify-between gap-3 p-3 rounded-md border bg-muted/30">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Cadastro de Líderes</div>
+              <div className="text-[11px] text-muted-foreground">{cfg.cadastro_lider_ativo ? "Coordenadores podem cadastrar novos líderes" : "Bloqueado para todos os coordenadores"}</div>
+            </div>
+            <Switch checked={cfg.cadastro_lider_ativo} onCheckedChange={(v) => setCfg(c => ({ ...c, cadastro_lider_ativo: v }))} />
+          </label>
+          <label className="flex items-center justify-between gap-3 p-3 rounded-md border bg-muted/30">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Cadastro de Cabos Eleitorais</div>
+              <div className="text-[11px] text-muted-foreground">{cfg.cadastro_cabo_ativo ? "Coordenadores podem cadastrar novos cabos" : "Bloqueado para todos os coordenadores"}</div>
+            </div>
+            <Switch checked={cfg.cadastro_cabo_ativo} onCheckedChange={(v) => setCfg(c => ({ ...c, cadastro_cabo_ativo: v }))} />
+          </label>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Dica: para travar somente <em>um</em> coordenador, use o menu de ações dele na lista de pessoas em "Eleição".
+        </p>
       </Card>
 
       <Card className="p-4 space-y-3">

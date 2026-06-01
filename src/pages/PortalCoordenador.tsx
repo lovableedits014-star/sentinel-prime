@@ -40,6 +40,8 @@ interface Pessoa {
   regiao: string | null; cidade: string | null;
   nome: string; telefone: string; endereco: string;
   parent_id: string | null; user_id: string | null;
+  pode_cadastrar_lider?: boolean | null;
+  pode_cadastrar_cabo?: boolean | null;
 }
 
 const TIPO_META: Record<Tipo, { label: string; color: string; icon: any }> = {
@@ -58,6 +60,7 @@ export default function PortalCoordenador() {
   const [team, setTeam] = useState<Pessoa[]>([]);
   const [clientName, setClientName] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [globalCfg, setGlobalCfg] = useState<{ cadastro_lider_ativo: boolean; cadastro_cabo_ativo: boolean }>({ cadastro_lider_ativo: true, cadastro_cabo_ativo: true });
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,6 +95,19 @@ export default function PortalCoordenador() {
     const { data: tr } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("client_id", clientId!).order("nome");
     setTeam((tr as any) || []);
+
+    const { data: cfg } = await supabase
+      .from("eleicao_notif_config" as any)
+      .select("cadastro_lider_ativo, cadastro_cabo_ativo")
+      .eq("client_id", clientId!)
+      .maybeSingle();
+    if (cfg) {
+      const c = cfg as any;
+      setGlobalCfg({
+        cadastro_lider_ativo: c.cadastro_lider_ativo ?? true,
+        cadastro_cabo_ativo: c.cadastro_cabo_ativo ?? true,
+      });
+    }
     setLoading(false);
   }
 
@@ -206,6 +222,15 @@ export default function PortalCoordenador() {
   const myCabosDir = team.filter(p => p.tipo === "cabo" && p.parent_id === me.id);
   const totals = { lideres: team.filter(p => p.tipo === "lider").length, cabos: team.filter(p => p.tipo === "cabo").length };
 
+  const permiteLider = globalCfg.cadastro_lider_ativo && (me.pode_cadastrar_lider ?? true);
+  const permiteCabo = globalCfg.cadastro_cabo_ativo && (me.pode_cadastrar_cabo ?? true);
+  const motivoLider = !globalCfg.cadastro_lider_ativo
+    ? "Cadastros de líderes temporariamente bloqueados pela administração da campanha."
+    : !(me.pode_cadastrar_lider ?? true) ? "Você está temporariamente bloqueado para cadastrar líderes." : "";
+  const motivoCabo = !globalCfg.cadastro_cabo_ativo
+    ? "Cadastros de cabos temporariamente bloqueados pela administração da campanha."
+    : !(me.pode_cadastrar_cabo ?? true) ? "Você está temporariamente bloqueado para cadastrar cabos." : "";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
@@ -237,11 +262,22 @@ export default function PortalCoordenador() {
           </CardContent>
         </Card>
 
+        {(motivoLider || motivoCabo) && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 p-3 text-xs space-y-1">
+            {motivoLider && <p>🔒 {motivoLider}</p>}
+            {motivoCabo && <p>🔒 {motivoCabo}</p>}
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2">
           {me.escopo === "campo_grande" && (
-            <Button size="sm" onClick={() => openNew("lider", me.id)}><Plus className="w-3.5 h-3.5 mr-1" />Novo Líder</Button>
+            <Button size="sm" onClick={() => openNew("lider", me.id)} disabled={!permiteLider} title={motivoLider || undefined}>
+              <Plus className="w-3.5 h-3.5 mr-1" />Novo Líder
+            </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => openNew("cabo", me.id)}><Plus className="w-3.5 h-3.5 mr-1" />Novo Cabo eleitoral</Button>
+          <Button size="sm" variant="outline" onClick={() => openNew("cabo", me.id)} disabled={!permiteCabo} title={motivoCabo || undefined}>
+            <Plus className="w-3.5 h-3.5 mr-1" />Novo Cabo eleitoral
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -258,6 +294,7 @@ export default function PortalCoordenador() {
             <Copy className="w-3.5 h-3.5 mr-1" />Copiar link da foto
           </Button>
         </div>
+
 
         <Card>
           <CardHeader className="pb-2">
@@ -318,7 +355,7 @@ export default function PortalCoordenador() {
                           {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small />)}
                         </div>
                         <div className="flex gap-2 mt-2">
-                          <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)}>
+                          <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)} disabled={!permiteCabo} title={motivoCabo || undefined}>
                             <Plus className="w-3 h-3 mr-1" />Cabo deste líder
                           </Button>
                           <Button size="sm" variant="ghost" className="text-destructive ml-auto" onClick={() => remove(l.id)}>

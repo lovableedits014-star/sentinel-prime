@@ -1639,6 +1639,8 @@ export type Database = {
       eleicao_notif_config: {
         Row: {
           auto_enviar: boolean
+          cadastro_cabo_ativo: boolean
+          cadastro_lider_ativo: boolean
           client_id: string
           created_at: string
           envio_cabo_boas_vindas_ativo: boolean
@@ -1657,6 +1659,8 @@ export type Database = {
         }
         Insert: {
           auto_enviar?: boolean
+          cadastro_cabo_ativo?: boolean
+          cadastro_lider_ativo?: boolean
           client_id: string
           created_at?: string
           envio_cabo_boas_vindas_ativo?: boolean
@@ -1675,6 +1679,8 @@ export type Database = {
         }
         Update: {
           auto_enviar?: boolean
+          cadastro_cabo_ativo?: boolean
+          cadastro_lider_ativo?: boolean
           client_id?: string
           created_at?: string
           envio_cabo_boas_vindas_ativo?: boolean
@@ -1822,6 +1828,8 @@ export type Database = {
           numero: string | null
           observacoes: string | null
           parent_id: string | null
+          pode_cadastrar_cabo: boolean
+          pode_cadastrar_lider: boolean
           regiao: string | null
           rua: string | null
           telefone: string
@@ -1846,6 +1854,8 @@ export type Database = {
           numero?: string | null
           observacoes?: string | null
           parent_id?: string | null
+          pode_cadastrar_cabo?: boolean
+          pode_cadastrar_lider?: boolean
           regiao?: string | null
           rua?: string | null
           telefone: string
@@ -1870,6 +1880,8 @@ export type Database = {
           numero?: string | null
           observacoes?: string | null
           parent_id?: string | null
+          pode_cadastrar_cabo?: boolean
+          pode_cadastrar_lider?: boolean
           regiao?: string | null
           rua?: string | null
           telefone?: string
@@ -6933,6 +6945,10 @@ export type Database = {
         Returns: Json
       }
       consume_lider_invite_token: { Args: { _token: string }; Returns: boolean }
+      coordenador_pode_cadastrar: {
+        Args: { _client_id: string; _coord_id: string; _tipo: string }
+        Returns: boolean
+      }
       count_pessoas_by_bairro: {
         Args: {
           p_bairro: string
