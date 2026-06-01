@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { Card } from "@/components/ui/card";
