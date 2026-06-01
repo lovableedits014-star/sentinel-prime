@@ -1462,6 +1462,15 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               )}
             </>
           )}
+          {p.tipo === "lider" && onResendLiderFlow && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onResendLiderFlow(p)}>
+                <RefreshCw className="w-3.5 h-3.5 mr-2" />Reenviar fluxo de cadastro
+              </DropdownMenuItem>
+            </>
+          )}
+
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => onDelete(p.id)} className="text-destructive focus:text-destructive">
             <Trash2 className="w-3.5 h-3.5 mr-2" />Excluir
