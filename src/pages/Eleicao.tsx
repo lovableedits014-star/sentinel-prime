@@ -213,6 +213,7 @@ export default function Eleicao() {
     numero: "",
     bairro: "",
     parent_id: "" as string,
+    liderAvulso: false,
     observacoes: "",
     email: "",
     password: "",
