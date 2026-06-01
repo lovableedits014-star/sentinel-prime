@@ -307,7 +307,7 @@ export default function Eleicao() {
       telefone: form.telefone.trim(),
       rua, numero: numero || null, bairro,
       endereco: enderecoConcat,
-      parent_id: form.parent_id || null,
+      parent_id: form.tipo === "lider" && form.liderAvulso ? null : (form.parent_id || null),
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
