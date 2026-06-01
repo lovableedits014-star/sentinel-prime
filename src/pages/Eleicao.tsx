@@ -1325,6 +1325,16 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, onTogglePermiss
           {p.tipo === "coordenador" && p.user_id && (
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" aria-label="Acesso configurado" />
           )}
+          {p.tipo === "coordenador" && p.pode_cadastrar_lider === false && (
+            <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-700 bg-amber-500/10 shrink-0 gap-0.5" title="Bloqueado para cadastrar líderes">
+              🔒 Líderes
+            </Badge>
+          )}
+          {p.tipo === "coordenador" && p.pode_cadastrar_cabo === false && (
+            <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-700 bg-amber-500/10 shrink-0 gap-0.5" title="Bloqueado para cadastrar cabos">
+              🔒 Cabos
+            </Badge>
+          )}
           {semValor ? (
             <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-600 bg-amber-500/10 shrink-0 gap-0.5">
               <AlertCircle className="w-2.5 h-2.5" />sem valor
