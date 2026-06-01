@@ -1013,6 +1013,7 @@ export default function Eleicao() {
         onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); }}
       />
     </div>
+    </EleicaoActionsContext.Provider>
   );
 }
 
