@@ -1,54 +1,46 @@
-## Diagnóstico
+## Contexto
 
-### 1. Divergência Total 72 vs Pendentes 73
+Hoje líderes podem ser salvos sem coordenador (a opção **"— Sem vínculo —"** já existe no formulário) e aparecem em cada região dentro do mini-bloco **"Líderes sem coordenador"** (linhas 1105-1110 de `Eleicao.tsx`). Tecnicamente, `gerarContratoIndividual` e `gerarLoteZip` (em `src/lib/eleicao-contrato-docx.ts`) já tratam `parent_id` nulo — preenchem `{coordenador}` com `—`.
 
-Em `src/pages/Eleicao.tsx`:
+Os problemas reais são de **UX e medição**:
+- O botão "Baixar contrato" da linha fica desabilitado quando `valor_contratacao = 0`, sem explicar o porquê.
+- Não há botão para gerar lote **só dos avulsos**.
+- Relatórios (`PrevisaoCustos`, KPIs, export) não os destacam.
+- O fluxo de notificação (`NotifyProgressDialog`) tenta etapa "Coordenador" mesmo quando o líder é avulso (vai pular sozinho, mas polui visualmente).
+- A opção "Sem vínculo" no select é discreta — o usuário não percebe que é válida.
 
-- O KPI **"Total: 72"** (linha 501) usa `stats.total`, que é filtrado pelo escopo atual (`p.escopo === escopo`, ex.: Campo Grande).
-- O badge **"Pendentes de valor: 73"** (linhas 606-609) conta `pessoas.filter(...)` **sem filtrar por escopo** — soma Campo Grande + Interior.
+## Plano
 
-Resultado: existe ao menos 1 pessoa no outro escopo (Interior) sem valor definido, que entra no badge mas não no Total exibido. Não é bug de dados — é inconsistência visual.
+### 1. Formulário (`src/pages/Eleicao.tsx`)
+- Quando `tipo = lider`, exibir **checkbox em destaque**: "Líder avulso (sem coordenador vinculado)". Marcado → esconde o select "Indicado por" e força `parent_id = null`.
+- Quando não há coordenadores na região, o checkbox já vem marcado por padrão e mostra um aviso explicativo.
 
-**Correção:** o badge da aba "Pendentes de valor" deve respeitar o mesmo escopo do KPI "Total" (ou pelo menos deixar isso explícito). Vou alinhar o badge ao escopo ativo, e o painel `PendentesValorPanel` continua mostrando todos com um sub-filtro por escopo.
+### 2. Mini-bloco "Líderes avulsos" no RegionBlock
+- Renomear o cabeçalho para **"Líderes avulsos (sem coordenador)"**.
+- Mostrar **contagem + valor total + quantos sem valor** ao lado do título.
+- Adicionar botão **"📄 Contratos avulsos"** que chama `gerarContratosLote` filtrando apenas os órfãos daquela região.
 
-### 2. Não há como reenviar o fluxo de cadastro do líder após editar o telefone
+### 3. KPI e filtro
+- Adicionar KPI **"Avulsos"** na aba Cadastros (`stats.avulsos = lideres sem parent_id no escopo`).
+- Adicionar opção **"Avulsos (sem coordenador)"** ao `statusFilter` (já tem "todos / sem valor / sem acesso").
 
-Hoje o dialog `NotifyProgressDialog` (Coordenador → Secretaria → Líder) só é aberto no `save()` quando é criação nova de líder (linhas 318-325). Se o telefone estava errado e foi corrigido depois, não existe ação para retomar o envio.
+### 4. Tooltip no botão "Baixar contrato"
+- No `PessoaRow`, quando `disabled={semValor}`, adicionar `title="Defina o valor em 'Pendentes de valor' para liberar o contrato"` para o usuário entender o bloqueio. (Vale para todos os tipos, não só avulsos.)
 
-No menu de ações da linha (`PessoaRow`, linhas 1395-1455), existem ações de envio só para `tipo === "coordenador"`. Para `lider` não há nada equivalente.
+### 5. Relatório de custos (`src/components/eleicao/PrevisaoCustos.tsx`)
+- Abaixo da linha "Líderes", adicionar sub-linha **"↳ dos quais avulsos: N · R$ X"** para que o usuário meça o peso dos avulsos no custo total.
 
----
+### 6. Export PDF/CSV (`src/lib/eleicao-export-pdf.ts` e CSV equivalente)
+- Quando `tipo = lider` e `parent_nome` é nulo, exibir **"— AVULSO —"** na coluna "Indicado por", para que o relatório impresso destaque visualmente.
 
-## Plano de mudanças (UI apenas, sem alterar lógica do backend)
+### 7. Fluxo de notificação ao criar líder avulso
+- No `save()`, quando o líder novo é avulso, **abrir o `NotifyProgressDialog` direto na etapa do líder** (pulando "Coordenador" e "Secretaria") — ou pular essas etapas internamente exibindo "ignorado: líder avulso". Solução pragmática: passar um prop opcional `skipSteps={['coordenador','secretaria']}` ao dialog e marcá-las como `skipped` antes de rodar.
 
-### A) Corrigir contador "Pendentes de valor"
-Em `src/pages/Eleicao.tsx`, fazer o badge da aba `pendentes` contar apenas pessoas do escopo ativo:
+## Arquivos afetados
 
-```text
-pessoas.filter(p => p.escopo === escopo && (!p.valor_contratacao || p.valor_contratacao === 0)).length
-```
+- `src/pages/Eleicao.tsx` — form, KPI, filtro, RegionBlock, tooltip, chamada ao NotifyProgressDialog.
+- `src/components/eleicao/NotifyProgressDialog.tsx` — aceitar `skipSteps`.
+- `src/components/eleicao/PrevisaoCustos.tsx` — sub-linha de avulsos.
+- `src/lib/eleicao-export-pdf.ts` e helper de CSV — marcar "AVULSO".
 
-Assim o número bate visualmente com o KPI "Total" da mesma aba. Reaproveitar `stats.semValor` (já calculado).
-
-### B) Botão "Reenviar fluxo de cadastro" para líderes
-
-No `PessoaRow` (`src/pages/Eleicao.tsx`), adicionar um bloco análogo ao do coordenador, mas para `p.tipo === "lider"`:
-
-- Novo prop opcional `onResendLiderFlow?: (p: Pessoa) => void` no `PessoaRow` / `LiderBlock` / `CoordBlock` / `Section` / `ListaPlana`.
-- Item no DropdownMenu da linha do líder:
-  - **"🔁 Reenviar fluxo de cadastro"** → abre o `NotifyProgressDialog` para esse líder (seta `notifyPessoaId = p.id` e `notifyOpen = true`), exatamente como acontece hoje na criação.
-  - O `NotifyProgressDialog` re-executa as etapas (Coordenador → Secretaria → Líder) usando o telefone atualizado.
-- Pequeno ajuste em `NotifyProgressDialog`: hoje o `ranRef` impede rodar de novo para o mesmo `pessoaId`. Vou permitir re-execução manual quando o dialog é reaberto explicitamente (resetar `ranRef.current` no `onClose` ou comparar com um `runKey` incremental, sem mexer no fluxo de criação).
-
-Sem alterações de banco de dados.
-
----
-
-## Resumo do que será alterado
-
-- `src/pages/Eleicao.tsx`
-  - Badge da aba "Pendentes de valor" passa a respeitar o escopo ativo.
-  - DropdownMenu da linha de líder ganha "Reenviar fluxo de cadastro".
-  - Propagação do handler `onResendLiderFlow` pelos componentes intermediários.
-- `src/components/eleicao/NotifyProgressDialog.tsx`
-  - Permitir reabrir o dialog para o mesmo `pessoa_id` e disparar novamente as etapas.
+Sem mudanças de banco de dados.
