@@ -201,6 +201,7 @@ export default function Eleicao() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyPessoaId, setNotifyPessoaId] = useState<string | null>(null);
+  const [notifySkip, setNotifySkip] = useState<("coordenador" | "secretaria" | "lider")[]>([]);
   const [editing, setEditing] = useState<Pessoa | null>(null);
   const [form, setForm] = useState({
     tipo: "coordenador" as Tipo,
