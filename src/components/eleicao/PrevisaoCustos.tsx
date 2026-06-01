@@ -13,6 +13,7 @@ interface Pessoa {
   regiao: string | null;
   cidade: string | null;
   nome: string;
+  parent_id?: string | null;
   valor_contratacao?: number | null;
 }
 
