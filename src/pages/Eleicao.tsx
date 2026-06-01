@@ -1261,13 +1261,12 @@ function FavoritoToggle({ pessoa }: { pessoa: Pessoa }) {
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, onTogglePermissao, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction }: {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   onCredentials: (p: Pessoa) => void;
   onSend?: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
-  onTogglePermissao?: (p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") => void;
   sendingId?: string | null;
   indent?: number;
   teamCount?: number;
@@ -1275,6 +1274,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, onTogglePermiss
   onToggle?: () => void;
   bulkAction?: { label: string; onClick: () => void };
 }) {
+  const actions = React.useContext(EleicaoActionsContext);
+  const onTogglePermissao = actions?.onTogglePermissao;
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
