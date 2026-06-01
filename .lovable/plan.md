@@ -1,208 +1,66 @@
+# Bloqueio de cadastros de Líderes e Cabos
 
-# Plano (v2): Resiliência de Grupos + Onboarding Automático de Nova Instância
+## Objetivo
+Permitir que o administrador controle, no painel **Eleição**, se coordenadores podem cadastrar **Líderes** e **Cabos eleitorais** no portal — com chave **global** (afeta todos) e **chave individual** por coordenador (para travar caso a caso quando o limite estourar).
 
-> Mantém integralmente as 6 frentes da versão anterior. Adiciona a **Frente 7**: assim que uma nova instância conecta, ela recebe automaticamente uma mensagem com **todos os links de grupo** que precisa entrar, por região, com checklist de progresso.
+## Mudanças
 
----
+### 1. Banco de dados (migração)
 
-## Recap das 6 frentes anteriores (sem alteração)
+**Tabela `eleicao_notif_config`** (controles globais — convive com a config existente):
+- `cadastro_lider_ativo` boolean default true
+- `cadastro_cabo_ativo` boolean default true
 
-1. Sincronizar grupos de todas as instâncias (não só principal).
-2. Badge de redundância por grupo + KPI "% de grupos com backup".
-3. Nova RPC `pick_healthy_instance_for_group` — dispatch escolhe instância membro do grupo.
-4. Failover automático mid-dispatch entre instâncias membro.
-5. Detecção de "linha provavelmente banida" + alerta.
-6. Anti-ban preventivo reforçado (rotação obrigatória entre instâncias, teto diário, aviso para política agressiva em grupos).
+**Tabela `eleicao_pessoas`** (controles por coordenador):
+- `pode_cadastrar_lider` boolean default true
+- `pode_cadastrar_cabo` boolean default true
 
----
+> Aplicáveis apenas a linhas com `tipo = 'coordenador'`. Para os demais tipos o valor é ignorado.
 
-## Frente 7 — Onboarding automático de nova instância
+### 2. Painel admin — `src/pages/Eleicao.tsx` / `EleicaoConfigPanel.tsx`
 
-### Conceito
-Quando uma nova instância termina de conectar (status passa para `connected`), o sistema dispara automaticamente **para o próprio número da instância** uma mensagem de boas-vindas contendo a lista de links de convite dos grupos de região que ela ainda **não** é membro, agrupados por região, com 1 clique para entrar em cada.
+**Card novo "Controle de cadastros" no `EleicaoConfigPanel`** (logo abaixo do card de notificações):
+- Switch **"Permitir cadastro de novos Líderes"** (global)
+- Switch **"Permitir cadastro de novos Cabos Eleitorais"** (global)
+- Texto explicativo: quando desligado, nenhum coordenador consegue cadastrar; mesmo se a chave global estiver ligada, é possível travar individualmente abaixo.
 
-O usuário (você) abre o WhatsApp daquele chip e tem uma checklist clicável. Conforme entra nos grupos, a próxima sincronização atualiza a cobertura automaticamente.
+**Por coordenador** — na listagem de pessoas (aba/lista de coordenadores em `Eleicao.tsx`), adicionar no menu de ações (DropdownMenu já existente) duas opções com toggle visual:
+- "Permitir cadastrar Líderes" ✓/✗
+- "Permitir cadastrar Cabos" ✓/✗
 
-### Fluxo
-```text
-┌──────────────────────┐
-│ Usuário escaneia QR  │
-│ da nova instância    │
-└──────────┬───────────┘
-           │ status: connecting → connected
-           ▼
-┌──────────────────────────────────────┐
-│ Trigger no whatsapp_instances        │
-│ (AFTER UPDATE status='connected')    │
-│ + ainda não enviou onboarding        │
-└──────────┬───────────────────────────┘
-           │ enqueue
-           ▼
-┌──────────────────────────────────────┐
-│ Edge function: onboard-whatsapp-     │
-│ instance                             │
-│  1. Lista regiões com link de grupo  │
-│  2. Filtra grupos onde esta instância│
-│     ainda NÃO é membro               │
-│  3. Monta mensagem formatada         │
-│  4. Envia para o próprio número      │
-│     usando a própria instância       │
-│  5. Marca onboarding_sent_at         │
-└──────────┬───────────────────────────┘
-           │
-           ▼
-┌──────────────────────────────────────┐
-│ Você abre WhatsApp do chip novo,     │
-│ clica em cada link, entra nos grupos │
-│                                      │
-│ Sincronização agendada (Frente 1)    │
-│ detecta entrada, atualiza badge      │
-│ de redundância (Frente 2)            │
-└──────────────────────────────────────┘
-```
+E um badge discreto ao lado do nome do coordenador quando algum dos dois estiver desligado (ex: "🔒 Líderes" / "🔒 Cabos"), para o admin enxergar rapidamente quem está bloqueado.
 
-### Mensagem (template)
+### 3. Portal do coordenador — `src/pages/PortalCoordenador.tsx`
 
-> 👋 **Olá! Sou seu painel de campanha.**
->
-> Esta linha (`+55 11 9XXXX-XXXX`) acaba de ser conectada como instância **backup** para os disparos.
->
-> Para começar a funcionar como rede de segurança da linha principal, **entre nos grupos abaixo** clicando em cada link. Depois disso, é só me deixar trabalhar — não precisa fazer mais nada.
->
-> **Grupos pendentes (12):**
->
-> 📍 **Centro**
-> → https://chat.whatsapp.com/abc123
->
-> 📍 **Zona Norte**
-> → https://chat.whatsapp.com/def456
->
-> 📍 **Zona Sul**
-> → https://chat.whatsapp.com/ghi789
->
-> _(... lista completa por região, só os que faltam ...)_
->
-> ✅ Já está nos grupos: 3 de 15
-> ⏳ Faltam: 12 grupos
->
-> 💡 **Dica:** depois de entrar em todos, peça ao admin de cada grupo para te promover a admin — assim, se a linha principal cair, você continua mandando mensagem normalmente.
->
-> _Você pode reabrir esta lista a qualquer momento em: Central WhatsApp → Status WhatsApp → "Reenviar onboarding"._
+No `load()`, buscar também:
+- `eleicao_notif_config` do client (campos `cadastro_lider_ativo`, `cadastro_cabo_ativo`)
+- Já tem o `me` (coordenador) — lê `pode_cadastrar_lider` / `pode_cadastrar_cabo`
 
-### Onde os links de grupo vivem hoje
-Já existem em Eleição (`EleicaoConfigPanel.tsx` linha 283 — campo `placeholder="https://chat.whatsapp.com/..."`) num jsonb tipo `{regiao_value: link}`. Vamos **reutilizar essa mesma fonte** — sem duplicar dados.
+Regras (calculadas no front, mas a barreira real é RLS — ver item 4):
+- `permiteLider = config.cadastro_lider_ativo && me.pode_cadastrar_lider`
+- `permiteCabo  = config.cadastro_cabo_ativo  && me.pode_cadastrar_cabo`
 
-A nova função busca `eleicao_configs.links_grupo_regiao` (ou nome equivalente — vou confirmar na implementação) e cruza com `whatsapp_groups` (instance_id, group_jid) para descobrir os pendentes:
+UI:
+- Esconder/desabilitar botão **"Novo Líder"** quando `!permiteLider`, com tooltip "Cadastros temporariamente bloqueados pela administração da campanha".
+- Mesma coisa para **"Novo Cabo eleitoral"** e o botão "Cabo deste líder" dentro do líder expandido.
+- Banner discreto no topo do painel quando algum cadastro estiver bloqueado, com a razão (global vs. individual).
 
-```sql
--- Pseudocódigo da query
-SELECT regiao.value, regiao.label, links->>regiao.value AS link
-FROM eleicao_regioes regiao
-WHERE links->>regiao.value IS NOT NULL  -- só regiões com link cadastrado
-  AND NOT EXISTS (
-    SELECT 1 FROM whatsapp_groups wg
-    WHERE wg.instance_id = :new_instance_id
-      AND wg.client_id = :client_id
-      -- match por nome do grupo OU por jid do grupo da principal
-  )
-ORDER BY regiao.ordem;
-```
+### 4. RLS — barreira real no banco
 
-### Alterações de banco (1 migration)
+Atualizar a policy de **INSERT** em `eleicao_pessoas` para coordenadores: além das checagens atuais, exigir que o switch correspondente esteja ligado tanto em `eleicao_notif_config` quanto no próprio coordenador (`pode_cadastrar_lider` / `pode_cadastrar_cabo` conforme `tipo` sendo inserido). Isso garante que mesmo um request manipulado no front não passe.
 
-```sql
-ALTER TABLE public.whatsapp_instances
-  ADD COLUMN IF NOT EXISTS onboarding_sent_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS onboarding_last_pending_count INTEGER;
+## Detalhes técnicos
 
--- Trigger: ao conectar pela primeira vez, agendar onboarding
-CREATE OR REPLACE FUNCTION public.queue_instance_onboarding()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.status = 'connected'
-     AND (OLD.status IS DISTINCT FROM 'connected')
-     AND NEW.onboarding_sent_at IS NULL
-     AND NEW.is_primary IS NOT TRUE THEN
-    PERFORM pg_notify('whatsapp_instance_connected', NEW.id::text);
-  END IF;
-  RETURN NEW;
-END $$;
+- **Migração** roda primeiro (precisa de aprovação do usuário). Defaults `true` para não quebrar fluxo atual.
+- Tipos do Supabase (`src/integrations/supabase/types.ts`) serão regenerados automaticamente após a migração.
+- `EleicaoConfigPanel.tsx` carrega/salva os 2 novos campos junto com os existentes — adicionar ao `interface Cfg`, `setCfg` inicial, leitura no `load()` e payload do `save()`.
+- Atualização individual do coordenador: simples `UPDATE eleicao_pessoas SET pode_cadastrar_* = ... WHERE id = ?` via dropdown na lista de coordenadores.
 
-CREATE TRIGGER trg_queue_instance_onboarding
-  AFTER UPDATE ON public.whatsapp_instances
-  FOR EACH ROW EXECUTE FUNCTION public.queue_instance_onboarding();
-```
-
-(Em vez de `pg_notify` podemos usar uma flag `pending_onboarding=true` lida por um job de 1 min — mais simples e robusto. Decido na implementação.)
-
-### Edge function nova: `onboard-whatsapp-instance`
-
-- Input: `{ instance_id }`
-- Pega `client_id`, `phone_number`, `bridge_url`, `bridge_api_key` da instância.
-- Busca `links_grupo_regiao` do client.
-- Busca `whatsapp_groups` da instância para saber em quais já está.
-- Monta mensagem (template acima).
-- Chama bridge para mandar mensagem **da própria instância para o próprio número** (`phone_number@s.whatsapp.net`).
-- Atualiza `onboarding_sent_at = now()`, `onboarding_last_pending_count = N`.
-- Loga em `dispatch_logs` para rastreabilidade.
-
-### Reenvio manual (botão)
-Em `StatusWhatsApp.tsx`, para cada instância (não-principal):
-- Card mostra: "Onboarding enviado em DD/MM/YY · 8 grupos pendentes na última checagem".
-- Botão **"Reenviar lista de grupos pendentes"** → chama a edge function de novo; recalcula pendentes em tempo real.
-- Botão **"Ver lista agora"** → modal com a mesma lista renderizada, sem precisar mandar mensagem.
-
-### Onde plugar no painel
-Em `StatusWhatsApp.tsx`:
-- Nova seção **"Onboarding de instâncias"** mostrando para cada instância backup: cobertura (X/Y grupos), botão de reenvio, último envio.
-- Em `Disparos.tsx` aba grupos: o badge de redundância (Frente 2) ganha link "Entrar em N grupos faltantes" que abre a mesma lista.
-
----
-
-## Edge cases e proteções
-
-1. **Anti-loop:** só envia se `onboarding_sent_at IS NULL` ou se o botão de reenvio for clicado explicitamente. Nunca dispara automaticamente 2x.
-2. **Instância principal:** nunca recebe onboarding (filtro `is_primary = false`).
-3. **Sem links cadastrados:** se `links_grupo_regiao` está vazio, manda mensagem alternativa: "Nenhum link de grupo cadastrado ainda. Cadastre em Eleição → Configurações → Links de Grupo, e clique em Reenviar."
-4. **Já é membro de tudo:** manda mensagem curta de parabéns: "✅ Esta linha já está em todos os grupos. Está pronta para o failover."
-5. **Bridge offline na hora de mandar:** marca `onboarding_sent_at = NULL` e tenta de novo no próximo ciclo (job 1min).
-6. **Link inválido / expirado:** o WhatsApp mostra erro ao clicar — não tem como detectar antes. Adicionar nota no painel de Eleição: "Renove os links a cada 90 dias para evitar expiração."
-7. **Detecção de entrada nos grupos:** a sincronização automática (que já existe, hoje só na principal — Frente 1 estende para todas) detecta a nova membership. Sugiro agendar sync da nova instância **15 min depois do onboarding** e depois **a cada 6h** nas primeiras 48h, depois cai no ritmo normal.
-
----
-
-## Arquivos afetados (somatório com plano anterior)
-
-**Banco (2 migrations totais — já contando a v1):**
-- v1: RPC `pick_healthy_instance_for_group`, (opcional) coluna `suspected_banned_at`.
-- **v2 (nova):** colunas `onboarding_sent_at`, `onboarding_last_pending_count`, trigger `queue_instance_onboarding`.
-
-**Edge functions:**
-- `send-whatsapp-dispatch` (v1).
-- **Nova: `onboard-whatsapp-instance`** (v2).
-- Job periódico (existente `data-sources-health` ou novo) processa fila de onboarding e detecção de ban.
-
-**Frontend:**
-- `Disparos.tsx` aba grupos (v1) + link "Entrar em N grupos faltantes" (v2).
-- `StatusWhatsApp.tsx` (v1 alerta de ban) + **nova seção "Onboarding de instâncias"** (v2).
-- `useWhatsAppGroups.ts` agrega cobertura por instância.
-
----
-
-## Garantias (mantidas)
-- Nada altera dados em Eleição. Apenas **lê** `links_grupo_regiao` e `eleicao_regioes`.
-- Onboarding nunca dispara para a instância principal.
-- Toda mensagem de onboarding é logada em `dispatch_logs`.
-- Reenvio é opt-in (botão), nunca automático após o primeiro envio.
-
----
+## Fora de escopo
+- Bloqueio com data/horário programado (pode entrar em iteração futura se quiser).
+- Limites numéricos automáticos (ex: bloquear ao atingir N cabos) — por enquanto é manual via essas chaves.
 
 ## Pergunta antes de implementar
-
-Confirma se o fluxo te serve assim:
-- **Mensagem enviada da nova instância para ela mesma** (você abre o WhatsApp do chip novo e vê na sua própria conversa "Mensagens para mim") — é o padrão mais limpo e não usa outro número.
-- **Alternativa:** enviar da instância **principal** para o número da nova instância. Vantagem: chega como conversa nova destacada. Desvantagem: gasta cota de envio da principal e parece "mensagem de outra pessoa".
-
-Eu recomendo a primeira (auto-mensagem) — mais limpo, sem custo na principal, e o WhatsApp permite normalmente. Topa?
-
-E sobre a coluna `suspected_banned_at` da v1, prefere criar coluna nova ou reusar `last_disconnected_at + consecutive_failures`?
+Confirma esses 2 pontos?
+1. Quando você desligar a chave global, ela **sobrescreve** as individuais (ninguém cadastra), mesmo que alguém esteja individualmente liberado — correto?
+2. Os defaults devem começar **ligados** (todos podem cadastrar até você desligar) ou prefere começar tudo **desligado** e ir liberando coordenador por coordenador?
