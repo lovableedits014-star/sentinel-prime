@@ -205,6 +205,34 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       </Card>
 
       <Card className="p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold flex items-center gap-2">🔒 Controle de cadastros no portal do coordenador</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Quando uma chave estiver <strong>desativada</strong>, nenhum coordenador conseguirá cadastrar pessoas daquele tipo no portal — mesmo que esteja individualmente liberado. Use para travar cadastros antes do início da campanha ou quando atingir o limite.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="flex items-center justify-between gap-3 p-3 rounded-md border bg-muted/30">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Cadastro de Líderes</div>
+              <div className="text-[11px] text-muted-foreground">{cfg.cadastro_lider_ativo ? "Coordenadores podem cadastrar novos líderes" : "Bloqueado para todos os coordenadores"}</div>
+            </div>
+            <Switch checked={cfg.cadastro_lider_ativo} onCheckedChange={(v) => setCfg(c => ({ ...c, cadastro_lider_ativo: v }))} />
+          </label>
+          <label className="flex items-center justify-between gap-3 p-3 rounded-md border bg-muted/30">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Cadastro de Cabos Eleitorais</div>
+              <div className="text-[11px] text-muted-foreground">{cfg.cadastro_cabo_ativo ? "Coordenadores podem cadastrar novos cabos" : "Bloqueado para todos os coordenadores"}</div>
+            </div>
+            <Switch checked={cfg.cadastro_cabo_ativo} onCheckedChange={(v) => setCfg(c => ({ ...c, cadastro_cabo_ativo: v }))} />
+          </label>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Dica: para travar somente <em>um</em> coordenador, use o menu de ações dele na lista de pessoas em "Eleição".
+        </p>
+      </Card>
+
+      <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2 font-medium text-sm"><Phone className="w-4 h-4" />Telefone da secretaria</div>
         <p className="text-xs text-muted-foreground">Recebe uma cópia da notificação a cada novo líder cadastrado.</p>
         <Input
