@@ -183,8 +183,10 @@ function genLocalPassword(len = 10) {
 // Contexto p/ ações que aparecem em várias linhas/níveis sem precisar passar props
 type EleicaoActions = {
   onTogglePermissao: (p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") => void;
+  onResendLiderFlow: (p: Pessoa) => void;
 };
 const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
+
 
 export default function Eleicao() {
   const { data: clientId } = useCurrentClientId();
