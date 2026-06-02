@@ -1,46 +1,75 @@
 ## Contexto
 
-Hoje líderes podem ser salvos sem coordenador (a opção **"— Sem vínculo —"** já existe no formulário) e aparecem em cada região dentro do mini-bloco **"Líderes sem coordenador"** (linhas 1105-1110 de `Eleicao.tsx`). Tecnicamente, `gerarContratoIndividual` e `gerarLoteZip` (em `src/lib/eleicao-contrato-docx.ts`) já tratam `parent_id` nulo — preenchem `{coordenador}` com `—`.
+Hoje em `Eleicao.tsx > handleExport()` (linhas 541-582) a exportação respeita só os filtros já ativos na tela (busca, tipo, região). O usuário quer:
 
-Os problemas reais são de **UX e medição**:
-- O botão "Baixar contrato" da linha fica desabilitado quando `valor_contratacao = 0`, sem explicar o porquê.
-- Não há botão para gerar lote **só dos avulsos**.
-- Relatórios (`PrevisaoCustos`, KPIs, export) não os destacam.
-- O fluxo de notificação (`NotifyProgressDialog`) tenta etapa "Coordenador" mesmo quando o líder é avulso (vai pular sozinho, mas polui visualmente).
-- A opção "Sem vínculo" no select é discreta — o usuário não percebe que é válida.
+1. **Filtros explícitos no momento da exportação** — escolher só Coordenadores, só Líderes ou só Cabos, sem precisar mexer no filtro principal da página.
+2. **Exportação "Raiz" (hierárquica)** — agrupar por Coordenador, mostrando dentro de cada um seus Líderes e, abaixo de cada Líder, seus Cabos. Útil para auditar a estrutura completa de uma equipe.
 
 ## Plano
 
-### 1. Formulário (`src/pages/Eleicao.tsx`)
-- Quando `tipo = lider`, exibir **checkbox em destaque**: "Líder avulso (sem coordenador vinculado)". Marcado → esconde o select "Indicado por" e força `parent_id = null`.
-- Quando não há coordenadores na região, o checkbox já vem marcado por padrão e mostra um aviso explicativo.
+### 1. Dialog único de exportação (`ExportEleicaoDialog`)
+Substituir o atual `DropdownMenu` "Exportar" por um botão que abre um dialog com as opções:
 
-### 2. Mini-bloco "Líderes avulsos" no RegionBlock
-- Renomear o cabeçalho para **"Líderes avulsos (sem coordenador)"**.
-- Mostrar **contagem + valor total + quantos sem valor** ao lado do título.
-- Adicionar botão **"📄 Contratos avulsos"** que chama `gerarContratosLote` filtrando apenas os órfãos daquela região.
+- **Tipo de exportação** (radio):
+  - "Lista simples" — comportamento atual (tabela única).
+  - "Raiz / Hierárquica (agrupada por Coordenador)" — novo formato em árvore.
+- **Filtrar por tipo** (checkboxes, multi-seleção, padrão = todos):
+  - Coordenadores, Líderes, Cabos.
+- **Filtrar por coordenador específico** (select opcional, só aparece se "Líderes" ou "Cabos" estiverem marcados): "Todos" ou nome de um coordenador da região atual. Quando escolhido, traz **apenas a equipe daquele coordenador** (ele + líderes dele + cabos dos líderes dele).
+- **Incluir avulsos?** (switch, default ligado) — só faz sentido se "Líderes" marcado; quando ligado adiciona uma seção/grupo "AVULSOS" no fim.
+- **Formato**: PDF / Imprimir / CSV (botões finais).
 
-### 3. KPI e filtro
-- Adicionar KPI **"Avulsos"** na aba Cadastros (`stats.avulsos = lideres sem parent_id no escopo`).
-- Adicionar opção **"Avulsos (sem coordenador)"** ao `statusFilter` (já tem "todos / sem valor / sem acesso").
+Esses filtros são aplicados **em cima** dos filtros já ativos da tela (escopo, busca, região), nunca os ignoram.
 
-### 4. Tooltip no botão "Baixar contrato"
-- No `PessoaRow`, quando `disabled={semValor}`, adicionar `title="Defina o valor em 'Pendentes de valor' para liberar o contrato"` para o usuário entender o bloqueio. (Vale para todos os tipos, não só avulsos.)
+### 2. Lista simples (existente, com filtros novos)
+- Aplicar o filtro de tipos (1-3 opções) e o filtro de coordenador antes de montar `ExportPessoa[]`.
+- O PDF/CSV continuam usando o agrupamento por tipo que já existe em `eleicao-export-pdf.ts`.
 
-### 5. Relatório de custos (`src/components/eleicao/PrevisaoCustos.tsx`)
-- Abaixo da linha "Líderes", adicionar sub-linha **"↳ dos quais avulsos: N · R$ X"** para que o usuário meça o peso dos avulsos no custo total.
+### 3. Modo "Raiz" (novo) — `exportEleicaoPdfRaiz()` e `exportEleicaoCsvRaiz()`
+Novos helpers em `src/lib/eleicao-export-pdf.ts`:
 
-### 6. Export PDF/CSV (`src/lib/eleicao-export-pdf.ts` e CSV equivalente)
-- Quando `tipo = lider` e `parent_nome` é nulo, exibir **"— AVULSO —"** na coluna "Indicado por", para que o relatório impresso destaque visualmente.
+- **Entrada**: lista de pessoas + flag `incluirAvulsos`.
+- **Estrutura montada em memória**:
 
-### 7. Fluxo de notificação ao criar líder avulso
-- No `save()`, quando o líder novo é avulso, **abrir o `NotifyProgressDialog` direto na etapa do líder** (pulando "Coordenador" e "Secretaria") — ou pular essas etapas internamente exibindo "ignorado: líder avulso". Solução pragmática: passar um prop opcional `skipSteps={['coordenador','secretaria']}` ao dialog e marcá-las como `skipped` antes de rodar.
+```text
+Coordenador A — Região X · Tel · R$ valor
+  ├─ Líder A1 — Bairro · Tel · R$ valor
+  │   ├─ Cabo A1a — Tel · R$ valor
+  │   └─ Cabo A1b — Tel · R$ valor
+  └─ Líder A2 ...
+Coordenador B ...
+[AVULSOS]
+  ├─ Líder X (sem coord) — Tel · R$ valor
+  │   └─ Cabo X1 ...
+```
+
+- **PDF**: para cada coordenador, um bloco com header destacado + sub-tabela de líderes (com cabos aninhados em coluna "Cabos" ou listados logo abaixo recuados). Mostrar totais por coordenador (qtd líderes, qtd cabos, R$ total da equipe) e total geral no rodapé.
+- **CSV**: linhas planas com coluna extra `nivel` (coordenador/lider/cabo) + colunas `coordenador_raiz` e `lider_raiz` preenchidas em cada linha para permitir pivotar no Excel. Ordenação: coord → líder → cabo, mantendo a hierarquia ao ler de cima pra baixo.
+- Para um filtro "só Coordenadores": modo raiz vira lista de coordenadores com totais agregados da equipe (sem listar nominalmente líderes/cabos).
+- Para um filtro com coordenador específico: gera o PDF/CSV apenas daquela equipe — nome do arquivo `equipe-{slug-do-coord}.pdf`.
+
+### 4. Ajustes em `handleExport`
+Reescrever para receber um `ExportConfig`:
+
+```ts
+type ExportConfig = {
+  formato: "pdf" | "csv" | "print";
+  modo: "lista" | "raiz";
+  tipos: Set<"coordenador" | "lider" | "cabo">;
+  coordenadorId?: string | null; // null = todos
+  incluirAvulsos: boolean;
+};
+```
+
+Aplica os filtros, monta `items`, chama o helper certo (`exportEleicaoPdf` / `exportEleicaoPdfRaiz` ou variante CSV).
+
+### 5. Toast e nome de arquivo
+Mensagem mostra modo e contagem: `"PDF raiz exportado · 3 coordenadores · 27 pessoas"`. Slug do arquivo inclui `-raiz` ou `-{tipo}` para diferenciar.
 
 ## Arquivos afetados
 
-- `src/pages/Eleicao.tsx` — form, KPI, filtro, RegionBlock, tooltip, chamada ao NotifyProgressDialog.
-- `src/components/eleicao/NotifyProgressDialog.tsx` — aceitar `skipSteps`.
-- `src/components/eleicao/PrevisaoCustos.tsx` — sub-linha de avulsos.
-- `src/lib/eleicao-export-pdf.ts` e helper de CSV — marcar "AVULSO".
+- `src/pages/Eleicao.tsx` — novo dialog, novo `handleExport`.
+- `src/components/eleicao/ExportEleicaoDialog.tsx` — **novo** componente.
+- `src/lib/eleicao-export-pdf.ts` — adicionar `exportEleicaoPdfRaiz` e `exportEleicaoCsvRaiz`; ajustar tipos de opções.
 
 Sem mudanças de banco de dados.
