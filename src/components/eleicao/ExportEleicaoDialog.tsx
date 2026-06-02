@@ -56,9 +56,11 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   }, [coordenadores, regiao]);
 
   // Se o coordenador escolhido sumiu por causa do filtro de região, volta para "todos"
-  if (coordenadorId !== "__all" && !coordsOrdenados.some(c => c.id === coordenadorId)) {
-    setCoordenadorId("__all");
-  }
+  useEffect(() => {
+    if (coordenadorId !== "__all" && !coordsOrdenados.some(c => c.id === coordenadorId)) {
+      setCoordenadorId("__all");
+    }
+  }, [coordsOrdenados, coordenadorId]);
 
   function fire(formato: ExportFormato) {
     if (tipos.length === 0) return;
