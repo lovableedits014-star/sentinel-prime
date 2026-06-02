@@ -125,6 +125,26 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
             )}
           </div>
 
+          {/* Região / Cidade */}
+          {regioes.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">
+                {escopoTipo === "cidade" ? "Cidade" : "Região"}
+              </Label>
+              <Select value={regiao} onValueChange={setRegiao}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all">
+                    {escopoTipo === "cidade" ? "Todas as cidades" : "Todas as regiões"}
+                  </SelectItem>
+                  {regioes.map(r => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Coordenador específico */}
           {(incluiLideresOuCabos || modo === "raiz") && coordsOrdenados.length > 0 && (
             <div className="space-y-2">
