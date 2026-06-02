@@ -676,25 +676,9 @@ export default function Eleicao() {
           {clientId && <EleicaoContractTemplates clientId={clientId} />}
           {view === "cadastros" && (
             <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <FileDown className="w-4 h-4 mr-2" />Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                    <FileText className="w-4 h-4 mr-2" />Exportar como PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("print")}>
-                    <Printer className="w-4 h-4 mr-2" />Abrir para imprimir
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleExport("csv")}>
-                    <Package className="w-4 h-4 mr-2" />Exportar como CSV (Excel)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+                <FileDown className="w-4 h-4 mr-2" />Exportar
+              </Button>
               <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
             </>
           )}
