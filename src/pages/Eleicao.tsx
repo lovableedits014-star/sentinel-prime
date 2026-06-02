@@ -544,7 +544,12 @@ export default function Eleicao() {
   function handleExport(cfg: ExportConfig) {
     // Base: respeita escopo + busca atual (filtros de tela), mas IGNORA tipoFilter
     // pois o dialog tem seu próprio filtro de tipos.
-    const base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p));
+    let base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p));
+    if (cfg.regiao) {
+      base = base.filter(p =>
+        escopo === "interior" ? p.cidade === cfg.regiao : p.regiao === cfg.regiao
+      );
+    }
 
     // Para o modo "raiz", precisamos da equipe inteira; aplicamos filtro de tipo
     // só no momento do filtro pós-montagem. Aqui já filtramos por coordenador escolhido.
