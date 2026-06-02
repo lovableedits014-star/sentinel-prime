@@ -2,6 +2,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 export interface ExportPessoa {
+  id?: string;
+  parent_id?: string | null;
   nome: string;
   tipo: "coordenador" | "lider" | "cabo";
   telefone: string;
