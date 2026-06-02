@@ -22,7 +22,8 @@ import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 import EntradaGrupoPanel from "@/components/eleicao/EntradaGrupoPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package, FileText, Printer } from "lucide-react";
-import { exportEleicaoPdf, exportEleicaoCsv, type ExportPessoa } from "@/lib/eleicao-export-pdf";
+import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
+import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/ExportEleicaoDialog";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 
