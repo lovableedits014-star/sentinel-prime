@@ -1125,6 +1125,13 @@ export default function Eleicao() {
         skipSteps={notifySkip}
         onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); setNotifySkip([]); }}
       />
+
+      <ExportEleicaoDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        coordenadores={coordenadoresEscopo}
+        onExport={handleExport}
+      />
     </div>
     </EleicaoActionsContext.Provider>
   );
