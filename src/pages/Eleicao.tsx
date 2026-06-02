@@ -659,9 +659,25 @@ export default function Eleicao() {
   const coordenadoresEscopo = useMemo(
     () => pessoas
       .filter(p => p.tipo === "coordenador" && p.escopo === escopo)
-      .map(p => ({ id: p.id, nome: p.nome })),
+      .map(p => ({
+        id: p.id,
+        nome: p.nome,
+        regiao: escopo === "interior" ? (p.cidade || "") : (p.regiao || ""),
+      })),
     [pessoas, escopo],
   );
+
+  const regioesExport = useMemo(() => {
+    const noEscopo = pessoas.filter(p => p.escopo === escopo);
+    if (escopo === "interior") {
+      const set = new Set(noEscopo.map(p => p.cidade || "").filter(Boolean));
+      return Array.from(set).sort().map(v => ({ value: v, label: v }));
+    }
+    const set = new Set(noEscopo.map(p => p.regiao || "").filter(Boolean));
+    const byValue: Record<string, string> = {};
+    for (const r of REGIOES) byValue[r.value] = r.label;
+    return Array.from(set).sort().map(v => ({ value: v, label: byValue[v] || v }));
+  }, [pessoas, escopo, REGIOES]);
 
   return (
     <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow }}>
