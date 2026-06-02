@@ -17,24 +17,29 @@ export interface ExportConfig {
   modo: ExportModo;
   tipos: ExportTipo[];
   coordenadorId: string | null; // null = todos
+  regiao: string | null; // null = todas
   incluirAvulsos: boolean;
 }
 
-interface CoordOption { id: string; nome: string }
+interface CoordOption { id: string; nome: string; regiao?: string | null }
+interface RegiaoOption { value: string; label: string }
 
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   coordenadores: CoordOption[]; // do escopo atual
+  regioes: RegiaoOption[]; // regiões (CG) ou cidades (interior) disponíveis
+  escopoTipo: "regiao" | "cidade";
   onExport: (cfg: ExportConfig) => void;
 }
 
 const TODOS: ExportTipo[] = ["coordenador", "lider", "cabo"];
 
-export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores, onExport }: Props) {
+export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores, regioes, escopoTipo, onExport }: Props) {
   const [modo, setModo] = useState<ExportModo>("lista");
   const [tipos, setTipos] = useState<ExportTipo[]>(TODOS);
   const [coordenadorId, setCoordenadorId] = useState<string>("__all");
+  const [regiao, setRegiao] = useState<string>("__all");
   const [incluirAvulsos, setIncluirAvulsos] = useState(true);
 
   const toggleTipo = (t: ExportTipo) => {
@@ -43,6 +48,12 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
 
   const incluiLideresOuCabos = tipos.includes("lider") || tipos.includes("cabo");
   const podeAvulsos = tipos.includes("lider") && coordenadorId === "__all";
+
+  // Coordenadores filtrados pela região escolhida
+  const coordsFiltrados = useMemo(() => {
+    if (regiao === "__all") return coordenadores;
+    return coordenadores.filter(c => (c.regiao || "") === regiao);
+  }, [coordenadores, regiao]);
 
   const coordsOrdenados = useMemo(
     () => [...coordenadores].sort((a, b) => a.nome.localeCompare(b.nome)),
