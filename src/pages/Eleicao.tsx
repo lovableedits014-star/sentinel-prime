@@ -579,6 +579,11 @@ export default function Eleicao() {
     const filtros: { label: string; value: string }[] = [];
     if (search) filtros.push({ label: "Busca", value: search });
     if (regiaoFilter && regiaoFilter !== "all") filtros.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
+    if (cfg.regiao) {
+      const label = escopo === "interior" ? "Cidade" : "Região";
+      const valor = escopo === "interior" ? cfg.regiao : (REGIOES.find(r => r.value === cfg.regiao)?.label || cfg.regiao);
+      filtros.push({ label, value: valor });
+    }
     filtros.push({ label: "Tipos", value: cfg.tipos.map(t => t === "coordenador" ? "Coord" : t === "lider" ? "Líder" : "Cabo").join(", ") });
     if (cfg.coordenadorId) {
       const coordNome = byId.get(cfg.coordenadorId) || "";
