@@ -2,6 +2,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 export interface ExportPessoa {
+  id?: string;
+  parent_id?: string | null;
   nome: string;
   tipo: "coordenador" | "lider" | "cabo";
   telefone: string;
@@ -253,6 +255,270 @@ export function exportEleicaoCsv(opts: ExportOptions) {
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
   const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   a.download = `cadastros-eleicao-${escopoSlug}-${ts}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Exportação RAIZ (hierárquica: Coordenador → Líderes → Cabos) ───
+
+export interface RaizExportOptions {
+  clientName?: string;
+  escopoLabel: string;
+  pessoas: ExportPessoa[]; // todas as pessoas do escopo (com id e parent_id)
+  incluirAvulsos?: boolean;
+  coordenadorFiltro?: { id: string; nome: string } | null;
+  filtros?: { label: string; value: string }[];
+}
+
+interface EquipeNode {
+  coord: ExportPessoa | null; // null = grupo AVULSOS
+  lideres: Array<{ lider: ExportPessoa; cabos: ExportPessoa[] }>;
+  totalValor: number;
+  qtdLideres: number;
+  qtdCabos: number;
+}
+
+function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
+  const { pessoas, incluirAvulsos = true, coordenadorFiltro } = opts;
+  const byId = new Map<string, ExportPessoa>();
+  for (const p of pessoas) if (p.id) byId.set(p.id, p);
+
+  const coords = pessoas.filter(p => p.tipo === "coordenador")
+    .filter(c => !coordenadorFiltro || c.id === coordenadorFiltro.id);
+  const lideres = pessoas.filter(p => p.tipo === "lider");
+  const cabos = pessoas.filter(p => p.tipo === "cabo");
+
+  const lideresPorCoord = new Map<string, ExportPessoa[]>();
+  const avulsos: ExportPessoa[] = [];
+  for (const l of lideres) {
+    if (l.parent_id && byId.get(l.parent_id)?.tipo === "coordenador") {
+      const arr = lideresPorCoord.get(l.parent_id) || [];
+      arr.push(l); lideresPorCoord.set(l.parent_id, arr);
+    } else {
+      avulsos.push(l);
+    }
+  }
+  const cabosPorLider = new Map<string, ExportPessoa[]>();
+  for (const c of cabos) {
+    if (c.parent_id) {
+      const arr = cabosPorLider.get(c.parent_id) || [];
+      arr.push(c); cabosPorLider.set(c.parent_id, arr);
+    }
+  }
+
+  const sortNome = (a: ExportPessoa, b: ExportPessoa) => (a.nome || "").localeCompare(b.nome || "");
+
+  const nodes: EquipeNode[] = [];
+  for (const coord of coords.sort(sortNome)) {
+    const lids = (lideresPorCoord.get(coord.id || "") || []).sort(sortNome);
+    const arr = lids.map(lider => ({
+      lider,
+      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortNome),
+    }));
+    const totalValor =
+      (coord.valor_contratacao || 0) +
+      arr.reduce((s, l) => s + (l.lider.valor_contratacao || 0) + l.cabos.reduce((ss, c) => ss + (c.valor_contratacao || 0), 0), 0);
+    const qtdCabos = arr.reduce((s, l) => s + l.cabos.length, 0);
+    nodes.push({ coord, lideres: arr, totalValor, qtdLideres: arr.length, qtdCabos });
+  }
+
+  if (incluirAvulsos && !coordenadorFiltro && avulsos.length > 0) {
+    const arr = avulsos.sort(sortNome).map(lider => ({
+      lider,
+      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortNome),
+    }));
+    const totalValor = arr.reduce((s, l) => s + (l.lider.valor_contratacao || 0) + l.cabos.reduce((ss, c) => ss + (c.valor_contratacao || 0), 0), 0);
+    const qtdCabos = arr.reduce((s, l) => s + l.cabos.length, 0);
+    nodes.push({ coord: null, lideres: arr, totalValor, qtdLideres: arr.length, qtdCabos });
+  }
+
+  return nodes;
+}
+
+export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 36;
+  let y = margin;
+
+  // Header band
+  doc.setFillColor(15, 23, 42);
+  doc.rect(0, 0, pageWidth, 70, "F");
+  doc.setTextColor(255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Estrutura por Coordenador", margin, 32);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(opts.escopoLabel, margin, 50);
+  const stamp = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  doc.text(`Gerado em ${stamp}`, pageWidth - margin, 50, { align: "right" });
+  if (opts.clientName) doc.text(opts.clientName, pageWidth - margin, 32, { align: "right" });
+  y = 90;
+  doc.setTextColor(0);
+
+  if (opts.filtros && opts.filtros.length > 0) {
+    doc.setFontSize(9); doc.setTextColor(100);
+    doc.text(opts.filtros.map(f => `${f.label}: ${f.value}`).join("   •   "), margin, y);
+    y += 14; doc.setTextColor(0);
+  }
+
+  const equipes = montarEquipes(opts);
+  if (equipes.length === 0) {
+    doc.setFontSize(11); doc.text("Nenhuma equipe encontrada com os filtros aplicados.", margin, y);
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+    doc.save(`eleicao-raiz-${ts}.pdf`); return;
+  }
+
+  // Totais gerais
+  const totGeral = equipes.reduce((s, e) => s + e.totalValor, 0);
+  const totLid = equipes.reduce((s, e) => s + e.qtdLideres, 0);
+  const totCab = equipes.reduce((s, e) => s + e.qtdCabos, 0);
+  const totCoord = equipes.filter(e => e.coord).length;
+  doc.setFontSize(9); doc.setTextColor(71, 85, 105);
+  doc.text(
+    `${totCoord} coordenador(es) · ${totLid} líder(es) · ${totCab} cabo(s) · Total: ${fmtBRL(totGeral)}`,
+    margin, y,
+  );
+  y += 14; doc.setTextColor(0);
+
+  for (const eq of equipes) {
+    if (y > pageHeight - 140) { doc.addPage(); y = margin; }
+
+    // Header do bloco
+    const isAvulso = !eq.coord;
+    doc.setFillColor(isAvulso ? 250 : 30, isAvulso ? 204 : 41, isAvulso ? 21 : 59);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 32, 4, 4, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(255);
+    const tituloCoord = isAvulso
+      ? "LÍDERES AVULSOS (sem coordenador)"
+      : `${eq.coord!.nome}  —  ${cap(eq.coord!.cidade || eq.coord!.regiao)}`;
+    doc.text(tituloCoord, margin + 10, y + 13);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    const sub = isAvulso
+      ? `${eq.qtdLideres} líder(es) · ${eq.qtdCabos} cabo(s) · Total ${fmtBRL(eq.totalValor)}`
+      : `${fmtPhone(eq.coord!.telefone)} · ${eq.qtdLideres} líder(es) · ${eq.qtdCabos} cabo(s) · Total equipe ${fmtBRL(eq.totalValor)}`;
+    doc.text(sub, margin + 10, y + 25);
+    doc.setTextColor(0);
+    y += 38;
+
+    if (eq.lideres.length === 0) {
+      doc.setFontSize(9); doc.setTextColor(120);
+      doc.text("(sem líderes vinculados)", margin + 14, y);
+      doc.setTextColor(0); y += 18; continue;
+    }
+
+    // Tabela de líderes + cabos resumidos
+    const rows: any[] = [];
+    for (const { lider, cabos } of eq.lideres) {
+      rows.push([
+        { content: `▸ ${lider.nome}`, styles: { fontStyle: "bold" } },
+        fmtPhone(lider.telefone),
+        cap(lider.bairro || lider.cidade || lider.regiao),
+        String(cabos.length),
+        lider.valor_contratacao && lider.valor_contratacao > 0 ? fmtBRL(lider.valor_contratacao) : "—",
+      ]);
+      for (const c of cabos) {
+        rows.push([
+          { content: `      └ ${c.nome}`, styles: { textColor: [80, 80, 80] as any, fontSize: 8 } },
+          { content: fmtPhone(c.telefone), styles: { textColor: [80, 80, 80] as any, fontSize: 8 } },
+          { content: cap(c.bairro || c.cidade || c.regiao), styles: { textColor: [80, 80, 80] as any, fontSize: 8 } },
+          { content: "—", styles: { textColor: [80, 80, 80] as any, fontSize: 8 } },
+          { content: c.valor_contratacao && c.valor_contratacao > 0 ? fmtBRL(c.valor_contratacao) : "—", styles: { textColor: [80, 80, 80] as any, fontSize: 8 } },
+        ]);
+      }
+    }
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Líder / Cabo", "Telefone", "Bairro/Cidade", "Cabos", "Valor"]],
+      body: rows,
+      theme: "grid",
+      styles: { fontSize: 9, cellPadding: 4, valign: "middle" },
+      headStyles: { fillColor: [71, 85, 105], textColor: 255, fontStyle: "bold", fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 200 },
+        1: { cellWidth: 85 },
+        2: { cellWidth: 110 },
+        3: { halign: "center", cellWidth: 45 },
+        4: { halign: "right", cellWidth: 70 },
+      },
+      margin: { left: margin, right: margin },
+    });
+    y = (doc as any).lastAutoTable.finalY + 14;
+  }
+
+  const pageCount = doc.getNumberOfPages();
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(140);
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.text(
+      `Sentinelle • Estrutura por Coordenador • Página ${i} de ${pageCount}`,
+      pageWidth / 2, pageHeight - 14, { align: "center" },
+    );
+  }
+
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const coordSlug = opts.coordenadorFiltro
+    ? "-equipe-" + opts.coordenadorFiltro.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    : "";
+  doc.save(`eleicao-raiz-${escopoSlug}${coordSlug}-${ts}.pdf`);
+}
+
+export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
+  const equipes = montarEquipes(opts);
+  const headers = [
+    "Nivel", "Coordenador (raiz)", "Lider (raiz)",
+    "Tipo", "Nome", "Telefone", "Regiao", "Cidade", "Bairro", "Valor (R$)",
+  ];
+  const escapeCsv = (v: any) => {
+    const s = v == null ? "" : String(v);
+    return /[";,\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [headers.join(";")];
+  const push = (cells: (string | number)[]) => lines.push(cells.map(escapeCsv).join(";"));
+
+  for (const eq of equipes) {
+    const coordNome = eq.coord?.nome || "— AVULSOS —";
+    if (eq.coord) {
+      push([
+        "coordenador", coordNome, "",
+        TIPO_LABEL.coordenador, eq.coord.nome, fmtPhone(eq.coord.telefone),
+        cap(eq.coord.regiao), eq.coord.cidade || "", eq.coord.bairro || "",
+        (eq.coord.valor_contratacao || 0).toFixed(2).replace(".", ","),
+      ]);
+    }
+    for (const { lider, cabos } of eq.lideres) {
+      push([
+        "lider", coordNome, lider.nome,
+        TIPO_LABEL.lider, lider.nome, fmtPhone(lider.telefone),
+        cap(lider.regiao), lider.cidade || "", lider.bairro || "",
+        (lider.valor_contratacao || 0).toFixed(2).replace(".", ","),
+      ]);
+      for (const c of cabos) {
+        push([
+          "cabo", coordNome, lider.nome,
+          TIPO_LABEL.cabo, c.nome, fmtPhone(c.telefone),
+          cap(c.regiao), c.cidade || "", c.bairro || "",
+          (c.valor_contratacao || 0).toFixed(2).replace(".", ","),
+        ]);
+      }
+    }
+  }
+
+  const csv = "\uFEFF" + lines.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const coordSlug = opts.coordenadorFiltro
+    ? "-equipe-" + opts.coordenadorFiltro.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    : "";
+  a.download = `eleicao-raiz-${escopoSlug}${coordSlug}-${ts}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

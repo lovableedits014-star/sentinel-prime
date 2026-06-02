@@ -22,7 +22,8 @@ import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 import EntradaGrupoPanel from "@/components/eleicao/EntradaGrupoPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package, FileText, Printer } from "lucide-react";
-import { exportEleicaoPdf, exportEleicaoCsv, type ExportPessoa } from "@/lib/eleicao-export-pdf";
+import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
+import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/ExportEleicaoDialog";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 
@@ -538,16 +539,95 @@ export default function Eleicao() {
   }, [pessoas, form.tipo, form.escopo, form.regiao, form.cidade]);
 
 
-  function handleExport(kind: "pdf" | "csv" | "print") {
-    const lista = pessoas.filter(p =>
-      p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p)
-    );
-    if (lista.length === 0) {
-      toast.error("Nenhum cadastro para exportar com os filtros atuais.");
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+
+  function handleExport(cfg: ExportConfig) {
+    // Base: respeita escopo + busca atual (filtros de tela), mas IGNORA tipoFilter
+    // pois o dialog tem seu próprio filtro de tipos.
+    const base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p));
+
+    // Para o modo "raiz", precisamos da equipe inteira; aplicamos filtro de tipo
+    // só no momento do filtro pós-montagem. Aqui já filtramos por coordenador escolhido.
+    let lista = base;
+    if (cfg.coordenadorId) {
+      const coord = pessoas.find(p => p.id === cfg.coordenadorId);
+      if (!coord) { toast.error("Coordenador não encontrado"); return; }
+      const lideresDoCoord = new Set(pessoas.filter(p => p.parent_id === coord.id).map(p => p.id));
+      lista = base.filter(p =>
+        p.id === coord.id ||
+        lideresDoCoord.has(p.id) ||
+        (p.parent_id && lideresDoCoord.has(p.parent_id))
+      );
+    }
+
+    // Aplica filtro de tipos do dialog
+    const tiposSet = new Set(cfg.tipos);
+    const listaTipada = lista.filter(p => tiposSet.has(p.tipo));
+
+    if (listaTipada.length === 0) {
+      toast.error("Nenhum cadastro para exportar com os filtros escolhidos.");
       return;
     }
+
     const byId = new Map(pessoas.map(p => [p.id, p.nome]));
-    const items: ExportPessoa[] = lista.map(p => ({
+    const escopoLabel = escopo === "campo_grande" ? "Campo Grande" : "Interior";
+    const filtros: { label: string; value: string }[] = [];
+    if (search) filtros.push({ label: "Busca", value: search });
+    if (regiaoFilter && regiaoFilter !== "all") filtros.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
+    filtros.push({ label: "Tipos", value: cfg.tipos.map(t => t === "coordenador" ? "Coord" : t === "lider" ? "Líder" : "Cabo").join(", ") });
+    if (cfg.coordenadorId) {
+      const coordNome = byId.get(cfg.coordenadorId) || "";
+      filtros.push({ label: "Equipe", value: coordNome });
+    }
+
+    if (cfg.modo === "raiz") {
+      // Para raiz precisamos da lista bruta (com ids/parent_ids) para montar árvore;
+      // o filtro de tipos é respeitado ao decidir o que aparece na árvore:
+      // - se "coordenador" não selecionado, ainda mostramos o cabeçalho do coord
+      //   (porque é a raiz), mas omitimos quando só "cabo" foi pedido.
+      const itemsRaiz: ExportPessoa[] = lista.map(p => ({
+        id: p.id,
+        parent_id: p.parent_id,
+        nome: p.nome,
+        tipo: p.tipo,
+        telefone: p.telefone,
+        regiao: p.regiao,
+        cidade: p.cidade,
+        bairro: p.bairro,
+        rua: p.rua,
+        numero: p.numero,
+        email: p.email,
+        observacoes: p.observacoes,
+        valor_contratacao: p.valor_contratacao,
+      }));
+      const coordFiltro = cfg.coordenadorId
+        ? { id: cfg.coordenadorId, nome: byId.get(cfg.coordenadorId) || "" }
+        : null;
+      const opts = {
+        escopoLabel,
+        pessoas: itemsRaiz,
+        incluirAvulsos: cfg.incluirAvulsos,
+        coordenadorFiltro: coordFiltro,
+        filtros,
+      };
+      if (cfg.formato === "csv") {
+        exportEleicaoCsvRaiz(opts);
+        toast.success(`CSV raiz exportado (${listaTipada.length} registros)`);
+      } else {
+        exportEleicaoPdfRaiz(opts);
+        toast.success(
+          cfg.formato === "print"
+            ? "PDF raiz gerado — use Ctrl+P para imprimir."
+            : `PDF raiz exportado (${listaTipada.length} registros)`
+        );
+      }
+      return;
+    }
+
+    // Modo "lista" (comportamento clássico, com filtros novos)
+    const items: ExportPessoa[] = listaTipada.map(p => ({
+      id: p.id,
+      parent_id: p.parent_id,
       nome: p.nome,
       tipo: p.tipo,
       telefone: p.telefone,
@@ -561,25 +641,27 @@ export default function Eleicao() {
       valor_contratacao: p.valor_contratacao,
       parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
     }));
-    const escopoLabel = escopo === "campo_grande" ? "Campo Grande" : "Interior";
-    const filtros: { label: string; value: string }[] = [];
-    if (search) filtros.push({ label: "Busca", value: search });
-    if (tipoFilter && tipoFilter !== "todos") filtros.push({ label: "Tipo", value: tipoFilter });
-    if (regiaoFilter && regiaoFilter !== "all") filtros.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
 
     const opts = { escopoLabel, pessoas: items, filtros };
-    if (kind === "csv") {
+    if (cfg.formato === "csv") {
       exportEleicaoCsv(opts);
       toast.success(`CSV exportado (${items.length} registros)`);
     } else {
       exportEleicaoPdf(opts);
-      if (kind === "print") {
-        toast.info("PDF gerado — abra o arquivo e use Ctrl+P para imprimir.");
-      } else {
-        toast.success(`PDF exportado (${items.length} registros)`);
-      }
+      toast.success(
+        cfg.formato === "print"
+          ? "PDF gerado — use Ctrl+P para imprimir."
+          : `PDF exportado (${items.length} registros)`
+      );
     }
   }
+
+  const coordenadoresEscopo = useMemo(
+    () => pessoas
+      .filter(p => p.tipo === "coordenador" && p.escopo === escopo)
+      .map(p => ({ id: p.id, nome: p.nome })),
+    [pessoas, escopo],
+  );
 
   return (
     <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow }}>
@@ -594,25 +676,9 @@ export default function Eleicao() {
           {clientId && <EleicaoContractTemplates clientId={clientId} />}
           {view === "cadastros" && (
             <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <FileDown className="w-4 h-4 mr-2" />Exportar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                    <FileText className="w-4 h-4 mr-2" />Exportar como PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport("print")}>
-                    <Printer className="w-4 h-4 mr-2" />Abrir para imprimir
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleExport("csv")}>
-                    <Package className="w-4 h-4 mr-2" />Exportar como CSV (Excel)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+                <FileDown className="w-4 h-4 mr-2" />Exportar
+              </Button>
               <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
             </>
           )}
@@ -1058,6 +1124,13 @@ export default function Eleicao() {
         pessoaId={notifyPessoaId}
         skipSteps={notifySkip}
         onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); setNotifySkip([]); }}
+      />
+
+      <ExportEleicaoDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        coordenadores={coordenadoresEscopo}
+        onExport={handleExport}
       />
     </div>
     </EleicaoActionsContext.Provider>
