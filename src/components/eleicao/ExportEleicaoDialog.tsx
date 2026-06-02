@@ -50,15 +50,15 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const podeAvulsos = tipos.includes("lider") && coordenadorId === "__all";
 
   // Coordenadores filtrados pela região escolhida
-  const coordsFiltrados = useMemo(() => {
-    if (regiao === "__all") return coordenadores;
-    return coordenadores.filter(c => (c.regiao || "") === regiao);
+  const coordsOrdenados = useMemo(() => {
+    const base = regiao === "__all" ? coordenadores : coordenadores.filter(c => (c.regiao || "") === regiao);
+    return [...base].sort((a, b) => a.nome.localeCompare(b.nome));
   }, [coordenadores, regiao]);
 
-  const coordsOrdenados = useMemo(
-    () => [...coordenadores].sort((a, b) => a.nome.localeCompare(b.nome)),
-    [coordenadores],
-  );
+  // Se o coordenador escolhido sumiu por causa do filtro de região, volta para "todos"
+  if (coordenadorId !== "__all" && !coordsOrdenados.some(c => c.id === coordenadorId)) {
+    setCoordenadorId("__all");
+  }
 
   function fire(formato: ExportFormato) {
     if (tipos.length === 0) return;
@@ -67,6 +67,7 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
       modo,
       tipos,
       coordenadorId: coordenadorId === "__all" ? null : coordenadorId,
+      regiao: regiao === "__all" ? null : regiao,
       incluirAvulsos: podeAvulsos ? incluirAvulsos : false,
     });
     onOpenChange(false);
