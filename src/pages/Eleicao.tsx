@@ -1156,6 +1156,8 @@ export default function Eleicao() {
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         coordenadores={coordenadoresEscopo}
+        regioes={regioesExport}
+        escopoTipo={escopo === "interior" ? "cidade" : "regiao"}
         onExport={handleExport}
       />
     </div>
