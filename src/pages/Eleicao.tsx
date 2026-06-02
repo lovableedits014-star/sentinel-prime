@@ -544,7 +544,12 @@ export default function Eleicao() {
   function handleExport(cfg: ExportConfig) {
     // Base: respeita escopo + busca atual (filtros de tela), mas IGNORA tipoFilter
     // pois o dialog tem seu próprio filtro de tipos.
-    const base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p));
+    let base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p));
+    if (cfg.regiao) {
+      base = base.filter(p =>
+        escopo === "interior" ? p.cidade === cfg.regiao : p.regiao === cfg.regiao
+      );
+    }
 
     // Para o modo "raiz", precisamos da equipe inteira; aplicamos filtro de tipo
     // só no momento do filtro pós-montagem. Aqui já filtramos por coordenador escolhido.
@@ -574,6 +579,11 @@ export default function Eleicao() {
     const filtros: { label: string; value: string }[] = [];
     if (search) filtros.push({ label: "Busca", value: search });
     if (regiaoFilter && regiaoFilter !== "all") filtros.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
+    if (cfg.regiao) {
+      const label = escopo === "interior" ? "Cidade" : "Região";
+      const valor = escopo === "interior" ? cfg.regiao : (REGIOES.find(r => r.value === cfg.regiao)?.label || cfg.regiao);
+      filtros.push({ label, value: valor });
+    }
     filtros.push({ label: "Tipos", value: cfg.tipos.map(t => t === "coordenador" ? "Coord" : t === "lider" ? "Líder" : "Cabo").join(", ") });
     if (cfg.coordenadorId) {
       const coordNome = byId.get(cfg.coordenadorId) || "";
@@ -659,9 +669,25 @@ export default function Eleicao() {
   const coordenadoresEscopo = useMemo(
     () => pessoas
       .filter(p => p.tipo === "coordenador" && p.escopo === escopo)
-      .map(p => ({ id: p.id, nome: p.nome })),
+      .map(p => ({
+        id: p.id,
+        nome: p.nome,
+        regiao: escopo === "interior" ? (p.cidade || "") : (p.regiao || ""),
+      })),
     [pessoas, escopo],
   );
+
+  const regioesExport = useMemo(() => {
+    const noEscopo = pessoas.filter(p => p.escopo === escopo);
+    if (escopo === "interior") {
+      const set = new Set(noEscopo.map(p => p.cidade || "").filter(Boolean));
+      return Array.from(set).sort().map(v => ({ value: v, label: v }));
+    }
+    const set = new Set(noEscopo.map(p => p.regiao || "").filter(Boolean));
+    const byValue: Record<string, string> = {};
+    for (const r of REGIOES) byValue[r.value] = r.label;
+    return Array.from(set).sort().map(v => ({ value: v, label: byValue[v] || v }));
+  }, [pessoas, escopo, REGIOES]);
 
   return (
     <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow }}>
@@ -1130,6 +1156,8 @@ export default function Eleicao() {
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         coordenadores={coordenadoresEscopo}
+        regioes={regioesExport}
+        escopoTipo={escopo === "interior" ? "cidade" : "regiao"}
         onExport={handleExport}
       />
     </div>

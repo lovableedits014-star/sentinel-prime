@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,24 +17,29 @@ export interface ExportConfig {
   modo: ExportModo;
   tipos: ExportTipo[];
   coordenadorId: string | null; // null = todos
+  regiao: string | null; // null = todas
   incluirAvulsos: boolean;
 }
 
-interface CoordOption { id: string; nome: string }
+interface CoordOption { id: string; nome: string; regiao?: string | null }
+interface RegiaoOption { value: string; label: string }
 
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   coordenadores: CoordOption[]; // do escopo atual
+  regioes: RegiaoOption[]; // regiões (CG) ou cidades (interior) disponíveis
+  escopoTipo: "regiao" | "cidade";
   onExport: (cfg: ExportConfig) => void;
 }
 
 const TODOS: ExportTipo[] = ["coordenador", "lider", "cabo"];
 
-export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores, onExport }: Props) {
+export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores, regioes, escopoTipo, onExport }: Props) {
   const [modo, setModo] = useState<ExportModo>("lista");
   const [tipos, setTipos] = useState<ExportTipo[]>(TODOS);
   const [coordenadorId, setCoordenadorId] = useState<string>("__all");
+  const [regiao, setRegiao] = useState<string>("__all");
   const [incluirAvulsos, setIncluirAvulsos] = useState(true);
 
   const toggleTipo = (t: ExportTipo) => {
@@ -44,10 +49,18 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const incluiLideresOuCabos = tipos.includes("lider") || tipos.includes("cabo");
   const podeAvulsos = tipos.includes("lider") && coordenadorId === "__all";
 
-  const coordsOrdenados = useMemo(
-    () => [...coordenadores].sort((a, b) => a.nome.localeCompare(b.nome)),
-    [coordenadores],
-  );
+  // Coordenadores filtrados pela região escolhida
+  const coordsOrdenados = useMemo(() => {
+    const base = regiao === "__all" ? coordenadores : coordenadores.filter(c => (c.regiao || "") === regiao);
+    return [...base].sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [coordenadores, regiao]);
+
+  // Se o coordenador escolhido sumiu por causa do filtro de região, volta para "todos"
+  useEffect(() => {
+    if (coordenadorId !== "__all" && !coordsOrdenados.some(c => c.id === coordenadorId)) {
+      setCoordenadorId("__all");
+    }
+  }, [coordsOrdenados, coordenadorId]);
 
   function fire(formato: ExportFormato) {
     if (tipos.length === 0) return;
@@ -56,6 +69,7 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
       modo,
       tipos,
       coordenadorId: coordenadorId === "__all" ? null : coordenadorId,
+      regiao: regiao === "__all" ? null : regiao,
       incluirAvulsos: podeAvulsos ? incluirAvulsos : false,
     });
     onOpenChange(false);
@@ -110,6 +124,26 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
               <p className="text-xs text-destructive">Selecione pelo menos um tipo.</p>
             )}
           </div>
+
+          {/* Região / Cidade */}
+          {regioes.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">
+                {escopoTipo === "cidade" ? "Cidade" : "Região"}
+              </Label>
+              <Select value={regiao} onValueChange={setRegiao}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all">
+                    {escopoTipo === "cidade" ? "Todas as cidades" : "Todas as regiões"}
+                  </SelectItem>
+                  {regioes.map(r => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Coordenador específico */}
           {(incluiLideresOuCabos || modo === "raiz") && coordsOrdenados.length > 0 && (

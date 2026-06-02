@@ -1,75 +1,33 @@
 ## Contexto
 
-Hoje em `Eleicao.tsx > handleExport()` (linhas 541-582) a exportação respeita só os filtros já ativos na tela (busca, tipo, região). O usuário quer:
-
-1. **Filtros explícitos no momento da exportação** — escolher só Coordenadores, só Líderes ou só Cabos, sem precisar mexer no filtro principal da página.
-2. **Exportação "Raiz" (hierárquica)** — agrupar por Coordenador, mostrando dentro de cada um seus Líderes e, abaixo de cada Líder, seus Cabos. Útil para auditar a estrutura completa de uma equipe.
+O `ExportEleicaoDialog` recém-criado permite filtrar por tipo, coordenador específico e avulsos, mas **não tem filtro de região/cidade próprio**. Hoje, no `handleExport`, a região vinda do filtro da tela (`regiaoFilter`) **não é aplicada** — quem dita o recorte regional é o usuário escolher na tela antes. Precisa ser explícito no dialog.
 
 ## Plano
 
-### 1. Dialog único de exportação (`ExportEleicaoDialog`)
-Substituir o atual `DropdownMenu` "Exportar" por um botão que abre um dialog com as opções:
+### 1. `ExportEleicaoDialog.tsx`
+- Adicionar prop `regioes: { value: string; label: string }[]` (lista de regiões/cidades disponíveis no escopo atual).
+- Adicionar prop `escopoLabel: "regiao" | "cidade"` para o label correto ("Região" em Campo Grande, "Cidade" em Interior).
+- Novo campo no formulário: `<Select>` "Região / Cidade" com opção "Todas" + cada região/cidade. Estado interno `regiao: string` (default `"__all"`).
+- Incluir no `ExportConfig` o campo `regiao: string | null` (null = todas).
 
-- **Tipo de exportação** (radio):
-  - "Lista simples" — comportamento atual (tabela única).
-  - "Raiz / Hierárquica (agrupada por Coordenador)" — novo formato em árvore.
-- **Filtrar por tipo** (checkboxes, multi-seleção, padrão = todos):
-  - Coordenadores, Líderes, Cabos.
-- **Filtrar por coordenador específico** (select opcional, só aparece se "Líderes" ou "Cabos" estiverem marcados): "Todos" ou nome de um coordenador da região atual. Quando escolhido, traz **apenas a equipe daquele coordenador** (ele + líderes dele + cabos dos líderes dele).
-- **Incluir avulsos?** (switch, default ligado) — só faz sentido se "Líderes" marcado; quando ligado adiciona uma seção/grupo "AVULSOS" no fim.
-- **Formato**: PDF / Imprimir / CSV (botões finais).
+### 2. `Eleicao.tsx`
+- Calcular `regioesParaExport`:
+  - Em Campo Grande: usar `REGIOES` (do hook) filtrando só as que têm gente cadastrada no escopo.
+  - Em Interior: derivar `cidades` únicas das `pessoas` do escopo.
+- Passar `regioes` e `escopoLabel` para o dialog.
+- Em `handleExport(cfg)`:
+  - Aplicar o filtro de região depois do filtro de escopo: `p.escopo === escopo && (escopo === "interior" ? p.cidade === cfg.regiao : p.regiao === cfg.regiao)` quando `cfg.regiao` está definido.
+  - Adicionar a região escolhida no array `filtros` que vai no header do PDF/CSV.
+- Quando o usuário escolhe um **coordenador específico**, esconder/ignorar o filtro de região (a equipe pode atravessar regiões? Aqui não — cada pessoa tem sua região; mantemos consistência: se ambos forem definidos, aplica os dois).
 
-Esses filtros são aplicados **em cima** dos filtros já ativos da tela (escopo, busca, região), nunca os ignoram.
-
-### 2. Lista simples (existente, com filtros novos)
-- Aplicar o filtro de tipos (1-3 opções) e o filtro de coordenador antes de montar `ExportPessoa[]`.
-- O PDF/CSV continuam usando o agrupamento por tipo que já existe em `eleicao-export-pdf.ts`.
-
-### 3. Modo "Raiz" (novo) — `exportEleicaoPdfRaiz()` e `exportEleicaoCsvRaiz()`
-Novos helpers em `src/lib/eleicao-export-pdf.ts`:
-
-- **Entrada**: lista de pessoas + flag `incluirAvulsos`.
-- **Estrutura montada em memória**:
-
-```text
-Coordenador A — Região X · Tel · R$ valor
-  ├─ Líder A1 — Bairro · Tel · R$ valor
-  │   ├─ Cabo A1a — Tel · R$ valor
-  │   └─ Cabo A1b — Tel · R$ valor
-  └─ Líder A2 ...
-Coordenador B ...
-[AVULSOS]
-  ├─ Líder X (sem coord) — Tel · R$ valor
-  │   └─ Cabo X1 ...
-```
-
-- **PDF**: para cada coordenador, um bloco com header destacado + sub-tabela de líderes (com cabos aninhados em coluna "Cabos" ou listados logo abaixo recuados). Mostrar totais por coordenador (qtd líderes, qtd cabos, R$ total da equipe) e total geral no rodapé.
-- **CSV**: linhas planas com coluna extra `nivel` (coordenador/lider/cabo) + colunas `coordenador_raiz` e `lider_raiz` preenchidas em cada linha para permitir pivotar no Excel. Ordenação: coord → líder → cabo, mantendo a hierarquia ao ler de cima pra baixo.
-- Para um filtro "só Coordenadores": modo raiz vira lista de coordenadores com totais agregados da equipe (sem listar nominalmente líderes/cabos).
-- Para um filtro com coordenador específico: gera o PDF/CSV apenas daquela equipe — nome do arquivo `equipe-{slug-do-coord}.pdf`.
-
-### 4. Ajustes em `handleExport`
-Reescrever para receber um `ExportConfig`:
-
-```ts
-type ExportConfig = {
-  formato: "pdf" | "csv" | "print";
-  modo: "lista" | "raiz";
-  tipos: Set<"coordenador" | "lider" | "cabo">;
-  coordenadorId?: string | null; // null = todos
-  incluirAvulsos: boolean;
-};
-```
-
-Aplica os filtros, monta `items`, chama o helper certo (`exportEleicaoPdf` / `exportEleicaoPdfRaiz` ou variante CSV).
-
-### 5. Toast e nome de arquivo
-Mensagem mostra modo e contagem: `"PDF raiz exportado · 3 coordenadores · 27 pessoas"`. Slug do arquivo inclui `-raiz` ou `-{tipo}` para diferenciar.
+### 3. Detalhes de UX
+- O select de região aparece **acima** do filtro de coordenador, já que define o universo.
+- Se "Todas as regiões" estiver escolhido, comportamento atual permanece.
+- Filtro independente do `regiaoFilter` da tela — o dialog tem seu próprio recorte para exportação.
 
 ## Arquivos afetados
 
-- `src/pages/Eleicao.tsx` — novo dialog, novo `handleExport`.
-- `src/components/eleicao/ExportEleicaoDialog.tsx` — **novo** componente.
-- `src/lib/eleicao-export-pdf.ts` — adicionar `exportEleicaoPdfRaiz` e `exportEleicaoCsvRaiz`; ajustar tipos de opções.
+- `src/components/eleicao/ExportEleicaoDialog.tsx` — novo campo + tipo `ExportConfig`.
+- `src/pages/Eleicao.tsx` — calcular lista de regiões, passar ao dialog, aplicar filtro em `handleExport`.
 
-Sem mudanças de banco de dados.
+Sem mudanças de banco.
