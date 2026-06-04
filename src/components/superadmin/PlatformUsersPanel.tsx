@@ -40,6 +40,7 @@ export default function PlatformUsersPanel() {
   const [paths, setPaths] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [filterClient, setFilterClient] = useState<string>("all");
+  const [resetTarget, setResetTarget] = useState<TeamUser | null>(null);
 
   const { data: clients = [] } = useQuery({
     queryKey: ["all-clients"],
