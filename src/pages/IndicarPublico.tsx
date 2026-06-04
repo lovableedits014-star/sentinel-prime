@@ -90,8 +90,8 @@ export default function IndicarPublico() {
       _token: token,
       _nome: nome.trim(),
       _telefone: telefone,
-      _bairro: bairro || null,
-      _observacao: obs || null,
+      _bairro: bairro || undefined,
+      _observacao: obs || undefined,
     });
     setSaving(false);
     if (error) { toast.error("Falha ao registrar — tente novamente"); return; }
