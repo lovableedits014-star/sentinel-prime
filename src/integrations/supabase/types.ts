@@ -1636,6 +1636,204 @@ export type Database = {
           },
         ]
       }
+      eleicao_indicacao_config: {
+        Row: {
+          ativo: boolean
+          client_id: string
+          created_at: string
+          limite_diario_token: number
+          meta_cabo: number
+          meta_coordenador: number
+          meta_lider: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          client_id: string
+          created_at?: string
+          limite_diario_token?: number
+          meta_cabo?: number
+          meta_coordenador?: number
+          meta_lider?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          client_id?: string
+          created_at?: string
+          limite_diario_token?: number
+          meta_cabo?: number
+          meta_coordenador?: number
+          meta_lider?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_indicacao_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      eleicao_indicacao_tokens: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          indicador_id: string
+          revoked_at: string | null
+          token: string
+          total_indicacoes: number
+          ultimo_acesso_em: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          indicador_id: string
+          revoked_at?: string | null
+          token: string
+          total_indicacoes?: number
+          ultimo_acesso_em?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          indicador_id?: string
+          revoked_at?: string | null
+          token?: string
+          total_indicacoes?: number
+          ultimo_acesso_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_indicacao_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_indicacao_tokens_indicador_id_fkey"
+            columns: ["indicador_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_indicacao_tokens_indicador_id_fkey"
+            columns: ["indicador_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
+          },
+        ]
+      }
+      eleicao_indicados: {
+        Row: {
+          bairro: string | null
+          cidade: string | null
+          client_id: string
+          created_at: string
+          criado_por_user_id: string | null
+          id: string
+          indicador_id: string
+          indicador_tipo: Database["public"]["Enums"]["eleicao_tipo"]
+          nome: string
+          observacao: string | null
+          origem: string
+          status_telemarketing: string
+          telefone: string
+          telefone_norm: string
+          token_id: string | null
+          total_tentativas: number
+          ultima_ligacao_em: string | null
+          ultimo_status_ligacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          bairro?: string | null
+          cidade?: string | null
+          client_id: string
+          created_at?: string
+          criado_por_user_id?: string | null
+          id?: string
+          indicador_id: string
+          indicador_tipo: Database["public"]["Enums"]["eleicao_tipo"]
+          nome: string
+          observacao?: string | null
+          origem?: string
+          status_telemarketing?: string
+          telefone: string
+          telefone_norm: string
+          token_id?: string | null
+          total_tentativas?: number
+          ultima_ligacao_em?: string | null
+          ultimo_status_ligacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bairro?: string | null
+          cidade?: string | null
+          client_id?: string
+          created_at?: string
+          criado_por_user_id?: string | null
+          id?: string
+          indicador_id?: string
+          indicador_tipo?: Database["public"]["Enums"]["eleicao_tipo"]
+          nome?: string
+          observacao?: string | null
+          origem?: string
+          status_telemarketing?: string
+          telefone?: string
+          telefone_norm?: string
+          token_id?: string | null
+          total_tentativas?: number
+          ultima_ligacao_em?: string | null
+          ultimo_status_ligacao?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_indicados_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_indicados_indicador_id_fkey"
+            columns: ["indicador_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_indicados_indicador_id_fkey"
+            columns: ["indicador_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
+          },
+          {
+            foreignKeyName: "eleicao_indicados_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_indicacao_tokens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_indicados_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["token_id"]
+          },
+        ]
+      }
       eleicao_notif_config: {
         Row: {
           auto_enviar: boolean
@@ -1771,6 +1969,13 @@ export type Database = {
             referencedRelation: "eleicao_pessoas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "eleicao_notif_log_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
+          },
         ]
       }
       eleicao_pessoa_grupo_status: {
@@ -1808,6 +2013,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "eleicao_pessoas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_pessoa_grupo_status_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: true
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
           },
         ]
       }
@@ -1911,6 +2123,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "eleicao_pessoas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_pessoas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
           },
         ]
       }
@@ -6920,7 +7139,46 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_eleicao_indicadores_cobranca: {
+        Row: {
+          cidade: string | null
+          client_id: string | null
+          indicador_id: string | null
+          meta: number | null
+          nome: string | null
+          parent_id: string | null
+          regiao: string | null
+          telefone: string | null
+          tipo: Database["public"]["Enums"]["eleicao_tipo"] | null
+          token: string | null
+          token_id: string | null
+          total_indicacoes: number | null
+          ultimo_acesso_em: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_pessoas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_pessoas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_pessoas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
+          },
+        ]
+      }
     }
     Functions: {
       calculate_engagement_score: {
@@ -6966,9 +7224,39 @@ export type Database = {
           severity: string
         }[]
       }
+      eleicao_gerar_token_indicador: {
+        Args: { _indicador_id: string }
+        Returns: string
+      }
+      eleicao_indicador_info: { Args: { _token: string }; Returns: Json }
+      eleicao_indicar_via_token: {
+        Args: {
+          _bairro?: string
+          _cidade?: string
+          _nome: string
+          _observacao?: string
+          _telefone: string
+          _token: string
+        }
+        Returns: Json
+      }
+      eleicao_listar_indicacoes_token: {
+        Args: { _limit?: number; _token: string }
+        Returns: {
+          bairro: string
+          created_at: string
+          id: string
+          nome: string
+          telefone: string
+        }[]
+      }
       eleicao_pessoa_in_user_tree: {
         Args: { _pessoa_id: string; _user_id: string }
         Returns: boolean
+      }
+      eleicao_remover_indicacao_token: {
+        Args: { _indicado_id: string; _token: string }
+        Returns: Json
       }
       enqueue_whatsapp_retry: {
         Args: {
