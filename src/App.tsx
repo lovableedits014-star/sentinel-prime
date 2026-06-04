@@ -46,6 +46,7 @@ const PortalCoordenador = lazy(() => import("./pages/PortalCoordenador"));
 const Telemarketing = lazy(() => import("./pages/Telemarketing"));
 const CadastroUnificado = lazy(() => import("./pages/CadastroUnificado"));
 const CadastroLiderConvite = lazy(() => import("./pages/CadastroLiderConvite"));
+const IndicarPublico = lazy(() => import("./pages/IndicarPublico"));
 const PortalUnificado = lazy(() => import("./pages/PortalUnificado"));
 const InteligenciaEleitoral = lazy(() => import("./pages/InteligenciaEleitoral"));
 const CalendarioPolitico = lazy(() => import("./pages/CalendarioPolitico"));
@@ -110,6 +111,7 @@ const AppRouter = () => {
             />
             <Route path="/cadastro/:clientId" element={<CadastroUnificado />} />
             <Route path="/cadastro-lider/:token" element={<CadastroLiderConvite />} />
+            <Route path="/indicar/:token" element={<IndicarPublico />} />
             {/* Redirects de rotas antigas de cadastro (mantém compatibilidade com links já compartilhados) */}
             <Route path="/registro/:clientId" element={<RedirectToCadastro extraQuery="modo=detalhado" />} />
             <Route path="/funcionario/:clientId" element={<RedirectToCadastro extraQuery="papel=funcionario" />} />
