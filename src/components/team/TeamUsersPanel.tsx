@@ -197,6 +197,9 @@ export default function TeamUsersPanel({ clientId }: { clientId: string }) {
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                   )}
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setResetTarget(u)} title="Redefinir senha">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleToggleStatus(u)} title={u.status === "active" ? "Desativar" : "Reativar"}>
                     <Power className="w-3.5 h-3.5" />
                   </Button>
