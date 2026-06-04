@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from "sonner";
 import { UserPlus, Users, Loader2, Trash2, Pencil, Eye, EyeOff, KeyRound, Power, Crown } from "lucide-react";
 import { ALL_APP_TABS, SECTION_ORDER, tabsBySection } from "@/lib/access-control";
+import ResetPasswordDialog from "@/components/team/ResetPasswordDialog";
 
 interface TeamUser {
   id: string;
@@ -39,6 +40,7 @@ export default function PlatformUsersPanel() {
   const [paths, setPaths] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [filterClient, setFilterClient] = useState<string>("all");
+  const [resetTarget, setResetTarget] = useState<TeamUser | null>(null);
 
   const { data: clients = [] } = useQuery({
     queryKey: ["all-clients"],
@@ -224,6 +226,9 @@ export default function PlatformUsersPanel() {
                   <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-300 hover:text-white" onClick={() => openEdit(u)} title="Editar acessos">
                     <Pencil className="w-3.5 h-3.5" />
                   </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-300 hover:text-amber-300" onClick={() => setResetTarget(u)} title="Redefinir senha">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-300 hover:text-amber-400" onClick={() => handleToggleStatus(u)} title={u.status === "active" ? "Desativar" : "Reativar"}>
                     <Power className="w-3.5 h-3.5" />
                   </Button>
@@ -355,6 +360,16 @@ export default function PlatformUsersPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {resetTarget && (
+        <ResetPasswordDialog
+          open={!!resetTarget}
+          onOpenChange={(o) => { if (!o) setResetTarget(null); }}
+          teamMemberId={resetTarget.id}
+          userName={resetTarget.name}
+          userEmail={resetTarget.email}
+        />
+      )}
     </Card>
   );
 }

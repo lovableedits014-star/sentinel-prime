@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from "sonner";
 import { UserPlus, Users, Loader2, Trash2, Pencil, Eye, EyeOff, KeyRound, Power, Crown } from "lucide-react";
 import { ALL_APP_TABS, SECTION_ORDER, tabsBySection } from "@/lib/access-control";
+import ResetPasswordDialog from "./ResetPasswordDialog";
 
 interface TeamUser {
   id: string;
@@ -34,6 +35,7 @@ export default function TeamUsersPanel({ clientId }: { clientId: string }) {
   const [showPwd, setShowPwd] = useState(false);
   const [paths, setPaths] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [resetTarget, setResetTarget] = useState<TeamUser | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["team-users", clientId],
@@ -195,6 +197,9 @@ export default function TeamUsersPanel({ clientId }: { clientId: string }) {
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                   )}
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setResetTarget(u)} title="Redefinir senha">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleToggleStatus(u)} title={u.status === "active" ? "Desativar" : "Reativar"}>
                     <Power className="w-3.5 h-3.5" />
                   </Button>
@@ -306,6 +311,16 @@ export default function TeamUsersPanel({ clientId }: { clientId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {resetTarget && (
+        <ResetPasswordDialog
+          open={!!resetTarget}
+          onOpenChange={(o) => { if (!o) setResetTarget(null); }}
+          teamMemberId={resetTarget.id}
+          userName={resetTarget.name}
+          userEmail={resetTarget.email}
+        />
+      )}
     </Card>
   );
 }
