@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from "sonner";
 import { UserPlus, Users, Loader2, Trash2, Pencil, Eye, EyeOff, KeyRound, Power, Crown } from "lucide-react";
 import { ALL_APP_TABS, SECTION_ORDER, tabsBySection } from "@/lib/access-control";
+import ResetPasswordDialog from "@/components/team/ResetPasswordDialog";
 
 interface TeamUser {
   id: string;
