@@ -150,8 +150,11 @@ Deno.serve(async (req) => {
         return json({ error: insErr.message }, 500);
       }
 
-      await admin.from("user_roles").insert({ user_id: userId, role: "team_member" })
-        .then(() => {}, () => {});
+      // 'platform_user' é o role válido no enum app_role para usuários de equipe.
+      const { error: roleErr } = await admin
+        .from("user_roles")
+        .upsert({ user_id: userId, role: "platform_user" }, { onConflict: "user_id,role" });
+      if (roleErr) console.warn("[manage-platform-user] user_roles upsert warn:", roleErr.message);
 
       await logSecurityEvent(admin, {
         event_type: "team_member_created",
