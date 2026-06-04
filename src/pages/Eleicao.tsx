@@ -737,6 +737,8 @@ export default function Eleicao() {
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
       ) : view === "grupo" ? (
         clientId ? <EntradaGrupoPanel clientId={clientId} /> : null
+      ) : view === "indicacoes" ? (
+        clientId ? <IndicacoesPanel clientId={clientId} /> : null
       ) : view === "config" ? (
         clientId ? <EleicaoConfigPanel clientId={clientId} /> : null
       ) : (
