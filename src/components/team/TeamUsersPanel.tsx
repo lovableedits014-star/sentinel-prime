@@ -311,6 +311,16 @@ export default function TeamUsersPanel({ clientId }: { clientId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {resetTarget && (
+        <ResetPasswordDialog
+          open={!!resetTarget}
+          onOpenChange={(o) => { if (!o) setResetTarget(null); }}
+          teamMemberId={resetTarget.id}
+          userName={resetTarget.name}
+          userEmail={resetTarget.email}
+        />
+      )}
     </Card>
   );
 }
