@@ -35,6 +35,7 @@ export default function TeamUsersPanel({ clientId }: { clientId: string }) {
   const [showPwd, setShowPwd] = useState(false);
   const [paths, setPaths] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [resetTarget, setResetTarget] = useState<TeamUser | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["team-users", clientId],
