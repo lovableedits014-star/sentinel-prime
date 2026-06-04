@@ -1,0 +1,316 @@
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Target, TrendingUp, Users } from "lucide-react";
+
+type Tipo = "coordenador" | "lider" | "cabo";
+
+type Row = {
+  indicador_id: string;
+  client_id: string;
+  nome: string;
+  tipo: Tipo;
+  telefone: string | null;
+  regiao: string | null;
+  cidade: string | null;
+  token: string | null;
+  total_indicacoes: number;
+  meta: number;
+  ultimo_acesso_em: string | null;
+};
+
+type Config = {
+  meta_coordenador: number;
+  meta_lider: number;
+  meta_cabo: number;
+  limite_diario_token: number;
+};
+
+const tipoLabel: Record<Tipo, string> = { coordenador: "Coordenador", lider: "Líder", cabo: "Cabo" };
+
+function buildLink(token: string) {
+  return `${window.location.origin}/indicar/${token}`;
+}
+
+function waLink(telefone: string, msg: string) {
+  const d = telefone.replace(/\D/g, "");
+  const full = d.startsWith("55") ? d : `55${d}`;
+  return `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
+}
+
+export default function IndicacoesPanel({ clientId }: { clientId: string }) {
+  const [tab, setTab] = useState<"cobranca" | "config">("cobranca");
+  const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busca, setBusca] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<"all" | Tipo>("all");
+  const [filtroStatus, setFiltroStatus] = useState<"all" | "zerados" | "abaixo" | "ok">("all");
+  const [config, setConfig] = useState<Config>({ meta_coordenador: 30, meta_lider: 30, meta_cabo: 5, limite_diario_token: 200 });
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [gerando, setGerando] = useState<string | null>(null);
+  const [candidatoNome, setCandidatoNome] = useState<string>("");
+
+  async function load() {
+    setLoading(true);
+    const [cob, cfg, cli] = await Promise.all([
+      supabase.from("v_eleicao_indicadores_cobranca").select("*").eq("client_id", clientId).order("total_indicacoes", { ascending: true }),
+      supabase.from("eleicao_indicacao_config").select("*").eq("client_id", clientId).maybeSingle(),
+      supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
+    ]);
+    setRows((cob.data as any) || []);
+    if (cfg.data) setConfig(cfg.data as any);
+    setCandidatoNome((cli.data as any)?.name || "");
+    setLoading(false);
+  }
+
+  useEffect(() => { if (clientId) load(); }, [clientId]);
+
+  const filtered = useMemo(() => {
+    return rows.filter((r) => {
+      if (filtroTipo !== "all" && r.tipo !== filtroTipo) return false;
+      if (filtroStatus === "zerados" && r.total_indicacoes > 0) return false;
+      if (filtroStatus === "abaixo" && r.total_indicacoes >= r.meta) return false;
+      if (filtroStatus === "ok" && r.total_indicacoes < r.meta) return false;
+      if (busca) {
+        const q = busca.toLowerCase();
+        if (!r.nome.toLowerCase().includes(q) && !(r.cidade || "").toLowerCase().includes(q) && !(r.regiao || "").toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [rows, filtroTipo, filtroStatus, busca]);
+
+  const stats = useMemo(() => {
+    const agg = { coord: { total: 0, meta: 0, pessoas: 0 }, lider: { total: 0, meta: 0, pessoas: 0 }, cabo: { total: 0, meta: 0, pessoas: 0 } };
+    for (const r of rows) {
+      const k = r.tipo === "coordenador" ? "coord" : r.tipo === "lider" ? "lider" : "cabo";
+      agg[k].total += r.total_indicacoes || 0;
+      agg[k].meta += r.meta || 0;
+      agg[k].pessoas += 1;
+    }
+    const grandTotal = agg.coord.total + agg.lider.total + agg.cabo.total;
+    const grandMeta = agg.coord.meta + agg.lider.meta + agg.cabo.meta;
+    return { agg, grandTotal, grandMeta };
+  }, [rows]);
+
+  async function gerarToken(indicadorId: string) {
+    setGerando(indicadorId);
+    const { data, error } = await supabase.rpc("eleicao_gerar_token_indicador", { _indicador_id: indicadorId });
+    setGerando(null);
+    if (error) { toast.error("Falha ao gerar link"); return; }
+    toast.success("Link gerado!");
+    await load();
+    if (data) await navigator.clipboard.writeText(buildLink(data as string)).catch(() => {});
+  }
+
+  async function copiarLink(token: string) {
+    await navigator.clipboard.writeText(buildLink(token));
+    toast.success("Link copiado");
+  }
+
+  function whatsCobranca(r: Row) {
+    const link = r.token ? buildLink(r.token) : "";
+    const falta = Math.max(0, r.meta - r.total_indicacoes);
+    const msg = falta > 0
+      ? `Olá ${r.nome.split(" ")[0]}! Faltam ${falta} indicações para sua meta${candidatoNome ? ` de votos em ${candidatoNome}` : ""}. Use seu link: ${link}`
+      : `Olá ${r.nome.split(" ")[0]}! Obrigado pelas suas indicações${candidatoNome ? ` para ${candidatoNome}` : ""}. Continue indicando: ${link}`;
+    return waLink(r.telefone || "", msg);
+  }
+
+  async function salvarConfig() {
+    setSavingConfig(true);
+    const { error } = await supabase.from("eleicao_indicacao_config").upsert({
+      client_id: clientId,
+      meta_coordenador: config.meta_coordenador,
+      meta_lider: config.meta_lider,
+      meta_cabo: config.meta_cabo,
+      limite_diario_token: config.limite_diario_token,
+      ativo: true,
+    });
+    setSavingConfig(false);
+    if (error) { toast.error("Falha ao salvar"); return; }
+    toast.success("Metas salvas");
+    await load();
+  }
+
+  return (
+    <div className="space-y-4">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
+        <TabsList>
+          <TabsTrigger value="cobranca"><Users className="w-4 h-4 mr-1.5" />Indicadores & Cobrança</TabsTrigger>
+          <TabsTrigger value="config"><Target className="w-4 h-4 mr-1.5" />Metas e configurações</TabsTrigger>
+        </TabsList>
+
+        {/* ──────────── COBRANÇA ──────────── */}
+        <TabsContent value="cobranca" className="space-y-4 mt-4">
+          {/* KPIs */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="p-3">
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Total geral</div>
+              <div className="text-2xl font-bold">{stats.grandTotal.toLocaleString("pt-BR")}</div>
+              <div className="text-[11px] text-muted-foreground">de {stats.grandMeta.toLocaleString("pt-BR")} esperadas</div>
+            </Card>
+            {(["coord", "lider", "cabo"] as const).map((k) => {
+              const a = stats.agg[k];
+              const pct = a.meta ? Math.round((a.total / a.meta) * 100) : 0;
+              const labels = { coord: "Coordenadores", lider: "Líderes", cabo: "Cabos" };
+              return (
+                <Card key={k} className="p-3">
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">{labels[k]}</div>
+                  <div className="text-2xl font-bold">{a.total.toLocaleString("pt-BR")}</div>
+                  <div className="text-[11px] text-muted-foreground">{a.pessoas} pessoas · {pct}% da meta</div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-muted-foreground" />
+              <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar nome, cidade, região…" className="pl-8" />
+            </div>
+            <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as any)}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                <SelectItem value="coordenador">Coordenadores</SelectItem>
+                <SelectItem value="lider">Líderes</SelectItem>
+                <SelectItem value="cabo">Cabos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filtroStatus} onValueChange={(v) => setFiltroStatus(v as any)}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="zerados">Sem indicações</SelectItem>
+                <SelectItem value="abaixo">Abaixo da meta</SelectItem>
+                <SelectItem value="ok">Meta cumprida</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-1.5" />Atualizar</Button>
+          </div>
+
+          {/* Tabela */}
+          <Card className="overflow-hidden">
+            {loading ? (
+              <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+            ) : filtered.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum indicador encontrado com esses filtros.</div>
+            ) : (
+              <div className="divide-y max-h-[600px] overflow-y-auto">
+                {filtered.map((r) => {
+                  const pct = r.meta ? Math.min(100, Math.round((r.total_indicacoes / r.meta) * 100)) : 0;
+                  const cor = r.total_indicacoes === 0 ? "bg-red-500" : pct < 50 ? "bg-amber-500" : pct < 100 ? "bg-blue-500" : "bg-emerald-500";
+                  return (
+                    <div key={r.indicador_id} className="p-3 hover:bg-muted/40 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium truncate">{r.nome}</span>
+                            <Badge variant="outline" className="text-[10px]">{tipoLabel[r.tipo]}</Badge>
+                            {r.regiao && <span className="text-xs text-muted-foreground">{r.regiao}{r.cidade ? ` · ${r.cidade}` : ""}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[200px]">
+                              <div className={`h-full ${cor} transition-all`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-xs tabular-nums">
+                              <strong>{r.total_indicacoes}</strong>
+                              <span className="text-muted-foreground"> / {r.meta}</span>
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {r.token ? (
+                            <>
+                              <Button size="sm" variant="ghost" title="Copiar link" onClick={() => copiarLink(r.token!)}>
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                              {r.telefone && (
+                                <a href={whatsCobranca(r)} target="_blank" rel="noreferrer">
+                                  <Button size="sm" variant="ghost" title="Cobrar via WhatsApp">
+                                    <MessageCircle className="w-4 h-4 text-emerald-600" />
+                                  </Button>
+                                </a>
+                              )}
+                              <Button size="sm" variant="ghost" title="Regenerar link" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
+                                {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                              </Button>
+                            </>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
+                              {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><LinkIcon className="w-4 h-4 mr-1.5" />Gerar link</>}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="p-2 text-[11px] text-muted-foreground border-t bg-muted/30">
+              Mostrando {filtered.length} de {rows.length} indicadores
+            </div>
+          </Card>
+        </TabsContent>
+
+        {/* ──────────── CONFIG DE METAS ──────────── */}
+        <TabsContent value="config" className="space-y-4 mt-4">
+          <Card className="p-5 space-y-4 max-w-2xl">
+            <div>
+              <h3 className="font-semibold flex items-center gap-2"><TrendingUp className="w-4 h-4" />Metas de indicações por tipo</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Defina quantas indicações cada tipo deve trazer. Você pode ajustar a qualquer momento — a cobrança automática usa esses valores.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label className="text-xs">Meta por Coordenador</Label>
+                <Input type="number" min={0} value={config.meta_coordenador}
+                  onChange={(e) => setConfig({ ...config, meta_coordenador: parseInt(e.target.value) || 0 })} />
+                <p className="text-[11px] text-muted-foreground mt-1">Indicações esperadas de cada coordenador</p>
+              </div>
+              <div>
+                <Label className="text-xs">Meta por Líder</Label>
+                <Input type="number" min={0} value={config.meta_lider}
+                  onChange={(e) => setConfig({ ...config, meta_lider: parseInt(e.target.value) || 0 })} />
+                <p className="text-[11px] text-muted-foreground mt-1">Indicações esperadas de cada líder</p>
+              </div>
+              <div>
+                <Label className="text-xs">Meta por Cabo eleitoral</Label>
+                <Input type="number" min={0} value={config.meta_cabo}
+                  onChange={(e) => setConfig({ ...config, meta_cabo: parseInt(e.target.value) || 0 })} />
+                <p className="text-[11px] text-muted-foreground mt-1">Indicações esperadas de cada cabo</p>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <Label className="text-xs">Limite diário de indicações por link</Label>
+              <Input type="number" min={1} max={1000} value={config.limite_diario_token}
+                onChange={(e) => setConfig({ ...config, limite_diario_token: parseInt(e.target.value) || 0 })}
+                className="max-w-[150px]" />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Proteção contra abuso. Se um indicador atingir esse número em 24h, novas indicações ficam bloqueadas até o dia seguinte. Padrão: 200.
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={salvarConfig} disabled={savingConfig}>
+                {savingConfig && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Salvar metas
+              </Button>
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

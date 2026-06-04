@@ -25,6 +25,7 @@ import { FileDown, Package, FileText, Printer } from "lucide-react";
 import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
 import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/ExportEleicaoDialog";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
+import IndicacoesPanel from "@/components/eleicao/IndicacoesPanel";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 
 // ─── Helpers visuais ────────────────────────────────────────────
@@ -477,7 +478,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config">("cadastros");
+  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config" | "indicacoes">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
@@ -713,7 +714,7 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+        <TabsList className="grid grid-cols-6 w-full max-w-4xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -723,7 +724,7 @@ export default function Eleicao() {
               </Badge>
             )}
           </TabsTrigger>
-
+          <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
@@ -736,6 +737,8 @@ export default function Eleicao() {
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
       ) : view === "grupo" ? (
         clientId ? <EntradaGrupoPanel clientId={clientId} /> : null
+      ) : view === "indicacoes" ? (
+        clientId ? <IndicacoesPanel clientId={clientId} /> : null
       ) : view === "config" ? (
         clientId ? <EleicaoConfigPanel clientId={clientId} /> : null
       ) : (
