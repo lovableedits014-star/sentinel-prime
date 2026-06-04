@@ -25,6 +25,7 @@ import { FileDown, Package, FileText, Printer } from "lucide-react";
 import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
 import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/ExportEleicaoDialog";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
+import IndicacoesPanel from "@/components/eleicao/IndicacoesPanel";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 
 // ─── Helpers visuais ────────────────────────────────────────────
@@ -713,7 +714,7 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+        <TabsList className="grid grid-cols-6 w-full max-w-4xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -723,7 +724,7 @@ export default function Eleicao() {
               </Badge>
             )}
           </TabsTrigger>
-
+          <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
