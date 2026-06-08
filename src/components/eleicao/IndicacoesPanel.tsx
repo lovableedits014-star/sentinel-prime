@@ -250,6 +250,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           cobranca_candidato: candidatoNome,
           cobranca_origin: window.location.origin,
           cobranca_teste_telefone: phone,
+          cobranca_cascata: cascata,
           batch_size: 1, delay_min: 0, delay_max: 1, batch_pause: 0,
         },
       });
