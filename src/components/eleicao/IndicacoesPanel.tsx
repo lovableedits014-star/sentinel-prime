@@ -596,6 +596,17 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </div>
             </div>
 
+            {/* Cobrar em cascata */}
+            <div className="flex items-start justify-between gap-3 rounded-md border p-3 bg-muted/30">
+              <div>
+                <Label htmlFor="mass-cascata" className="text-sm">Cobrar em cascata</Label>
+                <p className="text-[11px] text-muted-foreground mt-1 max-w-md">
+                  Inclui também líderes vinculados aos coordenadores e cabos vinculados aos líderes que estiverem no mesmo status. Útil para acionar a estrutura inteira de uma vez.
+                </p>
+              </div>
+              <Switch id="mass-cascata" checked={cascata} onCheckedChange={setCascata} />
+            </div>
+
             {/* Template */}
             <div className="space-y-1.5">
               <Label className="text-xs">Mensagem (placeholders: {"{primeiro_nome}, {meta}, {faltam}, {total}, {link}, {candidato}"})</Label>
