@@ -2188,6 +2188,7 @@ export type Database = {
       eleicao_pessoas: {
         Row: {
           bairro: string | null
+          candidato_alternativo: string | null
           cidade: string | null
           client_id: string
           created_at: string
@@ -2198,22 +2199,30 @@ export type Database = {
           funcionario_id: string | null
           id: string
           is_favorito_regiao: boolean
+          ligacao_em: string | null
+          ligacao_status: string | null
           nome: string
           numero: string | null
+          observacao_tele: string | null
           observacoes: string | null
+          operador_nome: string | null
           parent_id: string | null
           pode_cadastrar_cabo: boolean
           pode_cadastrar_lider: boolean
+          proxima_tentativa_em: string | null
           regiao: string | null
           rua: string | null
           telefone: string
+          tentativas_count: number
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at: string
           user_id: string | null
           valor_contratacao: number
+          vota_candidato: string | null
         }
         Insert: {
           bairro?: string | null
+          candidato_alternativo?: string | null
           cidade?: string | null
           client_id: string
           created_at?: string
@@ -2224,22 +2233,30 @@ export type Database = {
           funcionario_id?: string | null
           id?: string
           is_favorito_regiao?: boolean
+          ligacao_em?: string | null
+          ligacao_status?: string | null
           nome: string
           numero?: string | null
+          observacao_tele?: string | null
           observacoes?: string | null
+          operador_nome?: string | null
           parent_id?: string | null
           pode_cadastrar_cabo?: boolean
           pode_cadastrar_lider?: boolean
+          proxima_tentativa_em?: string | null
           regiao?: string | null
           rua?: string | null
           telefone: string
+          tentativas_count?: number
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at?: string
           user_id?: string | null
           valor_contratacao?: number
+          vota_candidato?: string | null
         }
         Update: {
           bairro?: string | null
+          candidato_alternativo?: string | null
           cidade?: string | null
           client_id?: string
           created_at?: string
@@ -2250,19 +2267,26 @@ export type Database = {
           funcionario_id?: string | null
           id?: string
           is_favorito_regiao?: boolean
+          ligacao_em?: string | null
+          ligacao_status?: string | null
           nome?: string
           numero?: string | null
+          observacao_tele?: string | null
           observacoes?: string | null
+          operador_nome?: string | null
           parent_id?: string | null
           pode_cadastrar_cabo?: boolean
           pode_cadastrar_lider?: boolean
+          proxima_tentativa_em?: string | null
           regiao?: string | null
           rua?: string | null
           telefone?: string
+          tentativas_count?: number
           tipo?: Database["public"]["Enums"]["eleicao_tipo"]
           updated_at?: string
           user_id?: string | null
           valor_contratacao?: number
+          vota_candidato?: string | null
         }
         Relationships: [
           {
