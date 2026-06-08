@@ -935,6 +935,8 @@ Deno.serve(async (req) => {
           headers: { "Content-Type": "application/json", "X-Bridge-Token": bridgeToken },
           body: JSON.stringify({ action: "create_instance", name: instName }),
         });
+        // Conta a tentativa SEMPRE que a chamada ao bridge é feita, sucesso ou não.
+        await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
         const bridgeData = await bridgeRes.json().catch(() => ({}));
         if (bridgeData.api_key) {
           await adminClient
