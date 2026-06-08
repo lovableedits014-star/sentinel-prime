@@ -143,6 +143,11 @@ export default function StatusWhatsApp() {
     setBusy(`reconnect-${instanceId}`);
     const { data, error } = await callBridge("reconnect", instanceId);
     setBusy(null);
+    if (data?.cooldown) {
+      const mins = Math.ceil(Number(data?.remaining_seconds || 0) / 60);
+      toast.error(`🛡️ Proteção anti-ban: aguarde ~${mins} min antes de tentar reconectar novamente.`, { duration: 8000 });
+      return;
+    }
     if (error || data?.error) {
       toast.error("Falha ao reconectar: " + (error?.message || data?.error));
     } else {
@@ -155,6 +160,11 @@ export default function StatusWhatsApp() {
     setBusy(`rescan-${instanceId}`);
     const { data, error } = await callBridge("create_instance", instanceId);
     setBusy(null);
+    if (data?.cooldown) {
+      const mins = Math.ceil(Number(data?.remaining_seconds || 0) / 60);
+      toast.error(`🛡️ Proteção anti-ban: aguarde ~${mins} min antes de gerar um novo QR para este número.`, { duration: 8000 });
+      return;
+    }
     if (error || data?.error) {
       toast.error("Falha ao gerar novo QR: " + (error?.message || data?.error));
     } else {

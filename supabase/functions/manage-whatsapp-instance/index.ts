@@ -126,6 +126,79 @@ const sanitizeBridgeData = (data: any) => {
   return safe;
 };
 
+// =====================================================================
+// Anti-ban cooldown: limita chamadas a `create_instance` e `reconnect`
+// para o mesmo número. Repetir login/handshake várias vezes em sequência
+// é um dos principais gatilhos de ban definitivo do WhatsApp.
+// =====================================================================
+const CREATE_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutos
+const RECONNECT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos
+const MAX_RECONNECTS_PER_DAY = 3;
+
+const todayDateStr = () => new Date().toISOString().slice(0, 10);
+
+type CooldownCheck =
+  | { allowed: true }
+  | { allowed: false; remainingMs: number; reason: string; remainingAttempts?: number };
+
+function checkReconnectCooldown(
+  row: any,
+  kind: "create" | "reconnect",
+): CooldownCheck {
+  if (!row) return { allowed: true };
+  const cooldown = kind === "create" ? CREATE_COOLDOWN_MS : RECONNECT_COOLDOWN_MS;
+  const lastAt = row.last_create_instance_at ? new Date(row.last_create_instance_at).getTime() : 0;
+  const elapsed = Date.now() - lastAt;
+  if (lastAt && elapsed < cooldown) {
+    return {
+      allowed: false,
+      remainingMs: cooldown - elapsed,
+      reason: `Proteção anti-ban: aguarde antes de tentar reconectar novamente.`,
+    };
+  }
+  const sameDay = row.reconnect_attempts_date === todayDateStr();
+  const used = sameDay ? Number(row.reconnect_attempts_today || 0) : 0;
+  if (used >= MAX_RECONNECTS_PER_DAY) {
+    return {
+      allowed: false,
+      remainingMs: 0,
+      reason: `Limite diário de ${MAX_RECONNECTS_PER_DAY} tentativas de reconexão atingido. Aguarde 24h.`,
+      remainingAttempts: 0,
+    };
+  }
+  return { allowed: true };
+}
+
+async function recordReconnectAttempt(adminClient: any, instanceId: string, row: any) {
+  const today = todayDateStr();
+  const sameDay = row?.reconnect_attempts_date === today;
+  const next = (sameDay ? Number(row?.reconnect_attempts_today || 0) : 0) + 1;
+  try {
+    await adminClient
+      .from("whatsapp_instances")
+      .update({
+        last_create_instance_at: new Date().toISOString(),
+        last_reconnect_attempt_at: new Date().toISOString(),
+        reconnect_attempts_today: next,
+        reconnect_attempts_date: today,
+      })
+      .eq("id", instanceId);
+  } catch (err) {
+    console.error("recordReconnectAttempt error", err);
+  }
+}
+
+const cooldownBlockedResponse = (check: Extract<CooldownCheck, { allowed: false }>) =>
+  jsonResponse({
+    success: false,
+    error: check.reason,
+    cooldown: true,
+    remaining_ms: check.remainingMs,
+    remaining_seconds: Math.ceil(check.remainingMs / 1000),
+  }, 200);
+
+
+
 const toBoolean = (value: unknown, fallback = false) => {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
@@ -812,7 +885,7 @@ Deno.serve(async (req) => {
     if (instance_id) {
       const { data: inst } = await adminClient
         .from("whatsapp_instances")
-        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since, phone_number, last_reconnect_attempt_at")
+        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since, phone_number, last_reconnect_attempt_at, last_create_instance_at, reconnect_attempts_today, reconnect_attempts_date")
         .eq("id", instance_id)
         .eq("client_id", resolvedClientId)
         .maybeSingle();
@@ -823,11 +896,31 @@ Deno.serve(async (req) => {
       ? activeInstanceRow.bridge_api_key
       : clientConfig?.whatsapp_bridge_api_key;
 
+    // === GET RECONNECT COOLDOWN (read-only, para UI) ===
+    if (action === "get_reconnect_cooldown" && activeInstanceRow) {
+      const c = checkReconnectCooldown(activeInstanceRow, "create");
+      const today = todayDateStr();
+      const sameDay = activeInstanceRow.reconnect_attempts_date === today;
+      const used = sameDay ? Number(activeInstanceRow.reconnect_attempts_today || 0) : 0;
+      return jsonResponse({
+        success: true,
+        allowed: c.allowed,
+        remaining_ms: c.allowed ? 0 : c.remainingMs,
+        remaining_seconds: c.allowed ? 0 : Math.ceil(c.remainingMs / 1000),
+        reason: c.allowed ? null : c.reason,
+        attempts_today: used,
+        max_per_day: MAX_RECONNECTS_PER_DAY,
+      });
+    }
+
     // === CREATE INSTANCE ===
     if (action === "create_instance") {
       // Versão multi-instância
       if (instance_id && activeInstanceRow) {
+        const cd = checkReconnectCooldown(activeInstanceRow, "create");
+        if (!cd.allowed) return cooldownBlockedResponse(cd);
         if (!bridgeToken) return jsonResponse({ error: "Bridge token não configurado" }, 500);
+
         if (activeInstanceRow.bridge_api_key) {
           try {
             await fetch(BRIDGE_URL, {
@@ -843,6 +936,8 @@ Deno.serve(async (req) => {
           headers: { "Content-Type": "application/json", "X-Bridge-Token": bridgeToken },
           body: JSON.stringify({ action: "create_instance", name: instName }),
         });
+        // Conta a tentativa SEMPRE que a chamada ao bridge é feita, sucesso ou não.
+        await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
         const bridgeData = await bridgeRes.json().catch(() => ({}));
         if (bridgeData.api_key) {
           await adminClient
@@ -1109,6 +1204,8 @@ Deno.serve(async (req) => {
     if (!clientApiKey) {
       if (action === "reconnect") {
         if (instance_id && activeInstanceRow) {
+          const cd = checkReconnectCooldown(activeInstanceRow, "reconnect");
+          if (!cd.allowed) return cooldownBlockedResponse(cd);
           if (!bridgeToken) return jsonResponse({ error: "Bridge token não configurado" }, 500);
           const instName = activeInstanceRow.apelido || "WhatsApp Bot";
           const bridgeRes = await fetch(BRIDGE_URL, {
@@ -1116,6 +1213,7 @@ Deno.serve(async (req) => {
             headers: { "Content-Type": "application/json", "X-Bridge-Token": bridgeToken },
             body: JSON.stringify({ action: "create_instance", name: instName }),
           });
+          await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
           const bridgeData = await bridgeRes.json().catch(() => ({}));
           if (bridgeData.api_key) {
             await adminClient
