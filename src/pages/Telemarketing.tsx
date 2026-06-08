@@ -21,8 +21,8 @@ interface ContatoTele {
   candidato_alternativo: string | null;
   operador_nome: string | null;
   ligacao_em: string | null;
-  tipo: "lider" | "liderado" | "indicado";
-  tabela: "contratados" | "contratado_indicados";
+  tipo: "lider" | "liderado" | "indicado" | "avulso";
+  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos";
   proxima_tentativa_em: string | null;
   tentativas_count: number | null;
   observacao_tele: string | null;
