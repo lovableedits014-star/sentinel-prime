@@ -413,6 +413,7 @@ export default function Telemarketing() {
           </p>
           <p className="text-xs text-muted-foreground">
             Operador: <span className="font-medium text-foreground">{operadorNome}</span>
+            {campanhaNome && <> · Fila: <span className="font-medium text-foreground">{campanhaNome}</span></>}
           </p>
         </div>
         <div className="flex gap-2">
