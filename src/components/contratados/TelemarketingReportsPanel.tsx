@@ -273,9 +273,14 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
             </SelectContent>
           </Select>
         </div>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCSV}>
-          <Download className="w-3.5 h-3.5" />Exportar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCSV}>
+            <Download className="w-3.5 h-3.5" />CSV
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={exportPDF}>
+            <FileDown className="w-3.5 h-3.5" />PDF
+          </Button>
+        </div>
       </div>
 
       {/* Summary cards */}
