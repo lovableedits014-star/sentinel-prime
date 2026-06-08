@@ -1872,6 +1872,8 @@ export type Database = {
       eleicao_indicados: {
         Row: {
           bairro: string | null
+          campanha_id: string | null
+          candidato_alternativo: string | null
           cidade: string | null
           client_id: string
           created_at: string
@@ -1881,7 +1883,10 @@ export type Database = {
           indicador_tipo: Database["public"]["Enums"]["eleicao_tipo"]
           nome: string
           observacao: string | null
+          observacao_tele: string | null
+          operador_nome: string | null
           origem: string
+          proxima_tentativa_em: string | null
           status_telemarketing: string
           telefone: string
           telefone_norm: string
@@ -1890,9 +1895,12 @@ export type Database = {
           ultima_ligacao_em: string | null
           ultimo_status_ligacao: string | null
           updated_at: string
+          vota_candidato: string | null
         }
         Insert: {
           bairro?: string | null
+          campanha_id?: string | null
+          candidato_alternativo?: string | null
           cidade?: string | null
           client_id: string
           created_at?: string
@@ -1902,7 +1910,10 @@ export type Database = {
           indicador_tipo: Database["public"]["Enums"]["eleicao_tipo"]
           nome: string
           observacao?: string | null
+          observacao_tele?: string | null
+          operador_nome?: string | null
           origem?: string
+          proxima_tentativa_em?: string | null
           status_telemarketing?: string
           telefone: string
           telefone_norm: string
@@ -1911,9 +1922,12 @@ export type Database = {
           ultima_ligacao_em?: string | null
           ultimo_status_ligacao?: string | null
           updated_at?: string
+          vota_candidato?: string | null
         }
         Update: {
           bairro?: string | null
+          campanha_id?: string | null
+          candidato_alternativo?: string | null
           cidade?: string | null
           client_id?: string
           created_at?: string
@@ -1923,7 +1937,10 @@ export type Database = {
           indicador_tipo?: Database["public"]["Enums"]["eleicao_tipo"]
           nome?: string
           observacao?: string | null
+          observacao_tele?: string | null
+          operador_nome?: string | null
           origem?: string
+          proxima_tentativa_em?: string | null
           status_telemarketing?: string
           telefone?: string
           telefone_norm?: string
@@ -1932,8 +1949,16 @@ export type Database = {
           ultima_ligacao_em?: string | null
           ultimo_status_ligacao?: string | null
           updated_at?: string
+          vota_candidato?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "eleicao_indicados_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "eleicao_indicados_client_id_fkey"
             columns: ["client_id"]
@@ -8122,6 +8147,15 @@ export type Database = {
         }
         Returns: Json
       }
+      tele_designar_eleicao_indicados: {
+        Args: {
+          _campanha_id: string
+          _client_id: string
+          _filtros: Json
+          _substituir?: boolean
+        }
+        Returns: Json
+      }
       tele_get_contato_log: {
         Args: { _client_id: string; _contato_id: string; _tabela: string }
         Returns: {
@@ -8150,6 +8184,52 @@ export type Database = {
         Args: { _campanha_id: string; _client_id: string; _rows: Json }
         Returns: Json
       }
+      tele_indicador_drill: {
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _indicador_id: string
+        }
+        Returns: {
+          bairro: string
+          cidade: string
+          id: string
+          nome: string
+          status_telemarketing: string
+          telefone: string
+          total_tentativas: number
+          ultima_ligacao_em: string
+          ultimo_status_ligacao: string
+          vota_candidato: string
+        }[]
+      }
+      tele_indicador_scorecard: {
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _indicador_tipo?: string
+        }
+        Returns: {
+          confirmados: number
+          indecisos: number
+          indicador_id: string
+          indicador_nome: string
+          indicador_tipo: string
+          invalidos: number
+          ligados: number
+          nao_atendeu: number
+          recusou: number
+          rejeitados: number
+          score_qualidade: number
+          taxa_confirmacao: number
+          taxa_voto_efetivo: number
+          total_indicados: number
+        }[]
+      }
+      tele_limpar_eleicao_campanha: {
+        Args: { _campanha_id: string; _client_id: string }
+        Returns: Json
+      }
       tele_list_campanhas_scripts: {
         Args: { _client_id: string; _nome: string; _senha: string }
         Returns: {
@@ -8168,6 +8248,8 @@ export type Database = {
           candidato_alternativo: string
           cidade: string
           id: string
+          indicador_nome: string
+          indicador_tipo: string
           ligacao_em: string
           ligacao_status: string
           locked_by: string
@@ -8182,6 +8264,19 @@ export type Database = {
           tipo: string
           vota_candidato: string
         }[]
+      }
+      tele_list_indicadores: {
+        Args: { _client_id: string }
+        Returns: {
+          cidade: string
+          id: string
+          nome: string
+          tipo: string
+        }[]
+      }
+      tele_preview_eleicao_indicados: {
+        Args: { _client_id: string; _filtros: Json }
+        Returns: Json
       }
       tele_registrar_ligacao: {
         Args: {

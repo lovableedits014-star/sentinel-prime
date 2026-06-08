@@ -21,14 +21,16 @@ interface ContatoTele {
   candidato_alternativo: string | null;
   operador_nome: string | null;
   ligacao_em: string | null;
-  tipo: "lider" | "liderado" | "indicado" | "avulso";
-  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos";
+  tipo: "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado";
+  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos" | "eleicao_indicados";
   proxima_tentativa_em: string | null;
   tentativas_count: number | null;
   observacao_tele: string | null;
   locked_by: string | null;
   locked_until: string | null;
   campanha_id: string | null;
+  indicador_nome: string | null;
+  indicador_tipo: string | null;
 }
 
 interface CampanhaScript {
@@ -48,7 +50,7 @@ export default function Telemarketing() {
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [clientName, setClientName] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso">("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado">("todos");
 
   // Form state
   const [ligacaoStatus, setLigacaoStatus] = useState("");
@@ -139,6 +141,8 @@ export default function Telemarketing() {
       locked_by: r.locked_by ?? null,
       locked_until: r.locked_until ?? null,
       campanha_id: r.campanha_id ?? null,
+      indicador_nome: r.indicador_nome ?? null,
+      indicador_tipo: r.indicador_tipo ?? null,
     }));
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
@@ -316,6 +320,7 @@ export default function Telemarketing() {
     if (tipo === "lider") return "Líder";
     if (tipo === "liderado") return "Liderado";
     if (tipo === "avulso") return "Mailing";
+    if (tipo === "eleicao_indicado") return "Eleição";
     return "Indicado";
   };
 
@@ -398,7 +403,7 @@ export default function Telemarketing() {
 
       {/* Type filter */}
       <div className="flex gap-2 flex-wrap">
-        {(["todos", "lider", "liderado", "indicado", "avulso"] as const).map((f) => (
+        {(["todos", "lider", "liderado", "indicado", "avulso", "eleicao_indicado"] as const).map((f) => (
           <Button
             key={f}
             variant={filtroTipo === f ? "default" : "outline"}
@@ -472,6 +477,16 @@ export default function Telemarketing() {
                   {current.bairro && <span>{current.bairro}</span>}
                   {current.bairro && current.cidade && <span>•</span>}
                   {current.cidade && <span>{current.cidade}</span>}
+                </div>
+              )}
+
+              {current.indicador_nome && (
+                <div className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 p-2 rounded flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5" />
+                  Indicado por <span className="font-semibold">{current.indicador_nome}</span>
+                  {current.indicador_tipo && (
+                    <Badge variant="outline" className="text-[10px] capitalize">{current.indicador_tipo}</Badge>
+                  )}
                 </div>
               )}
 

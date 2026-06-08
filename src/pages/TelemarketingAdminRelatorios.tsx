@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import TelemarketingReportsPanel from "@/components/contratados/TelemarketingReportsPanel";
 import TelemarketingSnapshotsPanel from "@/components/telemarketing/TelemarketingSnapshotsPanel";
+import TelemarketingIndicadorScorecard from "@/components/telemarketing/TelemarketingIndicadorScorecard";
 import { useContratadosData } from "@/components/contratados/useContratadosData";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 
@@ -22,6 +23,7 @@ export default function TelemarketingAdminRelatorios() {
         <p className="text-sm text-muted-foreground">Gráficos, ranking por bairro, candidatos alternativos, comparativo entre rodadas e export PDF.</p>
       </div>
       <div className="space-y-6">
+        {clientId && <TelemarketingIndicadorScorecard clientId={clientId} />}
         {clientId && <TelemarketingSnapshotsPanel clientId={clientId} />}
         <TelemarketingReportsPanel contratados={contratados as any} indicados={indicados as any} />
       </div>

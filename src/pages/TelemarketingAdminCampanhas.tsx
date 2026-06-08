@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import DesignarEleicaoPanel from "@/components/telemarketing/DesignarEleicaoPanel";
 
 interface Campanha {
   id: string;
@@ -214,6 +215,9 @@ export default function TelemarketingAdminCampanhas() {
               </Button>
             </CardContent>
           </Card>
+
+          <DesignarEleicaoPanel clientId={clientId} campanhas={campanhas} onChanged={load} />
+
 
           <Card className="lg:col-span-2">
             <CardHeader>
