@@ -76,7 +76,7 @@ function waLink(telefone: string, msg: string) {
 }
 
 export default function IndicacoesPanel({ clientId }: { clientId: string }) {
-  const [tab, setTab] = useState<"cobranca" | "config">("cobranca");
+  const [tab, setTab] = useState<"cobranca" | "config" | "pagina">("cobranca");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
