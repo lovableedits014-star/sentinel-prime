@@ -1743,6 +1743,13 @@ export type Database = {
           meta_cabo: number
           meta_coordenador: number
           meta_lider: number
+          page_botao_label: string | null
+          page_funcao_label: string | null
+          page_logo_url: string | null
+          page_progresso_titulo: string | null
+          page_rodape: string | null
+          page_saudacao: string | null
+          page_subtitulo: string | null
           updated_at: string
         }
         Insert: {
@@ -1753,6 +1760,13 @@ export type Database = {
           meta_cabo?: number
           meta_coordenador?: number
           meta_lider?: number
+          page_botao_label?: string | null
+          page_funcao_label?: string | null
+          page_logo_url?: string | null
+          page_progresso_titulo?: string | null
+          page_rodape?: string | null
+          page_saudacao?: string | null
+          page_subtitulo?: string | null
           updated_at?: string
         }
         Update: {
@@ -1763,6 +1777,13 @@ export type Database = {
           meta_cabo?: number
           meta_coordenador?: number
           meta_lider?: number
+          page_botao_label?: string | null
+          page_funcao_label?: string | null
+          page_logo_url?: string | null
+          page_progresso_titulo?: string | null
+          page_rodape?: string | null
+          page_saudacao?: string | null
+          page_subtitulo?: string | null
           updated_at?: string
         }
         Relationships: [
