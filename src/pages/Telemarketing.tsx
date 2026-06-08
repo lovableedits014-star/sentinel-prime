@@ -361,7 +361,7 @@ export default function Telemarketing() {
 
       {/* Type filter */}
       <div className="flex gap-2 flex-wrap">
-        {(["todos", "lider", "liderado", "indicado"] as const).map((f) => (
+        {(["todos", "lider", "liderado", "indicado", "avulso"] as const).map((f) => (
           <Button
             key={f}
             variant={filtroTipo === f ? "default" : "outline"}
