@@ -526,6 +526,11 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
           <CobrancaAutoConfig clientId={clientId} />
         </TabsContent>
+
+        {/* ──────────── PÁGINA PÚBLICA ──────────── */}
+        <TabsContent value="pagina" className="mt-4">
+          <IndicarPaginaConfig clientId={clientId} candidatoNome={candidatoNome} />
+        </TabsContent>
       </Tabs>
 
       {/* ───── Modal Disparo em Massa ───── */}
