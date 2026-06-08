@@ -568,8 +568,23 @@ export default function Telemarketing() {
                   </div>
                 )}
 
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Observação (opcional)</label>
+                  <Textarea
+                    placeholder="Ex: pediu retorno depois das 18h, número errado, mudou-se..."
+                    value={observacao}
+                    onChange={(e) => setObservacao(e.target.value)}
+                    rows={2}
+                    className="text-sm resize-none"
+                  />
+                </div>
+
                 <div className="flex gap-2 pt-2">
-                  <Button onClick={handleSave} disabled={saving || !ligacaoStatus} className="flex-1">
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving || !ligacaoStatus || (ligacaoStatus === "reagendou" && !proximaTentativa)}
+                    className="flex-1"
+                  >
                     {saving ? "Salvando..." : "Salvar e Próximo"}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={skipToNext}>
