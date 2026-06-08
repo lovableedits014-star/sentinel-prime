@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, Upload, Power, Megaphone, ShieldAlert } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Power, Megaphone, ShieldAlert, FileText, Pencil } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 interface Campanha {
@@ -17,6 +18,9 @@ interface Campanha {
   descricao: string | null;
   ativo: boolean;
   created_at: string;
+  script_intro?: string | null;
+  script_perguntas?: string[] | null;
+  tags_rapidas?: string[] | null;
 }
 
 interface ContatoAvulso {
@@ -39,6 +43,34 @@ export default function TelemarketingAdminCampanhas() {
   const [csv, setCsv] = useState("");
   const [importingTo, setImportingTo] = useState<string>("");
   const [importing, setImporting] = useState(false);
+
+  // Script edit dialog
+  const [editing, setEditing] = useState<Campanha | null>(null);
+  const [eIntro, setEIntro] = useState("");
+  const [ePerguntas, setEPerguntas] = useState("");
+  const [eTags, setETags] = useState("");
+
+  const openEdit = (c: Campanha) => {
+    setEditing(c);
+    setEIntro(c.script_intro || "");
+    setEPerguntas((c.script_perguntas || []).join("\n"));
+    setETags((c.tags_rapidas || []).join("\n"));
+  };
+
+  const saveScript = async () => {
+    if (!editing) return;
+    const perguntas = ePerguntas.split("\n").map(s => s.trim()).filter(Boolean);
+    const tags = eTags.split("\n").map(s => s.trim()).filter(Boolean);
+    const { error } = await supabase.from("telemarketing_campanhas" as any).update({
+      script_intro: eIntro.trim() || null,
+      script_perguntas: perguntas,
+      tags_rapidas: tags,
+    }).eq("id", editing.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Script atualizado");
+    setEditing(null);
+    load();
+  };
 
   const load = async () => {
     if (!clientId) return;
@@ -119,7 +151,7 @@ export default function TelemarketingAdminCampanhas() {
       <TelemarketingSubNav />
       <div className="mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2"><Megaphone className="w-6 h-6" /> Campanhas e mailing</h1>
-        <p className="text-sm text-muted-foreground">Crie campanhas, importe mailings em CSV e acompanhe os contatos adicionais que entram na fila do operador.</p>
+        <p className="text-sm text-muted-foreground">Crie campanhas, defina o roteiro de abordagem, importe mailings CSV e acompanhe os contatos avulsos que entram na fila do operador.</p>
       </div>
 
       {ctxLoading && (
@@ -194,19 +226,28 @@ export default function TelemarketingAdminCampanhas() {
                 {campanhas.map(c => {
                   const total = contatos.filter(x => x.campanha_id === c.id).length;
                   const ligados = contatos.filter(x => x.campanha_id === c.id && x.ligacao_status && x.ligacao_status !== "pendente").length;
+                  const nPerguntas = (c.script_perguntas || []).length;
+                  const nTags = (c.tags_rapidas || []).length;
                   return (
                     <div key={c.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium truncate">{c.nome}</span>
                           <Badge variant={c.ativo ? "default" : "secondary"} className="text-[10px]">
                             {c.ativo ? "Ativa" : "Inativa"}
                           </Badge>
+                          {(c.script_intro || nPerguntas > 0) && (
+                            <Badge variant="outline" className="text-[10px] gap-1"><FileText className="w-3 h-3" />Script</Badge>
+                          )}
+                          {nTags > 0 && <Badge variant="outline" className="text-[10px]">{nTags} tags</Badge>}
                         </div>
                         {c.descricao && <p className="text-xs text-muted-foreground truncate">{c.descricao}</p>}
                         <p className="text-[11px] text-muted-foreground mt-0.5">{ligados}/{total} contatos ligados</p>
                       </div>
                       <div className="flex gap-1 shrink-0">
+                        <Button size="sm" variant="outline" onClick={() => openEdit(c)} title="Editar script & tags">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => toggleAtivo(c)} title={c.ativo ? "Desativar" : "Ativar"}>
                           <Power className="w-3.5 h-3.5" />
                         </Button>
@@ -246,6 +287,32 @@ export default function TelemarketingAdminCampanhas() {
           </Card>
         </div>
       )}
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Script & tags — {editing?.nome}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium mb-1 block">Introdução (lida pelo operador no início)</label>
+              <Textarea rows={3} value={eIntro} onChange={(e) => setEIntro(e.target.value)} placeholder="Bom dia, aqui é {operador} falando em nome do candidato…" />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Perguntas do roteiro (uma por linha)</label>
+              <Textarea rows={5} value={ePerguntas} onChange={(e) => setEPerguntas(e.target.value)} placeholder={"Você costuma votar nas eleições municipais?\nO que mais te preocupa hoje no bairro?"} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block">Tags rápidas (uma por linha) — clique aplica à observação</label>
+              <Textarea rows={4} value={eTags} onChange={(e) => setETags(e.target.value)} placeholder={"Não mora mais aqui\nNúmero errado\nPediu retorno"} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button onClick={saveScript}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

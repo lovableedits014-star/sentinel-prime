@@ -28,6 +28,15 @@ interface ContatoTele {
   observacao_tele: string | null;
   locked_by: string | null;
   locked_until: string | null;
+  campanha_id: string | null;
+}
+
+interface CampanhaScript {
+  id: string;
+  nome: string;
+  script_intro: string | null;
+  script_perguntas: string[] | null;
+  tags_rapidas: string[] | null;
 }
 
 export default function Telemarketing() {
@@ -50,6 +59,7 @@ export default function Telemarketing() {
   const [observacao, setObservacao] = useState("");
   const [proximaTentativa, setProximaTentativa] = useState("");
   const [saving, setSaving] = useState(false);
+  const [scripts, setScripts] = useState<CampanhaScript[]>([]);
 
   useEffect(() => {
     // Force anon role to ensure RLS anon policies apply
@@ -128,6 +138,7 @@ export default function Telemarketing() {
       observacao_tele: r.observacao_tele ?? null,
       locked_by: r.locked_by ?? null,
       locked_until: r.locked_until ?? null,
+      campanha_id: r.campanha_id ?? null,
     }));
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
@@ -138,6 +149,21 @@ export default function Telemarketing() {
       (i) => !i.ligacao_status || i.ligacao_status === "pendente"
     );
     setCurrentIndex(firstPending >= 0 ? firstPending : 0);
+
+    // Load campaign scripts (best-effort)
+    const { data: scriptRows } = await supabase.rpc("tele_list_campanhas_scripts" as any, {
+      _client_id: clientId!,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+    });
+    setScripts(((scriptRows as any[]) || []).map((s) => ({
+      id: s.id,
+      nome: s.nome,
+      script_intro: s.script_intro,
+      script_perguntas: Array.isArray(s.script_perguntas) ? s.script_perguntas : [],
+      tags_rapidas: Array.isArray(s.tags_rapidas) ? s.tags_rapidas : [],
+    })));
+
     setLoggedIn(true);
     setLoading(false);
   };
@@ -469,6 +495,40 @@ export default function Telemarketing() {
                   <span className="font-medium">Observação anterior:</span> {current.observacao_tele}
                 </div>
               )}
+
+              {/* Script da campanha */}
+              {(() => {
+                const script = current.campanha_id ? scripts.find(s => s.id === current.campanha_id) : null;
+                if (!script || (!script.script_intro && !(script.script_perguntas || []).length && !(script.tags_rapidas || []).length)) return null;
+                return (
+                  <div className="bg-primary/5 border border-primary/20 rounded p-3 space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Script — {script.nome}</p>
+                    {script.script_intro && (
+                      <p className="text-xs whitespace-pre-wrap">{script.script_intro}</p>
+                    )}
+                    {(script.script_perguntas || []).length > 0 && (
+                      <ol className="text-xs list-decimal pl-4 space-y-0.5">
+                        {(script.script_perguntas || []).map((q, i) => <li key={i}>{q}</li>)}
+                      </ol>
+                    )}
+                    {(script.tags_rapidas || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {(script.tags_rapidas || []).map((t, i) => (
+                          <Button
+                            key={i}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-[10px] px-2"
+                            onClick={() => setObservacao((prev) => prev ? `${prev}; ${t}` : t)}
+                          >+ {t}</Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
 
               {/* Call result form */}
               <div className="border-t pt-4 space-y-3">

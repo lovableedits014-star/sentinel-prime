@@ -86,16 +86,17 @@ Aba **Visão geral** mostra:
 - Nova página admin `/telemarketing-admin/campanhas`: criar/desativar/remover campanhas, importar CSV (vírgula/;/tab, com ou sem cabeçalho), listar contatos importados com status.
 - Operador (`Telemarketing.tsx`): novo filtro "Mailing" e badge "Mailing" para contatos avulsos.
 
-### Fase 5 — Script + qualificação rica
-- Configurar perguntas adicionais por campanha (JSON).
-- Campo de observação livre + tags rápidas ("não mora mais aqui", "número errado", "pediu retorno").
-- Reagendamento manual com data/hora.
+### Fase 5 — Script + qualificação rica ✅ entregue
+- Campos `script_intro`, `script_perguntas` (jsonb) e `tags_rapidas` (jsonb) em `telemarketing_campanhas`.
+- Diálogo de edição de roteiro no admin de Campanhas (intro, perguntas linha-a-linha, tags rápidas).
+- RPC `tele_list_campanhas_scripts` (operator-authenticated) carregada no login do operador.
+- Operador (`Telemarketing.tsx`) mostra painel "Script da campanha" quando o contato pertence a uma campanha com roteiro, com chips de tags rápidas que adicionam à observação.
 
-### Fase 6 — Relatórios avançados
-- Export PDF do relatório.
-- Comparativo entre rodadas/campanhas.
-- Drill-down por bairro no mapa.
-- Alerta automático no Dashboard quando taxa "vota sim" cair > X% entre rodadas.
+### Fase 6 — Relatórios avançados ✅ entregue
+- Export **PDF** no painel de relatórios (resumo + bairros + alternativos + lista) via jspdf + autotable.
+- Gráfico **Top bairros** (vota sim/não/indeciso/pendente) no painel de relatórios.
+- Tabela `telemarketing_relatorio_snapshots` (rodadas) + RPC `tele_capture_snapshot` agregando contratados + indicados + avulsos.
+- Novo componente `TelemarketingSnapshotsPanel` no `/telemarketing-admin/relatorios`: capturar snapshot, listar histórico, comparar rodadas (Δ vota sim) e **alerta automático** quando a taxa "vota sim" cai ≥ 5 pontos percentuais entre a última e a anterior.
 
 ### Fase 7 — Segurança / anti-abuso ✅ entregue
 - Novos campos em `telemarketing_operadores`: `failed_attempts`, `locked_until`, `last_login_at`, `password_updated_at`.

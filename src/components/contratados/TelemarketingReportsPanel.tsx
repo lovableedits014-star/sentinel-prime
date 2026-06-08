@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { FileText, Download, Users, Phone, CheckCircle2, XCircle, HelpCircle, Crown, TrendingUp } from "lucide-react";
+import { FileText, Download, Users, Phone, CheckCircle2, XCircle, HelpCircle, Crown, TrendingUp, MapPin, FileDown } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface TeleContact {
   id: string;
@@ -179,6 +181,78 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
     URL.revokeObjectURL(url);
   };
 
+  // Bairro breakdown (top 10 by vota sim)
+  const bairroBreakdown = useMemo(() => {
+    const map: Record<string, { total: number; sim: number; nao: number; indeciso: number; pendente: number }> = {};
+    filtered.forEach(c => {
+      const k = (c.bairro || "(sem bairro)").trim() || "(sem bairro)";
+      if (!map[k]) map[k] = { total: 0, sim: 0, nao: 0, indeciso: 0, pendente: 0 };
+      map[k].total++;
+      if (c.vota_candidato === "sim") map[k].sim++;
+      else if (c.vota_candidato === "nao") map[k].nao++;
+      else if (c.vota_candidato === "indeciso") map[k].indeciso++;
+      else if (!c.ligacao_status || c.ligacao_status === "pendente") map[k].pendente++;
+    });
+    return Object.entries(map)
+      .map(([nome, v]) => ({ nome, ...v }))
+      .sort((a, b) => b.sim - a.sim || b.total - a.total)
+      .slice(0, 10);
+  }, [filtered]);
+
+  const exportPDF = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const liderName = selectedLider === "geral" ? "Geral" : (lideres.find(l => l.id === selectedLider)?.nome || "Líder");
+    doc.setFontSize(16);
+    doc.text(`Relatório de Telemarketing — ${liderName}`, 40, 40);
+    doc.setFontSize(10);
+    doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 40, 58);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [["Indicador", "Valor"]],
+      body: [
+        ["Total de contatos", String(total)],
+        ["Ligações feitas", `${ligados} (${total ? Math.round(ligados/total*100) : 0}%)`],
+        ["Atenderam", String(atendeu)],
+        ["Vota ✅", `${votaSim} (${pctSim}%)`],
+        ["Não vota ❌", String(votaNao)],
+        ["Indecisos 🤔", String(votoIndeciso)],
+        ["Recusaram", String(recusou)],
+        ["Pendentes", String(pendentes)],
+      ],
+      styles: { fontSize: 9 },
+    });
+
+    if (bairroBreakdown.length) {
+      autoTable(doc, {
+        head: [["Bairro", "Total", "Sim", "Não", "Indeciso", "Pendente"]],
+        body: bairroBreakdown.map(b => [b.nome, b.total, b.sim, b.nao, b.indeciso, b.pendente]),
+        styles: { fontSize: 9 },
+      });
+    }
+
+    if (alternativeRanking.length) {
+      autoTable(doc, {
+        head: [["Candidato alternativo", "Menções"]],
+        body: alternativeRanking.map(a => [a.name, a.count]),
+        styles: { fontSize: 9 },
+      });
+    }
+
+    autoTable(doc, {
+      head: [["Nome", "Telefone", "Tipo", "Status", "Voto", "Operador"]],
+      body: filtered.slice(0, 500).map(c => [
+        c.nome, c.telefone, c.tipo,
+        c.ligacao_status || "pendente",
+        c.vota_candidato || "—",
+        c.operador_nome || "—",
+      ]),
+      styles: { fontSize: 8 },
+    });
+
+    doc.save(`relatorio-telemarketing-${liderName.replace(/\s/g, "_")}.pdf`);
+  };
+
   const pctSim = ligados > 0 ? Math.round((votaSim / ligados) * 100) : 0;
 
   return (
@@ -199,9 +273,14 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
             </SelectContent>
           </Select>
         </div>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCSV}>
-          <Download className="w-3.5 h-3.5" />Exportar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCSV}>
+            <Download className="w-3.5 h-3.5" />CSV
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={exportPDF}>
+            <FileDown className="w-3.5 h-3.5" />PDF
+          </Button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -299,6 +378,32 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
           </CardContent>
         </Card>
       )}
+
+      {/* Bairro breakdown */}
+      {bairroBreakdown.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-primary" />Top bairros (por votos confirmados)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={Math.max(220, bairroBreakdown.length * 32)}>
+              <BarChart data={bairroBreakdown} layout="vertical" margin={{ left: 20, right: 30, top: 10, bottom: 10 }}>
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="nome" width={130} tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
+                <Bar dataKey="sim" name="Sim" fill={VOTE_COLORS.sim} stackId="b" />
+                <Bar dataKey="nao" name="Não" fill={VOTE_COLORS.nao} stackId="b" />
+                <Bar dataKey="indeciso" name="Indeciso" fill={VOTE_COLORS.indeciso} stackId="b" />
+                <Bar dataKey="pendente" name="Pendente" fill={VOTE_COLORS.sem} stackId="b" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* Alternative candidates ranking */}
       {alternativeRanking.length > 0 && (
