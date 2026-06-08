@@ -184,9 +184,21 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     await load();
   }
 
-  // Quem entra no disparo: filtrados + com telefone
-  const massElegiveis = useMemo(() => filtered.filter((r) => !!r.telefone && r.telefone.replace(/\D/g, "").length >= 8), [filtered]);
+  // Quem entra no disparo: filtrados + com telefone + fora da janela de não-reenvio
+  const massElegiveis = useMemo(() => {
+    const cutoff = janelaHoras > 0 ? Date.now() - janelaHoras * 3600 * 1000 : 0;
+    return filtered.filter((r) => {
+      if (!r.telefone || r.telefone.replace(/\D/g, "").length < 8) return false;
+      if (cutoff && r.ultima_cobranca_em && new Date(r.ultima_cobranca_em).getTime() >= cutoff) return false;
+      return true;
+    });
+  }, [filtered, janelaHoras]);
   const massSemToken = useMemo(() => massElegiveis.filter((r) => !r.token).length, [massElegiveis]);
+  const massPuladosJanela = useMemo(() => {
+    if (janelaHoras <= 0) return 0;
+    const cutoff = Date.now() - janelaHoras * 3600 * 1000;
+    return filtered.filter((r) => r.ultima_cobranca_em && new Date(r.ultima_cobranca_em).getTime() >= cutoff).length;
+  }, [filtered, janelaHoras]);
 
   function abrirMass() {
     if (filtered.length === 0) {
@@ -199,7 +211,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   }
 
   function previewMass(): string {
-    const r = massElegiveis[0];
+    const r = massElegiveis[0] || filtered[0];
     if (!r) return massTemplate;
     const primeiro = r.nome.split(" ")[0] || r.nome;
     const faltam = Math.max(0, r.meta - r.total_indicacoes);
@@ -214,8 +226,42 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
       .replace(/\{candidato\}/g, candidatoNome);
   }
 
+  async function testarComigo() {
+    const phone = testePhone.replace(/\D/g, "");
+    if (phone.length < 10) { toast.error("Informe um telefone válido (com DDD)."); return; }
+    if (!massTemplate.includes("{link}")) { toast.error("Inclua {link} na mensagem."); return; }
+    const base = filtered[0];
+    if (!base) { toast.error("Nenhum indicador no filtro para usar como base."); return; }
+    setTestando(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+        body: {
+          client_id: clientId,
+          titulo: `🧪 Teste — cobrança de indicações`,
+          mensagem: massTemplate,
+          tipo: "indicadores_cobranca",
+          cobranca_filtros: {
+            tipo: filtroTipo === "all" ? undefined : filtroTipo,
+            status: filtroStatus,
+            indicador_ids: [base.indicador_id],
+          },
+          cobranca_candidato: candidatoNome,
+          cobranca_origin: window.location.origin,
+          cobranca_teste_telefone: phone,
+          batch_size: 1, delay_min: 0, delay_max: 1, batch_pause: 0,
+        },
+      });
+      if (error) throw error;
+      toast.success(`🧪 Mensagem de teste enviada para ${phone}`);
+    } catch (err: any) {
+      toast.error("Falha no teste: " + (err?.message || "erro desconhecido"));
+    } finally {
+      setTestando(false);
+    }
+  }
+
   async function enviarMass() {
-    if (massElegiveis.length === 0) { toast.error("Nenhum destinatário com telefone."); return; }
+    if (massElegiveis.length === 0) { toast.error("Nenhum destinatário elegível."); return; }
     if (!massTemplate.includes("{link}")) {
       toast.error("Inclua {link} na mensagem para o destinatário receber o link de indicação.");
       return;
@@ -235,6 +281,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           },
           cobranca_candidato: candidatoNome,
           cobranca_origin: window.location.origin,
+          cobranca_janela_horas: janelaHoras,
           batch_size: 10, delay_min: 5, delay_max: 15, batch_pause: 60,
         },
       });
