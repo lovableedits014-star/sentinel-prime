@@ -1091,9 +1091,12 @@ export type Database = {
           ligacao_em: string | null
           ligacao_status: string | null
           nome: string
+          observacao_tele: string | null
           operador_nome: string | null
+          proxima_tentativa_em: string | null
           status: string
           telefone: string
+          tentativas_count: number
           verified_at: string | null
           verified_by: string | null
           vota_candidato: string | null
@@ -1110,9 +1113,12 @@ export type Database = {
           ligacao_em?: string | null
           ligacao_status?: string | null
           nome: string
+          observacao_tele?: string | null
           operador_nome?: string | null
+          proxima_tentativa_em?: string | null
           status?: string
           telefone: string
+          tentativas_count?: number
           verified_at?: string | null
           verified_by?: string | null
           vota_candidato?: string | null
@@ -1129,9 +1135,12 @@ export type Database = {
           ligacao_em?: string | null
           ligacao_status?: string | null
           nome?: string
+          observacao_tele?: string | null
           operador_nome?: string | null
+          proxima_tentativa_em?: string | null
           status?: string
           telefone?: string
+          tentativas_count?: number
           verified_at?: string | null
           verified_by?: string | null
           vota_candidato?: string | null
@@ -1301,13 +1310,16 @@ export type Database = {
           ligacao_status: string | null
           nome: string
           notas: string | null
+          observacao_tele: string | null
           operador_nome: string | null
           presenca_obrigatoria: boolean
+          proxima_tentativa_em: string | null
           quota_indicados: number
           redes_sociais: Json | null
           secao_eleitoral: string | null
           status: string
           telefone: string
+          tentativas_count: number
           updated_at: string
           user_id: string | null
           vota_candidato: string | null
@@ -1332,13 +1344,16 @@ export type Database = {
           ligacao_status?: string | null
           nome: string
           notas?: string | null
+          observacao_tele?: string | null
           operador_nome?: string | null
           presenca_obrigatoria?: boolean
+          proxima_tentativa_em?: string | null
           quota_indicados?: number
           redes_sociais?: Json | null
           secao_eleitoral?: string | null
           status?: string
           telefone: string
+          tentativas_count?: number
           updated_at?: string
           user_id?: string | null
           vota_candidato?: string | null
@@ -1363,13 +1378,16 @@ export type Database = {
           ligacao_status?: string | null
           nome?: string
           notas?: string | null
+          observacao_tele?: string | null
           operador_nome?: string | null
           presenca_obrigatoria?: boolean
+          proxima_tentativa_em?: string | null
           quota_indicados?: number
           redes_sociais?: Json | null
           secao_eleitoral?: string | null
           status?: string
           telefone?: string
+          tentativas_count?: number
           updated_at?: string
           user_id?: string | null
           vota_candidato?: string | null
@@ -6434,6 +6452,84 @@ export type Database = {
           },
         ]
       }
+      telemarketing_call_assignments: {
+        Row: {
+          client_id: string
+          contato_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          operador_nome: string
+          tabela: string
+        }
+        Insert: {
+          client_id: string
+          contato_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          operador_nome: string
+          tabela: string
+        }
+        Update: {
+          client_id?: string
+          contato_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          operador_nome?: string
+          tabela?: string
+        }
+        Relationships: []
+      }
+      telemarketing_call_log: {
+        Row: {
+          bairro: string | null
+          candidato_alternativo: string | null
+          cidade: string | null
+          client_id: string
+          contato_id: string
+          created_at: string
+          id: string
+          ligacao_status: string
+          observacao: string | null
+          operador_nome: string
+          proxima_tentativa_em: string | null
+          tabela: string
+          vota_candidato: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          client_id: string
+          contato_id: string
+          created_at?: string
+          id?: string
+          ligacao_status: string
+          observacao?: string | null
+          operador_nome: string
+          proxima_tentativa_em?: string | null
+          tabela: string
+          vota_candidato?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          client_id?: string
+          contato_id?: string
+          created_at?: string
+          id?: string
+          ligacao_status?: string
+          observacao?: string | null
+          operador_nome?: string
+          proxima_tentativa_em?: string | null
+          tabela?: string
+          vota_candidato?: string | null
+        }
+        Relationships: []
+      }
       telemarketing_operadores: {
         Row: {
           ativo: boolean
@@ -7800,6 +7896,41 @@ export type Database = {
         Returns: undefined
       }
       tea_ranking_ms: { Args: { p_codigo_ibge: number }; Returns: Json }
+      tele_claim_contato: {
+        Args: {
+          _client_id: string
+          _id: string
+          _nome: string
+          _senha: string
+          _tabela: string
+          _ttl_seconds?: number
+        }
+        Returns: Json
+      }
+      tele_get_contato_log: {
+        Args: { _client_id: string; _contato_id: string; _tabela: string }
+        Returns: {
+          bairro: string | null
+          candidato_alternativo: string | null
+          cidade: string | null
+          client_id: string
+          contato_id: string
+          created_at: string
+          id: string
+          ligacao_status: string
+          observacao: string | null
+          operador_nome: string
+          proxima_tentativa_em: string | null
+          tabela: string
+          vota_candidato: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "telemarketing_call_log"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       tele_list_contatos: {
         Args: { _client_id: string; _nome: string; _senha: string }
         Returns: {
@@ -7809,10 +7940,15 @@ export type Database = {
           id: string
           ligacao_em: string
           ligacao_status: string
+          locked_by: string
+          locked_until: string
           nome: string
+          observacao_tele: string
           operador_nome: string
+          proxima_tentativa_em: string
           tabela: string
           telefone: string
+          tentativas_count: number
           tipo: string
           vota_candidato: string
         }[]
@@ -7826,9 +7962,21 @@ export type Database = {
           _id: string
           _ligacao_status: string
           _nome: string
+          _observacao?: string
+          _proxima_tentativa_em?: string
           _senha: string
           _tabela: string
           _vota_candidato?: string
+        }
+        Returns: Json
+      }
+      tele_release_contato: {
+        Args: {
+          _client_id: string
+          _id: string
+          _nome: string
+          _senha: string
+          _tabela: string
         }
         Returns: Json
       }

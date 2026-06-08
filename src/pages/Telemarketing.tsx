@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 interface ContatoTele {
@@ -22,6 +23,11 @@ interface ContatoTele {
   ligacao_em: string | null;
   tipo: "lider" | "liderado" | "indicado";
   tabela: "contratados" | "contratado_indicados";
+  proxima_tentativa_em: string | null;
+  tentativas_count: number | null;
+  observacao_tele: string | null;
+  locked_by: string | null;
+  locked_until: string | null;
 }
 
 export default function Telemarketing() {
@@ -41,6 +47,8 @@ export default function Telemarketing() {
   const [candidatoAlt, setCandidatoAlt] = useState("");
   const [cidade, setCidade] = useState("");
   const [bairro, setBairro] = useState("");
+  const [observacao, setObservacao] = useState("");
+  const [proximaTentativa, setProximaTentativa] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -104,6 +112,11 @@ export default function Telemarketing() {
       ligacao_em: r.ligacao_em,
       tipo: r.tipo as "lider" | "liderado" | "indicado",
       tabela: r.tabela as "contratados" | "contratado_indicados",
+      proxima_tentativa_em: r.proxima_tentativa_em ?? null,
+      tentativas_count: r.tentativas_count ?? 0,
+      observacao_tele: r.observacao_tele ?? null,
+      locked_by: r.locked_by ?? null,
+      locked_until: r.locked_until ?? null,
     }));
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
@@ -137,17 +150,36 @@ export default function Telemarketing() {
     setCandidatoAlt("");
     setCidade("");
     setBairro("");
+    setObservacao("");
+    setProximaTentativa("");
   };
 
+  // Reivindica trava de 5min ao abrir o contato; libera ao trocar/pular
   useEffect(() => {
-    if (current) {
+    if (current && clientId) {
       setCidade(current.cidade || "");
       setBairro(current.bairro || "");
+      setObservacao("");
+      setProximaTentativa("");
       setLigacaoStatus("");
       setVotaCandidato("");
       setCandidatoAlt("");
+      supabase.rpc("tele_claim_contato" as any, {
+        _client_id: clientId,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _tabela: current.tabela,
+        _id: current.id,
+        _ttl_seconds: 300,
+      }).then(({ data }: any) => {
+        if (data && data.claimed === false && data.operador_nome && data.operador_nome !== operadorNome.trim()) {
+          toast.warning(`Este contato já está em atendimento por ${data.operador_nome}`);
+        }
+      });
     }
-  }, [currentIndex, filtroTipo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
+
 
   const handleSave = async () => {
     if (!ligacaoStatus) {
@@ -157,6 +189,7 @@ export default function Telemarketing() {
     if (!current) return;
 
     setSaving(true);
+    const proximaTs = proximaTentativa ? new Date(proximaTentativa).toISOString() : null;
     const { data: rpcResult, error } = await supabase.rpc("tele_registrar_ligacao" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
@@ -168,6 +201,8 @@ export default function Telemarketing() {
       _bairro: bairro.trim() || "",
       _vota_candidato: ligacaoStatus === "atendeu" ? (votaCandidato || null) : null,
       _candidato_alternativo: ligacaoStatus === "atendeu" ? (candidatoAlt.trim() || null) : null,
+      _observacao: observacao.trim() || null,
+      _proxima_tentativa_em: proximaTs,
     });
 
     if (error) {
@@ -219,7 +254,16 @@ export default function Telemarketing() {
     resetForm();
   };
 
-  const skipToNext = () => {
+  const skipToNext = async () => {
+    if (current && clientId) {
+      await supabase.rpc("tele_release_contato" as any, {
+        _client_id: clientId,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _tabela: current.tabela,
+        _id: current.id,
+      });
+    }
     const next = filteredContatos.findIndex(
       (i, idx) => idx > currentIndex && (!i.ligacao_status || i.ligacao_status === "pendente")
     );
@@ -393,11 +437,32 @@ export default function Telemarketing() {
                 </div>
               )}
 
+              {/* Lock / tentativas / agendamento info */}
+              {current.locked_by && current.locked_by !== operadorNome.trim() && (
+                <div className="flex items-center gap-2 text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 p-2 rounded">
+                  <Lock className="w-3.5 h-3.5" />
+                  Em atendimento por <span className="font-medium">{current.locked_by}</span>
+                </div>
+              )}
+              {(current.tentativas_count ?? 0) > 0 && (
+                <div className="text-[11px] text-muted-foreground">
+                  Tentativas anteriores: <span className="font-medium">{current.tentativas_count}</span>
+                  {current.proxima_tentativa_em && (
+                    <> · Reagendado para {new Date(current.proxima_tentativa_em).toLocaleString("pt-BR")}</>
+                  )}
+                </div>
+              )}
+              {current.observacao_tele && (
+                <div className="text-xs bg-muted/50 p-2 rounded border">
+                  <span className="font-medium">Observação anterior:</span> {current.observacao_tele}
+                </div>
+              )}
+
               {/* Call result form */}
               <div className="border-t pt-4 space-y-3">
                 <p className="font-medium text-sm">Resultado da ligação</p>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <Button
                     variant={ligacaoStatus === "atendeu" ? "default" : "outline"}
                     size="sm"
@@ -425,7 +490,30 @@ export default function Telemarketing() {
                     <XCircle className="w-3.5 h-3.5 mr-1" />
                     Recusou
                   </Button>
+                  <Button
+                    variant={ligacaoStatus === "reagendou" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setLigacaoStatus("reagendou")}
+                    className="text-xs"
+                  >
+                    <CalendarClock className="w-3.5 h-3.5 mr-1" />
+                    Reagendar
+                  </Button>
                 </div>
+
+                {(ligacaoStatus === "reagendou" || ligacaoStatus === "nao_atendeu") && (
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      Próxima tentativa {ligacaoStatus === "reagendou" ? "(obrigatório)" : "(opcional)"}
+                    </label>
+                    <Input
+                      type="datetime-local"
+                      value={proximaTentativa}
+                      onChange={(e) => setProximaTentativa(e.target.value)}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -480,8 +568,23 @@ export default function Telemarketing() {
                   </div>
                 )}
 
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Observação (opcional)</label>
+                  <Textarea
+                    placeholder="Ex: pediu retorno depois das 18h, número errado, mudou-se..."
+                    value={observacao}
+                    onChange={(e) => setObservacao(e.target.value)}
+                    rows={2}
+                    className="text-sm resize-none"
+                  />
+                </div>
+
                 <div className="flex gap-2 pt-2">
-                  <Button onClick={handleSave} disabled={saving || !ligacaoStatus} className="flex-1">
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving || !ligacaoStatus || (ligacaoStatus === "reagendou" && !proximaTentativa)}
+                    className="flex-1"
+                  >
                     {saving ? "Salvando..." : "Salvar e Próximo"}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={skipToNext}>

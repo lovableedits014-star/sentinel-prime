@@ -70,11 +70,13 @@ Aba **Visão geral** mostra:
 - Heatmap por hora (quando atendem mais).
 - Lista de "operadores online" (última atividade < 5min) baseada em `ligacao_em` mais recente por `operador_nome`.
 
-### Fase 3 — Fila inteligente
-- Tabela nova `telemarketing_call_log` (histórico imutável de cada tentativa, não sobrescreve).
-- Tabela nova `telemarketing_call_assignments` para "trava" temporária (operador X pegou contato Y por 5min) → evita colisão entre operadores.
-- Agendamento "ligar de novo": novo campo `proxima_tentativa_em`; fila prioriza vencidos.
-- Inclusão opcional de `eleicao_indicados` na fila (toggle por campanha).
+### Fase 3 — Fila inteligente ✅ entregue
+- Tabela `telemarketing_call_log` (histórico imutável, append-only).
+- Tabela `telemarketing_call_assignments` (trava de 5 min por operador/contato).
+- Novos campos em `contratados`/`contratado_indicados`: `proxima_tentativa_em`, `tentativas_count`, `observacao_tele`.
+- RPCs: `tele_claim_contato`, `tele_release_contato`, `tele_get_contato_log`. `tele_registrar_ligacao` agora aceita observação + reagendamento e grava no log. `tele_list_contatos` retorna lock atual + tentativas + reagendamento.
+- UI do operador (`Telemarketing.tsx`): aviso visual quando contato está em atendimento por outro operador, botão "Reagendar" + data/hora, campo de observação livre, exibição do histórico de tentativas e observação anterior.
+- Pendente: incluir `eleicao_indicados` na fila (toggle por campanha) → fica na Fase 4.
 
 ### Fase 4 — Campanhas / listas segmentadas
 - Tabela `telemarketing_campanhas`: nome, filtros (tipo, bairro, líder, status anterior), operadores atribuídos, prazo.
