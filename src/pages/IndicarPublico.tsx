@@ -18,6 +18,12 @@ type Info = {
   candidato_logo?: string;
   total_indicacoes?: number;
   meta?: number;
+  page_saudacao?: string | null;
+  page_subtitulo?: string | null;
+  page_funcao_label?: string | null;
+  page_progresso_titulo?: string | null;
+  page_botao_label?: string | null;
+  page_rodape?: string | null;
 };
 
 type Indicado = { id: string; nome: string; telefone: string; bairro: string | null; created_at: string };
