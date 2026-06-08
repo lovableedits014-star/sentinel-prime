@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Phone, CheckCircle2, Clock, TrendingUp, Users, Headphones, ArrowRight } from "lucide-react";
+import { Loader2, Phone, CheckCircle2, Clock, TrendingUp, Users, Headphones, ArrowRight, BarChart3, Settings as SettingsIcon } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useContratadosData } from "@/components/contratados/useContratadosData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -180,8 +180,8 @@ export default function TelemarketingAdmin() {
       <div className="grid sm:grid-cols-3 gap-3">
         {[
           { to: "/telemarketing-admin/operadores", label: "Cadastrar / editar operadores", icon: Users },
-          { to: "/telemarketing-admin/relatorios", label: "Ver relatórios completos", icon: BarChartShortcut },
-          { to: "/telemarketing-admin/configuracoes", label: "Configurações & link público", icon: SettingsShortcut },
+          { to: "/telemarketing-admin/relatorios", label: "Ver relatórios completos", icon: BarChart3 },
+          { to: "/telemarketing-admin/configuracoes", label: "Configurações & link público", icon: SettingsIcon },
         ].map((s) => (
           <Link key={s.to} to={s.to} className="border rounded-lg p-3 hover:bg-muted/40 transition flex items-center justify-between gap-2 group">
             <div className="flex items-center gap-2">
@@ -194,12 +194,4 @@ export default function TelemarketingAdmin() {
       </div>
     </div>
   );
-}
-
-function BarChartShortcut(props: React.SVGProps<SVGSVGElement>) {
-  // Lightweight inline icon alias so we avoid an extra import at top
-  return <TrendingUp {...(props as any)} />;
-}
-function SettingsShortcut(props: React.SVGProps<SVGSVGElement>) {
-  return <Headphones {...(props as any)} />;
 }
