@@ -63,6 +63,7 @@ const TelemarketingAdminRelatorios = lazy(() => import("./pages/TelemarketingAdm
 const TelemarketingAdminOperadores = lazy(() => import("./pages/TelemarketingAdminOperadores"));
 const TelemarketingAdminConfig = lazy(() => import("./pages/TelemarketingAdminConfig"));
 const TelemarketingAdminCampanhas = lazy(() => import("./pages/TelemarketingAdminCampanhas"));
+const TelemarketingAdminFilas = lazy(() => import("./pages/TelemarketingAdminFilas"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
