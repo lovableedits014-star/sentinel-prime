@@ -676,6 +676,66 @@ Deno.serve(async (req) => {
         .not("telefone", "is", null)
         .limit(2000);
       recipients = (data || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
+    } else if (tipo === "indicadores_cobranca") {
+      // ====== Cobrança em massa de indicadores ======
+      // payload: cobranca_filtros { tipo?, status?: 'all'|'zerados'|'abaixo'|'ok', indicador_ids?: string[] }
+      // payload: cobranca_candidato (string opcional)
+      const cf = (payload.cobranca_filtros || {}) as {
+        tipo?: "coordenador" | "lider" | "cabo";
+        status?: "all" | "zerados" | "abaixo" | "ok";
+        indicador_ids?: string[];
+      };
+      const candidatoNome = (payload.cobranca_candidato as string) || "";
+
+      let q = adminClient
+        .from("v_eleicao_indicadores_cobranca")
+        .select("indicador_id, nome, telefone, token, total_indicacoes, meta, tipo")
+        .eq("client_id", client_id)
+        .not("telefone", "is", null);
+      if (cf.tipo) q = q.eq("tipo", cf.tipo);
+      if (Array.isArray(cf.indicador_ids) && cf.indicador_ids.length > 0) {
+        q = q.in("indicador_id", cf.indicador_ids);
+      }
+      const { data: rowsRaw } = await q.limit(5000);
+      let rows = (rowsRaw || []) as any[];
+
+      if (cf.status === "zerados") rows = rows.filter((r) => (r.total_indicacoes || 0) === 0);
+      else if (cf.status === "abaixo") rows = rows.filter((r) => (r.total_indicacoes || 0) < (r.meta || 0));
+      else if (cf.status === "ok") rows = rows.filter((r) => (r.total_indicacoes || 0) >= (r.meta || 0));
+
+      // Gera token para quem não tem
+      for (const r of rows) {
+        if (!r.token) {
+          const { data: tk } = await adminClient.rpc("eleicao_gerar_token_indicador", {
+            _indicador_id: r.indicador_id,
+          });
+          if (tk) r.token = tk as string;
+        }
+      }
+
+      const origin = (payload.cobranca_origin as string) || "";
+      const render = (tpl: string, r: any) => {
+        const primeiro = (r.nome || "").split(" ")[0] || r.nome || "";
+        const faltam = Math.max(0, (r.meta || 0) - (r.total_indicacoes || 0));
+        const link = r.token ? `${origin}/indicar/${r.token}` : "";
+        return tpl
+          .replace(/\{primeiro_nome\}/g, primeiro)
+          .replace(/\{nome\}/g, r.nome || "")
+          .replace(/\{meta\}/g, String(r.meta || 0))
+          .replace(/\{total\}/g, String(r.total_indicacoes || 0))
+          .replace(/\{faltam\}/g, String(faltam))
+          .replace(/\{link\}/g, link)
+          .replace(/\{candidato\}/g, candidatoNome);
+      };
+
+      recipients = rows
+        .filter((r) => !!r.telefone && !!r.token)
+        .map((r) => ({
+          telefone: r.telefone as string,
+          nome: r.nome as string,
+          indicador_id: r.indicador_id as string,
+          mensagem_personalizada: render(mensagem || "", r),
+        }));
     } else {
       if (tag_filtro) {
         const { data: tagData } = await adminClient
