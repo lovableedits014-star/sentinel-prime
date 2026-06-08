@@ -137,6 +137,7 @@ export default function Telemarketing() {
       observacao_tele: r.observacao_tele ?? null,
       locked_by: r.locked_by ?? null,
       locked_until: r.locked_until ?? null,
+      campanha_id: r.campanha_id ?? null,
     }));
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
