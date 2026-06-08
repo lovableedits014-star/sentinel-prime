@@ -190,10 +190,10 @@ export default function TelemarketingAdminCampanhas() {
             <CardContent className="space-y-3">
               <div>
                 <label className="text-xs font-medium mb-1 block">Campanha (opcional)</label>
-                <Select value={importingTo} onValueChange={setImportingTo}>
+                <Select value={importingTo || "__none__"} onValueChange={(v) => setImportingTo(v === "__none__" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder="Sem campanha" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— Sem campanha —</SelectItem>
+                    <SelectItem value="__none__">— Sem campanha —</SelectItem>
                     {campanhas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
