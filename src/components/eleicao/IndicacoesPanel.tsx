@@ -280,11 +280,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           cobranca_filtros: {
             tipo: filtroTipo === "all" ? undefined : filtroTipo,
             status: filtroStatus,
-            indicador_ids: massElegiveis.map((r) => r.indicador_id),
+            indicador_ids: cascata ? undefined : massElegiveis.map((r) => r.indicador_id),
           },
           cobranca_candidato: candidatoNome,
           cobranca_origin: window.location.origin,
           cobranca_janela_horas: janelaHoras,
+          cobranca_cascata: cascata,
           batch_size: 10, delay_min: 5, delay_max: 15, batch_pause: 60,
         },
       });
