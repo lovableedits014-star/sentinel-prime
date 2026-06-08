@@ -678,18 +678,18 @@ Deno.serve(async (req) => {
       recipients = (data || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
     } else if (tipo === "indicadores_cobranca") {
       // ====== Cobrança em massa de indicadores ======
-      // payload: cobranca_filtros { tipo?, status?: 'all'|'zerados'|'abaixo'|'ok', indicador_ids?: string[] }
-      // payload: cobranca_candidato (string opcional)
       const cf = (payload.cobranca_filtros || {}) as {
         tipo?: "coordenador" | "lider" | "cabo";
         status?: "all" | "zerados" | "abaixo" | "ok";
         indicador_ids?: string[];
       };
       const candidatoNome = (payload.cobranca_candidato as string) || "";
+      const janelaHoras = Number(payload.cobranca_janela_horas) || 0;
+      const testePhone = (payload.cobranca_teste_telefone as string) || "";
 
       let q = adminClient
         .from("v_eleicao_indicadores_cobranca")
-        .select("indicador_id, nome, telefone, token, total_indicacoes, meta, tipo")
+        .select("indicador_id, nome, telefone, token, total_indicacoes, meta, tipo, ultima_cobranca_em")
         .eq("client_id", client_id)
         .not("telefone", "is", null);
       if (cf.tipo) q = q.eq("tipo", cf.tipo);
@@ -703,8 +703,15 @@ Deno.serve(async (req) => {
       else if (cf.status === "abaixo") rows = rows.filter((r) => (r.total_indicacoes || 0) < (r.meta || 0));
       else if (cf.status === "ok") rows = rows.filter((r) => (r.total_indicacoes || 0) >= (r.meta || 0));
 
-      // Gera token para quem não tem
-      for (const r of rows) {
+      // Janela "não reenviar nas últimas X horas"
+      if (janelaHoras > 0 && !testePhone) {
+        const cutoff = Date.now() - janelaHoras * 3600 * 1000;
+        rows = rows.filter((r) => !r.ultima_cobranca_em || new Date(r.ultima_cobranca_em).getTime() < cutoff);
+      }
+
+      // Gera token para quem não tem (modo teste: só o 1º)
+      const toEnsureTokens = testePhone ? rows.slice(0, 1) : rows;
+      for (const r of toEnsureTokens) {
         if (!r.token) {
           const { data: tk } = await adminClient.rpc("eleicao_gerar_token_indicador", {
             _indicador_id: r.indicador_id,
@@ -728,14 +735,23 @@ Deno.serve(async (req) => {
           .replace(/\{candidato\}/g, candidatoNome);
       };
 
-      recipients = rows
-        .filter((r) => !!r.telefone && !!r.token)
-        .map((r) => ({
-          telefone: r.telefone as string,
-          nome: r.nome as string,
-          indicador_id: r.indicador_id as string,
-          mensagem_personalizada: render(mensagem || "", r),
-        }));
+      if (testePhone) {
+        const base = rows.find((r) => !!r.token) || rows[0];
+        recipients = base ? [{
+          telefone: testePhone,
+          nome: `[TESTE] ${base.nome || ""}`,
+          mensagem_personalizada: `[TESTE]\n${render(mensagem || "", base)}`,
+        }] : [];
+      } else {
+        recipients = rows
+          .filter((r) => !!r.telefone && !!r.token)
+          .map((r) => ({
+            telefone: r.telefone as string,
+            nome: r.nome as string,
+            indicador_id: r.indicador_id as string,
+            mensagem_personalizada: render(mensagem || "", r),
+          }));
+      }
     } else {
       if (tag_filtro) {
         const { data: tagData } = await adminClient
