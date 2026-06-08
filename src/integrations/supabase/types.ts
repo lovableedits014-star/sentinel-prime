@@ -6530,29 +6530,169 @@ export type Database = {
         }
         Relationships: []
       }
+      telemarketing_campanhas: {
+        Row: {
+          ativo: boolean
+          client_id: string
+          created_at: string
+          descricao: string | null
+          filtros: Json
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          client_id: string
+          created_at?: string
+          descricao?: string | null
+          filtros?: Json
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          client_id?: string
+          created_at?: string
+          descricao?: string | null
+          filtros?: Json
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      telemarketing_contatos_avulsos: {
+        Row: {
+          ativo: boolean
+          bairro: string | null
+          campanha_id: string | null
+          candidato_alternativo: string | null
+          cidade: string | null
+          client_id: string
+          created_at: string
+          id: string
+          ligacao_em: string | null
+          ligacao_status: string | null
+          nome: string
+          observacao_tele: string | null
+          operador_nome: string | null
+          proxima_tentativa_em: string | null
+          telefone: string
+          tentativas_count: number
+          vota_candidato: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          bairro?: string | null
+          campanha_id?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          client_id: string
+          created_at?: string
+          id?: string
+          ligacao_em?: string | null
+          ligacao_status?: string | null
+          nome: string
+          observacao_tele?: string | null
+          operador_nome?: string | null
+          proxima_tentativa_em?: string | null
+          telefone: string
+          tentativas_count?: number
+          vota_candidato?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          bairro?: string | null
+          campanha_id?: string | null
+          candidato_alternativo?: string | null
+          cidade?: string | null
+          client_id?: string
+          created_at?: string
+          id?: string
+          ligacao_em?: string | null
+          ligacao_status?: string | null
+          nome?: string
+          observacao_tele?: string | null
+          operador_nome?: string | null
+          proxima_tentativa_em?: string | null
+          telefone?: string
+          tentativas_count?: number
+          vota_candidato?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemarketing_contatos_avulsos_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telemarketing_operador_audit: {
+        Row: {
+          client_id: string
+          created_at: string
+          detalhe: Json | null
+          evento: string
+          id: string
+          operador_nome: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          detalhe?: Json | null
+          evento: string
+          id?: string
+          operador_nome: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          detalhe?: Json | null
+          evento?: string
+          id?: string
+          operador_nome?: string
+        }
+        Relationships: []
+      }
       telemarketing_operadores: {
         Row: {
           ativo: boolean
           client_id: string
           created_at: string
+          failed_attempts: number
           id: string
+          last_login_at: string | null
+          locked_until: string | null
           nome: string
+          password_updated_at: string
           senha: string
         }
         Insert: {
           ativo?: boolean
           client_id: string
           created_at?: string
+          failed_attempts?: number
           id?: string
+          last_login_at?: string | null
+          locked_until?: string | null
           nome: string
+          password_updated_at?: string
           senha: string
         }
         Update: {
           ativo?: boolean
           client_id?: string
           created_at?: string
+          failed_attempts?: number
           id?: string
+          last_login_at?: string | null
+          locked_until?: string | null
           nome?: string
+          password_updated_at?: string
           senha?: string
         }
         Relationships: [
@@ -7413,6 +7553,10 @@ export type Database = {
       }
     }
     Functions: {
+      _tele_assert_operador: {
+        Args: { _client_id: string; _nome: string; _senha: string }
+        Returns: undefined
+      }
       calculate_engagement_score: {
         Args: { p_days?: number; p_supporter_id: string }
         Returns: number
@@ -7896,6 +8040,10 @@ export type Database = {
         Returns: undefined
       }
       tea_ranking_ms: { Args: { p_codigo_ibge: number }; Returns: Json }
+      tele_change_operador_password: {
+        Args: { _new_senha: string; _operador_id: string }
+        Returns: Json
+      }
       tele_claim_contato: {
         Args: {
           _client_id: string
@@ -7931,10 +8079,15 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      tele_import_contato_avulso_batch: {
+        Args: { _campanha_id: string; _client_id: string; _rows: Json }
+        Returns: Json
+      }
       tele_list_contatos: {
         Args: { _client_id: string; _nome: string; _senha: string }
         Returns: {
           bairro: string
+          campanha_id: string
           candidato_alternativo: string
           cidade: string
           id: string
@@ -7980,6 +8133,7 @@ export type Database = {
         }
         Returns: Json
       }
+      tele_unlock_operador: { Args: { _operador_id: string }; Returns: Json }
       unaccent: { Args: { "": string }; Returns: string }
       user_allowed_paths: { Args: { _client_id: string }; Returns: string[] }
       user_can_access_client: { Args: { _client_id: string }; Returns: boolean }
