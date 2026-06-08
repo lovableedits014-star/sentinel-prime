@@ -686,22 +686,59 @@ Deno.serve(async (req) => {
       const candidatoNome = (payload.cobranca_candidato as string) || "";
       const janelaHoras = Number(payload.cobranca_janela_horas) || 0;
       const testePhone = (payload.cobranca_teste_telefone as string) || "";
+      const cascata = !!payload.cobranca_cascata;
 
+      const matchStatus = (r: any) => {
+        if (cf.status === "zerados") return (r.total_indicacoes || 0) === 0;
+        if (cf.status === "abaixo") return (r.total_indicacoes || 0) < (r.meta || 0);
+        if (cf.status === "ok") return (r.total_indicacoes || 0) >= (r.meta || 0);
+        return true;
+      };
+
+      // Em modo cascata, precisamos do universo completo para resolver descendentes
       let q = adminClient
         .from("v_eleicao_indicadores_cobranca")
-        .select("indicador_id, nome, telefone, token, total_indicacoes, meta, tipo, ultima_cobranca_em")
+        .select("indicador_id, nome, telefone, token, total_indicacoes, meta, tipo, ultima_cobranca_em, parent_id")
         .eq("client_id", client_id)
         .not("telefone", "is", null);
-      if (cf.tipo) q = q.eq("tipo", cf.tipo);
-      if (Array.isArray(cf.indicador_ids) && cf.indicador_ids.length > 0) {
+      if (cf.tipo && !cascata) q = q.eq("tipo", cf.tipo);
+      if (Array.isArray(cf.indicador_ids) && cf.indicador_ids.length > 0 && !cascata) {
         q = q.in("indicador_id", cf.indicador_ids);
       }
-      const { data: rowsRaw } = await q.limit(5000);
-      let rows = (rowsRaw || []) as any[];
+      const { data: rowsRaw } = await q.limit(10000);
+      const allRows = (rowsRaw || []) as any[];
 
-      if (cf.status === "zerados") rows = rows.filter((r) => (r.total_indicacoes || 0) === 0);
-      else if (cf.status === "abaixo") rows = rows.filter((r) => (r.total_indicacoes || 0) < (r.meta || 0));
-      else if (cf.status === "ok") rows = rows.filter((r) => (r.total_indicacoes || 0) >= (r.meta || 0));
+      let rows: any[];
+      if (cascata) {
+        // Sementes: linhas que batem com filtro tipo + ids (ou todas) e status
+        const idsFilter = (Array.isArray(cf.indicador_ids) && cf.indicador_ids.length > 0)
+          ? new Set(cf.indicador_ids) : null;
+        const seeds = allRows.filter((r) =>
+          (!cf.tipo || r.tipo === cf.tipo) &&
+          (!idsFilter || idsFilter.has(r.indicador_id)) &&
+          matchStatus(r)
+        );
+        // Expande descendentes (todos os níveis), aplicando o mesmo status
+        const childrenByParent = new Map<string, any[]>();
+        for (const r of allRows) {
+          if (!r.parent_id) continue;
+          const list = childrenByParent.get(r.parent_id) || [];
+          list.push(r);
+          childrenByParent.set(r.parent_id, list);
+        }
+        const selected = new Map<string, any>();
+        const queue = [...seeds];
+        while (queue.length) {
+          const cur = queue.shift()!;
+          if (selected.has(cur.indicador_id)) continue;
+          selected.set(cur.indicador_id, cur);
+          const kids = childrenByParent.get(cur.indicador_id) || [];
+          for (const k of kids) if (matchStatus(k)) queue.push(k);
+        }
+        rows = Array.from(selected.values());
+      } else {
+        rows = allRows.filter(matchStatus);
+      }
 
       // Janela "não reenviar nas últimas X horas"
       if (janelaHoras > 0 && !testePhone) {
