@@ -181,6 +181,78 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
     URL.revokeObjectURL(url);
   };
 
+  // Bairro breakdown (top 10 by vota sim)
+  const bairroBreakdown = useMemo(() => {
+    const map: Record<string, { total: number; sim: number; nao: number; indeciso: number; pendente: number }> = {};
+    filtered.forEach(c => {
+      const k = (c.bairro || "(sem bairro)").trim() || "(sem bairro)";
+      if (!map[k]) map[k] = { total: 0, sim: 0, nao: 0, indeciso: 0, pendente: 0 };
+      map[k].total++;
+      if (c.vota_candidato === "sim") map[k].sim++;
+      else if (c.vota_candidato === "nao") map[k].nao++;
+      else if (c.vota_candidato === "indeciso") map[k].indeciso++;
+      else if (!c.ligacao_status || c.ligacao_status === "pendente") map[k].pendente++;
+    });
+    return Object.entries(map)
+      .map(([nome, v]) => ({ nome, ...v }))
+      .sort((a, b) => b.sim - a.sim || b.total - a.total)
+      .slice(0, 10);
+  }, [filtered]);
+
+  const exportPDF = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const liderName = selectedLider === "geral" ? "Geral" : (lideres.find(l => l.id === selectedLider)?.nome || "Líder");
+    doc.setFontSize(16);
+    doc.text(`Relatório de Telemarketing — ${liderName}`, 40, 40);
+    doc.setFontSize(10);
+    doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 40, 58);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [["Indicador", "Valor"]],
+      body: [
+        ["Total de contatos", String(total)],
+        ["Ligações feitas", `${ligados} (${total ? Math.round(ligados/total*100) : 0}%)`],
+        ["Atenderam", String(atendeu)],
+        ["Vota ✅", `${votaSim} (${pctSim}%)`],
+        ["Não vota ❌", String(votaNao)],
+        ["Indecisos 🤔", String(votoIndeciso)],
+        ["Recusaram", String(recusou)],
+        ["Pendentes", String(pendentes)],
+      ],
+      styles: { fontSize: 9 },
+    });
+
+    if (bairroBreakdown.length) {
+      autoTable(doc, {
+        head: [["Bairro", "Total", "Sim", "Não", "Indeciso", "Pendente"]],
+        body: bairroBreakdown.map(b => [b.nome, b.total, b.sim, b.nao, b.indeciso, b.pendente]),
+        styles: { fontSize: 9 },
+      });
+    }
+
+    if (alternativeRanking.length) {
+      autoTable(doc, {
+        head: [["Candidato alternativo", "Menções"]],
+        body: alternativeRanking.map(a => [a.name, a.count]),
+        styles: { fontSize: 9 },
+      });
+    }
+
+    autoTable(doc, {
+      head: [["Nome", "Telefone", "Tipo", "Status", "Voto", "Operador"]],
+      body: filtered.slice(0, 500).map(c => [
+        c.nome, c.telefone, c.tipo,
+        c.ligacao_status || "pendente",
+        c.vota_candidato || "—",
+        c.operador_nome || "—",
+      ]),
+      styles: { fontSize: 8 },
+    });
+
+    doc.save(`relatorio-telemarketing-${liderName.replace(/\s/g, "_")}.pdf`);
+  };
+
   const pctSim = ligados > 0 ? Math.round((votaSim / ligados) * 100) : 0;
 
   return (
