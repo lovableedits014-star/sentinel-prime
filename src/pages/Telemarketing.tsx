@@ -254,7 +254,16 @@ export default function Telemarketing() {
     resetForm();
   };
 
-  const skipToNext = () => {
+  const skipToNext = async () => {
+    if (current && clientId) {
+      await supabase.rpc("tele_release_contato" as any, {
+        _client_id: clientId,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _tabela: current.tabela,
+        _id: current.id,
+      });
+    }
     const next = filteredContatos.findIndex(
       (i, idx) => idx > currentIndex && (!i.ligacao_status || i.ligacao_status === "pendente")
     );
