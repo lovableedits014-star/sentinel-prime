@@ -28,6 +28,15 @@ interface ContatoTele {
   observacao_tele: string | null;
   locked_by: string | null;
   locked_until: string | null;
+  campanha_id: string | null;
+}
+
+interface CampanhaScript {
+  id: string;
+  nome: string;
+  script_intro: string | null;
+  script_perguntas: string[] | null;
+  tags_rapidas: string[] | null;
 }
 
 export default function Telemarketing() {
