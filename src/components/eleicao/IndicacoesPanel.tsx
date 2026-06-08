@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock } from "lucide-react";
 import CobrancaAutoConfig from "./CobrancaAutoConfig";
@@ -96,6 +97,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [massTemplate, setMassTemplate] = useState<string>(TEMPLATE_PADRAO.abaixo);
   const [massSending, setMassSending] = useState(false);
   const [janelaHoras, setJanelaHoras] = useState<number>(48);
+  const [cascata, setCascata] = useState<boolean>(false);
   const [testePhone, setTestePhone] = useState<string>("");
   const [testando, setTestando] = useState(false);
   const [historico, setHistorico] = useState<DispatchHist[]>([]);
@@ -249,6 +251,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           cobranca_candidato: candidatoNome,
           cobranca_origin: window.location.origin,
           cobranca_teste_telefone: phone,
+          cobranca_cascata: cascata,
           batch_size: 1, delay_min: 0, delay_max: 1, batch_pause: 0,
         },
       });
@@ -278,11 +281,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           cobranca_filtros: {
             tipo: filtroTipo === "all" ? undefined : filtroTipo,
             status: filtroStatus,
-            indicador_ids: massElegiveis.map((r) => r.indicador_id),
+            indicador_ids: cascata ? undefined : massElegiveis.map((r) => r.indicador_id),
           },
           cobranca_candidato: candidatoNome,
           cobranca_origin: window.location.origin,
           cobranca_janela_horas: janelaHoras,
+          cobranca_cascata: cascata,
           batch_size: 10, delay_min: 5, delay_max: 15, batch_pause: 60,
         },
       });
@@ -590,6 +594,17 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                 </div>
                 <p className="text-[10px] text-muted-foreground">Envia 1 mensagem pra esse número usando o 1º indicador como base.</p>
               </div>
+            </div>
+
+            {/* Cobrar em cascata */}
+            <div className="flex items-start justify-between gap-3 rounded-md border p-3 bg-muted/30">
+              <div>
+                <Label htmlFor="mass-cascata" className="text-sm">Cobrar em cascata</Label>
+                <p className="text-[11px] text-muted-foreground mt-1 max-w-md">
+                  Inclui também líderes vinculados aos coordenadores e cabos vinculados aos líderes que estiverem no mesmo status. Útil para acionar a estrutura inteira de uma vez.
+                </p>
+              </div>
+              <Switch id="mass-cascata" checked={cascata} onCheckedChange={setCascata} />
             </div>
 
             {/* Template */}

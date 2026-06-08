@@ -22,6 +22,7 @@ type Cfg = {
   mensagem_template: string;
   janela_horas: number;
   max_por_disparo: number;
+  cascata: boolean;
   ultimo_disparo_em?: string | null;
   ultimo_resultado?: string | null;
 };
@@ -48,6 +49,7 @@ export default function CobrancaAutoConfig({ clientId }: { clientId: string }) {
     mensagem_template: DEFAULT_TEMPLATE,
     janela_horas: 48,
     max_por_disparo: 300,
+    cascata: false,
   });
 
   useEffect(() => {
@@ -179,6 +181,17 @@ export default function CobrancaAutoConfig({ clientId }: { clientId: string }) {
           <Input type="number" min={1} max={2000} value={cfg.max_por_disparo}
             onChange={(e) => setCfg({ ...cfg, max_por_disparo: parseInt(e.target.value) || 1 })} />
         </div>
+      </div>
+
+      <div className="border-t pt-4 flex items-start justify-between gap-4">
+        <div>
+          <Label htmlFor="auto-cascata" className="text-sm">Cobrar em cascata</Label>
+          <p className="text-[11px] text-muted-foreground mt-1 max-w-md">
+            Além dos selecionados pelos filtros, inclui também líderes vinculados aos coordenadores e cabos vinculados aos líderes (todos abaixo da meta, conforme o status escolhido).
+          </p>
+        </div>
+        <Switch id="auto-cascata" checked={cfg.cascata}
+          onCheckedChange={(v) => setCfg({ ...cfg, cascata: v })} />
       </div>
 
       {cfg.ultimo_disparo_em && (

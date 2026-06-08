@@ -1639,6 +1639,7 @@ export type Database = {
       eleicao_cobranca_auto_config: {
         Row: {
           ativo: boolean
+          cascata: boolean
           client_id: string
           created_at: string
           dias_semana: number[]
@@ -1657,6 +1658,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          cascata?: boolean
           client_id: string
           created_at?: string
           dias_semana?: number[]
@@ -1675,6 +1677,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          cascata?: boolean
           client_id?: string
           created_at?: string
           dias_semana?: number[]
