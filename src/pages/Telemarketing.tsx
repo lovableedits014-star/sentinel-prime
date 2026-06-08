@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,14 +43,18 @@ interface CampanhaScript {
 
 export default function Telemarketing() {
   const { clientId } = useParams<{ clientId: string }>();
-  const [operadorNome, setOperadorNome] = useState("");
-  const [operadorSenha, setOperadorSenha] = useState("");
+  const [searchParams] = useSearchParams();
+  const campanhaIdParam = searchParams.get("campanha");
+  const [operadorNome, setOperadorNome] = useState(searchParams.get("nome") || "");
+  const [operadorSenha, setOperadorSenha] = useState(searchParams.get("senha") || "");
   const [loggedIn, setLoggedIn] = useState(false);
   const [contatos, setContatos] = useState<ContatoTele[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [clientName, setClientName] = useState("");
+  const [campanhaNome, setCampanhaNome] = useState<string | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura">("todos");
+  const autoLoginAttempted = useRef(false);
 
   // Form state
   const [ligacaoStatus, setLigacaoStatus] = useState("");
@@ -76,8 +80,27 @@ export default function Telemarketing() {
             if (data) setClientName(data.name);
           });
       }
+      if (campanhaIdParam) {
+        supabase.from("telemarketing_campanhas" as any)
+          .select("nome")
+          .eq("id", campanhaIdParam)
+          .maybeSingle()
+          .then(({ data }: any) => { if (data?.nome) setCampanhaNome(data.nome); });
+      }
     });
+  }, [clientId, campanhaIdParam]);
+
+  // Auto-login when admin opens with ?auto=1&nome=...&senha=...
+  useEffect(() => {
+    if (autoLoginAttempted.current) return;
+    if (!clientId) return;
+    if (searchParams.get("auto") !== "1") return;
+    if (!operadorNome.trim() || !operadorSenha.trim()) return;
+    autoLoginAttempted.current = true;
+    handleLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
+
 
   const handleLogin = async () => {
     if (!operadorNome.trim() || !operadorSenha.trim()) {
@@ -111,11 +134,13 @@ export default function Telemarketing() {
       return;
     }
 
-    // Fetch all contacts via secure RPC (operator-authenticated, no direct table read)
+    // Fetch contacts via secure RPC (operator-authenticated). When opened from
+    // the admin "Filas" page, ?campanha=ID restricts the list to that fila.
     const { data: rpcRows, error: rpcErr } = await supabase.rpc("tele_list_contatos" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
+      _campanha_id: campanhaIdParam || null,
     });
     if (rpcErr) {
       toast.error("Erro ao carregar contatos: " + rpcErr.message);
@@ -388,6 +413,7 @@ export default function Telemarketing() {
           </p>
           <p className="text-xs text-muted-foreground">
             Operador: <span className="font-medium text-foreground">{operadorNome}</span>
+            {campanhaNome && <> · Fila: <span className="font-medium text-foreground">{campanhaNome}</span></>}
           </p>
         </div>
         <div className="flex gap-2">
