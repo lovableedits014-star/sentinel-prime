@@ -480,6 +480,16 @@ export default function Telemarketing() {
                 </div>
               )}
 
+              {current.indicador_nome && (
+                <div className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 p-2 rounded flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5" />
+                  Indicado por <span className="font-semibold">{current.indicador_nome}</span>
+                  {current.indicador_tipo && (
+                    <Badge variant="outline" className="text-[10px] capitalize">{current.indicador_tipo}</Badge>
+                  )}
+                </div>
+              )}
+
               {/* Lock / tentativas / agendamento info */}
               {current.locked_by && current.locked_by !== operadorNome.trim() && (
                 <div className="flex items-center gap-2 text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 p-2 rounded">
