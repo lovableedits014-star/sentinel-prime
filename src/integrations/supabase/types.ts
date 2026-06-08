@@ -1636,6 +1636,71 @@ export type Database = {
           },
         ]
       }
+      eleicao_cobranca_auto_config: {
+        Row: {
+          ativo: boolean
+          client_id: string
+          created_at: string
+          dias_semana: number[]
+          filtro_status: string
+          filtro_tipo: string | null
+          frequencia: string
+          hora_envio: string
+          id: string
+          janela_horas: number
+          max_por_disparo: number
+          mensagem_template: string
+          proximo_disparo_em: string | null
+          ultimo_disparo_em: string | null
+          ultimo_resultado: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          client_id: string
+          created_at?: string
+          dias_semana?: number[]
+          filtro_status?: string
+          filtro_tipo?: string | null
+          frequencia?: string
+          hora_envio?: string
+          id?: string
+          janela_horas?: number
+          max_por_disparo?: number
+          mensagem_template?: string
+          proximo_disparo_em?: string | null
+          ultimo_disparo_em?: string | null
+          ultimo_resultado?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          client_id?: string
+          created_at?: string
+          dias_semana?: number[]
+          filtro_status?: string
+          filtro_tipo?: string | null
+          frequencia?: string
+          hora_envio?: string
+          id?: string
+          janela_horas?: number
+          max_por_disparo?: number
+          mensagem_template?: string
+          proximo_disparo_em?: string | null
+          ultimo_disparo_em?: string | null
+          ultimo_resultado?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_cobranca_auto_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eleicao_cobranca_log: {
         Row: {
           client_id: string
