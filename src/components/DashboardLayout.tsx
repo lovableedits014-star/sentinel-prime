@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, MessageSquare, Settings, LogOut, Shield,
-  Users, TrendingUp, Crown, Menu, X, MapPin, BookUser, UserPlus, Kanban, Sparkles, Trophy, Target, Briefcase, Send, CalendarCheck, Vote, CalendarDays, Newspaper, Activity, Megaphone, Brain,
+  Users, TrendingUp, Crown, Menu, X, MapPin, BookUser, UserPlus, Kanban, Sparkles, Trophy, Target, Briefcase, Send, CalendarCheck, Vote, CalendarDays, Newspaper, Activity, Megaphone, Brain, Headphones,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -83,6 +83,7 @@ const MENU_SECTIONS: MenuSection[] = [
       { icon: Users, label: "Funcionários", path: "/funcionarios" },
       { icon: CalendarCheck, label: "Controle de Presença", path: "/presenca" },
       { icon: CalendarDays, label: "Calendário Político", path: "/calendario-politico" },
+      { icon: Headphones, label: "Telemarketing", path: "/telemarketing-admin" },
     ],
   },
   {

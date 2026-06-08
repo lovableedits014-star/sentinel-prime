@@ -56,6 +56,12 @@ const CentralWhatsApp = lazy(() => import("./pages/CentralWhatsApp"));
 const Militancia = lazy(() => import("./pages/Militancia"));
 const InteligenciaConteudo = lazy(() => import("./pages/InteligenciaConteudo"));
 const FotoPublica = lazy(() => import("./pages/FotoPublica"));
+const TelemarketingAdmin = lazy(() => import("./pages/TelemarketingAdmin"));
+const TelemarketingAdminFila = lazy(() => import("./pages/TelemarketingAdminFila"));
+const TelemarketingAdminResultados = lazy(() => import("./pages/TelemarketingAdminResultados"));
+const TelemarketingAdminRelatorios = lazy(() => import("./pages/TelemarketingAdminRelatorios"));
+const TelemarketingAdminOperadores = lazy(() => import("./pages/TelemarketingAdminOperadores"));
+const TelemarketingAdminConfig = lazy(() => import("./pages/TelemarketingAdminConfig"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
@@ -150,6 +156,12 @@ const AppRouter = () => {
               <Route path="/calendario-politico" element={<CalendarioPolitico />} />
               <Route path="/midia" element={<Midia />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/telemarketing-admin" element={<TelemarketingAdmin />} />
+              <Route path="/telemarketing-admin/fila" element={<TelemarketingAdminFila />} />
+              <Route path="/telemarketing-admin/resultados" element={<TelemarketingAdminResultados />} />
+              <Route path="/telemarketing-admin/relatorios" element={<TelemarketingAdminRelatorios />} />
+              <Route path="/telemarketing-admin/operadores" element={<TelemarketingAdminOperadores />} />
+              <Route path="/telemarketing-admin/configuracoes" element={<TelemarketingAdminConfig />} />
               <Route path="/status-whatsapp" element={<Navigate to="/whatsapp?tab=status" replace />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
