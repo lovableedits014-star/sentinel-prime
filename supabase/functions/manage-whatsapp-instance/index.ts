@@ -142,30 +142,10 @@ type CooldownCheck =
   | { allowed: false; remainingMs: number; reason: string; remainingAttempts?: number };
 
 function checkReconnectCooldown(
-  row: any,
-  kind: "create" | "reconnect",
+  _row: any,
+  _kind: "create" | "reconnect",
 ): CooldownCheck {
-  if (!row) return { allowed: true };
-  const cooldown = kind === "create" ? CREATE_COOLDOWN_MS : RECONNECT_COOLDOWN_MS;
-  const lastAt = row.last_create_instance_at ? new Date(row.last_create_instance_at).getTime() : 0;
-  const elapsed = Date.now() - lastAt;
-  if (lastAt && elapsed < cooldown) {
-    return {
-      allowed: false,
-      remainingMs: cooldown - elapsed,
-      reason: `Proteção anti-ban: aguarde antes de tentar reconectar novamente.`,
-    };
-  }
-  const sameDay = row.reconnect_attempts_date === todayDateStr();
-  const used = sameDay ? Number(row.reconnect_attempts_today || 0) : 0;
-  if (used >= MAX_RECONNECTS_PER_DAY) {
-    return {
-      allowed: false,
-      remainingMs: 0,
-      reason: `Limite diário de ${MAX_RECONNECTS_PER_DAY} tentativas de reconexão atingido. Aguarde 24h.`,
-      remainingAttempts: 0,
-    };
-  }
+  // Cooldown anti-ban desativado a pedido do usuário — sempre permite.
   return { allowed: true };
 }
 
