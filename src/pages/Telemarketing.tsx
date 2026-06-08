@@ -496,6 +496,40 @@ export default function Telemarketing() {
                 </div>
               )}
 
+              {/* Script da campanha */}
+              {(() => {
+                const script = current.campanha_id ? scripts.find(s => s.id === current.campanha_id) : null;
+                if (!script || (!script.script_intro && !(script.script_perguntas || []).length && !(script.tags_rapidas || []).length)) return null;
+                return (
+                  <div className="bg-primary/5 border border-primary/20 rounded p-3 space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Script — {script.nome}</p>
+                    {script.script_intro && (
+                      <p className="text-xs whitespace-pre-wrap">{script.script_intro}</p>
+                    )}
+                    {(script.script_perguntas || []).length > 0 && (
+                      <ol className="text-xs list-decimal pl-4 space-y-0.5">
+                        {(script.script_perguntas || []).map((q, i) => <li key={i}>{q}</li>)}
+                      </ol>
+                    )}
+                    {(script.tags_rapidas || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {(script.tags_rapidas || []).map((t, i) => (
+                          <Button
+                            key={i}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-[10px] px-2"
+                            onClick={() => setObservacao((prev) => prev ? `${prev}; ${t}` : t)}
+                          >+ {t}</Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+
               {/* Call result form */}
               <div className="border-t pt-4 space-y-3">
                 <p className="font-medium text-sm">Resultado da ligação</p>
