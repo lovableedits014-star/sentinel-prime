@@ -1156,21 +1156,13 @@ Deno.serve(async (req) => {
       const dbDisconnected = freshRow?.status === "disconnected";
 
       if (currentStatus !== "connected" || dbDisconnected || recentlyDropped) {
-        const reconnect = await tryReconnectInstance(adminClient, activeInstanceRow);
-        if (reconnect.status !== "connected") {
-          const error = "Instância WhatsApp desconectada. Reconecte o chip antes de enviar.";
-          const bridgeState = String(reconnect.details?.status || reconnect.details?.instance?.status || health.details?.status || health.details?.instance?.status || "").toLowerCase();
-          if (isExplicitOfflineStatus(bridgeState)) {
-            await markInstanceDisconnected(adminClient, instance_id);
-          }
-          await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
-          return jsonResponse({ success: false, status: reconnect.status || health.status, error, health, reconnect });
-        }
-        // Reconexão bem-sucedida: aguarda 2s para o socket WhatsApp estabilizar
-        // antes de tentar enviar (envios imediatos pós-reconnect costumam falhar).
-        if (recentlyDropped || dbDisconnected) {
-          await sleep(2000);
-        }
+        // Política anti-ban: NÃO chamamos /reconnect proativamente antes de enviar.
+        // Se o status atual ou recente diz "desconectado", recusamos o envio e
+        // pedimos reconexão MANUAL. Auto-reconnect só acontece DEPOIS de uma
+        // falha real de envio (bloco abaixo), e ainda assim com cooldown de 15min.
+        const error = "Instância WhatsApp desconectada. Reconecte o chip manualmente (botão na UI) antes de enviar.";
+        await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
+        return jsonResponse({ success: false, status: health.status, error, health });
       }
     }
 
