@@ -150,17 +150,36 @@ export default function Telemarketing() {
     setCandidatoAlt("");
     setCidade("");
     setBairro("");
+    setObservacao("");
+    setProximaTentativa("");
   };
 
+  // Reivindica trava de 5min ao abrir o contato; libera ao trocar/pular
   useEffect(() => {
-    if (current) {
+    if (current && clientId) {
       setCidade(current.cidade || "");
       setBairro(current.bairro || "");
+      setObservacao("");
+      setProximaTentativa("");
       setLigacaoStatus("");
       setVotaCandidato("");
       setCandidatoAlt("");
+      supabase.rpc("tele_claim_contato" as any, {
+        _client_id: clientId,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _tabela: current.tabela,
+        _id: current.id,
+        _ttl_seconds: 300,
+      }).then(({ data }: any) => {
+        if (data && data.claimed === false && data.operador_nome && data.operador_nome !== operadorNome.trim()) {
+          toast.warning(`Este contato já está em atendimento por ${data.operador_nome}`);
+        }
+      });
     }
-  }, [currentIndex, filtroTipo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
+
 
   const handleSave = async () => {
     if (!ligacaoStatus) {
