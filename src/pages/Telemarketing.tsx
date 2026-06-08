@@ -75,15 +75,26 @@ export default function Telemarketing() {
     setLoading(true);
 
     // Validate operator credentials via SECURITY DEFINER function (senha não trafega na tabela)
-    const { data: opRows } = await supabase.rpc("verify_telemarketing_operador" as any, {
+    const { data: opRows, error: opErr } = await supabase.rpc("verify_telemarketing_operador" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
     });
-    const opData = Array.isArray(opRows) && opRows.length > 0 ? opRows[0] : null;
 
+    if (opErr) {
+      const msg = opErr.message || "";
+      if (/bloque/i.test(msg)) {
+        toast.error("Conta bloqueada temporariamente por excesso de tentativas. Tente novamente em alguns minutos.");
+      } else {
+        toast.error("Nome ou senha inválidos");
+      }
+      setLoading(false);
+      return;
+    }
+
+    const opData = Array.isArray(opRows) && opRows.length > 0 ? opRows[0] : null;
     if (!opData) {
-      toast.error("Nome ou senha inválidos");
+      toast.error("Nome ou senha inválidos. Após 5 tentativas, a conta é bloqueada por 15 minutos.");
       setLoading(false);
       return;
     }
