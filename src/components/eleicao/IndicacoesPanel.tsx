@@ -431,7 +431,43 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               Mostrando {filtered.length} de {rows.length} indicadores
             </div>
           </Card>
+
+          {/* Histórico de disparos de cobrança */}
+          {historico.length > 0 && (
+            <Card className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm flex items-center gap-2"><History className="w-4 h-4" />Histórico de cobranças</h3>
+                <span className="text-[11px] text-muted-foreground">últimos 10 disparos</span>
+              </div>
+              <div className="divide-y">
+                {historico.map((h) => {
+                  const statusColor =
+                    h.status === "completed" ? "text-emerald-600" :
+                    h.status === "sending" ? "text-blue-600" :
+                    h.status === "failed" ? "text-red-600" :
+                    h.status === "queued" ? "text-amber-600" : "text-muted-foreground";
+                  return (
+                    <div key={h.id} className="py-2 flex items-center gap-3 text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">{h.titulo}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {new Date(h.created_at).toLocaleString("pt-BR")} · {fmtAgo(h.completed_at || h.created_at)}
+                        </div>
+                      </div>
+                      <div className="text-xs tabular-nums text-right">
+                        <div><span className="text-emerald-600 font-medium">{h.enviados}</span> enviados</div>
+                        {h.falhas > 0 && <div className="text-red-600">{h.falhas} falhas</div>}
+                        <div className="text-muted-foreground">de {h.total_destinatarios}</div>
+                      </div>
+                      <Badge variant="outline" className={`text-[10px] ${statusColor}`}>{h.status}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
         </TabsContent>
+
 
         {/* ──────────── CONFIG DE METAS ──────────── */}
         <TabsContent value="config" className="space-y-4 mt-4">
