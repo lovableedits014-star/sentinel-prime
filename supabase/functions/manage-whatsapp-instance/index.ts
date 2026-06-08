@@ -303,8 +303,39 @@ async function logDirectSend(adminClient: any, params: { instanceId: string; cli
   });
 }
 
+// Cooldown entre auto-reconexões por instância. Bridge WhatsHub baniu números
+// com 17+ reconexões em 20h; cada /connect abre uma nova sessão WebSocket do
+// WhatsApp. Limitamos a no máximo 1 auto-reconnect a cada 15 minutos por
+// instância. Reconexões manuais (action="reconnect" disparada pelo usuário) NÃO
+// passam por aqui — esta função é só para tentativas automáticas em send/health.
+const AUTO_RECONNECT_COOLDOWN_MS = 15 * 60 * 1000;
+
 async function tryReconnectInstance(adminClient: any, inst: any) {
   if (!inst?.bridge_api_key) return { id: inst?.id, reconnected: false, reason: "missing_api_key" };
+
+  // Cooldown check: evita loop de reconnect que faz o WhatsApp banir o número.
+  const lastAttempt = inst.last_reconnect_attempt_at ? new Date(inst.last_reconnect_attempt_at).getTime() : 0;
+  const sinceLast = Date.now() - lastAttempt;
+  if (lastAttempt > 0 && sinceLast < AUTO_RECONNECT_COOLDOWN_MS) {
+    const waitMs = AUTO_RECONNECT_COOLDOWN_MS - sinceLast;
+    return {
+      id: inst.id,
+      reconnected: false,
+      reason: "cooldown",
+      status: inst.status || "disconnected",
+      ok: false,
+      details: {
+        error: `Reconexão automática em cooldown. Aguarde ${Math.ceil(waitMs / 60000)} min ou peça ao usuário para reconectar manualmente.`,
+      },
+    };
+  }
+
+  // Marca a tentativa ANTES de chamar a bridge, para que falhas/timeouts também contem para o cooldown.
+  await adminClient
+    .from("whatsapp_instances")
+    .update({ last_reconnect_attempt_at: new Date().toISOString() })
+    .eq("id", inst.id);
+
   const { bridgeRes, bridgeData } = await fetchBridgeAction({
     action: "reconnect",
     apiKey: inst.bridge_api_key,
