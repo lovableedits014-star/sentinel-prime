@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { FileText, Download, Users, Phone, CheckCircle2, XCircle, HelpCircle, Crown, TrendingUp } from "lucide-react";
+import { FileText, Download, Users, Phone, CheckCircle2, XCircle, HelpCircle, Crown, TrendingUp, MapPin, FileDown } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface TeleContact {
   id: string;
