@@ -321,6 +321,7 @@ export default function Telemarketing() {
     if (tipo === "liderado") return "Liderado";
     if (tipo === "avulso") return "Mailing";
     if (tipo === "eleicao_indicado") return "Eleição";
+    if (tipo === "estrutura") return "Estrutura";
     return "Indicado";
   };
 
