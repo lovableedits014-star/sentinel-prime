@@ -154,6 +154,75 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     await load();
   }
 
+  // Quem entra no disparo: filtrados + com telefone
+  const massElegiveis = useMemo(() => filtered.filter((r) => !!r.telefone && r.telefone.replace(/\D/g, "").length >= 8), [filtered]);
+  const massSemToken = useMemo(() => massElegiveis.filter((r) => !r.token).length, [massElegiveis]);
+
+  function abrirMass() {
+    if (filtered.length === 0) {
+      toast.error("Nenhum indicador no filtro atual.");
+      return;
+    }
+    const tpl = (TEMPLATE_PADRAO as any)[filtroStatus] || TEMPLATE_PADRAO.all;
+    setMassTemplate(tpl);
+    setMassOpen(true);
+  }
+
+  function previewMass(): string {
+    const r = massElegiveis[0];
+    if (!r) return massTemplate;
+    const primeiro = r.nome.split(" ")[0] || r.nome;
+    const faltam = Math.max(0, r.meta - r.total_indicacoes);
+    const link = r.token ? buildLink(r.token) : `${window.location.origin}/indicar/<token>`;
+    return massTemplate
+      .replace(/\{primeiro_nome\}/g, primeiro)
+      .replace(/\{nome\}/g, r.nome)
+      .replace(/\{meta\}/g, String(r.meta))
+      .replace(/\{total\}/g, String(r.total_indicacoes))
+      .replace(/\{faltam\}/g, String(faltam))
+      .replace(/\{link\}/g, link)
+      .replace(/\{candidato\}/g, candidatoNome);
+  }
+
+  async function enviarMass() {
+    if (massElegiveis.length === 0) { toast.error("Nenhum destinatário com telefone."); return; }
+    if (!massTemplate.includes("{link}")) {
+      toast.error("Inclua {link} na mensagem para o destinatário receber o link de indicação.");
+      return;
+    }
+    setMassSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+        body: {
+          client_id: clientId,
+          titulo: `Cobrança de indicações — ${massElegiveis.length} envios`,
+          mensagem: massTemplate,
+          tipo: "indicadores_cobranca",
+          cobranca_filtros: {
+            tipo: filtroTipo === "all" ? undefined : filtroTipo,
+            status: filtroStatus,
+            indicador_ids: massElegiveis.map((r) => r.indicador_id),
+          },
+          cobranca_candidato: candidatoNome,
+          cobranca_origin: window.location.origin,
+          batch_size: 10, delay_min: 5, delay_max: 15, batch_pause: 60,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.queued) {
+        toast.success("📥 Adicionado à fila — começa assim que o disparo atual terminar.");
+      } else {
+        toast.success(`📤 Cobrança disparada para ${massElegiveis.length} indicadores!`);
+      }
+      setMassOpen(false);
+      setTimeout(load, 1500);
+    } catch (err: any) {
+      toast.error("Falha ao disparar: " + (err?.message || "erro desconhecido"));
+    } finally {
+      setMassSending(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
