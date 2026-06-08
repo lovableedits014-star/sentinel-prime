@@ -183,6 +183,17 @@ export default function CobrancaAutoConfig({ clientId }: { clientId: string }) {
         </div>
       </div>
 
+      <div className="border-t pt-4 flex items-start justify-between gap-4">
+        <div>
+          <Label htmlFor="auto-cascata" className="text-sm">Cobrar em cascata</Label>
+          <p className="text-[11px] text-muted-foreground mt-1 max-w-md">
+            Além dos selecionados pelos filtros, inclui também líderes vinculados aos coordenadores e cabos vinculados aos líderes (todos abaixo da meta, conforme o status escolhido).
+          </p>
+        </div>
+        <Switch id="auto-cascata" checked={cfg.cascata}
+          onCheckedChange={(v) => setCfg({ ...cfg, cascata: v })} />
+      </div>
+
       {cfg.ultimo_disparo_em && (
         <div className="text-xs text-muted-foreground border-t pt-3">
           Último disparo automático: {new Date(cfg.ultimo_disparo_em).toLocaleString("pt-BR")}
