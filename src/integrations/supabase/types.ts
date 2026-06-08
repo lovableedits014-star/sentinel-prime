@@ -1636,6 +1636,36 @@ export type Database = {
           },
         ]
       }
+      eleicao_cobranca_log: {
+        Row: {
+          client_id: string
+          created_at: string
+          dispatch_id: string | null
+          dispatch_item_id: string | null
+          enviado_em: string
+          id: string
+          indicador_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          dispatch_id?: string | null
+          dispatch_item_id?: string | null
+          enviado_em?: string
+          id?: string
+          indicador_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          dispatch_id?: string | null
+          dispatch_item_id?: string | null
+          enviado_em?: string
+          id?: string
+          indicador_id?: string
+        }
+        Relationships: []
+      }
       eleicao_indicacao_config: {
         Row: {
           ativo: boolean
@@ -6659,6 +6689,7 @@ export type Database = {
           erro: string | null
           group_jid: string | null
           id: string
+          mensagem_personalizada: string | null
           nome: string
           status: string
           telefone: string | null
@@ -6670,6 +6701,7 @@ export type Database = {
           erro?: string | null
           group_jid?: string | null
           id?: string
+          mensagem_personalizada?: string | null
           nome: string
           status?: string
           telefone?: string | null
@@ -6681,6 +6713,7 @@ export type Database = {
           erro?: string | null
           group_jid?: string | null
           id?: string
+          mensagem_personalizada?: string | null
           nome?: string
           status?: string
           telefone?: string | null
@@ -7143,6 +7176,7 @@ export type Database = {
         Row: {
           cidade: string | null
           client_id: string | null
+          cobrancas_enviadas: number | null
           indicador_id: string | null
           meta: number | null
           nome: string | null
@@ -7153,6 +7187,7 @@ export type Database = {
           token: string | null
           token_id: string | null
           total_indicacoes: number | null
+          ultima_cobranca_em: string | null
           ultimo_acesso_em: string | null
         }
         Relationships: [
