@@ -136,7 +136,7 @@ export default function TelemarketingAdminCampanhas() {
     setImporting(true);
     const { data, error } = await supabase.rpc("tele_import_contato_avulso_batch" as any, {
       _client_id: clientId,
-      _campanha_id: importingTo || null,
+      _campanha_id: importingTo && importingTo !== "__none__" ? importingTo : null,
       _rows: rows as any,
     });
     setImporting(false);
