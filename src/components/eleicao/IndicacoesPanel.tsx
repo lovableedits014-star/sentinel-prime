@@ -550,11 +550,44 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </div>
             </div>
 
-            {filtered.length > massElegiveis.length && (
-              <p className="text-[11px] text-muted-foreground">
-                {filtered.length - massElegiveis.length} indicador(es) sem telefone serão ignorados.
-              </p>
-            )}
+            <div className="text-[11px] text-muted-foreground space-y-0.5">
+              {filtered.length > massElegiveis.length && (
+                <p>{filtered.length - massElegiveis.length} indicador(es) serão ignorados (sem telefone ou já cobrados na janela).</p>
+              )}
+              {massPuladosJanela > 0 && (
+                <p>⏱ {massPuladosJanela} pulados por já terem recebido cobrança nas últimas {janelaHoras}h.</p>
+              )}
+            </div>
+
+            {/* Janela de não-reenvio */}
+            <div className="grid grid-cols-2 gap-3 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Clock className="w-3 h-3" />Não reenviar nas últimas (horas)</Label>
+                <Input
+                  type="number" min={0} max={720}
+                  value={janelaHoras}
+                  onChange={(e) => setJanelaHoras(Math.max(0, parseInt(e.target.value) || 0))}
+                />
+                <p className="text-[10px] text-muted-foreground">0 = sem restrição. Padrão: 48h.</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><FlaskConical className="w-3 h-3" />Testar comigo</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    placeholder="WhatsApp p/ teste (ex: 67999999999)"
+                    value={testePhone}
+                    onChange={(e) => setTestePhone(e.target.value)}
+                  />
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    onClick={testarComigo} disabled={testando || !testePhone}
+                  >
+                    {testando ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enviar teste"}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Envia 1 mensagem pra esse número usando o 1º indicador como base.</p>
+              </div>
+            </div>
 
             {/* Template */}
             <div className="space-y-1.5">
@@ -568,10 +601,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
             </div>
 
             {/* Preview */}
-            {massElegiveis[0] && (
+            {(massElegiveis[0] || filtered[0]) && (
               <div className="rounded-md border bg-muted/30 p-3">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  Prévia para {massElegiveis[0].nome}
+                  Prévia para {(massElegiveis[0] || filtered[0]).nome}
                 </div>
                 <div className="text-sm whitespace-pre-wrap">{previewMass()}</div>
               </div>
