@@ -244,7 +244,13 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
   const reportedPhone = bridgeData?.phone_number || bridgeData?.phone
     || bridgeData?.instance?.phone_number || bridgeData?.instance?.phone;
   if (reportedPhone) updates.phone_number = String(reportedPhone).replace(/\D/g, "");
-  if (status === "connected" && !inst.connected_since) updates.connected_since = new Date().toISOString();
+  if (status === "connected") {
+    if (!inst.connected_since) updates.connected_since = new Date().toISOString();
+    // Limpa a janela de quarentena assim que a ponte confirma "connected" ao vivo.
+    // Sem isso, last_disconnected_at antigo segue bloqueando envios por até 90s
+    // mesmo com a sessão WhatsApp comprovadamente viva.
+    updates.last_disconnected_at = null;
+  }
   if (status === "disconnected") {
     updates.connected_since = null;
     updates.last_disconnected_at = new Date().toISOString();
