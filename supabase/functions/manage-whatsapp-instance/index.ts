@@ -563,17 +563,19 @@ Deno.serve(async (req) => {
       }
       let query = adminClient
         .from("whatsapp_instances")
-        .select("id, bridge_api_key, status, connected_since, is_active")
+        .select("id, bridge_api_key, status, connected_since, is_active, last_reconnect_attempt_at")
         .eq("is_active", true)
         .not("bridge_api_key", "is", null)
         .limit(50);
       if (isAuthenticatedUser && allowedClientId) query = query.eq("client_id", allowedClientId);
       const { data: rows, error } = await query;
       if (error) return jsonResponse({ success: false, error: error.message }, 500);
+      // IMPORTANTE: health_check_all NÃO reconecta automaticamente. Reconexões em
+      // cascata para várias instâncias offline foram o gatilho do banimento na
+      // Bridge WhatsHub. Aqui apenas sincronizamos o status atual; a reconexão
+      // deve ser explícita (botão na UI -> action="reconnect").
       const results = await Promise.allSettled((rows || []).map(async (inst: any) => {
-        const health = await syncInstanceHealth(adminClient, inst);
-        if (health.status === "connected") return health;
-        return { ...health, reconnect: await tryReconnectInstance(adminClient, inst) };
+        return await syncInstanceHealth(adminClient, inst);
       }));
       return jsonResponse({ success: true, checked: results.length, results });
     }
