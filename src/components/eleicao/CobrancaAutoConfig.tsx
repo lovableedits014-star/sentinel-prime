@@ -49,6 +49,7 @@ export default function CobrancaAutoConfig({ clientId }: { clientId: string }) {
     mensagem_template: DEFAULT_TEMPLATE,
     janela_horas: 48,
     max_por_disparo: 300,
+    cascata: false,
   });
 
   useEffect(() => {
