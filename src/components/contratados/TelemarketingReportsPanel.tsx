@@ -379,6 +379,32 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
         </Card>
       )}
 
+      {/* Bairro breakdown */}
+      {bairroBreakdown.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-primary" />Top bairros (por votos confirmados)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={Math.max(220, bairroBreakdown.length * 32)}>
+              <BarChart data={bairroBreakdown} layout="vertical" margin={{ left: 20, right: 30, top: 10, bottom: 10 }}>
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="nome" width={130} tick={{ fontSize: 10 }} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
+                <Bar dataKey="sim" name="Sim" fill={VOTE_COLORS.sim} stackId="b" />
+                <Bar dataKey="nao" name="Não" fill={VOTE_COLORS.nao} stackId="b" />
+                <Bar dataKey="indeciso" name="Indeciso" fill={VOTE_COLORS.indeciso} stackId="b" />
+                <Bar dataKey="pendente" name="Pendente" fill={VOTE_COLORS.sem} stackId="b" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+
       {/* Alternative candidates ranking */}
       {alternativeRanking.length > 0 && (
         <Card>
