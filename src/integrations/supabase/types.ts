@@ -1081,6 +1081,7 @@ export type Database = {
       contratado_indicados: {
         Row: {
           bairro: string | null
+          campanha_id: string | null
           candidato_alternativo: string | null
           cidade: string | null
           client_id: string
@@ -1103,6 +1104,7 @@ export type Database = {
         }
         Insert: {
           bairro?: string | null
+          campanha_id?: string | null
           candidato_alternativo?: string | null
           cidade?: string | null
           client_id: string
@@ -1125,6 +1127,7 @@ export type Database = {
         }
         Update: {
           bairro?: string | null
+          campanha_id?: string | null
           candidato_alternativo?: string | null
           cidade?: string | null
           client_id?: string
@@ -1146,6 +1149,13 @@ export type Database = {
           vota_candidato?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contratado_indicados_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contratado_indicados_client_id_fkey"
             columns: ["client_id"]
@@ -1294,6 +1304,7 @@ export type Database = {
       contratados: {
         Row: {
           bairro: string | null
+          campanha_id: string | null
           candidato_alternativo: string | null
           cidade: string | null
           client_id: string
@@ -1328,6 +1339,7 @@ export type Database = {
         }
         Insert: {
           bairro?: string | null
+          campanha_id?: string | null
           candidato_alternativo?: string | null
           cidade?: string | null
           client_id: string
@@ -1362,6 +1374,7 @@ export type Database = {
         }
         Update: {
           bairro?: string | null
+          campanha_id?: string | null
           candidato_alternativo?: string | null
           cidade?: string | null
           client_id?: string
@@ -1395,6 +1408,13 @@ export type Database = {
           zona_eleitoral?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contratados_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contratados_client_id_fkey"
             columns: ["client_id"]
@@ -2188,6 +2208,7 @@ export type Database = {
       eleicao_pessoas: {
         Row: {
           bairro: string | null
+          campanha_id: string | null
           candidato_alternativo: string | null
           cidade: string | null
           client_id: string
@@ -2222,6 +2243,7 @@ export type Database = {
         }
         Insert: {
           bairro?: string | null
+          campanha_id?: string | null
           candidato_alternativo?: string | null
           cidade?: string | null
           client_id: string
@@ -2256,6 +2278,7 @@ export type Database = {
         }
         Update: {
           bairro?: string | null
+          campanha_id?: string | null
           candidato_alternativo?: string | null
           cidade?: string | null
           client_id?: string
@@ -2289,6 +2312,13 @@ export type Database = {
           vota_candidato?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "eleicao_pessoas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "eleicao_pessoas_client_id_fkey"
             columns: ["client_id"]
@@ -8171,6 +8201,20 @@ export type Database = {
         }
         Returns: Json
       }
+      tele_create_fila_wizard: {
+        Args: {
+          _client_id: string
+          _csv_rows?: Json
+          _descricao: string
+          _filtros?: Json
+          _nome: string
+          _origem: string
+          _script_intro: string
+          _script_perguntas: string[]
+          _tags_rapidas: string[]
+        }
+        Returns: Json
+      }
       tele_designar_eleicao_indicados: {
         Args: {
           _campanha_id: string
@@ -8179,6 +8223,21 @@ export type Database = {
           _substituir?: boolean
         }
         Returns: Json
+      }
+      tele_ensure_test_operador: { Args: { _client_id: string }; Returns: Json }
+      tele_fila_summary: {
+        Args: { _client_id: string }
+        Returns: {
+          ativo: boolean
+          campanha_id: string
+          confirmados: number
+          created_at: string
+          descricao: string
+          ligados: number
+          nome: string
+          pendentes: number
+          total: number
+        }[]
       }
       tele_get_contato_log: {
         Args: { _client_id: string; _contato_id: string; _tabela: string }
@@ -8265,7 +8324,12 @@ export type Database = {
         }[]
       }
       tele_list_contatos: {
-        Args: { _client_id: string; _nome: string; _senha: string }
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _nome: string
+          _senha: string
+        }
         Returns: {
           bairro: string
           campanha_id: string
