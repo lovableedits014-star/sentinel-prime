@@ -299,7 +299,7 @@ export default function IndicarPublico() {
         )}
 
         <p className="text-[10px] text-center text-muted-foreground pt-2">
-          Esse link é pessoal e exclusivo seu. Não compartilhe com terceiros.
+          {rodape}
         </p>
       </main>
     </div>
