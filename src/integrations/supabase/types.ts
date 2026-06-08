@@ -8103,6 +8103,10 @@ export type Database = {
         Returns: undefined
       }
       tea_ranking_ms: { Args: { p_codigo_ibge: number }; Returns: Json }
+      tele_capture_snapshot: {
+        Args: { _campanha_id?: string; _client_id: string; _rotulo: string }
+        Returns: string
+      }
       tele_change_operador_password: {
         Args: { _new_senha: string; _operador_id: string }
         Returns: Json
@@ -8145,6 +8149,16 @@ export type Database = {
       tele_import_contato_avulso_batch: {
         Args: { _campanha_id: string; _client_id: string; _rows: Json }
         Returns: Json
+      }
+      tele_list_campanhas_scripts: {
+        Args: { _client_id: string; _nome: string; _senha: string }
+        Returns: {
+          id: string
+          nome: string
+          script_intro: string
+          script_perguntas: Json
+          tags_rapidas: Json
+        }[]
       }
       tele_list_contatos: {
         Args: { _client_id: string; _nome: string; _senha: string }
