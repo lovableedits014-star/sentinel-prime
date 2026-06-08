@@ -26,6 +26,8 @@ type Row = {
   total_indicacoes: number;
   meta: number;
   ultimo_acesso_em: string | null;
+  ultima_cobranca_em: string | null;
+  cobrancas_enviadas: number;
 };
 
 type Config = {
