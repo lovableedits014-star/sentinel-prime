@@ -165,6 +165,7 @@ const AppRouter = () => {
               <Route path="/telemarketing-admin/operadores" element={<TelemarketingAdminOperadores />} />
               <Route path="/telemarketing-admin/configuracoes" element={<TelemarketingAdminConfig />} />
               <Route path="/telemarketing-admin/campanhas" element={<TelemarketingAdminCampanhas />} />
+              <Route path="/telemarketing-admin/filas" element={<TelemarketingAdminFilas />} />
               <Route path="/status-whatsapp" element={<Navigate to="/whatsapp?tab=status" replace />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
