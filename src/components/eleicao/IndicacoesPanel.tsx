@@ -61,6 +61,17 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [gerando, setGerando] = useState<string | null>(null);
   const [candidatoNome, setCandidatoNome] = useState<string>("");
 
+  // ===== Disparo em massa =====
+  const TEMPLATE_PADRAO = {
+    zerados: "Oi {primeiro_nome}! Ainda não recebemos nenhuma indicação sua para {candidato}. Sua meta é de {meta} indicações. Use seu link para começar agora: {link}",
+    abaixo: "Olá {primeiro_nome}! Faltam {faltam} indicações para você bater sua meta de {meta} para {candidato}. Vamos lá! 👉 {link}",
+    ok: "Obrigado pelas {total} indicações, {primeiro_nome}! Continue compartilhando seu link para {candidato}: {link}",
+    all: "Olá {primeiro_nome}! Compartilhe seu link de indicação para {candidato}: {link}",
+  } as const;
+  const [massOpen, setMassOpen] = useState(false);
+  const [massTemplate, setMassTemplate] = useState<string>(TEMPLATE_PADRAO.abaixo);
+  const [massSending, setMassSending] = useState(false);
+
   async function load() {
     setLoading(true);
     const [cob, cfg, cli] = await Promise.all([
