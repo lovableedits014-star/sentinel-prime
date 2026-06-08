@@ -136,7 +136,7 @@ export default function TelemarketingAdminCampanhas() {
     setImporting(true);
     const { data, error } = await supabase.rpc("tele_import_contato_avulso_batch" as any, {
       _client_id: clientId,
-      _campanha_id: importingTo || null,
+      _campanha_id: importingTo && importingTo !== "__none__" ? importingTo : null,
       _rows: rows as any,
     });
     setImporting(false);
@@ -190,10 +190,10 @@ export default function TelemarketingAdminCampanhas() {
             <CardContent className="space-y-3">
               <div>
                 <label className="text-xs font-medium mb-1 block">Campanha (opcional)</label>
-                <Select value={importingTo} onValueChange={setImportingTo}>
+                <Select value={importingTo || "__none__"} onValueChange={(v) => setImportingTo(v === "__none__" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder="Sem campanha" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— Sem campanha —</SelectItem>
+                    <SelectItem value="__none__">— Sem campanha —</SelectItem>
                     {campanhas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
                   </SelectContent>
                 </Select>
