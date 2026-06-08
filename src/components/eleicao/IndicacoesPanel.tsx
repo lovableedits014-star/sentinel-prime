@@ -10,7 +10,30 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users } from "lucide-react";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock } from "lucide-react";
+
+type DispatchHist = {
+  id: string;
+  titulo: string;
+  status: string;
+  total_destinatarios: number;
+  enviados: number;
+  falhas: number;
+  created_at: string;
+  completed_at: string | null;
+};
+
+function fmtAgo(iso: string | null) {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `${min}min atrás`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h atrás`;
+  const d = Math.floor(h / 24);
+  return `${d}d atrás`;
+}
 
 type Tipo = "coordenador" | "lider" | "cabo";
 
@@ -71,17 +94,24 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [massOpen, setMassOpen] = useState(false);
   const [massTemplate, setMassTemplate] = useState<string>(TEMPLATE_PADRAO.abaixo);
   const [massSending, setMassSending] = useState(false);
+  const [janelaHoras, setJanelaHoras] = useState<number>(48);
+  const [testePhone, setTestePhone] = useState<string>("");
+  const [testando, setTestando] = useState(false);
+  const [historico, setHistorico] = useState<DispatchHist[]>([]);
 
   async function load() {
     setLoading(true);
-    const [cob, cfg, cli] = await Promise.all([
+    const [cob, cfg, cli, hist] = await Promise.all([
       supabase.from("v_eleicao_indicadores_cobranca").select("*").eq("client_id", clientId).order("total_indicacoes", { ascending: true }),
       supabase.from("eleicao_indicacao_config").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
+      supabase.from("whatsapp_dispatches").select("id,titulo,status,total_destinatarios,enviados,falhas,created_at,completed_at")
+        .eq("client_id", clientId).eq("tipo", "indicadores_cobranca").order("created_at", { ascending: false }).limit(10),
     ]);
     setRows((cob.data as any) || []);
     if (cfg.data) setConfig(cfg.data as any);
     setCandidatoNome((cli.data as any)?.name || "");
+    setHistorico((hist.data as any) || []);
     setLoading(false);
   }
 
@@ -154,9 +184,21 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     await load();
   }
 
-  // Quem entra no disparo: filtrados + com telefone
-  const massElegiveis = useMemo(() => filtered.filter((r) => !!r.telefone && r.telefone.replace(/\D/g, "").length >= 8), [filtered]);
+  // Quem entra no disparo: filtrados + com telefone + fora da janela de não-reenvio
+  const massElegiveis = useMemo(() => {
+    const cutoff = janelaHoras > 0 ? Date.now() - janelaHoras * 3600 * 1000 : 0;
+    return filtered.filter((r) => {
+      if (!r.telefone || r.telefone.replace(/\D/g, "").length < 8) return false;
+      if (cutoff && r.ultima_cobranca_em && new Date(r.ultima_cobranca_em).getTime() >= cutoff) return false;
+      return true;
+    });
+  }, [filtered, janelaHoras]);
   const massSemToken = useMemo(() => massElegiveis.filter((r) => !r.token).length, [massElegiveis]);
+  const massPuladosJanela = useMemo(() => {
+    if (janelaHoras <= 0) return 0;
+    const cutoff = Date.now() - janelaHoras * 3600 * 1000;
+    return filtered.filter((r) => r.ultima_cobranca_em && new Date(r.ultima_cobranca_em).getTime() >= cutoff).length;
+  }, [filtered, janelaHoras]);
 
   function abrirMass() {
     if (filtered.length === 0) {
@@ -169,7 +211,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   }
 
   function previewMass(): string {
-    const r = massElegiveis[0];
+    const r = massElegiveis[0] || filtered[0];
     if (!r) return massTemplate;
     const primeiro = r.nome.split(" ")[0] || r.nome;
     const faltam = Math.max(0, r.meta - r.total_indicacoes);
@@ -184,8 +226,42 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
       .replace(/\{candidato\}/g, candidatoNome);
   }
 
+  async function testarComigo() {
+    const phone = testePhone.replace(/\D/g, "");
+    if (phone.length < 10) { toast.error("Informe um telefone válido (com DDD)."); return; }
+    if (!massTemplate.includes("{link}")) { toast.error("Inclua {link} na mensagem."); return; }
+    const base = filtered[0];
+    if (!base) { toast.error("Nenhum indicador no filtro para usar como base."); return; }
+    setTestando(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+        body: {
+          client_id: clientId,
+          titulo: `🧪 Teste — cobrança de indicações`,
+          mensagem: massTemplate,
+          tipo: "indicadores_cobranca",
+          cobranca_filtros: {
+            tipo: filtroTipo === "all" ? undefined : filtroTipo,
+            status: filtroStatus,
+            indicador_ids: [base.indicador_id],
+          },
+          cobranca_candidato: candidatoNome,
+          cobranca_origin: window.location.origin,
+          cobranca_teste_telefone: phone,
+          batch_size: 1, delay_min: 0, delay_max: 1, batch_pause: 0,
+        },
+      });
+      if (error) throw error;
+      toast.success(`🧪 Mensagem de teste enviada para ${phone}`);
+    } catch (err: any) {
+      toast.error("Falha no teste: " + (err?.message || "erro desconhecido"));
+    } finally {
+      setTestando(false);
+    }
+  }
+
   async function enviarMass() {
-    if (massElegiveis.length === 0) { toast.error("Nenhum destinatário com telefone."); return; }
+    if (massElegiveis.length === 0) { toast.error("Nenhum destinatário elegível."); return; }
     if (!massTemplate.includes("{link}")) {
       toast.error("Inclua {link} na mensagem para o destinatário receber o link de indicação.");
       return;
@@ -205,6 +281,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           },
           cobranca_candidato: candidatoNome,
           cobranca_origin: window.location.origin,
+          cobranca_janela_horas: janelaHoras,
           batch_size: 10, delay_min: 5, delay_max: 15, batch_pause: 60,
         },
       });
@@ -313,6 +390,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                               <strong>{r.total_indicacoes}</strong>
                               <span className="text-muted-foreground"> / {r.meta}</span>
                             </span>
+                            {(r.cobrancas_enviadas > 0 || r.ultima_cobranca_em) && (
+                              <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1" title={r.ultima_cobranca_em ? `Última cobrança: ${new Date(r.ultima_cobranca_em).toLocaleString("pt-BR")}` : ""}>
+                                <Clock className="w-3 h-3" />
+                                {r.cobrancas_enviadas}× · {fmtAgo(r.ultima_cobranca_em)}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -348,7 +431,43 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               Mostrando {filtered.length} de {rows.length} indicadores
             </div>
           </Card>
+
+          {/* Histórico de disparos de cobrança */}
+          {historico.length > 0 && (
+            <Card className="p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm flex items-center gap-2"><History className="w-4 h-4" />Histórico de cobranças</h3>
+                <span className="text-[11px] text-muted-foreground">últimos 10 disparos</span>
+              </div>
+              <div className="divide-y">
+                {historico.map((h) => {
+                  const statusColor =
+                    h.status === "completed" ? "text-emerald-600" :
+                    h.status === "sending" ? "text-blue-600" :
+                    h.status === "failed" ? "text-red-600" :
+                    h.status === "queued" ? "text-amber-600" : "text-muted-foreground";
+                  return (
+                    <div key={h.id} className="py-2 flex items-center gap-3 text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">{h.titulo}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {new Date(h.created_at).toLocaleString("pt-BR")} · {fmtAgo(h.completed_at || h.created_at)}
+                        </div>
+                      </div>
+                      <div className="text-xs tabular-nums text-right">
+                        <div><span className="text-emerald-600 font-medium">{h.enviados}</span> enviados</div>
+                        {h.falhas > 0 && <div className="text-red-600">{h.falhas} falhas</div>}
+                        <div className="text-muted-foreground">de {h.total_destinatarios}</div>
+                      </div>
+                      <Badge variant="outline" className={`text-[10px] ${statusColor}`}>{h.status}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
         </TabsContent>
+
 
         {/* ──────────── CONFIG DE METAS ──────────── */}
         <TabsContent value="config" className="space-y-4 mt-4">
@@ -431,11 +550,44 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </div>
             </div>
 
-            {filtered.length > massElegiveis.length && (
-              <p className="text-[11px] text-muted-foreground">
-                {filtered.length - massElegiveis.length} indicador(es) sem telefone serão ignorados.
-              </p>
-            )}
+            <div className="text-[11px] text-muted-foreground space-y-0.5">
+              {filtered.length > massElegiveis.length && (
+                <p>{filtered.length - massElegiveis.length} indicador(es) serão ignorados (sem telefone ou já cobrados na janela).</p>
+              )}
+              {massPuladosJanela > 0 && (
+                <p>⏱ {massPuladosJanela} pulados por já terem recebido cobrança nas últimas {janelaHoras}h.</p>
+              )}
+            </div>
+
+            {/* Janela de não-reenvio */}
+            <div className="grid grid-cols-2 gap-3 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Clock className="w-3 h-3" />Não reenviar nas últimas (horas)</Label>
+                <Input
+                  type="number" min={0} max={720}
+                  value={janelaHoras}
+                  onChange={(e) => setJanelaHoras(Math.max(0, parseInt(e.target.value) || 0))}
+                />
+                <p className="text-[10px] text-muted-foreground">0 = sem restrição. Padrão: 48h.</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><FlaskConical className="w-3 h-3" />Testar comigo</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    placeholder="WhatsApp p/ teste (ex: 67999999999)"
+                    value={testePhone}
+                    onChange={(e) => setTestePhone(e.target.value)}
+                  />
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    onClick={testarComigo} disabled={testando || !testePhone}
+                  >
+                    {testando ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enviar teste"}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Envia 1 mensagem pra esse número usando o 1º indicador como base.</p>
+              </div>
+            </div>
 
             {/* Template */}
             <div className="space-y-1.5">
@@ -449,10 +601,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
             </div>
 
             {/* Preview */}
-            {massElegiveis[0] && (
+            {(massElegiveis[0] || filtered[0]) && (
               <div className="rounded-md border bg-muted/30 p-3">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  Prévia para {massElegiveis[0].nome}
+                  Prévia para {(massElegiveis[0] || filtered[0]).nome}
                 </div>
                 <div className="text-sm whitespace-pre-wrap">{previewMass()}</div>
               </div>
