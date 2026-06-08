@@ -43,14 +43,18 @@ interface CampanhaScript {
 
 export default function Telemarketing() {
   const { clientId } = useParams<{ clientId: string }>();
-  const [operadorNome, setOperadorNome] = useState("");
-  const [operadorSenha, setOperadorSenha] = useState("");
+  const [searchParams] = useSearchParams();
+  const campanhaIdParam = searchParams.get("campanha");
+  const [operadorNome, setOperadorNome] = useState(searchParams.get("nome") || "");
+  const [operadorSenha, setOperadorSenha] = useState(searchParams.get("senha") || "");
   const [loggedIn, setLoggedIn] = useState(false);
   const [contatos, setContatos] = useState<ContatoTele[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [clientName, setClientName] = useState("");
+  const [campanhaNome, setCampanhaNome] = useState<string | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura">("todos");
+  const autoLoginAttempted = useRef(false);
 
   // Form state
   const [ligacaoStatus, setLigacaoStatus] = useState("");
