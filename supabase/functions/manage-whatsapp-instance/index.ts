@@ -126,6 +126,78 @@ const sanitizeBridgeData = (data: any) => {
   return safe;
 };
 
+// =====================================================================
+// Anti-ban cooldown: limita chamadas a `create_instance` e `reconnect`
+// para o mesmo número. Repetir login/handshake várias vezes em sequência
+// é um dos principais gatilhos de ban definitivo do WhatsApp.
+// =====================================================================
+const CREATE_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutos
+const RECONNECT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos
+const MAX_RECONNECTS_PER_DAY = 3;
+
+const todayDateStr = () => new Date().toISOString().slice(0, 10);
+
+type CooldownCheck =
+  | { allowed: true }
+  | { allowed: false; remainingMs: number; reason: string; remainingAttempts?: number };
+
+function checkReconnectCooldown(
+  row: any,
+  kind: "create" | "reconnect",
+): CooldownCheck {
+  if (!row) return { allowed: true };
+  const cooldown = kind === "create" ? CREATE_COOLDOWN_MS : RECONNECT_COOLDOWN_MS;
+  const lastAt = row.last_create_instance_at ? new Date(row.last_create_instance_at).getTime() : 0;
+  const elapsed = Date.now() - lastAt;
+  if (lastAt && elapsed < cooldown) {
+    return {
+      allowed: false,
+      remainingMs: cooldown - elapsed,
+      reason: `Proteção anti-ban: aguarde antes de tentar reconectar novamente.`,
+    };
+  }
+  const sameDay = row.reconnect_attempts_date === todayDateStr();
+  const used = sameDay ? Number(row.reconnect_attempts_today || 0) : 0;
+  if (used >= MAX_RECONNECTS_PER_DAY) {
+    return {
+      allowed: false,
+      remainingMs: 0,
+      reason: `Limite diário de ${MAX_RECONNECTS_PER_DAY} tentativas de reconexão atingido. Aguarde 24h.`,
+      remainingAttempts: 0,
+    };
+  }
+  return { allowed: true };
+}
+
+async function recordReconnectAttempt(adminClient: any, instanceId: string, row: any) {
+  const today = todayDateStr();
+  const sameDay = row?.reconnect_attempts_date === today;
+  const next = (sameDay ? Number(row?.reconnect_attempts_today || 0) : 0) + 1;
+  try {
+    await adminClient
+      .from("whatsapp_instances")
+      .update({
+        last_create_instance_at: new Date().toISOString(),
+        last_reconnect_attempt_at: new Date().toISOString(),
+        reconnect_attempts_today: next,
+        reconnect_attempts_date: today,
+      })
+      .eq("id", instanceId);
+  } catch (err) {
+    console.error("recordReconnectAttempt error", err);
+  }
+}
+
+const cooldownBlockedResponse = (check: Extract<CooldownCheck, { allowed: false }>) =>
+  jsonResponse({
+    success: false,
+    error: check.reason,
+    cooldown: true,
+    remaining_ms: check.remainingMs,
+    remaining_seconds: Math.ceil(check.remainingMs / 1000),
+  }, 429);
+
+
 const toBoolean = (value: unknown, fallback = false) => {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
