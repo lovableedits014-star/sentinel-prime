@@ -128,6 +128,17 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
   const handleConnect = async () => {
     setBusy("connect");
     try {
+      // Antes de pedir QR/recriar a instância, valida ao vivo se a ponte já
+      // está conectada. Evita ações desnecessárias na ponte (anti-ban) e
+      // destrava o caso em que a UI mostra "desconectada" mas a sessão está viva.
+      const { data: statusData } = await invoke("instance_status");
+      const liveStatus = String(statusData?.status || statusData?.instance?.status || "").toLowerCase();
+      if (CONNECTED.has(liveStatus)) {
+        toast.success(`${instance.apelido} já está conectado.`);
+        onChange();
+        return;
+      }
+
       const { data, error } = await invoke("create_instance");
       if (error || data?.error) {
         toast.error("Erro: " + (error?.message || data?.error));
