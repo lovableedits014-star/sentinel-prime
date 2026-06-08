@@ -844,6 +844,7 @@ Deno.serve(async (req) => {
         telefone: r.telefone || null,
         nome: r.nome,
         group_jid: r.group_jid || null,
+        mensagem_personalizada: r.mensagem_personalizada || null,
       }));
 
       for (let i = 0; i < items.length; i += 100) {
