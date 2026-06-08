@@ -22,6 +22,7 @@ type Cfg = {
   mensagem_template: string;
   janela_horas: number;
   max_por_disparo: number;
+  cascata: boolean;
   ultimo_disparo_em?: string | null;
   ultimo_resultado?: string | null;
 };
