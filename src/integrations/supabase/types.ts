@@ -6539,6 +6539,9 @@ export type Database = {
           filtros: Json
           id: string
           nome: string
+          script_intro: string | null
+          script_perguntas: Json
+          tags_rapidas: Json
           updated_at: string
         }
         Insert: {
@@ -6549,6 +6552,9 @@ export type Database = {
           filtros?: Json
           id?: string
           nome: string
+          script_intro?: string | null
+          script_perguntas?: Json
+          tags_rapidas?: Json
           updated_at?: string
         }
         Update: {
@@ -6559,6 +6565,9 @@ export type Database = {
           filtros?: Json
           id?: string
           nome?: string
+          script_intro?: string | null
+          script_perguntas?: Json
+          tags_rapidas?: Json
           updated_at?: string
         }
         Relationships: []
@@ -6704,6 +6713,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      telemarketing_relatorio_snapshots: {
+        Row: {
+          atendeu: number
+          campanha_id: string | null
+          captured_at: string
+          client_id: string
+          created_by: string | null
+          id: string
+          indeciso: number
+          ligados: number
+          nao_atendeu: number
+          payload: Json
+          recusou: number
+          rotulo: string
+          total: number
+          vota_nao: number
+          vota_sim: number
+        }
+        Insert: {
+          atendeu?: number
+          campanha_id?: string | null
+          captured_at?: string
+          client_id: string
+          created_by?: string | null
+          id?: string
+          indeciso?: number
+          ligados?: number
+          nao_atendeu?: number
+          payload?: Json
+          recusou?: number
+          rotulo: string
+          total?: number
+          vota_nao?: number
+          vota_sim?: number
+        }
+        Update: {
+          atendeu?: number
+          campanha_id?: string | null
+          captured_at?: string
+          client_id?: string
+          created_by?: string | null
+          id?: string
+          indeciso?: number
+          ligados?: number
+          nao_atendeu?: number
+          payload?: Json
+          recusou?: number
+          rotulo?: string
+          total?: number
+          vota_nao?: number
+          vota_sim?: number
+        }
+        Relationships: []
       }
       territorial_zones: {
         Row: {
