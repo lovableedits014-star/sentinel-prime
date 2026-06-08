@@ -320,6 +320,7 @@ export default function Telemarketing() {
     if (tipo === "lider") return "Líder";
     if (tipo === "liderado") return "Liderado";
     if (tipo === "avulso") return "Mailing";
+    if (tipo === "eleicao_indicado") return "Eleição";
     return "Indicado";
   };
 
