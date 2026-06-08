@@ -47,6 +47,8 @@ export default function Telemarketing() {
   const [candidatoAlt, setCandidatoAlt] = useState("");
   const [cidade, setCidade] = useState("");
   const [bairro, setBairro] = useState("");
+  const [observacao, setObservacao] = useState("");
+  const [proximaTentativa, setProximaTentativa] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
