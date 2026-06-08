@@ -399,6 +399,81 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ───── Modal Disparo em Massa ───── */}
+      <Dialog open={massOpen} onOpenChange={setMassOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-emerald-600" />
+              Enviar cobrança em massa
+            </DialogTitle>
+            <DialogDescription>
+              Mensagem personalizada por indicador (com link, meta e contagem dele).
+              Respeita janela horária e ritmo configurados no cliente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Resumo */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-md bg-muted/40 p-2">
+                <div className="text-[10px] text-muted-foreground uppercase">No filtro</div>
+                <div className="text-xl font-bold">{filtered.length}</div>
+              </div>
+              <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 p-2">
+                <div className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase">Serão enviados</div>
+                <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{massElegiveis.length}</div>
+              </div>
+              <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 p-2">
+                <div className="text-[10px] text-amber-700 dark:text-amber-400 uppercase">Token será gerado</div>
+                <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{massSemToken}</div>
+              </div>
+            </div>
+
+            {filtered.length > massElegiveis.length && (
+              <p className="text-[11px] text-muted-foreground">
+                {filtered.length - massElegiveis.length} indicador(es) sem telefone serão ignorados.
+              </p>
+            )}
+
+            {/* Template */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Mensagem (placeholders: {"{primeiro_nome}, {meta}, {faltam}, {total}, {link}, {candidato}"})</Label>
+              <Textarea
+                value={massTemplate}
+                onChange={(e) => setMassTemplate(e.target.value)}
+                rows={5}
+                className="font-mono text-xs"
+              />
+            </div>
+
+            {/* Preview */}
+            {massElegiveis[0] && (
+              <div className="rounded-md border bg-muted/30 p-3">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  Prévia para {massElegiveis[0].nome}
+                </div>
+                <div className="text-sm whitespace-pre-wrap">{previewMass()}</div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMassOpen(false)} disabled={massSending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={enviarMass}
+              disabled={massSending || massElegiveis.length === 0}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+            >
+              {massSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Disparar {massElegiveis.length} mensagens
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
