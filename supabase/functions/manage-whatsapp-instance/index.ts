@@ -244,7 +244,13 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
   const reportedPhone = bridgeData?.phone_number || bridgeData?.phone
     || bridgeData?.instance?.phone_number || bridgeData?.instance?.phone;
   if (reportedPhone) updates.phone_number = String(reportedPhone).replace(/\D/g, "");
-  if (status === "connected" && !inst.connected_since) updates.connected_since = new Date().toISOString();
+  if (status === "connected") {
+    if (!inst.connected_since) updates.connected_since = new Date().toISOString();
+    // Limpa a janela de quarentena assim que a ponte confirma "connected" ao vivo.
+    // Sem isso, last_disconnected_at antigo segue bloqueando envios por até 90s
+    // mesmo com a sessão WhatsApp comprovadamente viva.
+    updates.last_disconnected_at = null;
+  }
   if (status === "disconnected") {
     updates.connected_since = null;
     updates.last_disconnected_at = new Date().toISOString();
@@ -1139,32 +1145,34 @@ Deno.serve(async (req) => {
 
     if ((action === "send" || action === "send_media") && instance_id && activeInstanceRow) {
       const health = await syncInstanceHealth(adminClient, activeInstanceRow);
-      // Para envio, o estado ao vivo da ponte manda mais que o status salvo no banco.
-      // Antes, um status antigo "connected" podia mascarar um health check recém-falho
-      // e o envio seguia mesmo com a ponte dizendo "not connected".
       const currentStatus = health.status;
-      // Releitura do estado mais recente do banco — o webhook pode ter acabado
-      // de marcar como "disconnected" (vps_reported_disconnected) entre o
-      // syncInstanceHealth e este ponto.
-      const { data: freshRow } = await adminClient
-        .from("whatsapp_instances")
-        .select("status, last_disconnected_at, connected_since")
-        .eq("id", instance_id)
-        .maybeSingle();
-      const lastDisc = freshRow?.last_disconnected_at ? new Date(freshRow.last_disconnected_at).getTime() : 0;
-      const recentlyDropped = lastDisc > 0 && (Date.now() - lastDisc) < 90_000;
-      const dbDisconnected = freshRow?.status === "disconnected";
 
-      if (currentStatus !== "connected" || dbDisconnected || recentlyDropped) {
-        // Política anti-ban: NÃO chamamos /reconnect proativamente antes de enviar.
-        // Se o status atual ou recente diz "desconectado", recusamos o envio e
-        // pedimos reconexão MANUAL. Auto-reconnect só acontece DEPOIS de uma
-        // falha real de envio (bloco abaixo), e ainda assim com cooldown de 15min.
-        const error = "Instância WhatsApp desconectada. Reconecte o chip manualmente (botão na UI) antes de enviar.";
-        await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
-        return jsonResponse({ success: false, status: health.status, error, health });
+      // Se a ponte ACABOU de confirmar "connected" ao vivo, confiamos nela.
+      // Não recusamos por dbDisconnected/recentlyDropped — esses dados são
+      // anteriores ao syncInstanceHealth que acabou de revalidar a sessão.
+      // Antes, um evento transitório de "disconnected" no webhook bloqueava
+      // envios por até 90s mesmo com a sessão WhatsApp comprovadamente viva.
+      if (currentStatus !== "connected") {
+        // Releitura do banco: o webhook pode ter marcado disconnected entre
+        // o syncInstanceHealth (sem confirmação) e este ponto.
+        const { data: freshRow } = await adminClient
+          .from("whatsapp_instances")
+          .select("status, last_disconnected_at, connected_since")
+          .eq("id", instance_id)
+          .maybeSingle();
+        const lastDisc = freshRow?.last_disconnected_at ? new Date(freshRow.last_disconnected_at).getTime() : 0;
+        const recentlyDropped = lastDisc > 0 && (Date.now() - lastDisc) < 90_000;
+        const dbDisconnected = freshRow?.status === "disconnected";
+
+        if (currentStatus !== "connected" || dbDisconnected || recentlyDropped) {
+          // Política anti-ban: NÃO chamamos /reconnect proativamente antes de enviar.
+          const error = "Instância WhatsApp desconectada. Reconecte o chip manualmente (botão na UI) antes de enviar.";
+          await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
+          return jsonResponse({ success: false, status: health.status, error, health });
+        }
       }
     }
+
 
     // Proxy all other actions to bridge with X-Api-Key
     // Normaliza telefone brasileiro para E.164: 55 + DDD + número.
@@ -1290,8 +1298,11 @@ Deno.serve(async (req) => {
         : (activeInstanceRow.status || "disconnected");
       if (wasConnected && status !== "connected" && !isExplicitOfflineStatus(rawStatus)) status = "connected";
       const updates: any = { status, last_health_check_at: new Date().toISOString() };
-      if (status === "connected" && !activeInstanceRow.connected_since) {
-        updates.connected_since = new Date().toISOString();
+      if (status === "connected") {
+        if (!activeInstanceRow.connected_since) updates.connected_since = new Date().toISOString();
+        // Mesma lógica do syncInstanceHealth: limpa quarentena quando a ponte
+        // confirma "connected" ao vivo via UI (Status/Reconectar).
+        updates.last_disconnected_at = null;
       }
       if (status === "disconnected") {
         updates.connected_since = null;
