@@ -96,6 +96,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [massTemplate, setMassTemplate] = useState<string>(TEMPLATE_PADRAO.abaixo);
   const [massSending, setMassSending] = useState(false);
   const [janelaHoras, setJanelaHoras] = useState<number>(48);
+  const [cascata, setCascata] = useState<boolean>(false);
   const [testePhone, setTestePhone] = useState<string>("");
   const [testando, setTestando] = useState(false);
   const [historico, setHistorico] = useState<DispatchHist[]>([]);
