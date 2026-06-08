@@ -4,11 +4,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Target, TrendingUp, Users } from "lucide-react";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users } from "lucide-react";
 
 type Tipo = "coordenador" | "lider" | "cabo";
 
@@ -24,6 +26,8 @@ type Row = {
   total_indicacoes: number;
   meta: number;
   ultimo_acesso_em: string | null;
+  ultima_cobranca_em: string | null;
+  cobrancas_enviadas: number;
 };
 
 type Config = {
@@ -56,6 +60,17 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [savingConfig, setSavingConfig] = useState(false);
   const [gerando, setGerando] = useState<string | null>(null);
   const [candidatoNome, setCandidatoNome] = useState<string>("");
+
+  // ===== Disparo em massa =====
+  const TEMPLATE_PADRAO = {
+    zerados: "Oi {primeiro_nome}! Ainda não recebemos nenhuma indicação sua para {candidato}. Sua meta é de {meta} indicações. Use seu link para começar agora: {link}",
+    abaixo: "Olá {primeiro_nome}! Faltam {faltam} indicações para você bater sua meta de {meta} para {candidato}. Vamos lá! 👉 {link}",
+    ok: "Obrigado pelas {total} indicações, {primeiro_nome}! Continue compartilhando seu link para {candidato}: {link}",
+    all: "Olá {primeiro_nome}! Compartilhe seu link de indicação para {candidato}: {link}",
+  } as const;
+  const [massOpen, setMassOpen] = useState(false);
+  const [massTemplate, setMassTemplate] = useState<string>(TEMPLATE_PADRAO.abaixo);
+  const [massSending, setMassSending] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -139,6 +154,75 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     await load();
   }
 
+  // Quem entra no disparo: filtrados + com telefone
+  const massElegiveis = useMemo(() => filtered.filter((r) => !!r.telefone && r.telefone.replace(/\D/g, "").length >= 8), [filtered]);
+  const massSemToken = useMemo(() => massElegiveis.filter((r) => !r.token).length, [massElegiveis]);
+
+  function abrirMass() {
+    if (filtered.length === 0) {
+      toast.error("Nenhum indicador no filtro atual.");
+      return;
+    }
+    const tpl = (TEMPLATE_PADRAO as any)[filtroStatus] || TEMPLATE_PADRAO.all;
+    setMassTemplate(tpl);
+    setMassOpen(true);
+  }
+
+  function previewMass(): string {
+    const r = massElegiveis[0];
+    if (!r) return massTemplate;
+    const primeiro = r.nome.split(" ")[0] || r.nome;
+    const faltam = Math.max(0, r.meta - r.total_indicacoes);
+    const link = r.token ? buildLink(r.token) : `${window.location.origin}/indicar/<token>`;
+    return massTemplate
+      .replace(/\{primeiro_nome\}/g, primeiro)
+      .replace(/\{nome\}/g, r.nome)
+      .replace(/\{meta\}/g, String(r.meta))
+      .replace(/\{total\}/g, String(r.total_indicacoes))
+      .replace(/\{faltam\}/g, String(faltam))
+      .replace(/\{link\}/g, link)
+      .replace(/\{candidato\}/g, candidatoNome);
+  }
+
+  async function enviarMass() {
+    if (massElegiveis.length === 0) { toast.error("Nenhum destinatário com telefone."); return; }
+    if (!massTemplate.includes("{link}")) {
+      toast.error("Inclua {link} na mensagem para o destinatário receber o link de indicação.");
+      return;
+    }
+    setMassSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+        body: {
+          client_id: clientId,
+          titulo: `Cobrança de indicações — ${massElegiveis.length} envios`,
+          mensagem: massTemplate,
+          tipo: "indicadores_cobranca",
+          cobranca_filtros: {
+            tipo: filtroTipo === "all" ? undefined : filtroTipo,
+            status: filtroStatus,
+            indicador_ids: massElegiveis.map((r) => r.indicador_id),
+          },
+          cobranca_candidato: candidatoNome,
+          cobranca_origin: window.location.origin,
+          batch_size: 10, delay_min: 5, delay_max: 15, batch_pause: 60,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.queued) {
+        toast.success("📥 Adicionado à fila — começa assim que o disparo atual terminar.");
+      } else {
+        toast.success(`📤 Cobrança disparada para ${massElegiveis.length} indicadores!`);
+      }
+      setMassOpen(false);
+      setTimeout(load, 1500);
+    } catch (err: any) {
+      toast.error("Falha ao disparar: " + (err?.message || "erro desconhecido"));
+    } finally {
+      setMassSending(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
@@ -195,6 +279,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-1.5" />Atualizar</Button>
+            <Button size="sm" onClick={abrirMass} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Send className="w-4 h-4" />
+              Enviar cobrança em massa
+            </Button>
           </div>
 
           {/* Tabela */}
@@ -311,6 +399,81 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ───── Modal Disparo em Massa ───── */}
+      <Dialog open={massOpen} onOpenChange={setMassOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-emerald-600" />
+              Enviar cobrança em massa
+            </DialogTitle>
+            <DialogDescription>
+              Mensagem personalizada por indicador (com link, meta e contagem dele).
+              Respeita janela horária e ritmo configurados no cliente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Resumo */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-md bg-muted/40 p-2">
+                <div className="text-[10px] text-muted-foreground uppercase">No filtro</div>
+                <div className="text-xl font-bold">{filtered.length}</div>
+              </div>
+              <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 p-2">
+                <div className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase">Serão enviados</div>
+                <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{massElegiveis.length}</div>
+              </div>
+              <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 p-2">
+                <div className="text-[10px] text-amber-700 dark:text-amber-400 uppercase">Token será gerado</div>
+                <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{massSemToken}</div>
+              </div>
+            </div>
+
+            {filtered.length > massElegiveis.length && (
+              <p className="text-[11px] text-muted-foreground">
+                {filtered.length - massElegiveis.length} indicador(es) sem telefone serão ignorados.
+              </p>
+            )}
+
+            {/* Template */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Mensagem (placeholders: {"{primeiro_nome}, {meta}, {faltam}, {total}, {link}, {candidato}"})</Label>
+              <Textarea
+                value={massTemplate}
+                onChange={(e) => setMassTemplate(e.target.value)}
+                rows={5}
+                className="font-mono text-xs"
+              />
+            </div>
+
+            {/* Preview */}
+            {massElegiveis[0] && (
+              <div className="rounded-md border bg-muted/30 p-3">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  Prévia para {massElegiveis[0].nome}
+                </div>
+                <div className="text-sm whitespace-pre-wrap">{previewMass()}</div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMassOpen(false)} disabled={massSending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={enviarMass}
+              disabled={massSending || massElegiveis.length === 0}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+            >
+              {massSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Disparar {massElegiveis.length} mensagens
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
