@@ -134,11 +134,13 @@ export default function Telemarketing() {
       return;
     }
 
-    // Fetch all contacts via secure RPC (operator-authenticated, no direct table read)
+    // Fetch contacts via secure RPC (operator-authenticated). When opened from
+    // the admin "Filas" page, ?campanha=ID restricts the list to that fila.
     const { data: rpcRows, error: rpcErr } = await supabase.rpc("tele_list_contatos" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
+      _campanha_id: campanhaIdParam || null,
     });
     if (rpcErr) {
       toast.error("Erro ao carregar contatos: " + rpcErr.message);
