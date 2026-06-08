@@ -1298,8 +1298,11 @@ Deno.serve(async (req) => {
         : (activeInstanceRow.status || "disconnected");
       if (wasConnected && status !== "connected" && !isExplicitOfflineStatus(rawStatus)) status = "connected";
       const updates: any = { status, last_health_check_at: new Date().toISOString() };
-      if (status === "connected" && !activeInstanceRow.connected_since) {
-        updates.connected_since = new Date().toISOString();
+      if (status === "connected") {
+        if (!activeInstanceRow.connected_since) updates.connected_since = new Date().toISOString();
+        // Mesma lógica do syncInstanceHealth: limpa quarentena quando a ponte
+        // confirma "connected" ao vivo via UI (Status/Reconectar).
+        updates.last_disconnected_at = null;
       }
       if (status === "disconnected") {
         updates.connected_since = null;
