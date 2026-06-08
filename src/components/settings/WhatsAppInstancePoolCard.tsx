@@ -140,6 +140,16 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
       }
 
       const { data, error } = await invoke("create_instance");
+      if (data?.cooldown) {
+        const secs = Number(data?.remaining_seconds || 0);
+        const mins = Math.ceil(secs / 60);
+        toast.error(
+          `🛡️ Proteção anti-ban ativa. Aguarde ~${mins} min antes de tentar reconectar este número. ` +
+          `Reconectar várias vezes seguidas é um dos principais gatilhos de banimento do WhatsApp.`,
+          { duration: 8000 },
+        );
+        return;
+      }
       if (error || data?.error) {
         toast.error("Erro: " + (error?.message || data?.error));
         return;
