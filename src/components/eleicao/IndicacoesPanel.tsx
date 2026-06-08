@@ -312,6 +312,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
         <TabsList>
           <TabsTrigger value="cobranca"><Users className="w-4 h-4 mr-1.5" />Indicadores & Cobrança</TabsTrigger>
           <TabsTrigger value="config"><Target className="w-4 h-4 mr-1.5" />Metas e configurações</TabsTrigger>
+          <TabsTrigger value="pagina"><Palette className="w-4 h-4 mr-1.5" />Página pública</TabsTrigger>
         </TabsList>
 
         {/* ──────────── COBRANÇA ──────────── */}
