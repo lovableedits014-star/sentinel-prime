@@ -157,28 +157,47 @@ export default function IndicarPublico() {
   }
 
   const tipoNice = tipoLabel[info.indicador_tipo || ""] || info.indicador_tipo;
+  const candidatoNome = info.candidato_nome || "";
+  const nomeIndicador = info.indicador_nome || "";
+  const fillTpl = (tpl: string) => tpl
+    .replace(/\{nome\}/g, nomeIndicador)
+    .replace(/\{primeiro_nome\}/g, nomeIndicador.split(" ")[0] || nomeIndicador)
+    .replace(/\{candidato\}/g, candidatoNome);
+
+  const saudacaoRaw = info.page_saudacao || "Olá, {nome}!";
+  const subtituloRaw = info.page_subtitulo || (candidatoNome
+    ? "Cadastre quem você sabe que vai votar em {candidato}."
+    : "Cadastre quem você sabe que vai votar.");
+  const funcaoLabel = info.page_funcao_label || "Sua função:";
+  const progressoTitulo = info.page_progresso_titulo || "Suas indicações";
+  const botaoLabel = info.page_botao_label || "Indicar e adicionar outra";
+  const rodape = info.page_rodape || "Esse link é pessoal e exclusivo seu. Não compartilhe com terceiros.";
+
+  // Renderiza a saudação destacando o nome em primary quando aparece
+  const saudacaoRendered = saudacaoRaw.includes("{nome}")
+    ? saudacaoRaw.split("{nome}").reduce<React.ReactNode[]>((acc, chunk, i, arr) => {
+        acc.push(<span key={`t-${i}`}>{chunk.replace(/\{candidato\}/g, candidatoNome)}</span>);
+        if (i < arr.length - 1) acc.push(<span key={`n-${i}`} className="text-primary">{nomeIndicador}</span>);
+        return acc;
+      }, [])
+    : fillTpl(saudacaoRaw);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 via-background to-background">
       <header className="px-4 pt-6 pb-4 max-w-md mx-auto text-center">
         {info.candidato_logo && (
-          <img src={info.candidato_logo} alt={info.candidato_nome || ""} className="h-16 mx-auto mb-3 object-contain" />
+          <img src={info.candidato_logo} alt={candidatoNome} className="h-16 mx-auto mb-3 object-contain" />
         )}
-        <h1 className="text-lg font-bold leading-tight">
-          Olá, <span className="text-primary">{info.indicador_nome}</span>!
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Cadastre quem você sabe que <strong>vai votar</strong>
-          {info.candidato_nome ? <> em <strong>{info.candidato_nome}</strong></> : null}.
-        </p>
-        <p className="text-[11px] text-muted-foreground mt-1">Sua função: {tipoNice}</p>
+        <h1 className="text-lg font-bold leading-tight">{saudacaoRendered}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{fillTpl(subtituloRaw)}</p>
+        <p className="text-[11px] text-muted-foreground mt-1">{funcaoLabel} {tipoNice}</p>
       </header>
 
       <main className="max-w-md mx-auto px-4 pb-24 space-y-5">
         {/* Progresso */}
         <Card className="p-4">
           <div className="flex items-baseline justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Suas indicações</span>
+            <span className="text-sm text-muted-foreground">{progressoTitulo}</span>
             <span className="text-2xl font-bold">
               {info.total_indicacoes}
               <span className="text-sm text-muted-foreground font-normal"> / {info.meta}</span>
