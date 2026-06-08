@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock } from "lucide-react";
+import CobrancaAutoConfig from "./CobrancaAutoConfig";
 
 type DispatchHist = {
   id: string;
