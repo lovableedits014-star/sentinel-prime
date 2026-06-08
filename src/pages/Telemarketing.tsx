@@ -21,8 +21,8 @@ interface ContatoTele {
   candidato_alternativo: string | null;
   operador_nome: string | null;
   ligacao_em: string | null;
-  tipo: "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado";
-  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos" | "eleicao_indicados";
+  tipo: "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura";
+  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos" | "eleicao_indicados" | "eleicao_pessoas";
   proxima_tentativa_em: string | null;
   tentativas_count: number | null;
   observacao_tele: string | null;
@@ -50,7 +50,7 @@ export default function Telemarketing() {
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [clientName, setClientName] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado">("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura">("todos");
 
   // Form state
   const [ligacaoStatus, setLigacaoStatus] = useState("");
@@ -321,6 +321,7 @@ export default function Telemarketing() {
     if (tipo === "liderado") return "Liderado";
     if (tipo === "avulso") return "Mailing";
     if (tipo === "eleicao_indicado") return "Eleição";
+    if (tipo === "estrutura") return "Estrutura";
     return "Indicado";
   };
 
@@ -403,7 +404,7 @@ export default function Telemarketing() {
 
       {/* Type filter */}
       <div className="flex gap-2 flex-wrap">
-        {(["todos", "lider", "liderado", "indicado", "avulso", "eleicao_indicado"] as const).map((f) => (
+        {(["todos", "lider", "liderado", "indicado", "avulso", "eleicao_indicado", "estrutura"] as const).map((f) => (
           <Button
             key={f}
             variant={filtroTipo === f ? "default" : "outline"}
@@ -487,6 +488,13 @@ export default function Telemarketing() {
                   {current.indicador_tipo && (
                     <Badge variant="outline" className="text-[10px] capitalize">{current.indicador_tipo}</Badge>
                   )}
+                </div>
+              )}
+
+              {current.tipo === "estrutura" && current.indicador_tipo && (
+                <div className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 p-2 rounded flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5" />
+                  Membro da estrutura: <Badge variant="outline" className="text-[10px] capitalize">{current.indicador_tipo}</Badge>
                 </div>
               )}
 
