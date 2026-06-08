@@ -98,6 +98,7 @@ export const Route = createFileRoute("/api/public/hooks/eleicao-cobranca-auto")(
                 cobranca_candidato: cli?.name || "",
                 cobranca_origin: origin,
                 cobranca_janela_horas: cfg.janela_horas || 48,
+                cobranca_cascata: !!cfg.cascata,
                 batch_size: 10, delay_min: 5, delay_max: 15, batch_pause: 60,
               }),
             });
