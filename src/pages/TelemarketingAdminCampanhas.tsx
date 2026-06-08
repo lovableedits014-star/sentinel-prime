@@ -216,6 +216,9 @@ export default function TelemarketingAdminCampanhas() {
             </CardContent>
           </Card>
 
+          <DesignarEleicaoPanel clientId={clientId} campanhas={campanhas} onChanged={load} />
+
+
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-base">Campanhas ({campanhas.length})</CardTitle>
