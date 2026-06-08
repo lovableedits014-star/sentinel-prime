@@ -21,14 +21,16 @@ interface ContatoTele {
   candidato_alternativo: string | null;
   operador_nome: string | null;
   ligacao_em: string | null;
-  tipo: "lider" | "liderado" | "indicado" | "avulso";
-  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos";
+  tipo: "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado";
+  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos" | "eleicao_indicados";
   proxima_tentativa_em: string | null;
   tentativas_count: number | null;
   observacao_tele: string | null;
   locked_by: string | null;
   locked_until: string | null;
   campanha_id: string | null;
+  indicador_nome: string | null;
+  indicador_tipo: string | null;
 }
 
 interface CampanhaScript {
