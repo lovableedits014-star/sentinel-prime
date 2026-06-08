@@ -1107,9 +1107,12 @@ Deno.serve(async (req) => {
             }
 
             try {
+              const baseMsg = (recipient as any).mensagem_personalizada
+                ? (recipient as any).mensagem_personalizada
+                : mensagem;
               const personalizedMsg = isGroup
-                ? mensagem
-                : mensagem.replace(/{nome}/g, recipient.nome);
+                ? baseMsg
+                : baseMsg.replace(/{nome}/g, recipient.nome);
               console.log(`[dispatch] inst=${instanceId ?? "legacy"} attempt=${attempt} preflight=${preflight.status}${preflight.reconnected ? "(reconectado)" : ""} ${isGroup ? "group" : "phone"}=${destination}`);
 
               const { res: sendRes, data: sendData } = await fetchBridgeSend({
@@ -1132,6 +1135,14 @@ Deno.serve(async (req) => {
                     p_dispatch_id: dispatch.id, p_success: true, p_error_message: null,
                     p_preflight_status: preflight.status,
                     p_preflight_reconnected: preflight.reconnected,
+                  });
+                }
+                // Registra cobrança de indicador (se aplicável)
+                if (tipo === "indicadores_cobranca" && (recipient as any).indicador_id) {
+                  await adminClient.from("eleicao_cobranca_log").insert({
+                    client_id,
+                    indicador_id: (recipient as any).indicador_id,
+                    dispatch_id: dispatch.id,
                   });
                 }
                 recipientResolved = true;
