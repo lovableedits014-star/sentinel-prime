@@ -80,8 +80,27 @@ export default function Telemarketing() {
             if (data) setClientName(data.name);
           });
       }
+      if (campanhaIdParam) {
+        supabase.from("telemarketing_campanhas" as any)
+          .select("nome")
+          .eq("id", campanhaIdParam)
+          .maybeSingle()
+          .then(({ data }: any) => { if (data?.nome) setCampanhaNome(data.nome); });
+      }
     });
+  }, [clientId, campanhaIdParam]);
+
+  // Auto-login when admin opens with ?auto=1&nome=...&senha=...
+  useEffect(() => {
+    if (autoLoginAttempted.current) return;
+    if (!clientId) return;
+    if (searchParams.get("auto") !== "1") return;
+    if (!operadorNome.trim() || !operadorSenha.trim()) return;
+    autoLoginAttempted.current = true;
+    handleLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
+
 
   const handleLogin = async () => {
     if (!operadorNome.trim() || !operadorSenha.trim()) {
