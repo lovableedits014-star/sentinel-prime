@@ -23,6 +23,7 @@ export default function TelemarketingAdminRelatorios() {
         <p className="text-sm text-muted-foreground">Gráficos, ranking por bairro, candidatos alternativos, comparativo entre rodadas e export PDF.</p>
       </div>
       <div className="space-y-6">
+        {clientId && <TelemarketingIndicadorScorecard clientId={clientId} />}
         {clientId && <TelemarketingSnapshotsPanel clientId={clientId} />}
         <TelemarketingReportsPanel contratados={contratados as any} indicados={indicados as any} />
       </div>
