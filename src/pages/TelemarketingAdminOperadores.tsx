@@ -1,6 +1,7 @@
 import { Loader2, ShieldAlert } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import TelemarketingSettingsCard from "@/components/settings/TelemarketingSettingsCard";
+import TelemarketingOperadorSecurityPanel from "@/components/telemarketing/TelemarketingOperadorSecurityPanel";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 
 export default function TelemarketingAdminOperadores() {
@@ -21,7 +22,12 @@ export default function TelemarketingAdminOperadores() {
           <p className="text-sm text-amber-900 dark:text-amber-200">Selecione um cliente no seletor lateral para gerenciar operadores.</p>
         </div>
       )}
-      {clientId && <TelemarketingSettingsCard clientId={clientId} />}
+      {clientId && (
+        <div className="space-y-6">
+          <TelemarketingSettingsCard clientId={clientId} />
+          <TelemarketingOperadorSecurityPanel clientId={clientId} />
+        </div>
+      )}
     </div>
   );
 }
