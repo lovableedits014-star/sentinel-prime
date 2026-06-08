@@ -884,7 +884,7 @@ Deno.serve(async (req) => {
     if (instance_id) {
       const { data: inst } = await adminClient
         .from("whatsapp_instances")
-        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since, phone_number, last_reconnect_attempt_at")
+        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since, phone_number, last_reconnect_attempt_at, last_create_instance_at, reconnect_attempts_today, reconnect_attempts_date")
         .eq("id", instance_id)
         .eq("client_id", resolvedClientId)
         .maybeSingle();
