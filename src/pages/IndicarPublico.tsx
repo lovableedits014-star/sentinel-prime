@@ -260,7 +260,7 @@ export default function IndicarPublico() {
             )}
 
             <Button type="submit" disabled={saving} className="w-full h-12 text-base">
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Check className="w-5 h-5 mr-2" />Indicar e adicionar outra</>}
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Check className="w-5 h-5 mr-2" />{botaoLabel}</>}
             </Button>
           </form>
         </Card>
