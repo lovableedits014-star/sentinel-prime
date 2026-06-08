@@ -7103,6 +7103,7 @@ export type Database = {
           instance_token: string | null
           is_active: boolean
           is_primary: boolean
+          last_create_instance_at: string | null
           last_disconnected_at: string | null
           last_health_check_at: string | null
           last_reconnect_attempt_at: string | null
@@ -7115,6 +7116,8 @@ export type Database = {
           pending_onboarding: boolean
           phone_number: string | null
           qr_code: string | null
+          reconnect_attempts_date: string | null
+          reconnect_attempts_today: number
           status: string
           suspected_banned_at: string | null
           total_failed: number
@@ -7136,6 +7139,7 @@ export type Database = {
           instance_token?: string | null
           is_active?: boolean
           is_primary?: boolean
+          last_create_instance_at?: string | null
           last_disconnected_at?: string | null
           last_health_check_at?: string | null
           last_reconnect_attempt_at?: string | null
@@ -7148,6 +7152,8 @@ export type Database = {
           pending_onboarding?: boolean
           phone_number?: string | null
           qr_code?: string | null
+          reconnect_attempts_date?: string | null
+          reconnect_attempts_today?: number
           status?: string
           suspected_banned_at?: string | null
           total_failed?: number
@@ -7169,6 +7175,7 @@ export type Database = {
           instance_token?: string | null
           is_active?: boolean
           is_primary?: boolean
+          last_create_instance_at?: string | null
           last_disconnected_at?: string | null
           last_health_check_at?: string | null
           last_reconnect_attempt_at?: string | null
@@ -7181,6 +7188,8 @@ export type Database = {
           pending_onboarding?: boolean
           phone_number?: string | null
           qr_code?: string | null
+          reconnect_attempts_date?: string | null
+          reconnect_attempts_today?: number
           status?: string
           suspected_banned_at?: string | null
           total_failed?: number
