@@ -1,58 +1,120 @@
-## O que eu verifiquei agora
+## Levantamento — o que existe hoje de Telemarketing
 
-Olhei tudo que poderia ter "tocado" no seu WhatsApp nas últimas horas:
+### 1. Fluxo do operador (público, sem login do Supabase)
+- **Página `/telemarketing/:clientId`** (`src/pages/Telemarketing.tsx`, 511 linhas):
+  - Tela de login do operador (nome + senha) validada por RPC `verify_telemarketing_operador`.
+  - Carrega contatos via RPC `tele_list_contatos` (líderes, liderados de `contratados` + `contratado_indicados`).
+  - Filtra apenas pendentes, mostra um por vez com click-to-call (`tel:`).
+  - Formulário registra resultado via RPC `tele_registrar_ligacao`: status (atendeu / não atendeu / recusou), cidade/bairro, intenção de voto (sim/não/indeciso), candidato alternativo.
+  - Filtros por tipo (todos / líder / liderado / indicado) e avanço automático para o próximo pendente.
+- Link público gerado em `TelemarketingSettingsCard` (em Configurações).
 
-- **Disparos (`whatsapp_dispatches`)**: o último foi em **05/06 22:21**, concluído. Nenhum disparo hoje, nenhum agendado, nenhum em execução, nenhum pausado.
-- **Fila de retry (`whatsapp_send_retry_queue`)**: **vazia**. Nada pendente, nada tentando reenviar.
-- **Log de envios da instância (`whatsapp_instance_send_log`)**: último envio em **05/06 22:21**. Zero envios nos últimos 3 dias.
-- **Cron jobs (`pg_cron`)**: só 3 ativos — `ic-monthly-drift-detection` (mensal), `llm-alert-detection` (LLM, nada de WhatsApp) e `eleicao-cobranca-auto-hourly` (chama um hook HTTP, não dispara mensagem direta). **Nenhum cron de disparo automático**.
-- **Estado da instância**: `status=connecting`, `last_disconnected_at = 08/06 15:27` (alguns minutos antes da sua mensagem). Última conexão saudável: 05/06.
-- **Logs do edge `manage-whatsapp-instance`**: chamadas a cada ~60s, mas todas são `instance_status` (consulta de status, **não envia mensagem**, não reautentica).
+### 2. Cadastro de operadores
+- **`src/components/settings/TelemarketingSettingsCard.tsx`** (em `/settings`):
+  - CRUD de operadores (`telemarketing_operadores`: nome, senha, ativo).
+  - Toggle ativo/inativo, redefinição de senha, exclusão.
+  - Exibe o link público do telemarketing.
 
-## Conclusão: o "dado fantasma" não é envio automático
+### 3. Resultados e relatórios (espalhados)
+- **`TelemarketingResultsPanel`** — usado em `Contratados` (aba interna). Lista com filtros (busca, status, voto, operador) + cards de KPI e desempenho por operador.
+- **`TelemarketingReportsPanel`** — usado em **`/contratados/relatorios`** (`ContratadosRelatorios.tsx`). Gráficos (pizza intenção + status), barras por líder, ranking de candidatos alternativos, tabela detalhada, export CSV.
+- **Dashboard `SuggestedActions`** — sugere "Indicados aguardando contato" linkando para `/telemarketing` (rota só existe com `:clientId`, então o link quebra).
 
-Não há nenhum disparo, retry, cron ou job de background tentando mandar mensagem. Não foi a plataforma que disparou nada. O que **pode** ter causado o ban é outro padrão no fluxo de reconexão:
+### 4. Dados no banco
+- `telemarketing_operadores` (id, client_id, nome, senha, ativo).
+- Campos de chamada distribuídos em **`contratados`** e **`contratado_indicados`**: `ligacao_status`, `vota_candidato`, `candidato_alternativo`, `operador_nome`, `ligacao_em`.
+- RPCs SECURITY DEFINER: `verify_telemarketing_operador`, `tele_list_contatos`, `tele_registrar_ligacao`.
+- Hoje: **1 operador cadastrado, 0 ligações registradas**.
 
-### Suspeito #1 (mais provável): recriação repetida de instância
+### 5. Lacunas e problemas atuais
+1. **Sem área administrativa centralizada** — operadores em Settings, resultados em Contratados, relatórios em ContratadosRelatorios. Não há "Telemarketing" no sidebar.
+2. `eleicao_indicados` (indicações públicas eleitorais) **não entra na fila** — só `contratado_indicados`.
+3. Histórico imutável: ao re-ligar, a chamada anterior é sobrescrita (sem auditoria).
+4. Sem **fila inteligente**: não distribui contatos entre operadores, não evita 2 operadores no mesmo contato, sem retomada/agendamento ("ligar de novo às 18h").
+5. Sem **timer/sessão de operador** (tempo logado, ligações/hora, taxa de conversão real).
+6. Sem **scripts de atendimento** configuráveis (perguntas-padrão, objeções).
+7. Sem **listas/campanhas** (segmentar quem ligar primeiro: bairro X, líder Y, só indecisos da rodada anterior).
+8. Sem **importação de mailing externo** (CSV avulso fora dos contratados/indicados).
+9. Sem **export PDF**, sem agendamento de relatório, sem comparativo entre rodadas.
+10. Link público acessível por qualquer um com o `clientId` — senha de operador é a única barreira; sem rate limit / bloqueio após X tentativas, sem expiração de senha.
+11. Sem **tags/observações livres** por contato (objeção, motivo da recusa em texto).
+12. Dashboard `SuggestedActions` link `/telemarketing` está quebrado (faltam `:clientId`).
 
-Quando você clica **"Conectar"** ou **"Gerar novo QR"** com o número desconectado:
-- `handleConnect` (em `WhatsAppInstancePoolCard`) e `handleRescan` (em `StatusWhatsApp`) chamam a action `create_instance` na ponte.
-- Cada `create_instance` força um novo login/auth do número no servidor da ponte.
-- Repetir isso várias vezes seguidas no mesmo número (especialmente após um ban anterior, como o que você teve) é **classicamente o que dispara ban definitivo** no WhatsApp — eles interpretam como tentativa de login abusiva/automatizada.
+---
 
-Como você teve um ban recente e o número voltou, ele já estava em "observação" do lado deles. Qualquer tentativa de reconectar/recriar nas horas seguintes amplifica o sinal de risco.
+## Plano de melhoria — Telemarketing como módulo dedicado
 
-### Suspeito #2 (menos provável, mas vale isolar): a ponte (Evolution/UAZAPI) ficando em loop de reconexão
+### Fase 1 — Centralização (UI / navegação) ⭐ prioridade
+**Criar item "Telemarketing" no sidebar** (grupo "Mobilização" ou "Operacional", ícone `Headphones`), apontando para `/telemarketing-admin` (rota nova, autenticada — distinta da `/telemarketing/:clientId` que continua sendo o operador público).
 
-O `status=connecting` há minutos, sem `last_reconnect_attempt_at` registrado por aqui, sugere que a ponte do lado externo pode estar tentando restabelecer sessão sozinha. Isso não vem do nosso código, mas se for o caso, precisa ser tratado lá ou bloqueado por aqui.
+Página `TelemarketingAdmin.tsx` com sub-abas (padrão `ContratadosSubNav`):
 
-## Plano de correção
+```text
+/telemarketing-admin                  → Visão geral (KPIs + ações rápidas)
+/telemarketing-admin/fila             → Fila ao vivo / contatos pendentes
+/telemarketing-admin/resultados       → Lista detalhada (move TelemarketingResultsPanel)
+/telemarketing-admin/relatorios       → Gráficos (move TelemarketingReportsPanel)
+/telemarketing-admin/operadores       → CRUD (move TelemarketingSettingsCard)
+/telemarketing-admin/campanhas        → (Fase 3) listas segmentadas
+/telemarketing-admin/configuracoes    → Link público, script de atendimento, regras
+```
 
-Mexer só onde reduz risco de ban, sem alterar o fluxo de envio em si.
+Manter os panels existentes onde estão (Contratados/Settings) como atalhos OU removê-los de lá para evitar duplicação — sugestão: **remover de Settings e ContratadosRelatorios** e deixar tudo concentrado no novo módulo.
 
-### 1. Cooldown forte em `create_instance`
-No edge `manage-whatsapp-instance`, na action `create_instance`:
-- Antes de chamar a ponte, ler `last_reconnect_attempt_at` e `last_disconnected_at`.
-- Se houve `create_instance` nos últimos **15 minutos**, **bloquear** com uma mensagem clara ("Aguarde X minutos antes de tentar reconectar — proteção anti-ban").
-- Gravar `last_reconnect_attempt_at = now()` sempre que `create_instance` for executado de fato.
-- Adicionar coluna `reconnect_attempts_today` + reset diário, e cortar em 3 tentativas/dia.
+Corrigir link quebrado em `SuggestedActions` para `/telemarketing-admin/fila`.
 
-### 2. Cooldown também em `reconnect`
-Mesmo tratamento (mais brando: 5 min) para a action `reconnect`, que também pode forçar handshake.
+### Fase 2 — Visão geral + monitor ao vivo
+Aba **Visão geral** mostra:
+- KPIs do dia: ligações feitas, taxa atendimento, % vota sim, operadores ativos agora.
+- Top operadores (24h / 7d).
+- Heatmap por hora (quando atendem mais).
+- Lista de "operadores online" (última atividade < 5min) baseada em `ligacao_em` mais recente por `operador_nome`.
 
-### 3. UI mostra cooldown
-- Em `WhatsAppInstancePoolCard` e `StatusWhatsApp`, desabilitar os botões "Conectar" / "Gerar novo QR" enquanto o cooldown estiver ativo, mostrando o tempo restante e o motivo ("proteção anti-ban: aguarde 12 min").
+### Fase 3 — Fila inteligente
+- Tabela nova `telemarketing_call_log` (histórico imutável de cada tentativa, não sobrescreve).
+- Tabela nova `telemarketing_call_assignments` para "trava" temporária (operador X pegou contato Y por 5min) → evita colisão entre operadores.
+- Agendamento "ligar de novo": novo campo `proxima_tentativa_em`; fila prioriza vencidos.
+- Inclusão opcional de `eleicao_indicados` na fila (toggle por campanha).
 
-### 4. Detecção de "provavelmente banido"
-- Se a ponte retornar `banned`, `logged_out` ou ficar em `connecting` por mais de 10 min sem conectar, marcar `suspected_banned_at = now()` e travar QUALQUER ação automática até intervenção manual (botão "Reconhecer e destravar").
+### Fase 4 — Campanhas / listas segmentadas
+- Tabela `telemarketing_campanhas`: nome, filtros (tipo, bairro, líder, status anterior), operadores atribuídos, prazo.
+- Operador, ao logar, escolhe campanha ativa.
+- Importação CSV de mailing avulso (tabela `telemarketing_contatos_avulsos`).
 
-### 5. (Recomendação operacional, sem código)
-- Não use o mesmo número que já foi banido uma vez para reconectar imediatamente. Aguarde **24-48h** antes de tentar novo login no número que já caiu.
-- Evite clicar "Conectar" / "Gerar QR" em sequência. Sempre 1 tentativa, aguarda, escaneia. Se não escanear em ~2 min, espere bastante antes da próxima.
+### Fase 5 — Script + qualificação rica
+- Configurar perguntas adicionais por campanha (JSON).
+- Campo de observação livre + tags rápidas ("não mora mais aqui", "número errado", "pediu retorno").
+- Reagendamento manual com data/hora.
 
-## Detalhes técnicos
-- Arquivos afetados: `supabase/functions/manage-whatsapp-instance/index.ts` (actions `create_instance` e `reconnect`), `src/components/settings/WhatsAppInstancePoolCard.tsx`, `src/pages/StatusWhatsApp.tsx`.
-- Migration: adicionar coluna `reconnect_attempts_today int default 0` e `reconnect_attempts_date date` em `whatsapp_instances` para o contador diário.
-- Sem mudança em fluxo de envio, dispatch ou cron — eles já estavam parados.
+### Fase 6 — Relatórios avançados
+- Export PDF do relatório.
+- Comparativo entre rodadas/campanhas.
+- Drill-down por bairro no mapa.
+- Alerta automático no Dashboard quando taxa "vota sim" cair > X% entre rodadas.
 
-Confirme se quer que eu aplique esse plano (cooldown + lock + UI) ou se prefere começar só pelo cooldown server-side (mais defensivo, sem mudar UI).
+### Fase 7 — Segurança / anti-abuso
+- Rate limit de tentativas de login do operador (já com SECURITY DEFINER, falta bloqueio).
+- Expiração / rotação de senha do operador.
+- Auditoria de quem chamou cada RPC.
+- Opção de exigir token rotativo no link público.
+
+---
+
+## Recomendação de execução agora
+
+Confirmar **Fase 1 + Fase 2** como primeira entrega:
+
+1. Criar `src/pages/TelemarketingAdmin.tsx` + `src/components/telemarketing/TelemarketingSubNav.tsx`.
+2. Criar subpáginas que reaproveitam os componentes já existentes (`TelemarketingResultsPanel`, `TelemarketingReportsPanel`, `TelemarketingSettingsCard`).
+3. Adicionar nova aba **Visão geral** com KPIs do dia + top operadores + heatmap por hora.
+4. Adicionar item "Telemarketing" no `DashboardLayout` (grupo "Mobilização", ícone `Headphones`).
+5. Adicionar rotas em `App.tsx` (`/telemarketing-admin/*`) com `AuthGate`.
+6. Corrigir link `/telemarketing` em `SuggestedActions` → `/telemarketing-admin/fila`.
+7. Remover duplicações: tirar `TelemarketingSettingsCard` de `Settings.tsx` e o painel de tele de `ContratadosRelatorios` (deixar apenas atalhos com link para o novo módulo).
+
+Fases 3–7 entram em entregas seguintes conforme prioridade.
+
+## Perguntas antes de implementar
+1. Posso **remover** o card de telemarketing de `Settings` e a aba telemarketing de `ContratadosRelatorios`, ou prefere **manter as duas localizações** + a nova (atalhos)?
+2. Quer já incluir `eleicao_indicados` na fila do operador nesta primeira fase, ou deixar para a Fase 3?
+3. Avanço com Fase 1 + Fase 2 agora?
