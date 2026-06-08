@@ -606,7 +606,7 @@ Deno.serve(async (req) => {
     const interMax = (clientData.whatsapp_inter_instance_delay_max ?? 3) * 1000;
 
     // Build recipient list — em modo resume usa items pendentes; senão, busca por tipo
-    let recipients: { telefone?: string; nome: string; group_jid?: string }[] = [];
+    let recipients: { telefone?: string; nome: string; group_jid?: string; mensagem_personalizada?: string; indicador_id?: string }[] = [];
     let dispatch: any;
 
     // Lista de JIDs de grupos vinda do payload (modo "grupos")
@@ -617,13 +617,14 @@ Deno.serve(async (req) => {
     if (isResume && existingDispatchId) {
       const { data: pendingItems } = await adminClient
         .from("whatsapp_dispatch_items")
-        .select("telefone, nome, group_jid")
+        .select("telefone, nome, group_jid, mensagem_personalizada")
         .eq("dispatch_id", existingDispatchId)
         .eq("status", "pendente");
       recipients = (pendingItems || []).map((r: any) => ({
         telefone: r.telefone || undefined,
         nome: r.nome || "",
         group_jid: r.group_jid || undefined,
+        mensagem_personalizada: r.mensagem_personalizada || undefined,
       }));
       dispatch = { id: existingDispatchId };
       console.log(`[resume] dispatch=${existingDispatchId} pending=${recipients.length}`);
