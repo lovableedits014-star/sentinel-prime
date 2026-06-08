@@ -50,7 +50,7 @@ export default function Telemarketing() {
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [clientName, setClientName] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso">("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado">("todos");
 
   // Form state
   const [ligacaoStatus, setLigacaoStatus] = useState("");
