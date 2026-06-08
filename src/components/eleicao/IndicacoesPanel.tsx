@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock } from "lucide-react";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye } from "lucide-react";
 import CobrancaAutoConfig from "./CobrancaAutoConfig";
+import IndicarPaginaConfig from "./IndicarPaginaConfig";
 
 type DispatchHist = {
   id: string;
@@ -75,7 +76,7 @@ function waLink(telefone: string, msg: string) {
 }
 
 export default function IndicacoesPanel({ clientId }: { clientId: string }) {
-  const [tab, setTab] = useState<"cobranca" | "config">("cobranca");
+  const [tab, setTab] = useState<"cobranca" | "config" | "pagina">("cobranca");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
@@ -311,6 +312,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
         <TabsList>
           <TabsTrigger value="cobranca"><Users className="w-4 h-4 mr-1.5" />Indicadores & Cobrança</TabsTrigger>
           <TabsTrigger value="config"><Target className="w-4 h-4 mr-1.5" />Metas e configurações</TabsTrigger>
+          <TabsTrigger value="pagina"><Palette className="w-4 h-4 mr-1.5" />Página pública</TabsTrigger>
         </TabsList>
 
         {/* ──────────── COBRANÇA ──────────── */}
@@ -523,6 +525,11 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           </Card>
 
           <CobrancaAutoConfig clientId={clientId} />
+        </TabsContent>
+
+        {/* ──────────── PÁGINA PÚBLICA ──────────── */}
+        <TabsContent value="pagina" className="mt-4">
+          <IndicarPaginaConfig clientId={clientId} candidatoNome={candidatoNome} />
         </TabsContent>
       </Tabs>
 
