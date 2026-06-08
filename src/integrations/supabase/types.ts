@@ -7084,6 +7084,7 @@ export type Database = {
           is_primary: boolean
           last_disconnected_at: string | null
           last_health_check_at: string | null
+          last_reconnect_attempt_at: string | null
           last_send_at: string | null
           messages_sent_today: number
           messages_sent_today_date: string
@@ -7116,6 +7117,7 @@ export type Database = {
           is_primary?: boolean
           last_disconnected_at?: string | null
           last_health_check_at?: string | null
+          last_reconnect_attempt_at?: string | null
           last_send_at?: string | null
           messages_sent_today?: number
           messages_sent_today_date?: string
@@ -7148,6 +7150,7 @@ export type Database = {
           is_primary?: boolean
           last_disconnected_at?: string | null
           last_health_check_at?: string | null
+          last_reconnect_attempt_at?: string | null
           last_send_at?: string | null
           messages_sent_today?: number
           messages_sent_today_date?: string

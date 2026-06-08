@@ -303,8 +303,39 @@ async function logDirectSend(adminClient: any, params: { instanceId: string; cli
   });
 }
 
+// Cooldown entre auto-reconexões por instância. Bridge WhatsHub baniu números
+// com 17+ reconexões em 20h; cada /connect abre uma nova sessão WebSocket do
+// WhatsApp. Limitamos a no máximo 1 auto-reconnect a cada 15 minutos por
+// instância. Reconexões manuais (action="reconnect" disparada pelo usuário) NÃO
+// passam por aqui — esta função é só para tentativas automáticas em send/health.
+const AUTO_RECONNECT_COOLDOWN_MS = 15 * 60 * 1000;
+
 async function tryReconnectInstance(adminClient: any, inst: any) {
   if (!inst?.bridge_api_key) return { id: inst?.id, reconnected: false, reason: "missing_api_key" };
+
+  // Cooldown check: evita loop de reconnect que faz o WhatsApp banir o número.
+  const lastAttempt = inst.last_reconnect_attempt_at ? new Date(inst.last_reconnect_attempt_at).getTime() : 0;
+  const sinceLast = Date.now() - lastAttempt;
+  if (lastAttempt > 0 && sinceLast < AUTO_RECONNECT_COOLDOWN_MS) {
+    const waitMs = AUTO_RECONNECT_COOLDOWN_MS - sinceLast;
+    return {
+      id: inst.id,
+      reconnected: false,
+      reason: "cooldown",
+      status: inst.status || "disconnected",
+      ok: false,
+      details: {
+        error: `Reconexão automática em cooldown. Aguarde ${Math.ceil(waitMs / 60000)} min ou peça ao usuário para reconectar manualmente.`,
+      },
+    };
+  }
+
+  // Marca a tentativa ANTES de chamar a bridge, para que falhas/timeouts também contem para o cooldown.
+  await adminClient
+    .from("whatsapp_instances")
+    .update({ last_reconnect_attempt_at: new Date().toISOString() })
+    .eq("id", inst.id);
+
   const { bridgeRes, bridgeData } = await fetchBridgeAction({
     action: "reconnect",
     apiKey: inst.bridge_api_key,
@@ -532,17 +563,19 @@ Deno.serve(async (req) => {
       }
       let query = adminClient
         .from("whatsapp_instances")
-        .select("id, bridge_api_key, status, connected_since, is_active")
+        .select("id, bridge_api_key, status, connected_since, is_active, last_reconnect_attempt_at")
         .eq("is_active", true)
         .not("bridge_api_key", "is", null)
         .limit(50);
       if (isAuthenticatedUser && allowedClientId) query = query.eq("client_id", allowedClientId);
       const { data: rows, error } = await query;
       if (error) return jsonResponse({ success: false, error: error.message }, 500);
+      // IMPORTANTE: health_check_all NÃO reconecta automaticamente. Reconexões em
+      // cascata para várias instâncias offline foram o gatilho do banimento na
+      // Bridge WhatsHub. Aqui apenas sincronizamos o status atual; a reconexão
+      // deve ser explícita (botão na UI -> action="reconnect").
       const results = await Promise.allSettled((rows || []).map(async (inst: any) => {
-        const health = await syncInstanceHealth(adminClient, inst);
-        if (health.status === "connected") return health;
-        return { ...health, reconnect: await tryReconnectInstance(adminClient, inst) };
+        return await syncInstanceHealth(adminClient, inst);
       }));
       return jsonResponse({ success: true, checked: results.length, results });
     }
@@ -773,7 +806,7 @@ Deno.serve(async (req) => {
     if (instance_id) {
       const { data: inst } = await adminClient
         .from("whatsapp_instances")
-        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since, phone_number")
+        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since, phone_number, last_reconnect_attempt_at")
         .eq("id", instance_id)
         .eq("client_id", resolvedClientId)
         .maybeSingle();
@@ -1123,21 +1156,13 @@ Deno.serve(async (req) => {
       const dbDisconnected = freshRow?.status === "disconnected";
 
       if (currentStatus !== "connected" || dbDisconnected || recentlyDropped) {
-        const reconnect = await tryReconnectInstance(adminClient, activeInstanceRow);
-        if (reconnect.status !== "connected") {
-          const error = "Instância WhatsApp desconectada. Reconecte o chip antes de enviar.";
-          const bridgeState = String(reconnect.details?.status || reconnect.details?.instance?.status || health.details?.status || health.details?.instance?.status || "").toLowerCase();
-          if (isExplicitOfflineStatus(bridgeState)) {
-            await markInstanceDisconnected(adminClient, instance_id);
-          }
-          await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
-          return jsonResponse({ success: false, status: reconnect.status || health.status, error, health, reconnect });
-        }
-        // Reconexão bem-sucedida: aguarda 2s para o socket WhatsApp estabilizar
-        // antes de tentar enviar (envios imediatos pós-reconnect costumam falhar).
-        if (recentlyDropped || dbDisconnected) {
-          await sleep(2000);
-        }
+        // Política anti-ban: NÃO chamamos /reconnect proativamente antes de enviar.
+        // Se o status atual ou recente diz "desconectado", recusamos o envio e
+        // pedimos reconexão MANUAL. Auto-reconnect só acontece DEPOIS de uma
+        // falha real de envio (bloco abaixo), e ainda assim com cooldown de 15min.
+        const error = "Instância WhatsApp desconectada. Reconecte o chip manualmente (botão na UI) antes de enviar.";
+        await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
+        return jsonResponse({ success: false, status: health.status, error, health });
       }
     }
 
