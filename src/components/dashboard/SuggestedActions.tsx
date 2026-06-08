@@ -178,7 +178,7 @@ export function SuggestedActions({ clientId }: SuggestedActionsProps) {
           description: "Indicados aguardando contato da central de telemarketing.",
           metric: `${indPend} para ligar`,
           cta: "Trabalhar fila",
-          to: "/telemarketing",
+          to: "/telemarketing-admin/fila",
         });
       }
 

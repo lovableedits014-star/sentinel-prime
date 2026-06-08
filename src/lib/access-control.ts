@@ -43,6 +43,7 @@ export const ALL_APP_TABS: AppTab[] = [
   { section: 'Mobilização', label: 'Funcionários', path: '/funcionarios' },
   { section: 'Mobilização', label: 'Controle de Presença', path: '/presenca' },
   { section: 'Mobilização', label: 'Calendário Político', path: '/calendario-politico' },
+  { section: 'Mobilização', label: 'Telemarketing', path: '/telemarketing-admin' },
   // Operacional
   { section: 'Operacional', label: 'Central WhatsApp', path: '/whatsapp' },
   { section: 'Operacional', label: 'Eleição', path: '/eleicao' },
