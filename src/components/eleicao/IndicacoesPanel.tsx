@@ -10,7 +10,30 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users } from "lucide-react";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock } from "lucide-react";
+
+type DispatchHist = {
+  id: string;
+  titulo: string;
+  status: string;
+  total_destinatarios: number;
+  enviados: number;
+  falhas: number;
+  created_at: string;
+  completed_at: string | null;
+};
+
+function fmtAgo(iso: string | null) {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `${min}min atrás`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h atrás`;
+  const d = Math.floor(h / 24);
+  return `${d}d atrás`;
+}
 
 type Tipo = "coordenador" | "lider" | "cabo";
 
