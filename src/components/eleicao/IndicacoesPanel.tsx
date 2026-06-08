@@ -390,6 +390,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                               <strong>{r.total_indicacoes}</strong>
                               <span className="text-muted-foreground"> / {r.meta}</span>
                             </span>
+                            {(r.cobrancas_enviadas > 0 || r.ultima_cobranca_em) && (
+                              <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1" title={r.ultima_cobranca_em ? `Última cobrança: ${new Date(r.ultima_cobranca_em).toLocaleString("pt-BR")}` : ""}>
+                                <Clock className="w-3 h-3" />
+                                {r.cobrancas_enviadas}× · {fmtAgo(r.ultima_cobranca_em)}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
