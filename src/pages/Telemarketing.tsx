@@ -189,6 +189,7 @@ export default function Telemarketing() {
     if (!current) return;
 
     setSaving(true);
+    const proximaTs = proximaTentativa ? new Date(proximaTentativa).toISOString() : null;
     const { data: rpcResult, error } = await supabase.rpc("tele_registrar_ligacao" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
@@ -200,6 +201,8 @@ export default function Telemarketing() {
       _bairro: bairro.trim() || "",
       _vota_candidato: ligacaoStatus === "atendeu" ? (votaCandidato || null) : null,
       _candidato_alternativo: ligacaoStatus === "atendeu" ? (candidatoAlt.trim() || null) : null,
+      _observacao: observacao.trim() || null,
+      _proxima_tentativa_em: proximaTs,
     });
 
     if (error) {
