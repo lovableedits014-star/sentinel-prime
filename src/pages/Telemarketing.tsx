@@ -149,6 +149,21 @@ export default function Telemarketing() {
       (i) => !i.ligacao_status || i.ligacao_status === "pendente"
     );
     setCurrentIndex(firstPending >= 0 ? firstPending : 0);
+
+    // Load campaign scripts (best-effort)
+    const { data: scriptRows } = await supabase.rpc("tele_list_campanhas_scripts" as any, {
+      _client_id: clientId!,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+    });
+    setScripts(((scriptRows as any[]) || []).map((s) => ({
+      id: s.id,
+      nome: s.nome,
+      script_intro: s.script_intro,
+      script_perguntas: Array.isArray(s.script_perguntas) ? s.script_perguntas : [],
+      tags_rapidas: Array.isArray(s.tags_rapidas) ? s.tags_rapidas : [],
+    })));
+
     setLoggedIn(true);
     setLoading(false);
   };
