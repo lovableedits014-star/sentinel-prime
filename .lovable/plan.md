@@ -78,10 +78,13 @@ Aba **Visão geral** mostra:
 - UI do operador (`Telemarketing.tsx`): aviso visual quando contato está em atendimento por outro operador, botão "Reagendar" + data/hora, campo de observação livre, exibição do histórico de tentativas e observação anterior.
 - Pendente: incluir `eleicao_indicados` na fila (toggle por campanha) → fica na Fase 4.
 
-### Fase 4 — Campanhas / listas segmentadas
-- Tabela `telemarketing_campanhas`: nome, filtros (tipo, bairro, líder, status anterior), operadores atribuídos, prazo.
-- Operador, ao logar, escolhe campanha ativa.
-- Importação CSV de mailing avulso (tabela `telemarketing_contatos_avulsos`).
+### Fase 4 — Campanhas / mailing avulso ✅ entregue
+- Tabelas `telemarketing_campanhas` (CRUD com ativo/inativo) e `telemarketing_contatos_avulsos` (mailing importado, com vínculo opcional a campanha).
+- RPC `tele_import_contato_avulso_batch` (admin) faz import em lote a partir de JSON parseado de CSV.
+- `tele_list_contatos` agora inclui contatos avulsos ativos como `tipo='avulso'` / `tabela='contatos_avulsos'`.
+- `tele_registrar_ligacao` aceita também `contatos_avulsos`.
+- Nova página admin `/telemarketing-admin/campanhas`: criar/desativar/remover campanhas, importar CSV (vírgula/;/tab, com ou sem cabeçalho), listar contatos importados com status.
+- Operador (`Telemarketing.tsx`): novo filtro "Mailing" e badge "Mailing" para contatos avulsos.
 
 ### Fase 5 — Script + qualificação rica
 - Configurar perguntas adicionais por campanha (JSON).
@@ -94,11 +97,14 @@ Aba **Visão geral** mostra:
 - Drill-down por bairro no mapa.
 - Alerta automático no Dashboard quando taxa "vota sim" cair > X% entre rodadas.
 
-### Fase 7 — Segurança / anti-abuso
-- Rate limit de tentativas de login do operador (já com SECURITY DEFINER, falta bloqueio).
-- Expiração / rotação de senha do operador.
-- Auditoria de quem chamou cada RPC.
-- Opção de exigir token rotativo no link público.
+### Fase 7 — Segurança / anti-abuso ✅ entregue
+- Novos campos em `telemarketing_operadores`: `failed_attempts`, `locked_until`, `last_login_at`, `password_updated_at`.
+- `verify_telemarketing_operador` agora bloqueia por 15 min após 5 tentativas erradas, reseta no sucesso e registra login.
+- Helper interno `_tele_assert_operador` aplicado a todos os RPCs do operador (claim/release/list/registrar), garantindo que contas bloqueadas não consigam usar a fila.
+- Tabela `telemarketing_operador_audit` (login ok / falha / bloqueio / troca de senha / desbloqueio).
+- RPCs admin: `tele_change_operador_password` (com auditoria) e `tele_unlock_operador`.
+- Painel admin em `/telemarketing-admin/operadores`: mostra tentativas erradas, último login, data da senha, botão de desbloquear, troca de senha e log de auditoria recente.
+- Mensagem no login do operador diferencia "credenciais inválidas" de "conta bloqueada".
 
 ---
 

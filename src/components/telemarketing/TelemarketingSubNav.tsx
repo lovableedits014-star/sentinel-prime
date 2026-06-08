@@ -1,10 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, ListChecks, BarChart3, Users, Settings as SettingsIcon, Phone } from "lucide-react";
+import { LayoutDashboard, ListChecks, BarChart3, Users, Settings as SettingsIcon, Phone, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { to: "/telemarketing-admin", label: "Visão geral", icon: LayoutDashboard, end: true },
   { to: "/telemarketing-admin/fila", label: "Fila ao vivo", icon: Phone },
+  { to: "/telemarketing-admin/campanhas", label: "Campanhas", icon: Megaphone },
   { to: "/telemarketing-admin/resultados", label: "Resultados", icon: ListChecks },
   { to: "/telemarketing-admin/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/telemarketing-admin/operadores", label: "Operadores", icon: Users },

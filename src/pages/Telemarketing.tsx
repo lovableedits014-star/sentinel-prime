@@ -21,8 +21,8 @@ interface ContatoTele {
   candidato_alternativo: string | null;
   operador_nome: string | null;
   ligacao_em: string | null;
-  tipo: "lider" | "liderado" | "indicado";
-  tabela: "contratados" | "contratado_indicados";
+  tipo: "lider" | "liderado" | "indicado" | "avulso";
+  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos";
   proxima_tentativa_em: string | null;
   tentativas_count: number | null;
   observacao_tele: string | null;
@@ -39,7 +39,7 @@ export default function Telemarketing() {
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [clientName, setClientName] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado">("todos");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso">("todos");
 
   // Form state
   const [ligacaoStatus, setLigacaoStatus] = useState("");
@@ -75,15 +75,26 @@ export default function Telemarketing() {
     setLoading(true);
 
     // Validate operator credentials via SECURITY DEFINER function (senha não trafega na tabela)
-    const { data: opRows } = await supabase.rpc("verify_telemarketing_operador" as any, {
+    const { data: opRows, error: opErr } = await supabase.rpc("verify_telemarketing_operador" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
     });
-    const opData = Array.isArray(opRows) && opRows.length > 0 ? opRows[0] : null;
 
+    if (opErr) {
+      const msg = opErr.message || "";
+      if (/bloque/i.test(msg)) {
+        toast.error("Conta bloqueada temporariamente por excesso de tentativas. Tente novamente em alguns minutos.");
+      } else {
+        toast.error("Nome ou senha inválidos");
+      }
+      setLoading(false);
+      return;
+    }
+
+    const opData = Array.isArray(opRows) && opRows.length > 0 ? opRows[0] : null;
     if (!opData) {
-      toast.error("Nome ou senha inválidos");
+      toast.error("Nome ou senha inválidos. Após 5 tentativas, a conta é bloqueada por 15 minutos.");
       setLoading(false);
       return;
     }
@@ -110,8 +121,8 @@ export default function Telemarketing() {
       candidato_alternativo: r.candidato_alternativo,
       operador_nome: r.operador_nome,
       ligacao_em: r.ligacao_em,
-      tipo: r.tipo as "lider" | "liderado" | "indicado",
-      tabela: r.tabela as "contratados" | "contratado_indicados",
+      tipo: r.tipo as ContatoTele["tipo"],
+      tabela: r.tabela as ContatoTele["tabela"],
       proxima_tentativa_em: r.proxima_tentativa_em ?? null,
       tentativas_count: r.tentativas_count ?? 0,
       observacao_tele: r.observacao_tele ?? null,
@@ -278,6 +289,7 @@ export default function Telemarketing() {
   const tipoLabel = (tipo: string) => {
     if (tipo === "lider") return "Líder";
     if (tipo === "liderado") return "Liderado";
+    if (tipo === "avulso") return "Mailing";
     return "Indicado";
   };
 
@@ -360,7 +372,7 @@ export default function Telemarketing() {
 
       {/* Type filter */}
       <div className="flex gap-2 flex-wrap">
-        {(["todos", "lider", "liderado", "indicado"] as const).map((f) => (
+        {(["todos", "lider", "liderado", "indicado", "avulso"] as const).map((f) => (
           <Button
             key={f}
             variant={filtroTipo === f ? "default" : "outline"}
