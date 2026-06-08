@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 interface ContatoTele {
@@ -22,6 +23,11 @@ interface ContatoTele {
   ligacao_em: string | null;
   tipo: "lider" | "liderado" | "indicado";
   tabela: "contratados" | "contratado_indicados";
+  proxima_tentativa_em: string | null;
+  tentativas_count: number | null;
+  observacao_tele: string | null;
+  locked_by: string | null;
+  locked_until: string | null;
 }
 
 export default function Telemarketing() {
