@@ -101,14 +101,17 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
   async function load() {
     setLoading(true);
-    const [cob, cfg, cli] = await Promise.all([
+    const [cob, cfg, cli, hist] = await Promise.all([
       supabase.from("v_eleicao_indicadores_cobranca").select("*").eq("client_id", clientId).order("total_indicacoes", { ascending: true }),
       supabase.from("eleicao_indicacao_config").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
+      supabase.from("whatsapp_dispatches").select("id,titulo,status,total_destinatarios,enviados,falhas,created_at,completed_at")
+        .eq("client_id", clientId).eq("tipo", "indicadores_cobranca").order("created_at", { ascending: false }).limit(10),
     ]);
     setRows((cob.data as any) || []);
     if (cfg.data) setConfig(cfg.data as any);
     setCandidatoNome((cli.data as any)?.name || "");
+    setHistorico((hist.data as any) || []);
     setLoading(false);
   }
 
