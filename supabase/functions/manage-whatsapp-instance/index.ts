@@ -1203,6 +1203,8 @@ Deno.serve(async (req) => {
     if (!clientApiKey) {
       if (action === "reconnect") {
         if (instance_id && activeInstanceRow) {
+          const cd = checkReconnectCooldown(activeInstanceRow, "reconnect");
+          if (!cd.allowed) return cooldownBlockedResponse(cd);
           if (!bridgeToken) return jsonResponse({ error: "Bridge token não configurado" }, 500);
           const instName = activeInstanceRow.apelido || "WhatsApp Bot";
           const bridgeRes = await fetch(BRIDGE_URL, {
@@ -1210,6 +1212,7 @@ Deno.serve(async (req) => {
             headers: { "Content-Type": "application/json", "X-Bridge-Token": bridgeToken },
             body: JSON.stringify({ action: "create_instance", name: instName }),
           });
+          await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
           const bridgeData = await bridgeRes.json().catch(() => ({}));
           if (bridgeData.api_key) {
             await adminClient
