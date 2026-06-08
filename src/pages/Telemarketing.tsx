@@ -110,6 +110,11 @@ export default function Telemarketing() {
       ligacao_em: r.ligacao_em,
       tipo: r.tipo as "lider" | "liderado" | "indicado",
       tabela: r.tabela as "contratados" | "contratado_indicados",
+      proxima_tentativa_em: r.proxima_tentativa_em ?? null,
+      tentativas_count: r.tentativas_count ?? 0,
+      observacao_tele: r.observacao_tele ?? null,
+      locked_by: r.locked_by ?? null,
+      locked_until: r.locked_until ?? null,
     }));
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
