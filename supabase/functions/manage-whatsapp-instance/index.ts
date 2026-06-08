@@ -195,7 +195,8 @@ const cooldownBlockedResponse = (check: Extract<CooldownCheck, { allowed: false 
     cooldown: true,
     remaining_ms: check.remainingMs,
     remaining_seconds: Math.ceil(check.remainingMs / 1000),
-  }, 429);
+  }, 200);
+
 
 
 const toBoolean = (value: unknown, fallback = false) => {
