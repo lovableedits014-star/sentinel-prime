@@ -1,88 +1,38 @@
-## Envios de cobrança — o que falta
+## Problema
 
-Hoje o painel de Indicações só permite **cobrança 1 a 1** (botão verde do WhatsApp por linha). Falta o disparo em **massa** e o **automático**, usando a infraestrutura de WhatsApp que o cliente já tem (`whatsapp_instances`, `message_dispatches`, `whatsapp_dispatch_items`).
+Após qualquer evento transitório de `disconnected` vindo do webhook da ponte, os envios ficam bloqueados por até 90 segundos mesmo quando a ponte já confirma `connected` ao vivo. A UI também segue mostrando "Desconectada" porque lê só o status armazenado no banco, sem revalidar ao vivo, e o campo `last_disconnected_at` nunca é zerado em reconexões bem-sucedidas.
 
----
+Sintoma do usuário: "mostra desconectada, não envia; eu vou na aba Status, ela aparece conectada, e aí envia."
 
-## Fase A — Disparo em massa manual (envio agora)
+## Correções
 
-Botão novo no `IndicacoesPanel`: **"Enviar cobrança em massa"**.
+### 1. `supabase/functions/manage-whatsapp-instance/index.ts`
 
-1. Usa exatamente os filtros já visíveis (tipo / status / busca) para definir o público.
-2. Modal mostra:
-   - Quantos indicadores serão atingidos.
-   - Quantos têm telefone (descarta sem telefone).
-   - Quantos já têm token (gera token automaticamente para quem não tem).
-   - Prévia da mensagem editável com placeholders `{primeiro_nome}`, `{faltam}`, `{meta}`, `{link}`, `{candidato}`.
-   - Seleção da instância de WhatsApp (reaproveita `WhatsAppInstancePoolCard`).
-3. Mensagens-modelo prontas por status:
-   - **Zerados:** "Oi {primeiro_nome}, ainda não recebemos nenhuma indicação sua. Sua meta é {meta}. Use seu link: {link}"
-   - **Abaixo da meta:** "Faltam {faltam} indicações para sua meta…"
-   - **Meta cumprida:** mensagem de agradecimento + continue indicando.
-4. Confirmação cria 1 `message_dispatches` + N `whatsapp_dispatch_items` e enfileira no mesmo pipeline que o resto do sistema já usa.
+**a) `syncInstanceHealth` (linhas ~240-253):** quando a ponte confirma `connected`, limpar `last_disconnected_at = null` no update. Isso encerra a "janela de quarentena" assim que a sessão é validada como viva.
 
-## Fase B — Cobrança automática agendada
+**b) Pré-envio (linhas ~1140-1167):** se `syncInstanceHealth` retornou `status === "connected"` (resposta ao vivo da ponte), confiar nela e **ignorar** o `recentlyDropped`. O `recentlyDropped` continua valendo apenas como salvaguarda quando a checagem ao vivo NÃO conseguiu confirmar "connected". Hoje ele invalida até confirmações ao vivo, que é a raiz do bug.
 
-Configurável em **Metas e configurações**:
+**c) Branch do `action === "instance_status"` (linhas ~1284-1300):** quando o status normaliza para `connected`, também limpar `last_disconnected_at = null`. Isso garante consistência quando o usuário aciona "Reconectar"/"Status" pela UI.
 
-- **Frequência:** desligada / semanal / a cada 3 dias / diária.
-- **Dia e horário** do disparo (ex: terça às 10h).
-- **Critério:** "só quem está abaixo da meta" + "só quem não recebeu cobrança nas últimas X horas".
-- **Limite por disparo** (ex: máx 500/dia) para não estourar a instância.
+### 2. `src/components/settings/WhatsAppInstancePoolCard.tsx`
 
-Implementação: cron `pg_cron` chama uma rota pública `/api/public/hooks/eleicao-cobranca-auto` que monta o lote e enfileira no mesmo dispatch.
+A UI atualmente exibe "Desconectada"/"Conectada" com base em `instance.status` carregado pelo pai, sem revalidar ao vivo. Isso amplifica o falso negativo.
 
-Tabelas extras:
-- `eleicao_cobranca_config` (client_id, frequencia, hora, criterios, ultimo_disparo_em).
-- Coluna `ultima_cobranca_em` em `v_eleicao_indicadores_cobranca` (vinda de `eleicao_notif_log` ou tabela própria) para evitar reenviar a mesma pessoa.
+- No botão **Reconectar** (já existente), antes de chamar `create_instance`, primeiro chamar `instance_status`; se a ponte responder `connected`/`open`, apenas chamar `onChange()` (refresh) e mostrar toast "Já estava conectado" sem disparar novo QR. Evita ações desnecessárias na ponte (anti-ban).
+- Não vou adicionar polling automático: manter o padrão "ações humanas" que combinamos no patch anti-ban.
 
-## Fase C — Acompanhamento e proteção
+### 3. (Opcional, baixo risco) Webhook `whatsapp-inbound-webhook`
 
-1. **Histórico de envios** dentro do painel: lista de disparos (data, total, sucesso, falhou, leu, clicou no link).
-2. **Tracking de clique** opcional: gerar link curto `/i/{token}/{hash}` que registra abertura antes de redirecionar para `/indicar/{token}`.
-3. **Não reenviar** para o mesmo indicador em menos de N horas (configurável; padrão 48h).
-4. **Pausar automático** se a instância de WhatsApp cair / for desconectada.
-5. **Botão "Testar comigo"** que envia para um número escolhido antes do disparo real.
+Não alterar — ele continua refletindo eventos da ponte imediatamente. A correção é no consumidor: tratar `disconnected` como hipótese, não verdade absoluta, e deixar a checagem ao vivo no momento do envio ter a palavra final.
 
-## Fase D — Cobrança do candidato para o coordenador (cascata)
+## Verificação após implementação
 
-Hoje a régua só fala com quem tem token. Falta a camada de **pressão estruturada**:
+1. Build passa (`bun run build`).
+2. Re-deploy do edge function `manage-whatsapp-instance`.
+3. Smoke test manual: simular um `disconnected` no DB (`update whatsapp_instances set status='disconnected', last_disconnected_at=now()`), tentar enviar — agora deve funcionar se a ponte estiver realmente conectada, e o registro deve voltar para `status='connected'` com `last_disconnected_at=null`.
 
-- Quando um **coordenador** está abaixo da meta, alertar o admin no Dashboard ("3 coordenadores zerados").
-- Disparo automático para o **coordenador** com resumo do time dele: "Seus 8 líderes trouxeram só 12 indicações. Cobra eles: {link_painel_do_lider_x}".
-- Opcional: relatório semanal por e-mail/PDF para o candidato.
+## Resumo do impacto
 
----
-
-## Detalhes técnicos
-
-**Banco**
-- `eleicao_cobranca_config` (client_id PK, frequencia text, hora int, dias_semana int[], criterios jsonb, max_por_disparo int, ativo bool, ultimo_disparo_em timestamptz).
-- `eleicao_cobranca_log` (id, client_id, indicador_id, dispatch_item_id, enviado_em, status, clicou_em, indicou_apos boolean).
-- RPC `eleicao_montar_lote_cobranca(_client_id, _filtros jsonb, _limit int)` → retorna a lista com token garantido (gera se faltar) + mensagem renderizada.
-- View `v_eleicao_indicadores_cobranca` ganha `ultima_cobranca_em` e `cobrancas_enviadas`.
-
-**Frontend**
-- `src/components/eleicao/IndicacoesPanel.tsx`: botão "Enviar em massa", modal de prévia, aba "Histórico de envios", aba "Cobrança automática" (dentro de Configurações).
-- Reaproveita componentes de `Disparos` (seleção de instância, preview da mensagem, progresso) para manter UX consistente.
-
-**Backend**
-- Rota `src/routes/api/public/hooks/eleicao-cobranca-auto.ts` chamada por `pg_cron`.
-- Server functions:
-  - `eleicaoEnviarCobrancaMassa.functions.ts` (manual, autenticada).
-  - `eleicaoCobrancaAutoRun.server.ts` (chamada pela rota pública com `apikey`).
-
----
-
-## Ordem sugerida
-
-1. **Fase A** (massa manual) — desbloqueia uso imediato.
-2. **Fase C** (histórico + não-reenviar + teste) — controle antes de automatizar.
-3. **Fase B** (agendamento automático).
-4. **Fase D** (cascata candidato → coordenador → líder).
-
-Antes de implementar, confirma 3 pontos:
-
-1. Pode começar pela **Fase A inteira** (massa manual + prévia + escolha da instância)?
-2. As mensagens-modelo (zerado / abaixo / ok) acima estão boas, ou você quer editar o texto antes?
-3. Reaproveito a instância de WhatsApp que já está conectada no cliente, ou quer poder escolher uma instância específica só pra cobrança de eleição?
+- Envios deixam de ser bloqueados por janela "fantasma" de 90s após eventos transitórios.
+- `last_disconnected_at` passa a representar a verdade ("última vez que ficou offline e ainda não voltou"), não "última vez que algum evento sugeriu queda".
+- Nenhuma chamada extra à ponte; nenhum polling novo (mantém política anti-ban).
