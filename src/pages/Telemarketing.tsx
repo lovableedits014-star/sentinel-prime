@@ -59,6 +59,7 @@ export default function Telemarketing() {
   const [observacao, setObservacao] = useState("");
   const [proximaTentativa, setProximaTentativa] = useState("");
   const [saving, setSaving] = useState(false);
+  const [scripts, setScripts] = useState<CampanhaScript[]>([]);
 
   useEffect(() => {
     // Force anon role to ensure RLS anon policies apply
