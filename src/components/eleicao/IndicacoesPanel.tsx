@@ -517,6 +517,8 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </Button>
             </div>
           </Card>
+
+          <CobrancaAutoConfig clientId={clientId} />
         </TabsContent>
       </Tabs>
 
