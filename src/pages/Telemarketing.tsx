@@ -278,6 +278,7 @@ export default function Telemarketing() {
   const tipoLabel = (tipo: string) => {
     if (tipo === "lider") return "Líder";
     if (tipo === "liderado") return "Liderado";
+    if (tipo === "avulso") return "Mailing";
     return "Indicado";
   };
 
