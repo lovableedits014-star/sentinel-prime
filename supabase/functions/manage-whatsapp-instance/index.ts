@@ -895,11 +895,31 @@ Deno.serve(async (req) => {
       ? activeInstanceRow.bridge_api_key
       : clientConfig?.whatsapp_bridge_api_key;
 
+    // === GET RECONNECT COOLDOWN (read-only, para UI) ===
+    if (action === "get_reconnect_cooldown" && activeInstanceRow) {
+      const c = checkReconnectCooldown(activeInstanceRow, "create");
+      const today = todayDateStr();
+      const sameDay = activeInstanceRow.reconnect_attempts_date === today;
+      const used = sameDay ? Number(activeInstanceRow.reconnect_attempts_today || 0) : 0;
+      return jsonResponse({
+        success: true,
+        allowed: c.allowed,
+        remaining_ms: c.allowed ? 0 : c.remainingMs,
+        remaining_seconds: c.allowed ? 0 : Math.ceil(c.remainingMs / 1000),
+        reason: c.allowed ? null : c.reason,
+        attempts_today: used,
+        max_per_day: MAX_RECONNECTS_PER_DAY,
+      });
+    }
+
     // === CREATE INSTANCE ===
     if (action === "create_instance") {
       // Versão multi-instância
       if (instance_id && activeInstanceRow) {
+        const cd = checkReconnectCooldown(activeInstanceRow, "create");
+        if (!cd.allowed) return cooldownBlockedResponse(cd);
         if (!bridgeToken) return jsonResponse({ error: "Bridge token não configurado" }, 500);
+
         if (activeInstanceRow.bridge_api_key) {
           try {
             await fetch(BRIDGE_URL, {
