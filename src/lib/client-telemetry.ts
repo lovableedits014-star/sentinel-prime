@@ -17,7 +17,8 @@ export type TelemetryEventType =
   | "queries_invalidated"
   | "resolve_started"
   | "resolve_finished"
-  | "resolve_error";
+  | "resolve_error"
+  | "render_error";
 
 export interface TelemetryEvent {
   type: TelemetryEventType;

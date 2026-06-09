@@ -14,6 +14,7 @@ import {
 import { createBrowserHistory, type BrowserHistory } from "history";
 import DashboardLayout from "./components/DashboardLayout";
 import RequireRole from "./components/RequireRole";
+import RouteErrorBoundary from "./components/RouteErrorBoundary";
 
 // Lazy-load all pages so each route loads only its own chunk on demand.
 const Index = lazy(() => import("./pages/Index"));
@@ -93,19 +94,13 @@ const PageFallback = () => (
   </div>
 );
 
-const AppRouter = () => {
-  const [history, setHistory] = useState<BrowserHistory | null>(null);
-
-  useEffect(() => {
-    setHistory(createBrowserHistory({ window }));
-  }, []);
-
-  if (!history) return <PageFallback />;
-
+const RoutesWithBoundary = () => {
+  const location = useLocation();
   return (
-    <HistoryRouter history={history as any} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <RouteErrorBoundary resetKey={location.pathname}>
       <Suspense fallback={<PageFallback />}>
         <Routes>
+
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/signup/:token" element={<Signup />} />
@@ -174,6 +169,22 @@ const AppRouter = () => {
             <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+    </RouteErrorBoundary>
+  );
+};
+
+const AppRouter = () => {
+  const [history, setHistory] = useState<BrowserHistory | null>(null);
+
+  useEffect(() => {
+    setHistory(createBrowserHistory({ window }));
+  }, []);
+
+  if (!history) return <PageFallback />;
+
+  return (
+    <HistoryRouter history={history as any} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <RoutesWithBoundary />
     </HistoryRouter>
   );
 };
