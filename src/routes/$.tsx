@@ -1,10 +1,5 @@
-import { createFileRoute, ClientOnly } from "@tanstack/react-router";
-import App from "@/App";
+import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/$")({
-  component: () => (
-    <ClientOnly fallback={<div />}>
-      <App />
-    </ClientOnly>
-  ),
+  component: () => null,
 });

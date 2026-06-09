@@ -1,4 +1,5 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { ClientOnly, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import App from "@/App";
 
 import appCss from "../styles.css?url";
 
@@ -64,5 +65,9 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  return <Outlet />;
+  return (
+    <ClientOnly fallback={<div />}>
+      <App />
+    </ClientOnly>
+  );
 }
