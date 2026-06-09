@@ -1,8 +1,53 @@
+import { useEffect } from "react";
 import { createRouter, useRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { logTelemetry } from "@/lib/client-telemetry";
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
+
+  // Log + telemetria assim que o boundary renderiza.
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.error("[router DefaultErrorComponent]", error);
+    try {
+      (window as any).__lastRenderError = {
+        message: error?.message,
+        stack: error?.stack,
+        at: new Date().toISOString(),
+        pathname: typeof window !== "undefined" ? window.location.pathname : null,
+      };
+    } catch {}
+    try {
+      logTelemetry("render_error", {
+        scope: "tanstack_default",
+        pathname: typeof window !== "undefined" ? window.location.pathname : null,
+        message: error?.message,
+        stack: (error?.stack || "").split("\n").slice(0, 5).join("\n"),
+      });
+    } catch {}
+  }, [error]);
+
+  // Auto-reset: se a URL mudar (ex.: usuário clicou em outro item do menu da SPA
+  // interna em react-router-dom), o boundary se limpa sozinho para não prender
+  // o usuário nesta tela.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const initial = window.location.pathname + window.location.search;
+    const check = () => {
+      const current = window.location.pathname + window.location.search;
+      if (current !== initial) {
+        router.invalidate();
+        reset();
+      }
+    };
+    window.addEventListener("popstate", check);
+    const interval = window.setInterval(check, 400);
+    return () => {
+      window.removeEventListener("popstate", check);
+      window.clearInterval(interval);
+    };
+  }, [router, reset]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
