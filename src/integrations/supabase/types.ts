@@ -8421,6 +8421,35 @@ export type Database = {
         }
         Returns: Json
       }
+      tele_ranking_indicadores: {
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _data_ate?: string
+          _data_de?: string
+          _universo?: string
+        }
+        Returns: {
+          bairro: string
+          cidade: string
+          confirmados: number
+          coordenador_id: string
+          coordenador_nome: string
+          filhos_count: number
+          indecisos: number
+          indicados_diretos: number
+          indicados_total: number
+          ligados: number
+          meta: number
+          pendentes: number
+          pessoa_id: string
+          pessoa_nome: string
+          pessoa_tipo: string
+          rejeitados: number
+          taxa_conversao: number
+          ultima_atividade: string
+        }[]
+      }
       tele_registrar_ligacao: {
         Args: {
           _bairro: string
