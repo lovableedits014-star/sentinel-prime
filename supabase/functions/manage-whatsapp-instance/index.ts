@@ -532,12 +532,13 @@ async function createClientInstance(params: {
   // Persist api_key even when QR generation failed — the instance exists on the
   // bridge and we'll need the key to retry/reconnect. Without this, the next
   // call would create another instance from scratch and loop forever.
-  if (bridgeData.api_key) {
+  const apiKey = getBridgeApiKey(bridgeData);
+  if (apiKey) {
     const { error: updateError } = await adminClient
       .from("clients")
       .update({
         whatsapp_bridge_url: BRIDGE_URL,
-        whatsapp_bridge_api_key: bridgeData.api_key,
+        whatsapp_bridge_api_key: apiKey,
       } as any)
       .eq("id", clientId);
 
@@ -551,27 +552,20 @@ async function createClientInstance(params: {
 
   // Bridge created the instance but failed to issue a QR code immediately.
   // Try to fetch a QR via reconnect using the freshly-saved api_key.
-  if ((!bridgeRes.ok || !bridgeData.success) && bridgeData.api_key && !isQrPendingResponse(bridgeData)) {
+  if (apiKey) {
     try {
-      const retryRes = await fetch(BRIDGE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": bridgeData.api_key,
-        },
-        body: JSON.stringify({ action: "reconnect" }),
-      });
-      const retryData = await retryRes.json().catch(() => ({}));
-      if (retryRes.ok && (retryData.qrcode || retryData.instance?.qrcode)) {
+      const retry = await fetchFreshQr(apiKey, 2);
+      if (retry.qrcode) {
         return jsonResponse({
           success: true,
-          qrcode: retryData.qrcode ?? retryData.instance?.qrcode,
-          instance: retryData.instance,
+          qrcode: retry.qrcode,
+          status: retry.status || "connecting",
+          instance: retry.bridgeData.instance,
           recreated: true,
         });
       }
     } catch (err) {
-      console.error("Retry reconnect after create failed:", err);
+      console.error("Fresh QR after create failed:", err);
     }
   }
 
@@ -586,7 +580,7 @@ async function createClientInstance(params: {
     );
   }
 
-  if (!bridgeData.api_key) {
+  if (!apiKey) {
     return jsonResponse(
       { error: "A ponte não retornou a api_key da instância", details: bridgeData },
       502,
@@ -595,7 +589,8 @@ async function createClientInstance(params: {
 
   return jsonResponse({
     success: true,
-    qrcode: bridgeData.qrcode,
+    qrcode: getBridgeQrCode(bridgeData),
+    status: getBridgeRawStatus(bridgeData),
     instance: bridgeData.instance,
     recreated: true,
   });
