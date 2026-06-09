@@ -8182,6 +8182,28 @@ export type Database = {
         Returns: undefined
       }
       tea_ranking_ms: { Args: { p_codigo_ibge: number }; Returns: Json }
+      tele_admin_listar_contatos_full: {
+        Args: { _client_id: string }
+        Returns: {
+          bairro: string
+          campanha_id: string
+          campanha_nome: string
+          candidato_alternativo: string
+          cidade: string
+          contratado_id: string
+          id: string
+          is_lider: boolean
+          lider_id: string
+          ligacao_em: string
+          ligacao_status: string
+          nome: string
+          operador_nome: string
+          tabela: string
+          telefone: string
+          tipo: string
+          vota_candidato: string
+        }[]
+      }
       tele_capture_snapshot: {
         Args: { _campanha_id?: string; _client_id: string; _rotulo: string }
         Returns: string
