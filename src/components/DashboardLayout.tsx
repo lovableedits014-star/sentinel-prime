@@ -164,11 +164,18 @@ const DashboardLayout = () => {
         );
         if (!mounted) return;
 
-        const isSuperAdmin = superAdminRes?.data;
+        // Tratar erros de RPC/select como "ausente" em vez de exception —
+        // evita derrubar a UI inteira para um usuário novo (RLS pode estar
+        // bloqueando seletivamente algumas linhas).
+        if (superAdminRes?.error) console.warn("is_super_admin RPC error:", superAdminRes.error);
+        if (clientRes?.error) console.warn("clients select error:", clientRes.error);
+        if (teamRes?.error) console.warn("team_members select error:", teamRes.error);
+
+        const isSuperAdmin = superAdminRes?.data === true;
         const clientData = clientRes?.data;
         const teamData = teamRes?.data;
 
-        if (isSuperAdmin === true) {
+        if (isSuperAdmin) {
           setIsSuperAdmin(true);
           setIsClientOwner(true);
           setAccessProfile(null);
@@ -180,7 +187,7 @@ const DashboardLayout = () => {
             setPlatformPaths(null);
           } else if (teamData) {
             const row = teamData as any;
-            const paths: string[] = row.allowed_paths || [];
+            const paths: string[] = Array.isArray(row.allowed_paths) ? row.allowed_paths : [];
             const isManager = !!row.is_manager;
             setIsClientOwner(false);
             if (isManager || paths.includes("*")) {
@@ -190,9 +197,14 @@ const DashboardLayout = () => {
               setPlatformPaths([...paths, ...ALWAYS_ALLOWED_PATHS]);
               setAccessProfile(null);
             } else {
-              setAccessProfile(row.role as AccessProfile);
+              // role pode ser null/desconhecido — não passa direto para getRoleLabels
+              setAccessProfile((row.role as AccessProfile) || null);
+              if (!row.role) {
+                setPlatformPaths([...ALWAYS_ALLOWED_PATHS]);
+              }
             }
           } else {
+            console.warn("Usuário sem client/team_member ativo", { userId: session.user.id });
             toast.error("Você não tem permissão para acessar o painel");
             await supabase.auth.signOut();
             navigate("/auth", { replace: true });
