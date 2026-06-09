@@ -596,11 +596,16 @@ export default function Telemarketing() {
                   <Button
                     variant={ligacaoStatus === "nao_atendeu" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setLigacaoStatus("nao_atendeu")}
+                    onClick={() => {
+                      setLigacaoStatus("nao_atendeu");
+                      const d = new Date(Date.now() + 60 * 60 * 1000);
+                      const pad = (n: number) => String(n).padStart(2, "0");
+                      setProximaTentativa(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                    }}
                     className="text-xs"
                   >
                     <PhoneOff className="w-3.5 h-3.5 mr-1" />
-                    Não atendeu
+                    Não atendeu (+1h)
                   </Button>
                   <Button
                     variant={ligacaoStatus === "recusou" ? "destructive" : "outline"}
