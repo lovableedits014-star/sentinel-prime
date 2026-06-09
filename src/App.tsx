@@ -169,6 +169,22 @@ const RoutesWithBoundary = () => {
             <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+    </RouteErrorBoundary>
+  );
+};
+
+const AppRouter = () => {
+  const [history, setHistory] = useState<BrowserHistory | null>(null);
+
+  useEffect(() => {
+    setHistory(createBrowserHistory({ window }));
+  }, []);
+
+  if (!history) return <PageFallback />;
+
+  return (
+    <HistoryRouter history={history as any} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <RoutesWithBoundary />
     </HistoryRouter>
   );
 };
