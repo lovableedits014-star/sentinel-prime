@@ -174,10 +174,6 @@ export default function Telemarketing() {
     const lista = allContatos.filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
 
     setContatos(lista);
-    const firstPending = lista.findIndex(
-      (i) => !i.ligacao_status || i.ligacao_status === "pendente"
-    );
-    setCurrentIndex(firstPending >= 0 ? firstPending : 0);
 
     // Load campaign scripts (best-effort)
     const { data: scriptRows } = await supabase.rpc("tele_list_campanhas_scripts" as any, {
@@ -195,6 +191,22 @@ export default function Telemarketing() {
 
     setLoggedIn(true);
     setLoading(false);
+
+    // Picker atômico no servidor: cada operador começa em um contato diferente.
+    const { data: pick } = await supabase.rpc("tele_proximo_contato" as any, {
+      _client_id: clientId!,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: campanhaIdParam || null,
+      _ttl_seconds: 300,
+    });
+    const res = pick as { found: boolean; tabela?: string; contato_id?: string } | null;
+    if (res?.found) {
+      const idx = lista.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+      setCurrentIndex(idx >= 0 ? idx : 0);
+    } else {
+      setCurrentIndex(0);
+    }
   };
 
   const filteredContatos = filtroTipo === "todos"
