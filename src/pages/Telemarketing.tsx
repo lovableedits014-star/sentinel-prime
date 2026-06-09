@@ -220,6 +220,69 @@ export default function Telemarketing() {
     setProximaTentativa("");
   };
 
+  // Recarrega a lista (mantendo o contato atual se ainda existir)
+  const reloadContatos = async (preserveId?: { id: string; tabela: string }) => {
+    if (!clientId || !operadorNome.trim() || !operadorSenha.trim()) return [] as ContatoTele[];
+    const { data: rpcRows } = await supabase.rpc("tele_list_contatos" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: campanhaIdParam || null,
+    });
+    const lista: ContatoTele[] = ((rpcRows as any[]) || [])
+      .map((r) => ({
+        id: r.id, nome: r.nome, telefone: r.telefone,
+        cidade: r.cidade, bairro: r.bairro,
+        ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
+        candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
+        ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
+        tabela: r.tabela as ContatoTele["tabela"],
+        proxima_tentativa_em: r.proxima_tentativa_em ?? null,
+        tentativas_count: r.tentativas_count ?? 0,
+        observacao_tele: r.observacao_tele ?? null,
+        locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
+        campanha_id: r.campanha_id ?? null,
+        indicador_nome: r.indicador_nome ?? null,
+        indicador_tipo: r.indicador_tipo ?? null,
+      }))
+      .filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
+    setContatos(lista);
+    if (preserveId) {
+      const idx = lista.findIndex(c => c.id === preserveId.id && c.tabela === preserveId.tabela);
+      if (idx >= 0) setCurrentIndex(idx);
+    }
+    return lista;
+  };
+
+  // Picker atômico: servidor escolhe + trava o próximo disponível.
+  // Garante que dois operadores nunca recebam o mesmo contato.
+  const jumpToProximoDisponivel = async () => {
+    if (!clientId) return;
+    const { data, error } = await supabase.rpc("tele_proximo_contato" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: campanhaIdParam || null,
+      _ttl_seconds: 300,
+    });
+    if (error) { toast.error("Erro: " + error.message); return; }
+    const res = data as { found: boolean; tabela?: string; contato_id?: string } | null;
+    if (!res || !res.found) {
+      toast.info("Fila vazia no momento — aguardando reagendamentos.");
+      return;
+    }
+    let idx = contatos.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+    if (idx < 0) {
+      const lista = await reloadContatos();
+      idx = lista.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+    }
+    if (idx >= 0) {
+      setFiltroTipo("todos");
+      setCurrentIndex(idx);
+      resetForm();
+    }
+  };
+
   // Reivindica trava de 5min ao abrir o contato; libera ao trocar/pular
   useEffect(() => {
     if (current && clientId) {
@@ -239,12 +302,45 @@ export default function Telemarketing() {
         _ttl_seconds: 300,
       }).then(({ data }: any) => {
         if (data && data.claimed === false && data.operador_nome && data.operador_nome !== operadorNome.trim()) {
-          toast.warning(`Este contato já está em atendimento por ${data.operador_nome}`);
+          toast.warning(`Este contato está em atendimento por ${data.operador_nome}. Pulando…`);
+          void jumpToProximoDisponivel();
         }
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
+
+  // Heartbeat: renova a trava a cada 60s
+  useEffect(() => {
+    if (!current || !clientId) return;
+    const iv = setInterval(() => {
+      supabase.rpc("tele_heartbeat_contato" as any, {
+        _client_id: clientId,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _tabela: current.tabela,
+        _id: current.id,
+        _ttl_seconds: 300,
+      });
+    }, 60_000);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id, clientId]);
+
+  // Realtime: reflete travas de outros operadores quase em tempo real
+  useEffect(() => {
+    if (!loggedIn || !clientId) return;
+    const ch = supabase
+      .channel(`tele_assign_${clientId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "telemarketing_call_assignments", filter: `client_id=eq.${clientId}` },
+        () => { void reloadContatos(current ? { id: current.id, tabela: current.tabela } : undefined); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, clientId]);
 
 
   const handleSave = async () => {
@@ -276,48 +372,25 @@ export default function Telemarketing() {
       setSaving(false);
       return;
     }
-    if (!rpcResult || (rpcResult as any).updated === 0) {
+    const result = rpcResult as { updated?: number; conflict?: boolean; lock_owner?: string } | null;
+    if (result?.conflict) {
+      toast.error(`Outro operador (${result.lock_owner}) atendeu este contato agora. Indo para o próximo…`);
+      setSaving(false);
+      resetForm();
+      await jumpToProximoDisponivel();
+      return;
+    }
+    if (!result || (result.updated ?? 0) === 0) {
       toast.error("Falha ao salvar no banco. Tente recarregar a página.");
       setSaving(false);
       return;
     }
 
-    const updateData: Record<string, any> = {
-      ligacao_status: ligacaoStatus,
-      operador_nome: operadorNome.trim(),
-      ligacao_em: new Date().toISOString(),
-      cidade: cidade.trim() || null,
-      bairro: bairro.trim() || null,
-      vota_candidato: ligacaoStatus === "atendeu" ? (votaCandidato || null) : null,
-      candidato_alternativo: ligacaoStatus === "atendeu" ? (candidatoAlt.trim() || null) : null,
-    };
-
-    setContatos((prev) =>
-      prev.map((i) =>
-        i.id === current.id ? { ...i, ...updateData } : i
-      )
-    );
-
+    setContatos((prev) => prev.filter((i) => i.id !== current.id));
     toast.success("Ligação registrada!");
     setSaving(false);
-
-    // Move to next pending in filtered list
-    const nextPending = filteredContatos.findIndex(
-      (i, idx) => idx > currentIndex && (!i.ligacao_status || i.ligacao_status === "pendente")
-    );
-    if (nextPending >= 0) {
-      setCurrentIndex(nextPending);
-    } else {
-      const fromStart = filteredContatos.findIndex(
-        (i, idx) => idx !== currentIndex && (!i.ligacao_status || i.ligacao_status === "pendente")
-      );
-      if (fromStart >= 0) {
-        setCurrentIndex(fromStart);
-      } else {
-        toast.success("🎉 Todos os contatos foram ligados!");
-      }
-    }
     resetForm();
+    await jumpToProximoDisponivel();
   };
 
   const skipToNext = async () => {
@@ -330,15 +403,8 @@ export default function Telemarketing() {
         _id: current.id,
       });
     }
-    const next = filteredContatos.findIndex(
-      (i, idx) => idx > currentIndex && (!i.ligacao_status || i.ligacao_status === "pendente")
-    );
-    if (next >= 0) {
-      setCurrentIndex(next);
-      resetForm();
-    } else {
-      toast.info("Não há mais contatos pendentes");
-    }
+    resetForm();
+    await jumpToProximoDisponivel();
   };
 
   const tipoLabel = (tipo: string) => {
