@@ -126,6 +126,15 @@ const sanitizeBridgeData = (data: any) => {
   return safe;
 };
 
+const getBridgeApiKey = (data: any) =>
+  data?.api_key || data?.instance?.api_key || data?.token || data?.instance?.token || null;
+
+const getBridgeQrCode = (data: any) =>
+  data?.qrcode || data?.qr_code || data?.qr || data?.base64 || data?.instance?.qrcode || data?.instance?.qr_code || null;
+
+const getBridgeRawStatus = (data: any) =>
+  data?.status || data?.instance?.status || data?.state || data?.instance?.state || null;
+
 // =====================================================================
 // Anti-ban cooldown: limita chamadas a `create_instance` e `reconnect`
 // para o mesmo número. Repetir login/handshake várias vezes em sequência
