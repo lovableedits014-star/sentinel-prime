@@ -259,6 +259,34 @@ async function fetchBridgeAction(params: {
   throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
 }
 
+async function fetchFreshQr(apiKey: string, attempts = 2) {
+  for (let i = 0; i < attempts; i++) {
+    const { bridgeRes, bridgeData } = await fetchBridgeAction({
+      action: "reconnect",
+      apiKey,
+      body: { action: "reconnect" },
+    });
+    const qrcode = getBridgeQrCode(bridgeData);
+    const status = getBridgeRawStatus(bridgeData);
+    if (qrcode || isConnectedStatus(status) || !bridgeRes.ok) {
+      return { bridgeRes, bridgeData, qrcode, status };
+    }
+    await sleep(1500);
+  }
+
+  const { bridgeRes, bridgeData } = await fetchBridgeAction({
+    action: "instance_status",
+    apiKey,
+    body: { action: "instance_status" },
+  });
+  return {
+    bridgeRes,
+    bridgeData,
+    qrcode: getBridgeQrCode(bridgeData),
+    status: getBridgeRawStatus(bridgeData),
+  };
+}
+
 async function syncInstanceHealth(adminClient: any, inst: any) {
   if (!inst?.bridge_api_key) return { id: inst?.id, status: "disconnected", ok: false };
 
