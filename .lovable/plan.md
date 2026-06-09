@@ -1,105 +1,61 @@
 
-## Diagnóstico — por que está confuso hoje
+## Diagnóstico — por que suas ligações não apareceram
 
-O fluxo atual está espalhado em 3 lugares diferentes e o operador **vê todos os contatos misturados**, sem vínculo com nenhuma "fila":
+Confirmei no banco: suas 4 ligações de teste como OPERADOR1 **foram salvas corretamente** em `telemarketing_call_log` (2 "atendeu" + 2 "nao_atendeu", tabela `eleicao_pessoas`).
 
-1. **Campanhas** → cria campanha + edita script + importa CSV + designa indicados da eleição (4 conceitos no mesmo card)
-2. **Fila ao vivo** → mostra só contratados/indicados pendentes, **ignora CSV e eleição**
-3. **Operadores** → cadastra operador, mas não conecta operador ↔ campanha
+O bug está nos painéis do admin (`Resultados detalhados` e `Relatórios`):
 
-Resultado: você cria uma campanha, mas o operador continua vendo "tudo". Não dá pra testar uma fila específica.
+- Eles usam o hook `useContratadosData`, que só busca **contratados** e **contratado_indicados**.
+- Ligações feitas em **eleicao_pessoas**, **eleicao_indicados** e **contatos_avulsos** simplesmente não entram nas estatísticas, no ranking por operador, nem aparecem na lista detalhada.
+- Como você testou em contatos da fila de eleição, nada apareceu — mesmo o `tele_registrar_ligacao` tendo gravado tudo certo.
 
----
+## Correção — uma fonte só de verdade: `telemarketing_call_log`
 
-## Proposta — 1 wizard, 1 fila por campanha, 1 link pronto
-
-### A. Novo wizard "Nova fila de ligação" (substitui o card atual de Campanhas)
-
-Um passo-a-passo único na aba **Campanhas**:
+### 1) Nova RPC `tele_admin_listar_ligacoes(_client_id, filtros)`
+Lê de `telemarketing_call_log` (SECURITY DEFINER, restrito a admin do cliente) e devolve, em uma única lista:
 
 ```text
-[1] Nomeie a fila        →  "Bairro Centro - 1ª rodada"
-[2] De onde vêm os nomes →  ( ) CSV/colar lista
-                            ( ) Estrutura eleitoral (coord/líder/cabo)
-                            ( ) Indicados (votos orgânicos)
-                            ( ) Contratados/liderados
-[3] Filtros              →  Cidade, bairro, tipo, indicador…
-                            "Apenas não ligados" (default ON)
-[4] Pré-visualização     →  "1.247 contatos entrarão na fila"
-[5] Script & tags        →  Intro + perguntas + tags rápidas
-[6] Confirmar            →  Cria a campanha + carrega a fila
-                            Mostra: link público + QR + senha sugerida
+id, data_hora, operador_nome, ligacao_status,
+tabela (origem: contratado/indicado/eleicao_pessoa/eleicao_indicado/avulso),
+contato_id, contato_nome, contato_telefone, cidade, bairro,
+vota_candidato, candidato_alternativo, observacao,
+campanha_id, campanha_nome
 ```
 
-Tudo num único dialog em etapas. CSV, eleição, indicados e contratados deixam de ser cards separados.
+Faz `LEFT JOIN` em cada tabela de origem para resolver nome/telefone/campanha. Aceita filtros: `data_de`, `data_ate`, `operador`, `status`, `campanha_id`, `tabela`.
 
-### B. Filtro automático por campanha no operador
+### 2) `TelemarketingResultsPanel` passa a usar essa RPC
+- Substitui o input via props (`contratados`, `indicados`) por fetch direto da RPC.
+- KPIs (total ligados, atendeu, não atendeu, recusou) calculados sobre o log → mostram **todas** as ligações, de todas as origens.
+- Ranking "Por operador" passa a refletir o que cada operador realmente fez.
+- Filtro novo: **Origem** (contratados / indicados / eleição-pessoas / eleição-indicados / avulsos) + **Campanha**.
+- Cada linha mostra origem e campanha, para você saber de onde veio o contato.
 
-Hoje `tele_list_contatos` devolve tudo. Vamos:
+### 3) `TelemarketingReportsPanel` (gráficos + export)
+- Mesma RPC alimenta os gráficos de evolução, ranking por bairro, candidato alternativo e comparativo entre rodadas.
+- O CSV/PDF de export inclui as novas colunas (origem, campanha).
+- Mantém o agrupamento por bairro/cidade já existente.
 
-- Adicionar `campanha_id` ao login do operador (escolhe a fila ao entrar, ou recebe link já com `?fila=xxx`).
-- A função passa a filtrar **só os contatos vinculados àquela campanha**.
-- Operador vê só os nomes da fila atribuída — fim da confusão.
+### 4) Visão geral (KPIs do topo do admin)
+Hoje também só conta contratados/indicados. Atualizar para contar `telemarketing_call_log` distintamente por `contato_id` para não inflar duplicado.
 
-### C. "Fila ao vivo" vira painel por campanha
+## Detalhes técnicos
 
-Em vez de lista achatada de contatos pendentes, mostra:
-
-```text
-┌─ Bairro Centro - 1ª rodada ───────────────────┐
-│ 1.247 contatos · 312 ligados · 187 confirmados│
-│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 25%   │
-│ [Abrir como operador] [Copiar link] [QR]      │
-│ Operadores online: Ana, Carlos                │
-└───────────────────────────────────────────────┘
-```
-
-Cada campanha vira um card com progresso, link pronto e quem está online.
-
-### D. Atalho "Testar agora" (resolve seu bloqueio)
-
-Botão **"Testar essa fila"** ao final do wizard → abre o portal do operador em nova aba, já logado com uma senha de teste, na campanha recém-criada. Você consegue validar em 1 clique sem precisar passar por login/operador/senha manualmente.
-
----
-
-## Como ficam as telas
-
-```text
-TELEMARKETING ADMIN
-├── Visão geral       (KPIs por campanha)
-├── Filas ⭐          (cards de campanha + "Nova fila" botão grande)
-├── Resultados
-├── Relatórios
-├── Operadores        (só cadastro; senha agora é por-campanha opcional)
-└── Configurações
-```
-
-"Campanhas" e "Fila ao vivo" viram **uma aba só: Filas**.
-
----
-
-## Detalhes técnicos (para referência)
-
-- **Tabela `telemarketing_fila_itens`** (nova, opcional): vínculo `campanha_id ↔ contato (tabela+id)` para suportar mailings que misturam origens. Se não quisermos nova tabela, a campanha_id já existe em `telemarketing_contatos_avulsos` e `eleicao_indicados`; basta adicioná-la em `contratados`/`contratado_indicados` ou usar uma view de junção.
-- **`tele_list_contatos`** ganha parâmetro `_campanha_id uuid` opcional. Quando preenchido, filtra `WHERE campanha_id = _campanha_id` em cada UNION.
-- **`tele_operador_login`** retorna campanhas disponíveis pro operador escolher (ou se houver só 1 ativa, entra direto).
-- **`tele_create_fila_wizard`** (nova RPC) — recebe `{ nome, origem, filtros, script, tags }` e cria a campanha + atribui os contatos numa única transação.
-- **Senha de teste**: gerar JWT curto de 1h com `op=__teste__` + `campanha_id` embarcado, abrir `/telemarketing/{clientId}?token=...`.
-
----
+- **Migration**: cria função `tele_admin_listar_ligacoes` com `SECURITY DEFINER` + `GRANT EXECUTE` para `authenticated`; valida `client_id` contra `has_role(auth.uid(),'admin')` ou membro do client.
+- **Sem nova tabela** — `telemarketing_call_log` já tem todos os campos necessários, basta consumir.
+- **Performance**: índice em `(client_id, created_at DESC)` se ainda não existir; paginação na lista detalhada (200 por página).
+- **Compatibilidade**: o painel `Filas` continua usando os updates nas tabelas-fonte; nada muda no fluxo do operador.
 
 ## O que NÃO muda
 
-- Estrutura de scoring de indicadores (já está pronta).
-- Click-to-call, registro de resultado, telemarketing_call_log.
-- Cadastro de operadores em si.
-
----
+- Tela do operador (`/telemarketing/:clientId`) e fluxo de salvar ligação.
+- Estrutura do `telemarketing_call_log` (já completa).
+- Botão "Não atendeu (+1h)" recém-adicionado.
 
 ## Entregáveis
 
-1. Wizard "Nova fila" em 6 passos na aba Filas.
-2. Operador filtra por campanha automaticamente.
-3. Painel "Filas" com cards de progresso por campanha.
-4. Botão "Testar essa fila" gerando link/senha temporários.
-5. Remoção dos cards duplicados (CSV solto, Designar Eleição solto).
+1. Migration com `tele_admin_listar_ligacoes`.
+2. `TelemarketingResultsPanel` refatorado para consumir a RPC, com filtros por origem e campanha.
+3. `TelemarketingReportsPanel` consumindo a RPC para gráficos e export.
+4. KPIs da visão geral do admin usando o log unificado.
+5. Validação: você refaz o teste com OPERADOR1 → as 4 ligações aparecem em Resultados, no ranking do operador e nos gráficos.
