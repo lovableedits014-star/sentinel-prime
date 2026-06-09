@@ -951,11 +951,18 @@ Deno.serve(async (req) => {
         // Conta a tentativa SEMPRE que a chamada ao bridge é feita, sucesso ou não.
         await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
         const bridgeData = await bridgeRes.json().catch(() => ({}));
-        if (bridgeData.api_key) {
+        const apiKey = getBridgeApiKey(bridgeData);
+        if (apiKey) {
           await adminClient
             .from("whatsapp_instances")
-            .update({ bridge_url: BRIDGE_URL, bridge_api_key: bridgeData.api_key, status: "connecting" })
+            .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
             .eq("id", instance_id);
+          try {
+            const fresh = await fetchFreshQr(apiKey, 2);
+            if (fresh.qrcode) {
+              return jsonResponse({ success: true, qrcode: fresh.qrcode, status: fresh.status || "connecting", instance: fresh.bridgeData.instance, recreated: true });
+            }
+          } catch (err) { console.error("fresh qr after pool create failed:", err); }
         }
         if ((!bridgeRes.ok || !bridgeData.success) && isQrPendingResponse(bridgeData)) {
           return awaitingQrResponse();
@@ -963,7 +970,7 @@ Deno.serve(async (req) => {
         if (!bridgeRes.ok || !bridgeData.success) {
           return jsonResponse({ success: false, error: bridgeData.error || "Erro ao criar instância", details: sanitizeBridgeData(bridgeData) });
         }
-        return jsonResponse({ success: true, qrcode: bridgeData.qrcode, instance: bridgeData.instance, recreated: true });
+        return jsonResponse({ success: true, qrcode: getBridgeQrCode(bridgeData), status: getBridgeRawStatus(bridgeData), instance: bridgeData.instance, recreated: true });
       }
       return await createClientInstance({
         adminClient,
