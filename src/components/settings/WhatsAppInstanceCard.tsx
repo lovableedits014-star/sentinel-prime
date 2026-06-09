@@ -73,19 +73,40 @@ const cleanPhoneForBridge = (raw: string) => {
 export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardProps) {
   const [state, setState] = useState<ConnectionState>("loading");
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrAge, setQrAge] = useState(0); // segundos desde que o QR atual chegou
   const [creating, setCreating] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [testing, setTesting] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const qrCodeRef = useRef<string | null>(null);
+  const qrReceivedAtRef = useRef<number | null>(null);
   const pollAttemptsRef = useRef(0);
-  const MAX_POLL_ATTEMPTS = 20; // ~60s at 3s interval
+  const MAX_POLL_ATTEMPTS = 40; // ~120s @ 3s
 
   const setStoredQrCode = (value: string | null) => {
+    if (value && value !== qrCodeRef.current) {
+      qrReceivedAtRef.current = Date.now();
+      setQrAge(0);
+    }
+    if (!value) {
+      qrReceivedAtRef.current = null;
+      setQrAge(0);
+    }
     qrCodeRef.current = value;
     setQrCode(value);
   };
+
+  // Atualiza idade do QR a cada segundo enquanto aguardando scan
+  useEffect(() => {
+    if (state !== "awaiting_scan" || !qrReceivedAtRef.current) return;
+    const id = setInterval(() => {
+      if (qrReceivedAtRef.current) {
+        setQrAge(Math.floor((Date.now() - qrReceivedAtRef.current) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [state, qrCode]);
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {
