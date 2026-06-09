@@ -1,61 +1,66 @@
+## Problema
 
-## Diagnóstico — por que suas ligações não apareceram
+Hoje cada operador abre a fila e começa do **mesmo primeiro contato** da lista. O `tele_claim_contato` existe (trava de 5 min), mas:
 
-Confirmei no banco: suas 4 ligações de teste como OPERADOR1 **foram salvas corretamente** em `telemarketing_call_log` (2 "atendeu" + 2 "nao_atendeu", tabela `eleicao_pessoas`).
+- Só dispara quando o operador **abre** o contato — os 5 já clicaram antes da trava aparecer.
+- A lista é carregada uma vez e fica estática: operador B não vê em tempo real que o A travou alguém.
+- O aviso é só um toast amarelo — nada impede o operador de ligar mesmo assim.
+- Sem fila "próximo disponível": todos seguem a mesma ordem.
 
-O bug está nos painéis do admin (`Resultados detalhados` e `Relatórios`):
+Resultado: com 5+ operadores simultâneos, várias pessoas recebem ligações repetidas em segundos.
 
-- Eles usam o hook `useContratadosData`, que só busca **contratados** e **contratado_indicados**.
-- Ligações feitas em **eleicao_pessoas**, **eleicao_indicados** e **contatos_avulsos** simplesmente não entram nas estatísticas, no ranking por operador, nem aparecem na lista detalhada.
-- Como você testou em contatos da fila de eleição, nada apareceu — mesmo o `tele_registrar_ligacao` tendo gravado tudo certo.
+## Solução: distribuição automática + trava forte + tempo real
 
-## Correção — uma fonte só de verdade: `telemarketing_call_log`
+### 1) RPC `tele_proximo_contato(_client_id, _nome, _senha, _campanha_id)`
+Servidor escolhe e **já trava** o próximo contato disponível, em uma única transação atômica (`FOR UPDATE SKIP LOCKED`):
 
-### 1) Nova RPC `tele_admin_listar_ligacoes(_client_id, filtros)`
-Lê de `telemarketing_call_log` (SECURITY DEFINER, restrito a admin do cliente) e devolve, em uma única lista:
+- Exclui quem já tem `ligacao_status` final (atendeu/recusou/etc.)
+- Exclui quem está travado por outro operador (`expires_at > now()`)
+- Exclui quem tem `proxima_tentativa_em > now()` (reagendado)
+- Ordena por: pendentes primeiro → tentativas asc → criação asc
+- Cria/renova a trava de 5 min para o operador que chamou
+- Retorna o contato + dados de exibição
 
-```text
-id, data_hora, operador_nome, ligacao_status,
-tabela (origem: contratado/indicado/eleicao_pessoa/eleicao_indicado/avulso),
-contato_id, contato_nome, contato_telefone, cidade, bairro,
-vota_candidato, candidato_alternativo, observacao,
-campanha_id, campanha_nome
-```
+Isso elimina a corrida: dois operadores nunca recebem o mesmo registro.
 
-Faz `LEFT JOIN` em cada tabela de origem para resolver nome/telefone/campanha. Aceita filtros: `data_de`, `data_ate`, `operador`, `status`, `campanha_id`, `tabela`.
+### 2) Botão "Próximo contato" no painel do operador
+- Substitui o `currentIndex` local pela chamada à RPC acima.
+- Ao salvar uma ligação ou clicar "Pular", chama `tele_proximo_contato` de novo.
+- Se a RPC devolver vazio: "Fila vazia — aguarde reagendamentos" + auto-retry a cada 30s.
 
-### 2) `TelemarketingResultsPanel` passa a usar essa RPC
-- Substitui o input via props (`contratados`, `indicados`) por fetch direto da RPC.
-- KPIs (total ligados, atendeu, não atendeu, recusou) calculados sobre o log → mostram **todas** as ligações, de todas as origens.
-- Ranking "Por operador" passa a refletir o que cada operador realmente fez.
-- Filtro novo: **Origem** (contratados / indicados / eleição-pessoas / eleição-indicados / avulsos) + **Campanha**.
-- Cada linha mostra origem e campanha, para você saber de onde veio o contato.
+### 3) Trava forte ao salvar
+`tele_registrar_ligacao` passa a **rejeitar** o save se a trava ativa pertencer a outro operador (em vez de só sobrescrever). Mensagem: "Outro operador atendeu este contato há instantes". Evita gravação dupla mesmo se dois cliques colidirem.
 
-### 3) `TelemarketingReportsPanel` (gráficos + export)
-- Mesma RPC alimenta os gráficos de evolução, ranking por bairro, candidato alternativo e comparativo entre rodadas.
-- O CSV/PDF de export inclui as novas colunas (origem, campanha).
-- Mantém o agrupamento por bairro/cidade já existente.
+### 4) Heartbeat + presença em tempo real
+- Enquanto o operador está com um contato aberto, renova a trava a cada 60s (heartbeat).
+- Canal Realtime do Supabase em `telemarketing_call_assignments`: a lista admin "Operadores online" mostra quem está atendendo quem, ao vivo.
+- Ao fechar a aba / trocar de contato, libera a trava (`tele_release_contato`, já existe).
 
-### 4) Visão geral (KPIs do topo do admin)
-Hoje também só conta contratados/indicados. Atualizar para contar `telemarketing_call_log` distintamente por `contato_id` para não inflar duplicado.
+### 5) Anti-duplicação por telefone
+Quando vários registros têm o mesmo telefone (ex.: mesma pessoa em `eleicao_pessoas` e `contratado_indicados`), `tele_proximo_contato` exclui também telefones travados nos últimos 5 min em **qualquer** tabela. Evita ligar pro mesmo número duas vezes por origens diferentes.
 
-## Detalhes técnicos
+### 6) Painel admin "Ao vivo" (opcional, mas barato)
+Pequeno card em `TelemarketingAdminFilas`:
+- Quantos operadores online agora
+- Lista: operador → contato atual → há quanto tempo
+- Útil para você ver de longe se a distribuição está fluindo.
 
-- **Migration**: cria função `tele_admin_listar_ligacoes` com `SECURITY DEFINER` + `GRANT EXECUTE` para `authenticated`; valida `client_id` contra `has_role(auth.uid(),'admin')` ou membro do client.
-- **Sem nova tabela** — `telemarketing_call_log` já tem todos os campos necessários, basta consumir.
-- **Performance**: índice em `(client_id, created_at DESC)` se ainda não existir; paginação na lista detalhada (200 por página).
-- **Compatibilidade**: o painel `Filas` continua usando os updates nas tabelas-fonte; nada muda no fluxo do operador.
+## Entregáveis técnicos
+
+1. **Migration**: 
+   - `tele_proximo_contato(...)` SECURITY DEFINER com `SELECT ... FOR UPDATE SKIP LOCKED`.
+   - Atualizar `tele_registrar_ligacao` para validar dono da trava.
+   - Índice em `telemarketing_call_assignments(client_id, expires_at)` se faltar.
+2. **`src/pages/Telemarketing.tsx`**:
+   - Trocar navegação por índice → fluxo "Próximo contato".
+   - Heartbeat (`setInterval` 60s renovando claim).
+   - Realtime subscribe em `telemarketing_call_assignments` para refletir mudanças.
+3. **`TelemarketingAdminFilas.tsx`**: card "Operadores ao vivo".
+4. **Validação**: abrir 3 abas anônimas como OPERADOR1/2/3 → cada um recebe contato diferente; ao salvar, próxima ligação também única.
 
 ## O que NÃO muda
 
-- Tela do operador (`/telemarketing/:clientId`) e fluxo de salvar ligação.
-- Estrutura do `telemarketing_call_log` (já completa).
-- Botão "Não atendeu (+1h)" recém-adicionado.
-
-## Entregáveis
-
-1. Migration com `tele_admin_listar_ligacoes`.
-2. `TelemarketingResultsPanel` refatorado para consumir a RPC, com filtros por origem e campanha.
-3. `TelemarketingReportsPanel` consumindo a RPC para gráficos e export.
-4. KPIs da visão geral do admin usando o log unificado.
-5. Validação: você refaz o teste com OPERADOR1 → as 4 ligações aparecem em Resultados, no ranking do operador e nos gráficos.
+- Estrutura das tabelas de contatos.
+- Botão "Não atendeu (+1h)".
+- Painéis de Resultados/Relatórios.
+- Fluxo de criação de filas.
