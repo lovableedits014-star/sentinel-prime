@@ -8450,6 +8450,34 @@ export type Database = {
           ultima_atividade: string
         }[]
       }
+      tele_ranking_indicados_da_pessoa: {
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _data_ate?: string
+          _data_de?: string
+          _incluir_filhos?: boolean
+          _pessoa_id: string
+          _universo?: string
+        }
+        Returns: {
+          bairro: string
+          candidato_alternativo: string
+          cidade: string
+          created_at: string
+          indicado_id: string
+          indicador_id: string
+          indicador_nome: string
+          nome: string
+          observacao_tele: string
+          operador_nome: string
+          telefone: string
+          total_tentativas: number
+          ultima_ligacao_em: string
+          ultimo_status_ligacao: string
+          vota_candidato: string
+        }[]
+      }
       tele_registrar_ligacao: {
         Args: {
           _bairro: string
