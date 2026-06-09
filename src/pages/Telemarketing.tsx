@@ -494,7 +494,11 @@ export default function Telemarketing() {
             {campanhaNome && <> · Fila: <span className="font-medium text-foreground">{campanhaNome}</span></>}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Button size="sm" variant="default" onClick={jumpToProximoDisponivel}>
+            <ArrowRight className="w-3.5 h-3.5 mr-1" />
+            Próximo disponível
+          </Button>
           <Badge variant="secondary" className="text-xs">
             <Clock className="w-3 h-3 mr-1" />
             {totalPendentes} pendentes
