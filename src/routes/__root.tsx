@@ -34,6 +34,11 @@ export const Route = createRootRoute({
       { title: "Sentinelle" },
       { name: "description", content: "Sentinelle" },
       { name: "author", content: "Sentinelle" },
+      // Evita que tradutores automáticos (Chrome/Google Translate) substituam
+      // text nodes do React e causem "Failed to execute 'removeChild'..."
+      // que disparava a tela "Something went wrong" a cada navegação.
+      { name: "google", content: "notranslate" },
+      { httpEquiv: "Content-Language", content: "pt-BR" },
       { property: "og:title", content: "Sentinelle" },
       { property: "og:description", content: "Sentinelle" },
       { property: "og:type", content: "website" },
