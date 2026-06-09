@@ -381,11 +381,32 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
 
       {/* QR Code se em conexão */}
       {qrCode && (
-        <div className="text-center border rounded-md p-3 bg-white">
+        <div className="text-center border rounded-md p-3 bg-white space-y-2">
           <img src={qrCode} alt="QR Code" className="w-44 h-44 mx-auto" />
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Escaneie no WhatsApp do número desejado
+          <p className="text-[11px] text-slate-700">
+            Escaneie no WhatsApp do número desejado · {qrAge}s
           </p>
+          {qrAge >= 30 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-900">
+              Se o celular ficou carregando, este QR expirou. Gere um QR novo antes de tentar de novo.
+            </div>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleConnect}
+            disabled={busy === "connect"}
+            className="h-8 gap-1.5 text-xs text-slate-800 border-slate-300 hover:bg-slate-100"
+          >
+            {busy === "connect" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Gerar novo QR
+          </Button>
+        </div>
+      )}
+      {scanTimedOut && !qrCode && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+          A instância foi criada na ponte, mas não confirmou conexão no WhatsApp. Gere um QR novo e escaneie novamente.
         </div>
       )}
       {polling && !qrCode && (
