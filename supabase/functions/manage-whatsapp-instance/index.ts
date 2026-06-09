@@ -1234,16 +1234,24 @@ Deno.serve(async (req) => {
           });
           await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
           const bridgeData = await bridgeRes.json().catch(() => ({}));
-          if (bridgeData.api_key) {
+          const apiKey = getBridgeApiKey(bridgeData);
+          if (apiKey) {
             await adminClient
               .from("whatsapp_instances")
-              .update({ bridge_url: BRIDGE_URL, bridge_api_key: bridgeData.api_key, status: "connecting" })
+              .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
               .eq("id", instance_id);
+            try {
+              const fresh = await fetchFreshQr(apiKey, 2);
+              if (fresh.qrcode) {
+                return jsonResponse({ success: true, qrcode: fresh.qrcode, status: fresh.status || "connecting", instance: fresh.bridgeData.instance });
+              }
+            } catch (err) { console.error("fresh qr after reconnect create failed:", err); }
           }
           if (isQrPendingResponse(bridgeData)) return awaitingQrResponse();
           return jsonResponse({
             success: bridgeRes.ok && bridgeData.success,
-            qrcode: bridgeData.qrcode,
+            qrcode: getBridgeQrCode(bridgeData),
+            status: getBridgeRawStatus(bridgeData),
             instance: bridgeData.instance,
             error: !bridgeRes.ok || !bridgeData.success ? (bridgeData.error || "Erro ao reconectar") : undefined,
           });
