@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
+import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
 
 interface FilaResumo {
   campanha_id: string;
