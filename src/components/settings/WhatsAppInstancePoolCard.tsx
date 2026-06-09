@@ -75,21 +75,57 @@ function formatPhoneBR(raw: string | null): string {
 
 const CONNECTED = new Set(["connected", "open"]);
 
+const normalizeQrCode = (raw?: string | null) => {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("data:image")) return trimmed;
+  if (/^[A-Za-z0-9+/=]+$/.test(trimmed) && trimmed.length > 100) return `data:image/png;base64,${trimmed}`;
+  return trimmed;
+};
+
 export default function WhatsAppInstancePoolCard({ clientId, instance, onChange }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(instance.apelido);
   const [busy, setBusy] = useState<string | null>(null);
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrAge, setQrAge] = useState(0);
+  const [scanTimedOut, setScanTimedOut] = useState(false);
   const [polling, setPolling] = useState(false);
   const [showTest, setShowTest] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [reassignOpen, setReassignOpen] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const qrReceivedAtRef = useRef<number | null>(null);
+  const qrCodeRef = useRef<string | null>(null);
   const { groups, isSyncing, syncFromInstance } = useWhatsAppGroups(clientId);
   const { isSuperAdmin } = useActiveClientId();
   const groupsForThisInstance = groups.filter((g) => g.instance_id === instance.id).length;
 
   useEffect(() => setName(instance.apelido), [instance.apelido]);
+
+  const setStoredQrCode = (value: string | null) => {
+    if (value && value !== qrCodeRef.current) {
+      qrReceivedAtRef.current = Date.now();
+      setQrAge(0);
+      setScanTimedOut(false);
+    }
+    if (!value) {
+      qrReceivedAtRef.current = null;
+      setQrAge(0);
+    }
+    qrCodeRef.current = value;
+    setQrCode(value);
+  };
+
+  useEffect(() => {
+    if (!qrReceivedAtRef.current) return;
+    const id = setInterval(() => {
+      if (!qrReceivedAtRef.current) return;
+      setQrAge(Math.floor((Date.now() - qrReceivedAtRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [qrCode]);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -112,15 +148,19 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
       attempts += 1;
       const { data } = await invoke("instance_status");
       const status = String(data?.status || data?.instance?.status || "").toLowerCase();
-      const qr = data?.qrcode || data?.instance?.qrcode;
-      if (qr && qr !== qrCode) setQrCode(typeof qr === "string" ? (qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`) : null);
+      const nextQr = normalizeQrCode(data?.qrcode || data?.instance?.qrcode);
+      if (nextQr) setStoredQrCode(nextQr);
       if (CONNECTED.has(status)) {
-        setQrCode(null);
+        setStoredQrCode(null);
+        setScanTimedOut(false);
         stopPolling();
         toast.success(`${instance.apelido} conectado!`);
         onChange();
       } else if (attempts >= 25) {
         stopPolling();
+        setScanTimedOut(true);
+        toast.error(`Tempo esgotado: ${instance.apelido} não confirmou a conexão. Gere um QR novo e tente novamente.`);
+        onChange();
       }
     }, 3000);
   };
@@ -139,6 +179,8 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
         return;
       }
 
+      setStoredQrCode(null);
+      setScanTimedOut(false);
       const { data, error } = await invoke("create_instance");
       if (data?.cooldown) {
         const secs = Number(data?.remaining_seconds || 0);
@@ -154,8 +196,8 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
         toast.error("Erro: " + (error?.message || data?.error));
         return;
       }
-      const qr = data?.qrcode || data?.instance?.qrcode;
-      if (qr) setQrCode(typeof qr === "string" ? (qr.startsWith("data:") ? qr : `data:image/png;base64,${qr}`) : null);
+      const qr = normalizeQrCode(data?.qrcode || data?.instance?.qrcode);
+      if (qr) setStoredQrCode(qr);
       startPolling();
       onChange();
     } finally {
@@ -167,7 +209,8 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
     setBusy("disconnect");
     try {
       await invoke("disconnect");
-      setQrCode(null);
+      setStoredQrCode(null);
+      setScanTimedOut(false);
       stopPolling();
       toast.success("Instância desconectada.");
       onChange();
@@ -338,11 +381,32 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
 
       {/* QR Code se em conexão */}
       {qrCode && (
-        <div className="text-center border rounded-md p-3 bg-white">
+        <div className="text-center border rounded-md p-3 bg-white space-y-2">
           <img src={qrCode} alt="QR Code" className="w-44 h-44 mx-auto" />
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Escaneie no WhatsApp do número desejado
+          <p className="text-[11px] text-slate-700">
+            Escaneie no WhatsApp do número desejado · {qrAge}s
           </p>
+          {qrAge >= 30 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-900">
+              Se o celular ficou carregando, este QR expirou. Gere um QR novo antes de tentar de novo.
+            </div>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleConnect}
+            disabled={busy === "connect"}
+            className="h-8 gap-1.5 text-xs text-slate-800 border-slate-300 hover:bg-slate-100"
+          >
+            {busy === "connect" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Gerar novo QR
+          </Button>
+        </div>
+      )}
+      {scanTimedOut && !qrCode && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+          A instância foi criada na ponte, mas não confirmou conexão no WhatsApp. Gere um QR novo e escaneie novamente.
         </div>
       )}
       {polling && !qrCode && (

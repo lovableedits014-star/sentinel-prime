@@ -126,6 +126,15 @@ const sanitizeBridgeData = (data: any) => {
   return safe;
 };
 
+const getBridgeApiKey = (data: any) =>
+  data?.api_key || data?.instance?.api_key || data?.token || data?.instance?.token || null;
+
+const getBridgeQrCode = (data: any) =>
+  data?.qrcode || data?.qr_code || data?.qr || data?.base64 || data?.instance?.qrcode || data?.instance?.qr_code || null;
+
+const getBridgeRawStatus = (data: any) =>
+  data?.status || data?.instance?.status || data?.state || data?.instance?.state || null;
+
 // =====================================================================
 // Anti-ban cooldown: limita chamadas a `create_instance` e `reconnect`
 // para o mesmo número. Repetir login/handshake várias vezes em sequência
@@ -248,6 +257,34 @@ async function fetchBridgeAction(params: {
   }
 
   throw new Error("Falha inesperada ao comunicar com a ponte WhatsApp");
+}
+
+async function fetchFreshQr(apiKey: string, attempts = 2) {
+  for (let i = 0; i < attempts; i++) {
+    const { bridgeRes, bridgeData } = await fetchBridgeAction({
+      action: "reconnect",
+      apiKey,
+      body: { action: "reconnect" },
+    });
+    const qrcode = getBridgeQrCode(bridgeData);
+    const status = getBridgeRawStatus(bridgeData);
+    if (qrcode || isConnectedStatus(status) || !bridgeRes.ok) {
+      return { bridgeRes, bridgeData, qrcode, status };
+    }
+    await sleep(1500);
+  }
+
+  const { bridgeRes, bridgeData } = await fetchBridgeAction({
+    action: "instance_status",
+    apiKey,
+    body: { action: "instance_status" },
+  });
+  return {
+    bridgeRes,
+    bridgeData,
+    qrcode: getBridgeQrCode(bridgeData),
+    status: getBridgeRawStatus(bridgeData),
+  };
 }
 
 async function syncInstanceHealth(adminClient: any, inst: any) {
@@ -495,12 +532,13 @@ async function createClientInstance(params: {
   // Persist api_key even when QR generation failed — the instance exists on the
   // bridge and we'll need the key to retry/reconnect. Without this, the next
   // call would create another instance from scratch and loop forever.
-  if (bridgeData.api_key) {
+  const apiKey = getBridgeApiKey(bridgeData);
+  if (apiKey) {
     const { error: updateError } = await adminClient
       .from("clients")
       .update({
         whatsapp_bridge_url: BRIDGE_URL,
-        whatsapp_bridge_api_key: bridgeData.api_key,
+        whatsapp_bridge_api_key: apiKey,
       } as any)
       .eq("id", clientId);
 
@@ -514,27 +552,20 @@ async function createClientInstance(params: {
 
   // Bridge created the instance but failed to issue a QR code immediately.
   // Try to fetch a QR via reconnect using the freshly-saved api_key.
-  if ((!bridgeRes.ok || !bridgeData.success) && bridgeData.api_key && !isQrPendingResponse(bridgeData)) {
+  if (apiKey) {
     try {
-      const retryRes = await fetch(BRIDGE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": bridgeData.api_key,
-        },
-        body: JSON.stringify({ action: "reconnect" }),
-      });
-      const retryData = await retryRes.json().catch(() => ({}));
-      if (retryRes.ok && (retryData.qrcode || retryData.instance?.qrcode)) {
+      const retry = await fetchFreshQr(apiKey, 2);
+      if (retry.qrcode) {
         return jsonResponse({
           success: true,
-          qrcode: retryData.qrcode ?? retryData.instance?.qrcode,
-          instance: retryData.instance,
+          qrcode: retry.qrcode,
+          status: retry.status || "connecting",
+          instance: retry.bridgeData.instance,
           recreated: true,
         });
       }
     } catch (err) {
-      console.error("Retry reconnect after create failed:", err);
+      console.error("Fresh QR after create failed:", err);
     }
   }
 
@@ -549,7 +580,7 @@ async function createClientInstance(params: {
     );
   }
 
-  if (!bridgeData.api_key) {
+  if (!apiKey) {
     return jsonResponse(
       { error: "A ponte não retornou a api_key da instância", details: bridgeData },
       502,
@@ -558,7 +589,8 @@ async function createClientInstance(params: {
 
   return jsonResponse({
     success: true,
-    qrcode: bridgeData.qrcode,
+    qrcode: getBridgeQrCode(bridgeData),
+    status: getBridgeRawStatus(bridgeData),
     instance: bridgeData.instance,
     recreated: true,
   });
@@ -919,11 +951,18 @@ Deno.serve(async (req) => {
         // Conta a tentativa SEMPRE que a chamada ao bridge é feita, sucesso ou não.
         await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
         const bridgeData = await bridgeRes.json().catch(() => ({}));
-        if (bridgeData.api_key) {
+        const apiKey = getBridgeApiKey(bridgeData);
+        if (apiKey) {
           await adminClient
             .from("whatsapp_instances")
-            .update({ bridge_url: BRIDGE_URL, bridge_api_key: bridgeData.api_key, status: "connecting" })
+            .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
             .eq("id", instance_id);
+          try {
+            const fresh = await fetchFreshQr(apiKey, 2);
+            if (fresh.qrcode) {
+              return jsonResponse({ success: true, qrcode: fresh.qrcode, status: fresh.status || "connecting", instance: fresh.bridgeData.instance, recreated: true });
+            }
+          } catch (err) { console.error("fresh qr after pool create failed:", err); }
         }
         if ((!bridgeRes.ok || !bridgeData.success) && isQrPendingResponse(bridgeData)) {
           return awaitingQrResponse();
@@ -931,7 +970,7 @@ Deno.serve(async (req) => {
         if (!bridgeRes.ok || !bridgeData.success) {
           return jsonResponse({ success: false, error: bridgeData.error || "Erro ao criar instância", details: sanitizeBridgeData(bridgeData) });
         }
-        return jsonResponse({ success: true, qrcode: bridgeData.qrcode, instance: bridgeData.instance, recreated: true });
+        return jsonResponse({ success: true, qrcode: getBridgeQrCode(bridgeData), status: getBridgeRawStatus(bridgeData), instance: bridgeData.instance, recreated: true });
       }
       return await createClientInstance({
         adminClient,
@@ -1195,16 +1234,24 @@ Deno.serve(async (req) => {
           });
           await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
           const bridgeData = await bridgeRes.json().catch(() => ({}));
-          if (bridgeData.api_key) {
+          const apiKey = getBridgeApiKey(bridgeData);
+          if (apiKey) {
             await adminClient
               .from("whatsapp_instances")
-              .update({ bridge_url: BRIDGE_URL, bridge_api_key: bridgeData.api_key, status: "connecting" })
+              .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
               .eq("id", instance_id);
+            try {
+              const fresh = await fetchFreshQr(apiKey, 2);
+              if (fresh.qrcode) {
+                return jsonResponse({ success: true, qrcode: fresh.qrcode, status: fresh.status || "connecting", instance: fresh.bridgeData.instance });
+              }
+            } catch (err) { console.error("fresh qr after reconnect create failed:", err); }
           }
           if (isQrPendingResponse(bridgeData)) return awaitingQrResponse();
           return jsonResponse({
             success: bridgeRes.ok && bridgeData.success,
-            qrcode: bridgeData.qrcode,
+            qrcode: getBridgeQrCode(bridgeData),
+            status: getBridgeRawStatus(bridgeData),
             instance: bridgeData.instance,
             error: !bridgeRes.ok || !bridgeData.success ? (bridgeData.error || "Erro ao reconectar") : undefined,
           });
