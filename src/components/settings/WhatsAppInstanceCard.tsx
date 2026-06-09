@@ -454,10 +454,27 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
                     Abra o WhatsApp → Menu (⋮) → Aparelhos conectados → Conectar aparelho
                   </p>
                 </div>
-                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Aguardando leitura do QR Code...
-                </div>
+                {qrAge >= 30 ? (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-xs p-2.5">
+                    ⚠️ Este QR Code está aberto há {qrAge}s e provavelmente expirou.
+                    Se o celular continua girando, clique em <b>Gerar novo QR</b> abaixo.
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Aguardando leitura do QR Code... ({qrAge}s)
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateInstance}
+                  disabled={creating}
+                  className="gap-1.5"
+                >
+                  {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Gerar novo QR
+                </Button>
               </>
             ) : (
               <>
@@ -470,6 +487,16 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
                     Aguarde enquanto a ponte gera o QR Code para conexão.
                   </p>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateInstance}
+                  disabled={creating}
+                  className="gap-1.5"
+                >
+                  {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Tentar novamente
+                </Button>
               </>
             )}
           </div>
