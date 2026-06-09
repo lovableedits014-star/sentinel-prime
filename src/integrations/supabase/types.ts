@@ -8285,6 +8285,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      tele_heartbeat_contato: {
+        Args: {
+          _client_id: string
+          _id: string
+          _nome: string
+          _senha: string
+          _tabela: string
+          _ttl_seconds?: number
+        }
+        Returns: Json
+      }
       tele_import_contato_avulso_batch: {
         Args: { _campanha_id: string; _client_id: string; _rows: Json }
         Returns: Json
@@ -8384,8 +8395,30 @@ export type Database = {
           tipo: string
         }[]
       }
+      tele_operadores_ao_vivo: {
+        Args: { _client_id: string }
+        Returns: {
+          contato_id: string
+          contato_nome: string
+          contato_telefone: string
+          expires_at: string
+          operador_nome: string
+          started_at: string
+          tabela: string
+        }[]
+      }
       tele_preview_eleicao_indicados: {
         Args: { _client_id: string; _filtros: Json }
+        Returns: Json
+      }
+      tele_proximo_contato: {
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _nome: string
+          _senha: string
+          _ttl_seconds?: number
+        }
         Returns: Json
       }
       tele_registrar_ligacao: {

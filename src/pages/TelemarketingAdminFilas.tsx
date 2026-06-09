@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
+import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
 
 interface FilaResumo {
   campanha_id: string;
@@ -101,6 +102,9 @@ export default function TelemarketingAdminFilas() {
 
       {clientId && (
         <>
+          <div className="mb-4">
+            <OperadoresAoVivoCard clientId={clientId} />
+          </div>
           {loading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
           {!loading && filas.length === 0 && (
             <Card>
