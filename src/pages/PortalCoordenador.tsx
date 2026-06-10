@@ -97,15 +97,12 @@ export default function PortalCoordenador() {
     setTeam((tr as any) || []);
 
     const { data: cfg } = await supabase
-      .from("eleicao_notif_config" as any)
-      .select("cadastro_lider_ativo, cadastro_cabo_ativo")
-      .eq("client_id", clientId!)
-      .maybeSingle();
-    if (cfg) {
-      const c = cfg as any;
+      .rpc("get_eleicao_cadastro_flags" as any, { _client_id: clientId! });
+    const row = Array.isArray(cfg) ? cfg[0] : cfg;
+    if (row) {
       setGlobalCfg({
-        cadastro_lider_ativo: c.cadastro_lider_ativo ?? true,
-        cadastro_cabo_ativo: c.cadastro_cabo_ativo ?? true,
+        cadastro_lider_ativo: (row as any).cadastro_lider_ativo ?? true,
+        cadastro_cabo_ativo: (row as any).cadastro_cabo_ativo ?? true,
       });
     }
     setLoading(false);

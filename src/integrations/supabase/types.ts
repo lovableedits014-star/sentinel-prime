@@ -7865,6 +7865,13 @@ export type Database = {
           ultima_mencao: string
         }[]
       }
+      get_eleicao_cadastro_flags: {
+        Args: { _client_id: string }
+        Returns: {
+          cadastro_cabo_ativo: boolean
+          cadastro_lider_ativo: boolean
+        }[]
+      }
       get_migracoes_partidarias: {
         Args: { p_min_votos?: number; p_uf?: string }
         Returns: {
