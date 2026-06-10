@@ -24,6 +24,21 @@ interface Props {
 
 const CANVAS_SIZE = 1080;
 
+// Fallback default frame used when the client has no campaign_frames configured.
+// Lets every user (coordenador, líder, cabo, apoiador) generate a photo even
+// before the admin uploads custom molduras.
+const DEFAULT_FRAME: Frame = {
+  id: "__default__",
+  nome: "Moldura padrão",
+  image_url: "",
+  composition: {
+    ...DEFAULT_COMPOSITION,
+    background: { type: "color", color: "#0f172a" },
+    photoCircle: { cx: 540, cy: 540, r: 430 },
+    layers: [],
+  },
+};
+
 export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar minha foto", variant = "card" }: Props) {
   const [open, setOpen] = useState(false);
   const [frames, setFrames] = useState<Frame[]>([]);
@@ -49,9 +64,10 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
     if (!open || !clientId) return;
     (async () => {
       const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
-      const list = (data ?? []) as any as Frame[];
-      setFrames(list);
-      if (list.length > 0 && !selectedFrame) setSelectedFrame(list[0]);
+      const list = ((data ?? []) as any as Frame[]);
+      const effective = list.length > 0 ? list : [DEFAULT_FRAME];
+      setFrames(effective);
+      if (!selectedFrame) setSelectedFrame(effective[0]);
     })();
   }, [open, clientId]);
 
@@ -60,7 +76,8 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
     if (variant !== "showcase" || !clientId) return;
     (async () => {
       const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
-      const first = ((data ?? [])[0] ?? null) as any as Frame | null;
+      const list = ((data ?? []) as any as Frame[]);
+      const first = list[0] ?? DEFAULT_FRAME;
       setShowcaseFrame(first);
     })();
   }, [variant, clientId]);
