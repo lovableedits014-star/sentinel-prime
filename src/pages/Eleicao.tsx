@@ -1582,6 +1582,9 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               <MessageCircle className="w-3.5 h-3.5 mr-2" />Abrir WhatsApp
             </DropdownMenuItem>
           )}
+          <DropdownMenuSeparator />
+          <EnviarFluxoMenu pessoa={p as any} />
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             disabled={semValor}
             title={semValor ? "Defina o valor em 'Pendentes de valor' para liberar o contrato" : "Gerar contrato em .docx"}
