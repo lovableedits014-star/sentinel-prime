@@ -550,8 +550,20 @@ async function createClientInstance(params: {
     }
   }
 
+  const createdQr = getBridgeQrCode(bridgeData);
+  if (apiKey && createdQr) {
+    return jsonResponse({
+      success: true,
+      qrcode: createdQr,
+      status: getBridgeRawStatus(bridgeData) || "connecting",
+      instance: bridgeData.instance,
+      recreated: true,
+    });
+  }
+
   // Bridge created the instance but failed to issue a QR code immediately.
-  // Try to fetch a QR via reconnect using the freshly-saved api_key.
+  // Only then ask for a fresh QR. Calling reconnect after a valid QR can
+  // invalidate the QR the phone is currently scanning and leave it loading.
   if (apiKey) {
     try {
       const retry = await fetchFreshQr(apiKey, 2);
@@ -589,7 +601,7 @@ async function createClientInstance(params: {
 
   return jsonResponse({
     success: true,
-    qrcode: getBridgeQrCode(bridgeData),
+    qrcode: createdQr,
     status: getBridgeRawStatus(bridgeData),
     instance: bridgeData.instance,
     recreated: true,
