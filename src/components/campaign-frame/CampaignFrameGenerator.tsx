@@ -24,6 +24,21 @@ interface Props {
 
 const CANVAS_SIZE = 1080;
 
+// Fallback default frame used when the client has no campaign_frames configured.
+// Lets every user (coordenador, líder, cabo, apoiador) generate a photo even
+// before the admin uploads custom molduras.
+const DEFAULT_FRAME: Frame = {
+  id: "__default__",
+  nome: "Moldura padrão",
+  image_url: "",
+  composition: {
+    ...DEFAULT_COMPOSITION,
+    background: { type: "color", color: "#0f172a" },
+    photoCircle: { cx: 540, cy: 540, r: 430 },
+    layers: [],
+  },
+};
+
 export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar minha foto", variant = "card" }: Props) {
   const [open, setOpen] = useState(false);
   const [frames, setFrames] = useState<Frame[]>([]);
