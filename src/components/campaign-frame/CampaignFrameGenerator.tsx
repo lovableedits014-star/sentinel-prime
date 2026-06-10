@@ -64,9 +64,10 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
     if (!open || !clientId) return;
     (async () => {
       const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
-      const list = (data ?? []) as any as Frame[];
-      setFrames(list);
-      if (list.length > 0 && !selectedFrame) setSelectedFrame(list[0]);
+      const list = ((data ?? []) as any as Frame[]);
+      const effective = list.length > 0 ? list : [DEFAULT_FRAME];
+      setFrames(effective);
+      if (!selectedFrame) setSelectedFrame(effective[0]);
     })();
   }, [open, clientId]);
 
@@ -75,7 +76,8 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
     if (variant !== "showcase" || !clientId) return;
     (async () => {
       const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
-      const first = ((data ?? [])[0] ?? null) as any as Frame | null;
+      const list = ((data ?? []) as any as Frame[]);
+      const first = list[0] ?? DEFAULT_FRAME;
       setShowcaseFrame(first);
     })();
   }, [variant, clientId]);
