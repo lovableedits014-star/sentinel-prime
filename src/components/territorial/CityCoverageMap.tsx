@@ -3,9 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet.markercluster";
-import "leaflet.markercluster/dist/MarkerCluster.css";
-import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +80,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
   const mapDivRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const clusterRef = useRef<any>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
   const [activeTipos, setActiveTipos] = useState<Set<string>>(new Set(["coordenador", "lider", "cabo"]));
   const [search, setSearch] = useState("");
@@ -180,29 +177,26 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    const cluster = (L as any).markerClusterGroup({
-      showCoverageOnHover: false,
-      maxClusterRadius: 50,
-    });
-    map.addLayer(cluster);
+    const layer = L.layerGroup();
+    map.addLayer(layer);
 
     mapRef.current = map;
-    clusterRef.current = cluster;
+    markersLayerRef.current = layer;
 
     return () => {
       map.remove();
       mapRef.current = null;
-      clusterRef.current = null;
+      markersLayerRef.current = null;
     };
   }, []);
 
   // Atualiza pinos
   useEffect(() => {
     const map = mapRef.current;
-    const cluster = clusterRef.current;
-    if (!map || !cluster) return;
+    const layer = markersLayerRef.current;
+    if (!map || !layer) return;
 
-    cluster.clearLayers();
+    layer.clearLayers();
 
     const bounds = L.latLngBounds([]);
 
@@ -254,7 +248,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
         }
       });
 
-      cluster.addLayer(marker);
+      layer.addLayer(marker);
       bounds.extend([Number(p.lat), Number(p.lng)]);
     }
 
