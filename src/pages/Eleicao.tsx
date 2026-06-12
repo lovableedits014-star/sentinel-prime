@@ -328,43 +328,41 @@ export default function Eleicao() {
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
 
-    // Disparo automático de notificações ao criar novo líder.
-    // Abre o dialog visual de progresso por etapa (Coordenador → Secretaria → Líder).
-    // Para líder avulso (sem coordenador), pula as etapas Coordenador e Secretaria.
-    if (!editing && form.tipo === "lider" && savedPessoa) {
-      toast.success("Líder cadastrado!");
+    // Novo cadastro: abre o popup de envio MANUAL (WhatsApp Web do próprio usuário).
+    // Substitui os disparos automáticos anteriores — o usuário decide o que enviar.
+    // Pode ser desativado por sessão via sessionStorage["eleicao:skip-pos-cadastro"].
+    if (!editing && savedPessoa) {
+      toast.success(`${TIPO_META[form.tipo].label} cadastrado!`);
       setDialogOpen(false);
-      const isAvulso = !payload.parent_id;
-      setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
-      setNotifyPessoaId((savedPessoa as any).id);
-      setNotifyOpen(true);
       load();
+      let skip = false;
+      try { skip = sessionStorage.getItem("eleicao:skip-pos-cadastro") === "1"; } catch {}
+      if (skip) {
+        // Fallback ao comportamento antigo (instância automática).
+        if (form.tipo === "lider") {
+          const isAvulso = !payload.parent_id;
+          setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
+          setNotifyPessoaId((savedPessoa as any).id);
+          setNotifyOpen(true);
+        } else if (form.tipo === "coordenador") {
+          if (form.send_access) {
+            await sendCredentials(savedPessoa as unknown as Pessoa, "whatsapp", {
+              email: form.email.trim(),
+              password: form.password,
+            });
+          }
+          void notifyCoordBoasVindas((savedPessoa as any).id);
+        } else if (form.tipo === "cabo") {
+          void sendCaboBoasVindas((savedPessoa as any).id);
+        }
+        return;
+      }
+      setPosCadastroPessoa(savedPessoa as unknown as Pessoa);
+      setPosCadastroOpen(true);
       return;
     }
 
-    if (!editing && form.tipo === "coordenador" && form.send_access) {
-      await sendCredentials(savedPessoa as unknown as Pessoa, "whatsapp", {
-        email: form.email.trim(),
-        password: form.password,
-        closeRegisterDialog: true,
-      });
-      // Após enviar credenciais, dispara também a mensagem de boas-vindas.
-      void notifyCoordBoasVindas((savedPessoa as any).id);
-      return;
-    }
-
-    // Coordenador novo (sem envio de credenciais): manda apenas a boas-vindas.
-    if (!editing && form.tipo === "coordenador" && savedPessoa) {
-      void notifyCoordBoasVindas((savedPessoa as any).id);
-    }
-
-    // Cabo eleitoral novo: dispara boas-vindas com link do grupo da região.
-    if (!editing && form.tipo === "cabo" && savedPessoa) {
-      void sendCaboBoasVindas((savedPessoa as any).id);
-    }
-
-
-    toast.success(editing ? "Atualizado!" : "Cadastrado!");
+    toast.success("Atualizado!");
     setDialogOpen(false);
     load();
   }
