@@ -166,9 +166,11 @@ Deno.serve(async (req) => {
   try {
     const rawBody = await req.json();
     validateInput(EleicaoSendCredentialsSchema, rawBody, { fn: "eleicao-send-credentials" });
-    const { pessoa_id, channel, app_url, email, password: providedPassword } = rawBody; // channel: "whatsapp" | "link_only"
+    const { pessoa_id, channel, app_url, email, password: providedPassword, reset_password } = rawBody;
     const emailInput = typeof email === "string" ? email.trim().toLowerCase() : "";
     const passwordInput = typeof providedPassword === "string" ? providedPassword : "";
+    const wantReset = reset_password === true || passwordInput.length > 0;
+
     if (emailInput && !validEmail(emailInput)) {
       return new Response(JSON.stringify({ error: "E-mail inválido" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
     }
