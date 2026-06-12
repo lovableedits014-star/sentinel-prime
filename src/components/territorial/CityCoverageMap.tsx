@@ -515,68 +515,25 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Mapa */}
-        <Card className="lg:col-span-2">
-          <CardContent className="p-0 relative">
-            {mapsError ? (
-              <div className="h-[600px] flex items-center justify-center text-sm text-destructive p-4 text-center">
-                Erro carregando Google Maps: {mapsError}
-              </div>
-            ) : !loaded ? (
-              <div className="h-[600px] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : isLoading ? (
-              <div className="h-[600px] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : null}
-            <div ref={mapDivRef} className="w-full h-[600px] rounded-md" style={{ display: loaded && !mapsError ? "block" : "none" }} />
-          </CardContent>
-        </Card>
-
-        {/* Painel de lacunas */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-              Bairros sem coordenador
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Priorize cadastrar coordenadores nestes bairros{cityFilter !== ALL_CITIES ? " (cidade filtrada)" : ""}.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="max-h-[540px] overflow-y-auto divide-y">
-              {gapAnalysis.semCoord.length === 0 ? (
-                <p className="text-xs text-muted-foreground p-4 text-center">
-                  🎉 Todos os bairros com cadastros já têm coordenador!
-                </p>
-              ) : (
-                gapAnalysis.semCoord.slice(0, 50).map((g) => (
-                  <div key={`${g.cidade}-${g.bairro}`} className="px-4 py-2.5 hover:bg-muted/40">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{g.bairro}</p>
-                        <p className="text-[10px] text-muted-foreground">{g.cidade}</p>
-                      </div>
-                      <Badge variant={g.lideres > 0 ? "secondary" : "destructive"} className="text-[10px] shrink-0">
-                        {g.total} pessoa{g.total === 1 ? "" : "s"}
-                      </Badge>
-                    </div>
-                    {g.lideres > 0 && (
-                      <p className="text-[10px] text-blue-600 mt-1">
-                        ✓ {g.lideres} líder{g.lideres === 1 ? "" : "es"} · falta coordenador
-                      </p>
-                    )}
-                  </div>
-                ))
-              )}
+      {/* Mapa */}
+      <Card>
+        <CardContent className="p-0 relative">
+          {mapsError ? (
+            <div className="h-[600px] flex items-center justify-center text-sm text-destructive p-4 text-center">
+              Erro carregando Google Maps: {mapsError}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          ) : !loaded ? (
+            <div className="h-[600px] flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : isLoading ? (
+            <div className="h-[600px] flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : null}
+          <div ref={mapDivRef} className="w-full h-[600px] rounded-md" style={{ display: loaded && !mapsError ? "block" : "none" }} />
+        </CardContent>
+      </Card>
 
       {/* Dialog de edição rápida de endereço */}
       <EditEnderecoDialog
