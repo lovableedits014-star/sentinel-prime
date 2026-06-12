@@ -267,14 +267,22 @@ export default function Eleicao() {
 
   function openEdit(p: Pessoa) {
     setEditing(p);
-    // Tenta extrair rua/numero/bairro do endereço legado se ainda não foram preenchidos
+    // Só usa o `endereco` legado como rua quando ele realmente parece conter rua
+    // (diferente do bairro e não é só o concat "rua - bairro" que já guardamos).
+    // Caso contrário (cadastros onde só o bairro foi preenchido), deixa Rua em branco.
     const legado = p.endereco || "";
+    const bairroAtual = (p.bairro || "").trim();
+    const legadoEhSoBairro =
+      !!bairroAtual && legado.trim().toLowerCase() === bairroAtual.toLowerCase();
+    const ruaFallback = legado && !legadoEhSoBairro
+      ? legado.replace(new RegExp(`\\s-\\s*${bairroAtual}\\s*$`, "i"), "").trim()
+      : "";
     setForm({
       tipo: p.tipo, escopo: p.escopo,
       regiao: (p.regiao || "centro") as Regiao,
       cidade: p.cidade || "",
       nome: p.nome, telefone: p.telefone,
-      rua: p.rua || legado,
+      rua: p.rua || ruaFallback,
       numero: p.numero || "",
       bairro: p.bairro || "",
       parent_id: p.parent_id || "",
