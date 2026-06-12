@@ -1,0 +1,411 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useGoogleMaps } from "@/hooks/useGoogleMaps";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Loader2, MapPin, RefreshCw, Search, AlertTriangle, Users, Crown, UserCheck, User as UserIcon } from "lucide-react";
+import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+
+type Pessoa = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  tipo: string;
+  regiao: string | null;
+  cidade: string | null;
+  bairro: string | null;
+  lat: number | null;
+  lng: number | null;
+  geocode_status: string | null;
+};
+
+const TIPO_LABEL: Record<string, string> = {
+  coordenador: "Coordenador",
+  lider: "Líder",
+  cabo: "Cabo Eleitoral",
+  liderado: "Liderado",
+};
+
+const TIPO_COLOR: Record<string, string> = {
+  coordenador: "#8b5cf6", // roxo
+  lider: "#3b82f6",       // azul
+  cabo: "#10b981",        // verde
+  liderado: "#94a3b8",    // cinza
+};
+
+const TIPO_ICON_RECORD: Record<string, any> = {
+  coordenador: Crown,
+  lider: UserCheck,
+  cabo: UserIcon,
+  liderado: UserIcon,
+};
+
+function pinSvg(color: string, size = 36): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">
+    <path fill="${color}" stroke="white" stroke-width="1.5" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+    <circle cx="12" cy="9" r="2.8" fill="white"/>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+export function CityCoverageMap({ clientId }: { clientId: string }) {
+  const qc = useQueryClient();
+  const { loaded, error: mapsError } = useGoogleMaps();
+  const mapDivRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const clustererRef = useRef<MarkerClusterer | null>(null);
+  const markersRef = useRef<any[]>([]);
+
+  const [activeTipos, setActiveTipos] = useState<Set<string>>(new Set(["coordenador", "lider", "cabo"]));
+  const [showLiderados, setShowLiderados] = useState(false);
+  const [heatmap, setHeatmap] = useState(false);
+  const [search, setSearch] = useState("");
+  const [geocoding, setGeocoding] = useState(false);
+
+  const { data: pessoas = [], isLoading, refetch } = useQuery({
+    queryKey: ["coverage-pessoas", clientId],
+    enabled: !!clientId,
+    queryFn: async (): Promise<Pessoa[]> => {
+      const { data, error } = await supabase
+        .from("eleicao_pessoas" as any)
+        .select("id, nome, telefone, tipo, regiao, cidade, bairro, lat, lng, geocode_status")
+        .eq("client_id", clientId)
+        .limit(5000);
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+  });
+
+  const stats = useMemo(() => {
+    const total = pessoas.length;
+    const geocoded = pessoas.filter((p) => p.lat != null && p.lng != null).length;
+    const pending = pessoas.filter((p) => p.lat == null && (p.cidade || p.bairro)).length;
+    return { total, geocoded, pending };
+  }, [pessoas]);
+
+  // Análise de gaps por bairro
+  const gapAnalysis = useMemo(() => {
+    const byBairro = new Map<string, { bairro: string; cidade: string; total: number; coordenadores: number; lideres: number; cabos: number; }>();
+    for (const p of pessoas) {
+      const b = (p.bairro || "Sem bairro").trim();
+      const c = (p.cidade || "Sem cidade").trim();
+      const key = `${c}||${b}`;
+      let g = byBairro.get(key);
+      if (!g) { g = { bairro: b, cidade: c, total: 0, coordenadores: 0, lideres: 0, cabos: 0 }; byBairro.set(key, g); }
+      g.total++;
+      if (p.tipo === "coordenador") g.coordenadores++;
+      else if (p.tipo === "lider") g.lideres++;
+      else if (p.tipo === "cabo") g.cabos++;
+    }
+    const arr = Array.from(byBairro.values());
+    const semCoord = arr.filter((g) => g.coordenadores === 0 && g.total > 0);
+    const semLider = arr.filter((g) => g.lideres === 0 && g.coordenadores === 0 && g.total > 0);
+    return {
+      bairros: arr.sort((a, b) => b.total - a.total),
+      semCoord: semCoord.sort((a, b) => b.total - a.total),
+      semLider: semLider.sort((a, b) => b.total - a.total),
+      coverage: arr.length === 0 ? 0 : Math.round(((arr.length - semCoord.length) / arr.length) * 100),
+    };
+  }, [pessoas]);
+
+  const filteredPins = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return pessoas.filter((p) => {
+      if (p.lat == null || p.lng == null) return false;
+      const tipoOk = activeTipos.has(p.tipo) || (showLiderados && p.tipo === "liderado");
+      if (!tipoOk) return false;
+      if (term) {
+        const hay = `${p.nome} ${p.bairro || ""} ${p.cidade || ""}`.toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      return true;
+    });
+  }, [pessoas, activeTipos, showLiderados, search]);
+
+  // Inicializa mapa
+  useEffect(() => {
+    if (!loaded || !mapDivRef.current || mapRef.current) return;
+    const google = (window as any).google;
+
+    // Centro inicial: média dos pontos ou Campo Grande/MS como fallback
+    const withCoords = pessoas.filter((p) => p.lat && p.lng);
+    let center = { lat: -20.4697, lng: -54.6201 };
+    if (withCoords.length > 0) {
+      const avgLat = withCoords.reduce((s, p) => s + (p.lat || 0), 0) / withCoords.length;
+      const avgLng = withCoords.reduce((s, p) => s + (p.lng || 0), 0) / withCoords.length;
+      center = { lat: avgLat, lng: avgLng };
+    }
+
+    mapRef.current = new google.maps.Map(mapDivRef.current, {
+      center,
+      zoom: 12,
+      mapTypeControl: true,
+      streetViewControl: false,
+      fullscreenControl: true,
+    });
+  }, [loaded, pessoas]);
+
+  // Atualiza pinos
+  useEffect(() => {
+    if (!loaded || !mapRef.current) return;
+    const google = (window as any).google;
+
+    // limpa
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current = [];
+    clustererRef.current?.clearMarkers();
+
+    const bounds = new google.maps.LatLngBounds();
+    const infoWindow = new google.maps.InfoWindow();
+
+    const markers = filteredPins.map((p) => {
+      const color = TIPO_COLOR[p.tipo] || "#64748b";
+      const marker = new google.maps.Marker({
+        position: { lat: Number(p.lat), lng: Number(p.lng) },
+        icon: {
+          url: pinSvg(color, p.tipo === "coordenador" ? 44 : 32),
+          scaledSize: new google.maps.Size(p.tipo === "coordenador" ? 44 : 32, p.tipo === "coordenador" ? 44 : 32),
+          anchor: new google.maps.Point(p.tipo === "coordenador" ? 22 : 16, p.tipo === "coordenador" ? 44 : 32),
+        },
+        title: p.nome,
+      });
+      marker.addListener("click", () => {
+        infoWindow.setContent(`
+          <div style="font-family: system-ui; min-width: 200px; padding: 4px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${p.nome}</div>
+            <div style="font-size: 12px; color: #64748b;">
+              <div><strong>${TIPO_LABEL[p.tipo] || p.tipo}</strong></div>
+              ${p.regiao ? `<div>Região: ${p.regiao}</div>` : ""}
+              ${p.bairro ? `<div>Bairro: ${p.bairro}</div>` : ""}
+              ${p.cidade ? `<div>Cidade: ${p.cidade}</div>` : ""}
+              ${p.telefone ? `<div style="margin-top:6px;"><a href="https://wa.me/${p.telefone.replace(/\\D/g, "")}" target="_blank" style="color:#10b981; text-decoration:none;">📱 WhatsApp</a></div>` : ""}
+            </div>
+          </div>
+        `);
+        infoWindow.open(mapRef.current, marker);
+      });
+      bounds.extend({ lat: Number(p.lat), lng: Number(p.lng) });
+      return marker;
+    });
+
+    markersRef.current = markers;
+
+    if (heatmap && google.maps.visualization) {
+      // Heatmap mode (sem cluster)
+      const heat = new google.maps.visualization.HeatmapLayer({
+        data: markers.map((m) => m.getPosition()),
+        radius: 30,
+      });
+      heat.setMap(mapRef.current);
+      markersRef.current.push({ setMap: (m: any) => heat.setMap(m) } as any);
+    } else {
+      clustererRef.current = new MarkerClusterer({ markers, map: mapRef.current });
+    }
+
+    if (markers.length > 0 && markers.length < 200) {
+      mapRef.current.fitBounds(bounds, 60);
+    }
+  }, [filteredPins, loaded, heatmap]);
+
+  const handleGeocode = async () => {
+    if (geocoding) return;
+    setGeocoding(true);
+    let totalSuccess = 0, totalFailed = 0;
+    try {
+      let keepGoing = true;
+      let rounds = 0;
+      while (keepGoing && rounds < 40) {
+        const { data, error } = await supabase.functions.invoke("geocode-eleicao-pessoas", {
+          body: { clientId, limit: 25 },
+        });
+        if (error) throw error;
+        const res = data as { success: number; failed: number; pending: number };
+        totalSuccess += res.success;
+        totalFailed += res.failed;
+        toast.info(`Geocodificando… ${totalSuccess} ok · ${res.pending} restantes`);
+        keepGoing = (res.success + res.failed) > 0 && res.pending > 0;
+        rounds++;
+      }
+      toast.success(`Concluído: ${totalSuccess} endereços localizados${totalFailed ? `, ${totalFailed} falhas` : ""}`);
+      qc.invalidateQueries({ queryKey: ["coverage-pessoas", clientId] });
+    } catch (e: any) {
+      toast.error(e?.message || "Falha no geocoding");
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const toggleTipo = (t: string) => {
+    setActiveTipos((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-primary" />
+          Mapa de Cobertura da Equipe
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Visualize onde estão seus <strong>coordenadores, líderes e cabos</strong> no mapa real da cidade.
+          Identifique <strong>bairros sem cobertura</strong> para preencher lacunas estratégicas.
+        </p>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card><CardContent className="pt-4 pb-3 px-4">
+          <p className="text-xs text-muted-foreground">Equipe total</p>
+          <p className="text-2xl font-bold">{stats.total.toLocaleString("pt-BR")}</p>
+          <p className="text-[10px] text-muted-foreground">Pessoas cadastradas em Eleição</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4 pb-3 px-4">
+          <p className="text-xs text-muted-foreground">No mapa</p>
+          <p className="text-2xl font-bold text-primary">{stats.geocoded.toLocaleString("pt-BR")}</p>
+          <p className="text-[10px] text-muted-foreground">Endereços geolocalizados</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4 pb-3 px-4">
+          <p className="text-xs text-muted-foreground">Cobertura por bairro</p>
+          <p className="text-2xl font-bold">{gapAnalysis.coverage}%</p>
+          <p className="text-[10px] text-muted-foreground">{gapAnalysis.bairros.length - gapAnalysis.semCoord.length}/{gapAnalysis.bairros.length} bairros c/ coordenador</p>
+        </CardContent></Card>
+        <Card className={gapAnalysis.semCoord.length > 0 ? "border-amber-500/40" : ""}><CardContent className="pt-4 pb-3 px-4">
+          <p className="text-xs text-muted-foreground">Lacunas</p>
+          <p className="text-2xl font-bold text-amber-600">{gapAnalysis.semCoord.length}</p>
+          <p className="text-[10px] text-muted-foreground">Bairros sem coordenador</p>
+        </CardContent></Card>
+      </div>
+
+      {/* Aviso geocoding */}
+      {stats.pending > 0 && (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-3 px-4 flex items-center gap-3 flex-wrap">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <div className="text-xs flex-1 min-w-[200px]">
+              <p className="font-medium">{stats.pending} pessoa{stats.pending === 1 ? "" : "s"} com endereço sem coordenadas</p>
+              <p className="text-muted-foreground">Geocodificar consulta o Google Maps com base em rua/bairro/cidade pra plotar no mapa.</p>
+            </div>
+            <Button size="sm" onClick={handleGeocode} disabled={geocoding}>
+              {geocoding ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+              {geocoding ? "Geocodificando…" : "Geocodificar agora"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filtros e legenda */}
+      <Card>
+        <CardContent className="py-3 px-4 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            {(["coordenador", "lider", "cabo"] as const).map((t) => {
+              const Icon = TIPO_ICON_RECORD[t];
+              const active = activeTipos.has(t);
+              const count = filteredPins.filter((p) => p.tipo === t).length;
+              return (
+                <Button
+                  key={t}
+                  size="sm"
+                  variant={active ? "default" : "outline"}
+                  className="h-8 text-xs gap-1.5"
+                  onClick={() => toggleTipo(t)}
+                  style={active ? { background: TIPO_COLOR[t], borderColor: TIPO_COLOR[t] } : { borderColor: TIPO_COLOR[t], color: TIPO_COLOR[t] }}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ background: active ? "white" : TIPO_COLOR[t] }} />
+                  <Icon className="w-3.5 h-3.5" />
+                  {TIPO_LABEL[t]}
+                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{count}</Badge>
+                </Button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <Switch id="heatmap" checked={heatmap} onCheckedChange={setHeatmap} />
+            <Label htmlFor="heatmap" className="text-xs cursor-pointer">Heatmap</Label>
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar nome, bairro…"
+              className="h-8 pl-7 text-xs"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Mapa */}
+        <Card className="lg:col-span-2">
+          <CardContent className="p-0 relative">
+            {mapsError ? (
+              <div className="h-[600px] flex items-center justify-center text-sm text-destructive p-4 text-center">
+                Erro carregando Google Maps: {mapsError}
+              </div>
+            ) : !loaded ? (
+              <div className="h-[600px] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : isLoading ? (
+              <div className="h-[600px] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : null}
+            <div ref={mapDivRef} className="w-full h-[600px] rounded-md" style={{ display: loaded && !mapsError ? "block" : "none" }} />
+          </CardContent>
+        </Card>
+
+        {/* Painel de lacunas */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              Bairros sem coordenador
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Onde você já tem pessoas mas falta liderança. Priorize cadastrar coordenadores nestes bairros.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="max-h-[540px] overflow-y-auto divide-y">
+              {gapAnalysis.semCoord.length === 0 ? (
+                <p className="text-xs text-muted-foreground p-4 text-center">
+                  🎉 Todos os bairros com cadastros já têm coordenador!
+                </p>
+              ) : (
+                gapAnalysis.semCoord.slice(0, 50).map((g) => (
+                  <div key={`${g.cidade}-${g.bairro}`} className="px-4 py-2.5 hover:bg-muted/40">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{g.bairro}</p>
+                        <p className="text-[10px] text-muted-foreground">{g.cidade}</p>
+                      </div>
+                      <Badge variant={g.lideres > 0 ? "secondary" : "destructive"} className="text-[10px] shrink-0">
+                        {g.total} pessoa{g.total === 1 ? "" : "s"}
+                      </Badge>
+                    </div>
+                    {g.lideres > 0 && (
+                      <p className="text-[10px] text-blue-600 mt-1">
+                        ✓ {g.lideres} líder{g.lideres === 1 ? "" : "es"} · falta coordenador
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
