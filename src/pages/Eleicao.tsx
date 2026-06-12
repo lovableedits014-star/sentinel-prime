@@ -459,6 +459,7 @@ export default function Eleicao() {
           app_url: window.location.origin,
           email: options?.email,
           password: options?.password,
+          reset_password: !!options?.password,
         },
       });
       if (error) {
@@ -468,12 +469,14 @@ export default function Eleicao() {
       }
       if (!data?.success) throw new Error(data?.error || "Falha");
       setCredResult({ pessoa: p, ...data });
-      if (data.sent) toast.success("Credenciais enviadas por WhatsApp!");
+      const senhaMantida = data.password === null || data.password === undefined;
+      if (data.sent) toast.success(senhaMantida ? "Acesso enviado por WhatsApp (senha atual mantida)" : "Credenciais enviadas por WhatsApp!");
       else if (data.warning) toast.warning(data.warning);
-      else toast.success("Credenciais geradas! Copie abaixo.");
+      else toast.success(senhaMantida ? "Link gerado (senha atual mantida)" : "Credenciais geradas! Copie abaixo.");
       if (options?.closeRegisterDialog) setDialogOpen(false);
       load();
       return true;
+
     } catch (e: any) {
       toast.error(e.message);
       return false;
