@@ -1,94 +1,60 @@
-## Diagnóstico — o que tem hoje na aba "Visão Brasil (macro)"
+## Problema
 
-A aba acumulou 6 seções verticais que se sobrepõem. Mapeamento:
+Hoje os 3 botões de acesso do coordenador (Enviar acesso por WhatsApp, Gerar link e copiar, Definir e enviar acesso) chamam a mesma edge function `eleicao-send-credentials` **sempre gerando uma senha nova** (`genPassword(10)`) e sobrescrevendo a senha do auth via `auth.admin.updateUserById`. Qualquer clique invalida o acesso atual.
 
-| # | Seção | Problema |
-|---|---|---|
-| 1 | Filtro de origem (chips) | OK — manter |
-| 2 | Aviso "X cadastros sem cidade" | Alerta isolado, perdido no meio |
-| 3 | **Crescimento da Base** (KPIs total/hoje/7d/30d + chart diário + origem) | Não é visão geográfica — é Dashboard. Duplica métricas que já existem lá. |
-| 4 | **Mapa de Influência** | 5 KPIs + BrazilMap + Por Região BR + Top 10 Estados + drill-down cidades + drill-down bairros + chart "Top Cidades Brasil" + busca + cold zones + CityGroupedList completo |
-| 5 | **Por Região** (microzonas da campanha) | Conflita com a aba "Cobertura da Cidade" (que já mostra microzonas no mapa) e usa o mesmo título "Por Região" do item 4 — confusão |
-| 6 | **Últimos Cadastros** (tabela) | Operacional, não macro. Já existe no Dashboard. |
+Além disso, o menu tem 3 itens fazendo praticamente a mesma coisa, poluindo a interface, e o diálogo "Definir e enviar acesso" abre com senha aleatória pré-preenchida, estimulando sobrescrita acidental.
 
-Dentro do item 4 sozinho, **a mesma informação geográfica é exibida 4 vezes**: Top 10 Estados (lista), chart "Top Cidades/Bairros Brasil", cards "Cidades em UF", e `CityGroupedList` no rodapé.
+## Objetivo
 
-## Princípio do refino
+1. **Não resetar senha por padrão** — só quando o admin explicitamente pedir.
+2. **Senha-coringa padrão = `coringa15111`** (em vez de aleatória).
+3. **Consolidar o menu** de 3 itens em **1 item único** com submenu, reduzindo poluição visual.
 
-A aba "Visão Brasil" deveria responder **uma pergunta só**: *onde minha base está no país?* Com drill-down Brasil → Estado → Cidade → Bairro e nada mais.
+## Nova UX do dropdown (consolidação)
 
-Tudo que for crescimento/origem/últimos cadastros sai. Tudo que duplica drill-down sai. Cold zones e variantes viram um painel único de "oportunidades".
+Em vez de 3 linhas separadas, **1 item raiz** com submenu:
 
-## Nova estrutura
-
-```text
-┌───────────────────────────────────────────────────────────────┐
-│  [Filtro origem: Todos · CRM · Apoiadores · Indicados · Eleição]  │
-│  [🔍 Busca cidade/bairro em todo o Brasil ____________]        │
-├───────────────────────────────────────────────────────────────┤
-│  KPIs nacionais (4 cards)                                     │
-│  Estados ativos · Cidades · Pessoas localizadas · Sem cidade  │
-├───────────────────────────────────────────────────────────────┤
-│  ⚠ Oportunidades & Qualidade  (só aparece se houver algo)     │
-│  • N zonas frias  • M sem cidade  • K variantes p/ mesclar    │
-├───────────────────────────────┬───────────────────────────────┤
-│  Mapa do Brasil (interativo)  │  Por Região (Norte/NE/CO/...) │
-│  clique para drill-down       │  Top 10 Estados (clicável)    │
-├───────────────────────────────┴───────────────────────────────┤
-│  Breadcrumb: Brasil / SP / São Paulo   [✕ limpar]             │
-├───────────────────────────────────────────────────────────────┤
-│  ↓ aparece quando UF selecionado:                             │
-│    Cidades em <UF> — cards com barra + checkbox mesclar       │
-│  ↓ aparece quando Cidade selecionada:                         │
-│    Bairros em <Cidade> — cards com barra + checkbox mesclar   │
-└───────────────────────────────────────────────────────────────┘
+```
+🔑 Acesso ao portal  ▸
+   ├─ 📱 Enviar por WhatsApp        (não mexe na senha)
+   ├─ 📋 Copiar link de acesso       (não mexe na senha)
+   ├─ ───────────────────────────
+   └─ 🔁 Redefinir senha e enviar…   (abre diálogo, único caminho que reseta)
 ```
 
-## O que entra, sai e muda
+- As 2 primeiras opções são "não destrutivas" — usam a senha já cadastrada.
+- A terceira é destrutiva e leva ao diálogo com `coringa15111` pré-preenchido (editável).
+- Mesma lógica/itens aparecem na lista plana e no dialog de bulk, sem duplicar código (extrai-se um `<AcessoPortalMenu pessoa={p} onSend={…} onCredentials={…} />`).
 
-### Removido (corta redundância)
-- **Bloco inteiro "Crescimento da Base"** (KPIs + chart diário + chart origem). Pertence ao Dashboard, polui a visão geográfica.
-- **Bloco "Por Região" (microzonas da campanha)** com seus 4 KPIs e collapsibles. Microzonas já são tratadas na aba "Cobertura da Cidade" no mapa real e em Eleição → Configurações.
-- **Bloco "Últimos Cadastros"** (tabela). Operacional, não macro.
-- **Chart "Top Cidades/Bairros — Brasil"** (BarChart vertical) — duplica o drill-down.
-- **`CityGroupedList`** no rodapé — duplica o drill-down Cidades/Bairros que já está acima.
-- **Card KPI "Crescimento 30d"** (5º card dos KPIs nacionais) — vira ruído nessa aba.
+## Mudanças técnicas
 
-### Consolidado
-- **Painel único "Oportunidades & Qualidade"** logo abaixo dos KPIs, com 3 linhas curtas (só renderiza as que tiverem valor):
-  - `⚠ N regiões com poucos apoiadores (zonas frias)` — antigo cold zones
-  - `📍 M cadastros sem cidade definida` — antigo aviso eleicaoSemCidade, expandido pra incluir todos os tipos
-  - `🔀 K cidades/bairros com variantes para mesclar` — novo, conta `variantCount > 1` agregado, com botão "Revisar"
-- **Busca** sobe pro topo (junto do filtro de origem) — hoje fica perdida no rodapé.
+### 1. Edge function `supabase/functions/eleicao-send-credentials/index.ts`
 
-### Mantido
-- Filtro de origem (chips).
-- KPIs nacionais reduzidos a 4: Estados ativos / Cidades / Pessoas localizadas / Sem cidade.
-- BrazilMap interativo + sidebar Por Região + Top 10 Estados.
-- Breadcrumb de drill-down.
-- Cards de Cidades (com checkbox mesclar) e cards de Bairros (com checkbox mesclar) aparecendo conforme drill-down.
-- Dialogs `LocalityDetailDialog` e `MergeLocalitiesDialog`.
+- Aceitar nova flag `reset_password: boolean` (default `false`) no schema/body.
+- Lógica de senha:
+  - Se `reset_password === true` **ou** se a conta ainda não existe: usar `passwordInput || "coringa15111"`.
+  - Caso contrário (usuário já existe e `reset_password === false`): **não enviar `password` no `updateUserById`** — atualizar só `email`/`email_confirm`/`user_metadata`. Retornar `password: null` no payload.
+- Mensagem WhatsApp:
+  - Com senha → mantém "🔑 Senha: …".
+  - Sem senha → "🔑 Use a senha já cadastrada anteriormente."
 
-### Renomeado
-- Aba "Visão Brasil (macro)" → **"Visão Brasil"** (o "(macro)" virou ruído; o nome da aba já entrega).
-- Heading "Mapa de Influência" → removido (a aba já é o mapa; vira título de seção implícito).
+### 2. `src/pages/Eleicao.tsx`
 
-## Detalhes técnicos
+- `sendCredentials(p, channel, options)`: incluir `reset_password: !!options?.password` no body. WhatsApp/Copiar continuam sem `options` → não resetam. `saveCred()` continua passando senha → reseta.
+- `openCred(p)`: trocar `setCredPassword(genLocalPassword())` por `setCredPassword("coringa15111")`.
+- Bloco `credResult`: quando `password` vier `null`, ocultar campo de senha e mostrar nota "Senha atual mantida".
+- Toasts: "Link copiado (senha atual mantida)" / "Acesso enviado por WhatsApp (senha atual mantida)".
 
-- Arquivo único: `src/pages/Territorial.tsx`. Edição cirúrgica dentro do `<TabsContent value="brasil">`.
-- Deletar blocos: linhas ~1000-1066 (Crescimento), ~1390-1415 (chart Top Brasil), ~1418-1421 (busca atual), ~1424-1434 (cold zones isolado), ~1436-1477 (filtered + CityGroupedList), ~1480-1573 (Por Região microzonas), ~1575-1629 (Últimos cadastros).
-- Adicionar novo componente inline `OportunidadesPanel` (3 chips condicionais) no lugar do aviso atual.
-- Mover `<Input>` de busca pra dentro do mesmo Card do filtro de origem (mesma linha, lado direito).
-- Reduzir o grid de KPI nacional de 5 → 4 colunas (remover o card de Crescimento 30d).
-- Verificar e remover do imports tudo que ficou órfão: `BarChart`, `CartesianGrid`, `XAxis`, `YAxis`, `Cell`, `ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `CityGroupedList`, `Collapsible*`, `ChevronDown`, `Clock`, `tipoLabels`, `recentPessoas`, `regionGroups`, `selectedRegion`, `growthStats`, `dailyChartData`, `origemData`, `recruitMetrics`, `maxDailyChart` — qualquer um que não seja mais referenciado.
-- `filtered`, `selectedLocationKeys`, `openSelectedLocationsMerge`, `coldZones` ainda são usados pelo painel de oportunidades — verificar caso a caso.
-- Sem mudanças em queries / banco / edge function.
+### 3. Consolidação do menu
 
-## Validação
-1. Build limpa sem warnings de imports não usados.
-2. Clicar num estado no BrazilMap mostra cards de Cidades.
-3. Clicar numa cidade mostra cards de Bairros.
-4. Breadcrumb "Limpar" reseta tudo.
-5. Mesclar 2 cidades dispara o mesmo dialog atual e atualiza a lista.
-6. Painel "Oportunidades" some quando não tem cold zones nem sem-cidade nem variantes.
+- Criar componente local `AcessoPortalSubmenu` em `Eleicao.tsx` usando `DropdownMenuSub` + `DropdownMenuSubTrigger` + `DropdownMenuSubContent` do shadcn.
+- Substituir os 3 `DropdownMenuItem` atuais (linhas 1606–1615) por esse submenu.
+- Mesma substituição no item equivalente da `ListaPlana` se existir.
+- Manter "Enviar boas-vindas (grupo)" como item separado (intenção distinta).
 
+## Critério de aceitação
+
+1. Menu do coordenador mostra **1 linha "Acesso ao portal"** com submenu de 3 opções (WhatsApp, Copiar link, Redefinir senha).
+2. WhatsApp e Copiar link **não alteram** a senha em coordenador que já tem acesso (login antigo segue válido); confirmado por toast "senha atual mantida" e payload com `password: null`.
+3. Redefinir senha abre diálogo pré-preenchido com `coringa15111`; ao confirmar, sobrescreve e envia.
+4. Coordenador novo (sem `user_id`): qualquer das 3 ações cria conta com `coringa15111` e devolve a senha na mensagem.
