@@ -240,14 +240,15 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     setGeocoding(true);
     let totalSuccess = 0, totalFailed = 0, totalOut = 0;
     try {
-      let keepGoing = true;
       let rounds = 0;
-      while (keepGoing && rounds < 60) {
+      let lastPending = Infinity;
+      let stalledRounds = 0;
+      while (rounds < 60) {
         const { data, error } = await supabase.functions.invoke("geocode-eleicao-pessoas", {
           body: {
             clientId,
             limit: 25,
-            force: force && rounds === 0, // só força na 1ª rodada; depois pega pendentes
+            force: force && rounds === 0,
             defaultCity: "Campo Grande",
             defaultState: "MS",
             defaultCountry: "BR",
@@ -259,7 +260,19 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
         totalFailed += res.failed;
         totalOut += res.outOfRegion || 0;
         toast.info(`Geocodificando… ${totalSuccess} ok · ${res.pending} restantes`);
-        keepGoing = (res.success + res.failed) > 0 && res.pending > 0;
+        if (res.pending === 0) break;
+        // Para se não houve progresso (ex.: Google Maps Gateway 503) em 2 rodadas seguidas
+        if (res.pending >= lastPending) {
+          stalledRounds++;
+          if (stalledRounds >= 2) {
+            toast.warning(`Geocoding pausado: ${res.pending} pendentes (Google Maps indisponível ou endereços não encontrados). Tente novamente em alguns minutos.`);
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 3000));
+        } else {
+          stalledRounds = 0;
+        }
+        lastPending = res.pending;
         rounds++;
       }
       toast.success(`Concluído: ${totalSuccess} endereços localizados${totalOut ? ` · ${totalOut} fora da região` : ""}${totalFailed ? ` · ${totalFailed} falhas` : ""}`);
