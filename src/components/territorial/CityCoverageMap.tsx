@@ -7,10 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Loader2, MapPin, RefreshCw, Search, AlertTriangle, Crown, UserCheck, User as UserIcon, Building2 } from "lucide-react";
+import { Loader2, MapPin, RefreshCw, Search, AlertTriangle, Crown, UserCheck, User as UserIcon, Building2, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
 
 type Pessoa = {
   id: string;
@@ -25,6 +27,7 @@ type Pessoa = {
   lat: number | null;
   lng: number | null;
   geocode_status: string | null;
+  geocode_precision: string | null;
 };
 
 const TIPO_LABEL: Record<string, string> = {
@@ -53,13 +56,28 @@ const ALL_CITIES = "__ALL__";
 const normCity = (s: string | null | undefined) =>
   (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 
-function pinSvg(color: string, size = 36): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">
-    <path fill="${color}" stroke="white" stroke-width="1.5" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-    <circle cx="12" cy="9" r="2.8" fill="white"/>
+function pinSvg(color: string, size = 36, precision: string | null = "rua"): string {
+  // Precisão 'rua' = pino cheio com brilho normal.
+  // Precisão 'bairro' = pino translúcido com borda tracejada.
+  // Precisão 'cidade' = pino bem translúcido + símbolo "~" central.
+  const opacity = precision === "cidade" ? 0.5 : precision === "bairro" ? 0.75 : 1;
+  const stroke = precision === "rua" ? "white" : color;
+  const strokeDash = precision === "rua" ? "" : `stroke-dasharray="2,1.5"`;
+  const inner = precision === "cidade"
+    ? `<text x="12" y="12" text-anchor="middle" font-size="6" font-weight="bold" fill="${color}" font-family="system-ui">~</text>`
+    : `<circle cx="12" cy="9" r="2.8" fill="white"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}" opacity="${opacity}">
+    <path fill="${color}" stroke="${stroke}" stroke-width="1.5" ${strokeDash} d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+    ${inner}
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
+
+const PRECISION_LABEL: Record<string, string> = {
+  rua: "Endereço exato",
+  bairro: "Aproximado (bairro)",
+  cidade: "Aproximado (cidade)",
+};
 
 export function CityCoverageMap({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
@@ -70,11 +88,10 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
   const markersRef = useRef<any[]>([]);
 
   const [activeTipos, setActiveTipos] = useState<Set<string>>(new Set(["coordenador", "lider", "cabo"]));
-  const [showLiderados, setShowLiderados] = useState(false);
-  const [heatmap, setHeatmap] = useState(false);
   const [search, setSearch] = useState("");
   const [geocoding, setGeocoding] = useState(false);
   const [cityFilter, setCityFilter] = useState<string>(ALL_CITIES);
+  const [editing, setEditing] = useState<Pessoa | null>(null);
 
   const { data: pessoas = [], isLoading } = useQuery({
     queryKey: ["coverage-pessoas", clientId],
@@ -82,7 +99,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     queryFn: async (): Promise<Pessoa[]> => {
       const { data, error } = await supabase
         .from("eleicao_pessoas" as any)
-        .select("id, nome, telefone, tipo, regiao, cidade, bairro, rua, numero, lat, lng, geocode_status")
+        .select("id, nome, telefone, tipo, regiao, cidade, bairro, rua, numero, lat, lng, geocode_status, geocode_precision")
         .eq("client_id", clientId)
         .limit(5000);
       if (error) throw error;
@@ -117,25 +134,22 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
   const stats = useMemo(() => {
     const total = pessoasNaCidade.length;
     const geocoded = pessoasNaCidade.filter((p) => p.lat != null && p.lng != null).length;
+    const exact = pessoasNaCidade.filter((p) => p.geocode_precision === "rua").length;
+    const approxBairro = pessoasNaCidade.filter((p) => p.geocode_precision === "bairro").length;
+    const approxCidade = pessoasNaCidade.filter((p) => p.geocode_precision === "cidade").length;
     const pending = pessoasNaCidade.filter((p) => p.lat == null && (p.cidade || p.bairro || p.rua || p.numero)).length;
     const semCidade = pessoasNaCidade.filter((p) => !p.cidade || !p.cidade.trim()).length;
     const semBairro = pessoasNaCidade.filter((p) => !p.bairro || !p.bairro.trim()).length;
-    const cityMismatch = pessoasNaCidade.filter((p) => p.geocode_status === "city_mismatch").length;
-    const outOfRegion = pessoasNaCidade.filter((p) => p.geocode_status === "out_of_region").length;
-    const bairroNaoConfirmado = pessoasNaCidade.filter((p) => p.geocode_status === "bairro_nao_confirmado").length;
-    return { total, geocoded, pending, semCidade, semBairro, cityMismatch, outOfRegion, bairroNaoConfirmado };
+    return { total, geocoded, exact, approxBairro, approxCidade, pending, semCidade, semBairro };
   }, [pessoasNaCidade]);
 
   const pendingList = useMemo(() => {
     return pessoasNaCidade.filter((p) => p.lat == null || p.lng == null).map((p) => ({
       ...p,
       motivo:
-        p.geocode_status === "city_mismatch" ? "Cidade divergente do retorno do Google" :
-        p.geocode_status === "out_of_region" ? "Fora da região esperada" :
-        p.geocode_status === "bairro_nao_confirmado" ? "Bairro não confirmado pelo Google" :
         p.geocode_status === "no_address" ? "Sem endereço cadastrado" :
+        p.geocode_status === "city_not_found" ? "Cidade não localizada" :
         !p.cidade ? "Sem cidade" :
-        !p.bairro ? "Sem bairro" :
         p.geocode_status ? `Falha: ${p.geocode_status}` : "Aguardando geocodificação",
     }));
   }, [pessoasNaCidade]);
@@ -169,15 +183,14 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     const term = search.trim().toLowerCase();
     return pessoasNaCidade.filter((p) => {
       if (p.lat == null || p.lng == null) return false;
-      const tipoOk = activeTipos.has(p.tipo) || (showLiderados && p.tipo === "liderado");
-      if (!tipoOk) return false;
+      if (!activeTipos.has(p.tipo)) return false;
       if (term) {
         const hay = `${p.nome} ${p.bairro || ""} ${p.cidade || ""}`.toLowerCase();
         if (!hay.includes(term)) return false;
       }
       return true;
     });
-  }, [pessoasNaCidade, activeTipos, showLiderados, search]);
+  }, [pessoasNaCidade, activeTipos, search]);
 
   // Inicializa mapa
   useEffect(() => {
@@ -215,25 +228,34 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
 
     const markers = filteredPins.map((p) => {
       const color = TIPO_COLOR[p.tipo] || "#64748b";
+      const precision = (p.geocode_precision as "rua" | "bairro" | "cidade" | null) || "rua";
+      const baseSize = p.tipo === "coordenador" ? 44 : 32;
+      const size = precision === "cidade" ? Math.round(baseSize * 0.8) : baseSize;
       const marker = new google.maps.Marker({
         position: { lat: Number(p.lat), lng: Number(p.lng) },
         icon: {
-          url: pinSvg(color, p.tipo === "coordenador" ? 44 : 32),
-          scaledSize: new google.maps.Size(p.tipo === "coordenador" ? 44 : 32, p.tipo === "coordenador" ? 44 : 32),
-          anchor: new google.maps.Point(p.tipo === "coordenador" ? 22 : 16, p.tipo === "coordenador" ? 44 : 32),
+          url: pinSvg(color, size, precision),
+          scaledSize: new google.maps.Size(size, size),
+          anchor: new google.maps.Point(size / 2, size),
         },
         title: p.nome,
       });
       marker.addListener("click", () => {
+        const aproxNota = precision === "rua" ? "" : `
+          <div style="margin-top:6px; padding:6px 8px; background:#fef3c7; border-radius:6px; font-size:11px; color:#92400e;">
+            📍 ${PRECISION_LABEL[precision]} — endereço não totalmente confirmado.
+          </div>`;
         infoWindow.setContent(`
-          <div style="font-family: system-ui; min-width: 200px; padding: 4px;">
+          <div style="font-family: system-ui; min-width: 220px; padding: 4px;">
             <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${p.nome}</div>
             <div style="font-size: 12px; color: #64748b;">
               <div><strong>${TIPO_LABEL[p.tipo] || p.tipo}</strong></div>
               ${p.regiao ? `<div>Região: ${p.regiao}</div>` : ""}
+              ${p.rua ? `<div>${p.rua}${p.numero ? `, ${p.numero}` : ""}</div>` : ""}
               ${p.bairro ? `<div>Bairro: ${p.bairro}</div>` : ""}
               ${p.cidade ? `<div>Cidade: ${p.cidade}</div>` : ""}
               ${p.telefone ? `<div style="margin-top:6px;"><a href="https://wa.me/${p.telefone.replace(/\D/g, "")}" target="_blank" style="color:#10b981; text-decoration:none;">📱 WhatsApp</a></div>` : ""}
+              ${aproxNota}
             </div>
           </div>
         `);
@@ -244,32 +266,21 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     });
 
     markersRef.current = markers;
-
-    if (heatmap && google.maps.visualization) {
-      const heat = new google.maps.visualization.HeatmapLayer({
-        data: markers.map((m) => m.getPosition()),
-        radius: 30,
-      });
-      heat.setMap(mapRef.current);
-      markersRef.current.push({ setMap: (m: any) => heat.setMap(m) } as any);
-    } else {
-      markers.forEach((m) => m.setMap(mapRef.current));
-    }
+    markers.forEach((m) => m.setMap(mapRef.current));
 
     if (markers.length > 0) {
       mapRef.current.fitBounds(bounds, 60);
-      // evita zoom excessivo quando só existe 1 pino
       const listener = google.maps.event.addListenerOnce(mapRef.current, "bounds_changed", () => {
         if (mapRef.current.getZoom() > 15) mapRef.current.setZoom(15);
       });
       void listener;
     }
-  }, [filteredPins, loaded, heatmap]);
+  }, [filteredPins, loaded]);
 
   const handleGeocode = async (force = false) => {
     if (geocoding) return;
     setGeocoding(true);
-    let totalSuccess = 0, totalFailed = 0, totalMismatch = 0;
+    let totalSuccess = 0, totalFailed = 0;
     try {
       let rounds = 0;
       let lastPending = Infinity;
@@ -286,16 +297,15 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
           },
         });
         if (error) throw error;
-        const res = data as { success: number; failed: number; pending: number; cityMismatch?: number };
+        const res = data as { success: number; failed: number; pending: number };
         totalSuccess += res.success;
         totalFailed += res.failed;
-        totalMismatch += res.cityMismatch || 0;
         toast.info(`Geocodificando… ${totalSuccess} ok · ${res.pending} restantes`);
         if (res.pending === 0) break;
         if (res.pending >= lastPending) {
           stalledRounds++;
           if (stalledRounds >= 2) {
-            toast.warning(`Geocoding pausado: ${res.pending} pendentes. Verifique cidade/bairro nos cadastros e tente novamente.`);
+            toast.warning(`Geocoding pausado: ${res.pending} pendentes. Verifique cidade nos cadastros.`);
             break;
           }
           await new Promise((r) => setTimeout(r, 3000));
@@ -305,7 +315,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
         lastPending = res.pending;
         rounds++;
       }
-      toast.success(`Concluído: ${totalSuccess} localizados${totalMismatch ? ` · ${totalMismatch} cidade divergente` : ""}${totalFailed ? ` · ${totalFailed} falhas` : ""}`);
+      toast.success(`Concluído: ${totalSuccess} localizados${totalFailed ? ` · ${totalFailed} falhas` : ""}`);
       qc.invalidateQueries({ queryKey: ["coverage-pessoas", clientId] });
     } catch (e: any) {
       toast.error(e?.message || "Falha no geocoding");
@@ -376,7 +386,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
         <Card><CardContent className="pt-4 pb-3 px-4">
           <p className="text-xs text-muted-foreground">No mapa</p>
           <p className="text-2xl font-bold text-primary">{stats.geocoded.toLocaleString("pt-BR")}</p>
-          <p className="text-[10px] text-muted-foreground">Endereços geolocalizados</p>
+          <p className="text-[10px] text-muted-foreground">{stats.exact} exato · {stats.approxBairro} bairro · {stats.approxCidade} cidade</p>
         </CardContent></Card>
         <Card><CardContent className="pt-4 pb-3 px-4">
           <p className="text-xs text-muted-foreground">Cobertura por bairro</p>
@@ -397,7 +407,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <div className="text-xs flex-1 min-w-[200px]">
               <p className="font-medium">{stats.pending} pessoa{stats.pending === 1 ? "" : "s"} com endereço sem coordenadas</p>
-              <p className="text-muted-foreground">Geocodifica respeitando a cidade de cada cadastro (Dourados → Dourados, Campo Grande → Campo Grande, etc.).</p>
+              <p className="text-muted-foreground">A geocodificação tenta rua → bairro → cidade. Todo cadastro com cidade preenchida vai aparecer no mapa.</p>
             </div>
             <Button size="sm" onClick={() => handleGeocode(false)} disabled={geocoding}>
               {geocoding ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
@@ -431,24 +441,24 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
               <p className="text-base font-bold">{stats.total}</p>
             </div>
             <div className="rounded-md border bg-card p-2">
-              <p className="text-[10px] text-muted-foreground">No mapa</p>
-              <p className="text-base font-bold text-primary">{stats.geocoded}</p>
+              <p className="text-[10px] text-muted-foreground">Rua exata</p>
+              <p className="text-base font-bold text-primary">{stats.exact}</p>
             </div>
-            <div className={`rounded-md border p-2 ${stats.semCidade ? "border-amber-500/40 bg-amber-500/5" : "bg-card"}`}>
+            <div className="rounded-md border bg-card p-2">
+              <p className="text-[10px] text-muted-foreground">Aprox. bairro</p>
+              <p className="text-base font-bold">{stats.approxBairro}</p>
+            </div>
+            <div className="rounded-md border bg-card p-2">
+              <p className="text-[10px] text-muted-foreground">Aprox. cidade</p>
+              <p className="text-base font-bold">{stats.approxCidade}</p>
+            </div>
+            <div className={`rounded-md border p-2 ${stats.semCidade ? "border-destructive/40 bg-destructive/5" : "bg-card"}`}>
               <p className="text-[10px] text-muted-foreground">Sem cidade</p>
-              <p className="text-base font-bold">{stats.semCidade}</p>
+              <p className="text-base font-bold text-destructive">{stats.semCidade}</p>
             </div>
             <div className={`rounded-md border p-2 ${stats.semBairro ? "border-amber-500/40 bg-amber-500/5" : "bg-card"}`}>
               <p className="text-[10px] text-muted-foreground">Sem bairro</p>
               <p className="text-base font-bold">{stats.semBairro}</p>
-            </div>
-            <div className={`rounded-md border p-2 ${stats.cityMismatch ? "border-destructive/40 bg-destructive/5" : "bg-card"}`}>
-              <p className="text-[10px] text-muted-foreground">Cidade divergente</p>
-              <p className="text-base font-bold text-destructive">{stats.cityMismatch}</p>
-            </div>
-            <div className={`rounded-md border p-2 ${stats.bairroNaoConfirmado ? "border-amber-500/40 bg-amber-500/5" : "bg-card"}`}>
-              <p className="text-[10px] text-muted-foreground">Bairro não confirmado</p>
-              <p className="text-base font-bold">{stats.bairroNaoConfirmado}</p>
             </div>
           </div>
           {showPendentes && pendingList.length > 0 && (
@@ -462,6 +472,14 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
                     </p>
                   </div>
                   <Badge variant="outline" className="text-[10px] shrink-0">{p.motivo}</Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[10px] shrink-0"
+                    onClick={() => setEditing(p)}
+                  >
+                    <Pencil className="w-3 h-3 mr-1" /> Editar
+                  </Button>
                 </div>
               ))}
               {pendingList.length > 200 && (
@@ -497,15 +515,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
               );
             })}
           </div>
-          <div className="flex items-center gap-2">
-            <Switch id="liderados" checked={showLiderados} onCheckedChange={setShowLiderados} />
-            <Label htmlFor="liderados" className="text-xs cursor-pointer">Mostrar liderados</Label>
-          </div>
-          <div className="flex items-center gap-2 ml-auto">
-            <Switch id="heatmap" checked={heatmap} onCheckedChange={setHeatmap} />
-            <Label htmlFor="heatmap" className="text-xs cursor-pointer">Heatmap</Label>
-          </div>
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-64 ml-auto">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar nome, bairro…"
@@ -579,6 +589,142 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog de edição rápida de endereço */}
+      <EditEnderecoDialog
+        pessoa={editing}
+        clientId={clientId}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null);
+          qc.invalidateQueries({ queryKey: ["coverage-pessoas", clientId] });
+        }}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Dialog leve para editar só o endereço e disparar reprocessamento do pino
+// ============================================================================
+function EditEnderecoDialog({
+  pessoa, clientId, onClose, onSaved,
+}: {
+  pessoa: Pessoa | null;
+  clientId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [rua, setRua] = useState("");
+  const [numero, setNumero] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (pessoa) {
+      setRua(pessoa.rua || "");
+      setNumero(pessoa.numero || "");
+      setBairro(pessoa.bairro || "");
+      setCidade(pessoa.cidade || "");
+    }
+  }, [pessoa]);
+
+  if (!pessoa) return null;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("eleicao_pessoas" as any)
+        .update({
+          rua: rua.trim() || null,
+          numero: numero.trim() || null,
+          bairro: bairro.trim() || null,
+          cidade: cidade.trim() || null,
+          // limpa coordenadas para forçar regeocoding
+          lat: null,
+          lng: null,
+          geocode_status: null,
+          geocode_precision: null,
+          geocode_endereco_hash: null,
+        })
+        .eq("id", pessoa.id);
+      if (error) throw error;
+
+      toast.info("Endereço atualizado. Localizando no mapa…");
+
+      // dispara geocode pontual
+      const { data, error: gErr } = await supabase.functions.invoke("geocode-eleicao-pessoas", {
+        body: {
+          clientId,
+          ids: [pessoa.id],
+          force: true,
+          defaultCity: cidade.trim() || "Campo Grande",
+          defaultState: "MS",
+          defaultCountry: "BR",
+        },
+      });
+      if (gErr) throw gErr;
+      const res = data as { success: number };
+      if (res?.success) {
+        toast.success("Pessoa posicionada no mapa!");
+      } else {
+        toast.warning("Salvo, mas não foi possível posicionar — verifique a cidade.");
+      }
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!pessoa} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar endereço · {pessoa.nome}</DialogTitle>
+          <DialogDescription>
+            Corrija a cidade, bairro ou rua. Após salvar, o pino é reposicionado automaticamente.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <Label className="text-xs">Rua</Label>
+              <Input value={rua} onChange={(e) => setRua(e.target.value)} className="h-9" />
+            </div>
+            <div>
+              <Label className="text-xs">Número</Label>
+              <Input value={numero} onChange={(e) => setNumero(e.target.value)} className="h-9" />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Bairro</Label>
+            <Input value={bairro} onChange={(e) => setBairro(e.target.value)} className="h-9" />
+          </div>
+          <div>
+            <Label className="text-xs">Cidade *</Label>
+            <Input
+              value={cidade}
+              onChange={(e) => setCidade(e.target.value)}
+              className="h-9"
+              placeholder="Ex.: Dourados, Três Lagoas, Campo Grande…"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              A cidade é o mínimo necessário para a pessoa aparecer no mapa.
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving || !cidade.trim()}>
+            {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : null}
+            Salvar e localizar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

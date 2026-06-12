@@ -1,0 +1,1 @@
+ALTER TABLE public.eleicao_pessoas ADD COLUMN IF NOT EXISTS geocode_precision text;

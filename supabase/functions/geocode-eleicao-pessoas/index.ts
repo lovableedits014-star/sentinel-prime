@@ -1,12 +1,8 @@
-// Geocoding em lote para eleicao_pessoas via Google Maps Platform Gateway.
-// Estratégia:
-//  - Respeita a CIDADE do cadastro (Campo Grande só é usado como fallback
-//    quando o campo cidade está vazio).
-//  - Usa components filter (country/admin/locality) com a cidade real.
-//  - Valida que o resultado caiu no país/UF/cidade corretos.
-//  - Se houver bairro informado, tenta confirmar pelos address_components.
-//  - Se cidade do retorno difere da cadastrada → city_mismatch (não grava).
-//  - Se bairro não confere → bairro_nao_confirmado (não grava).
+// Geocoding em lote para eleicao_pessoas com fallback inteligente:
+//  1. Tenta rua + número + bairro + cidade (precision: 'rua')
+//  2. Se falhar, tenta bairro + cidade (precision: 'bairro')
+//  3. Se falhar, tenta cidade + UF (precision: 'cidade')
+// Assim, todo cadastro com pelo menos a cidade preenchida aparece no mapa.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -24,13 +20,7 @@ const norm = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-async function geocode(
-  addressBase: string,
-  bairro: string | null,
-  city: string,
-  state: string,
-  country: string,
-) {
+async function callGoogle(address: string, city: string, state: string, country: string) {
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   const gmapsKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
   if (!lovableKey || !gmapsKey) throw new Error("Credenciais Google Maps não configuradas");
@@ -42,7 +32,7 @@ async function geocode(
   ].filter(Boolean).join("|");
 
   const params = new URLSearchParams({
-    address: addressBase,
+    address,
     region: country.toLowerCase(),
     language: "pt-BR",
     components,
@@ -64,86 +54,107 @@ async function geocode(
     break;
   }
   if (!r || !r.ok) throw new Error(`Gateway ${r?.status ?? "no-response"}`);
-  const data = await r.json();
-  const status = data.status as string;
-  if (status !== "OK" || !data.results?.length) {
-    return { status, lat: 0, lng: 0, validated: false };
-  }
+  return await r.json();
+}
 
+// Procura nos resultados um que bata com a cidade/estado.
+// Retorna lat/lng + indicador se confirmou o bairro (quando informado).
+function pickResult(data: any, city: string, state: string, bairro: string | null):
+  { lat: number; lng: number; bairroOk: boolean } | null {
+  if (data?.status !== "OK" || !data.results?.length) return null;
   const cityN = norm(city);
   const stateN = norm(state);
   const bairroN = bairro ? norm(bairro) : "";
 
-  let cityStateMatchFallback: any = null;
-  let anyStateMatch = false;
+  let fallback: { lat: number; lng: number; bairroOk: boolean } | null = null;
 
   for (const res of data.results) {
     const comps = res.address_components || [];
-
-    const componentsByType = (type: string) =>
+    const byType = (type: string) =>
       comps.filter((c: any) => c.types?.includes(type))
         .flatMap((c: any) => [c.long_name, c.short_name].filter(Boolean));
-
     const matchesAny = (type: string, val: string) =>
-      componentsByType(type).some((v: string) => norm(v) === val);
+      byType(type).some((v: string) => norm(v) === val);
 
     const stateOk = !stateN || matchesAny("administrative_area_level_1", stateN);
-    if (stateOk) anyStateMatch = true;
-
     const cityOk = !cityN ||
       matchesAny("locality", cityN) ||
       matchesAny("administrative_area_level_2", cityN);
 
-    if (!cityOk || !stateOk) continue;
+    if (!stateOk || !cityOk) continue;
     if (!res.geometry?.location) continue;
     const { lat, lng } = res.geometry.location;
 
-    if (!bairroN) {
-      return { status: "OK", lat, lng, validated: true };
-    }
+    if (!bairroN) return { lat, lng, bairroOk: true };
 
     const bairroCandidates: string[] = [
-      ...componentsByType("sublocality"),
-      ...componentsByType("sublocality_level_1"),
-      ...componentsByType("neighborhood"),
-      ...componentsByType("political"),
-      ...componentsByType("administrative_area_level_4"),
+      ...byType("sublocality"),
+      ...byType("sublocality_level_1"),
+      ...byType("neighborhood"),
+      ...byType("political"),
+      ...byType("administrative_area_level_4"),
     ].map((v: string) => norm(v));
 
     const bairroOk = bairroCandidates.some((v) => v === bairroN || v.includes(bairroN) || bairroN.includes(v));
-
-    if (bairroOk) {
-      return { status: "OK", lat, lng, validated: true };
-    }
-    if (!cityStateMatchFallback) cityStateMatchFallback = { lat, lng };
+    if (bairroOk) return { lat, lng, bairroOk: true };
+    if (!fallback) fallback = { lat, lng, bairroOk: false };
   }
 
-  if (cityStateMatchFallback && bairroN) {
-    return { status: "BAIRRO_NAO_CONFIRMADO", lat: 0, lng: 0, validated: false };
-  }
-  if (cityStateMatchFallback) {
-    return { status: "OK", lat: cityStateMatchFallback.lat, lng: cityStateMatchFallback.lng, validated: true };
-  }
-  // Cidade não bateu — pode ser que o cadastro tenha cidade errada ou o
-  // Google interpretou diferente. Marca city_mismatch.
-  if (anyStateMatch) {
-    return { status: "CITY_MISMATCH", lat: 0, lng: 0, validated: false };
-  }
-  return { status: "OUT_OF_REGION", lat: 0, lng: 0, validated: false };
+  return fallback;
 }
 
-function buildAddressBase(p: any, fallbackCity: string, fallbackState: string): { text: string; bairro: string | null; cidade: string } {
-  const parts: string[] = [];
-  const bairro = (p.bairro || "").trim() || null;
-  if (p.rua) parts.push(`${p.rua}${p.numero ? `, ${p.numero}` : ""}`);
-  if (bairro) parts.push(`Bairro ${bairro}`);
-  if (!p.rua && !bairro && p.endereco) parts.push(p.endereco);
-
+// Geocode com fallback em 3 níveis. Sempre devolve lat/lng se houver pelo menos
+// cidade resolvível. precision indica a granularidade real do pino.
+async function geocodeWithFallback(p: any, fallbackCity: string, state: string, country: string):
+  Promise<{ lat: number; lng: number; precision: "rua" | "bairro" | "cidade" } | { error: string }> {
   const cidade = (p.cidade || "").trim() || fallbackCity;
-  const estado = fallbackState;
-  parts.push(`${cidade} - ${estado}`);
-  parts.push("Brasil");
-  return { text: parts.join(", "), bairro, cidade };
+  const bairro = (p.bairro || "").trim() || null;
+  const rua = (p.rua || "").trim();
+  const numero = (p.numero || "").trim();
+
+  // Nível 1: rua + número + bairro + cidade
+  if (rua) {
+    const addr = [
+      `${rua}${numero ? `, ${numero}` : ""}`,
+      bairro ? `Bairro ${bairro}` : "",
+      `${cidade} - ${state}`,
+      "Brasil",
+    ].filter(Boolean).join(", ");
+    try {
+      const data = await callGoogle(addr, cidade, state, country);
+      const picked = pickResult(data, cidade, state, bairro);
+      if (picked && picked.bairroOk) {
+        return { lat: picked.lat, lng: picked.lng, precision: "rua" };
+      }
+      // Se city+state bateram mas bairro não — segue para o nível 2.
+    } catch (_) { /* tenta nível 2 */ }
+  }
+
+  // Nível 2: bairro + cidade
+  if (bairro) {
+    const addr = `Bairro ${bairro}, ${cidade} - ${state}, Brasil`;
+    try {
+      const data = await callGoogle(addr, cidade, state, country);
+      const picked = pickResult(data, cidade, state, null);
+      if (picked) {
+        return { lat: picked.lat, lng: picked.lng, precision: "bairro" };
+      }
+    } catch (_) { /* tenta nível 3 */ }
+  }
+
+  // Nível 3: cidade + UF
+  const addr = `${cidade} - ${state}, Brasil`;
+  try {
+    const data = await callGoogle(addr, cidade, state, country);
+    const picked = pickResult(data, cidade, state, null);
+    if (picked) {
+      return { lat: picked.lat, lng: picked.lng, precision: "cidade" };
+    }
+  } catch (e: any) {
+    return { error: `geocode_failed: ${e?.message || "erro"}` };
+  }
+
+  return { error: "city_not_found" };
 }
 
 function addressHash(p: any): string {
@@ -186,7 +197,8 @@ Deno.serve(async (req) => {
     const { data: rows, error } = await q;
     if (error) throw error;
 
-    let success = 0, failed = 0, skipped = 0, outOfRegion = 0, bairroNaoConfirmado = 0, cityMismatch = 0;
+    let success = 0, failed = 0, skipped = 0;
+    let pRua = 0, pBairro = 0, pCidade = 0;
     const results: any[] = [];
 
     for (const p of rows || []) {
@@ -194,40 +206,41 @@ Deno.serve(async (req) => {
         skipped++;
         await admin.from("eleicao_pessoas").update({
           geocode_status: "no_address",
+          geocode_precision: null,
           geocoded_at: new Date().toISOString(),
         }).eq("id", p.id);
         continue;
       }
-      const { text: addr, bairro, cidade } = buildAddressBase(p, defaultCity, defaultState);
       try {
-        const g = await geocode(addr, bairro, cidade, defaultState, defaultCountry);
-        if (g.validated && g.status === "OK") {
+        const g = await geocodeWithFallback(p, defaultCity, defaultState, defaultCountry);
+        if ("error" in g) {
+          await admin.from("eleicao_pessoas").update({
+            lat: null,
+            lng: null,
+            geocode_status: g.error,
+            geocode_precision: null,
+            geocoded_at: new Date().toISOString(),
+            geocode_endereco_hash: addressHash(p),
+          }).eq("id", p.id);
+          failed++;
+        } else {
+          const statusOut =
+            g.precision === "rua" ? "ok" :
+            g.precision === "bairro" ? "bairro_aproximado" :
+            "cidade_aproximada";
           await admin.from("eleicao_pessoas").update({
             lat: g.lat,
             lng: g.lng,
-            geocode_status: "ok",
+            geocode_status: statusOut,
+            geocode_precision: g.precision,
             geocoded_at: new Date().toISOString(),
             geocode_endereco_hash: addressHash(p),
           }).eq("id", p.id);
           success++;
-          results.push({ id: p.id, lat: g.lat, lng: g.lng });
-        } else {
-          const statusOut =
-            g.status === "OUT_OF_REGION" ? "out_of_region" :
-            g.status === "CITY_MISMATCH" ? "city_mismatch" :
-            g.status === "BAIRRO_NAO_CONFIRMADO" ? "bairro_nao_confirmado" :
-            (g.status?.toLowerCase() || "failed");
-          await admin.from("eleicao_pessoas").update({
-            lat: null,
-            lng: null,
-            geocode_status: statusOut,
-            geocoded_at: new Date().toISOString(),
-            geocode_endereco_hash: addressHash(p),
-          }).eq("id", p.id);
-          if (g.status === "OUT_OF_REGION") outOfRegion++;
-          else if (g.status === "CITY_MISMATCH") cityMismatch++;
-          else if (g.status === "BAIRRO_NAO_CONFIRMADO") bairroNaoConfirmado++;
-          failed++;
+          if (g.precision === "rua") pRua++;
+          else if (g.precision === "bairro") pBairro++;
+          else pCidade++;
+          results.push({ id: p.id, lat: g.lat, lng: g.lng, precision: g.precision });
         }
       } catch (e: any) {
         console.error("[geocode] erro:", p.id, e?.message);
@@ -243,7 +256,7 @@ Deno.serve(async (req) => {
       .is("lat", null);
 
     return new Response(
-      JSON.stringify({ success, failed, skipped, outOfRegion, cityMismatch, bairroNaoConfirmado, pending: pending || 0, results }),
+      JSON.stringify({ success, failed, skipped, pRua, pBairro, pCidade, pending: pending || 0, results }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: any) {
