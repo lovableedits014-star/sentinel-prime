@@ -303,9 +303,13 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
               <p className="font-medium">{stats.pending} pessoa{stats.pending === 1 ? "" : "s"} com endereço sem coordenadas</p>
               <p className="text-muted-foreground">Geocodificar consulta o Google Maps com base em rua/bairro/cidade pra plotar no mapa.</p>
             </div>
-            <Button size="sm" onClick={handleGeocode} disabled={geocoding}>
+            <Button size="sm" onClick={() => handleGeocode(false)} disabled={geocoding}>
               {geocoding ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
               {geocoding ? "Geocodificando…" : "Geocodificar agora"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => handleGeocode(true)} disabled={geocoding} title="Reprocessa todos, inclusive já geocodificados, forçando Campo Grande/MS">
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              Reprocessar tudo
             </Button>
           </CardContent>
         </Card>
