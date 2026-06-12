@@ -2218,10 +2218,15 @@ export type Database = {
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id: string | null
+          geocode_endereco_hash: string | null
+          geocode_status: string | null
+          geocoded_at: string | null
           id: string
           is_favorito_regiao: boolean
+          lat: number | null
           ligacao_em: string | null
           ligacao_status: string | null
+          lng: number | null
           nome: string
           numero: string | null
           observacao_tele: string | null
@@ -2253,10 +2258,15 @@ export type Database = {
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id?: string | null
+          geocode_endereco_hash?: string | null
+          geocode_status?: string | null
+          geocoded_at?: string | null
           id?: string
           is_favorito_regiao?: boolean
+          lat?: number | null
           ligacao_em?: string | null
           ligacao_status?: string | null
+          lng?: number | null
           nome: string
           numero?: string | null
           observacao_tele?: string | null
@@ -2288,10 +2298,15 @@ export type Database = {
           endereco?: string
           escopo?: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id?: string | null
+          geocode_endereco_hash?: string | null
+          geocode_status?: string | null
+          geocoded_at?: string | null
           id?: string
           is_favorito_regiao?: boolean
+          lat?: number | null
           ligacao_em?: string | null
           ligacao_status?: string | null
+          lng?: number | null
           nome?: string
           numero?: string | null
           observacao_tele?: string | null
