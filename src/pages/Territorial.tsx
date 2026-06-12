@@ -1627,6 +1627,8 @@ export default function Territorial() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Dialogs */}
       <LocalityDetailDialog
