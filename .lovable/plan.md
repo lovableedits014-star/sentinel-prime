@@ -1,67 +1,41 @@
-## Objetivo
+## Bug: bairro aparece como "rua" ao editar cadastros antigos
 
-Após concluir um **novo cadastro** (líder, coordenador ou cabo) na aba Eleição, abrir automaticamente um **popup de "Envio Manual"** que permita ao usuário do sistema disparar todas as mensagens do fluxo **pelo próprio WhatsApp Web** (clicando em links `wa.me`), sem depender da instância da campanha. Isso garante que mesmo se a instância estiver offline ou se o usuário preferir enviar manualmente (mais pessoal / mais entregável), ele tenha **um único lugar** com tudo pronto: mensagens redigidas, números corretos e botões "Abrir no WhatsApp".
+### Diagnóstico
 
-A funcionalidade já existe parcialmente no menu de cada linha (`EnviarFluxoMenu` + `resolverFluxoCadastro`). O que falta é **abrir esse fluxo automaticamente no fim do cadastro**, num dialog maior e mais didático, com a opção também de incluir o **acesso ao portal** (no caso de coordenador).
+Investigação no banco (`eleicao_pessoas`, 105 registros):
+- **0 registros** têm `rua = bairro` no banco — os dados ainda estão íntegros.
+- **58 registros** têm `endereco = bairro` (cadastros onde só o bairro foi informado; o campo legado `endereco` ficou com o nome do bairro).
 
-## UX proposto
+A causa visual está em **`src/pages/Eleicao.tsx` linha 277**, na função `openEdit()`:
 
-Após salvar um novo cadastro com sucesso (em `save()` do `Eleicao.tsx`), em vez de só fechar o dialog e dar toast, abre um novo dialog **`PosCadastroEnvioDialog`** com:
+```ts
+const legado = p.endereco || "";
+setForm({
+  ...
+  rua: p.rua || legado,   // ← bug: quando rua está vazia, cai no endereco
+  ...
+  bairro: p.bairro || "",
+});
+```
 
-**Cabeçalho:**
-- Título: "Cadastro concluído — enviar mensagens"
-- Subtítulo: "Envie pelo seu próprio WhatsApp (sem usar a instância). Clique em cada botão para abrir a conversa com a mensagem pronta."
-- Badge do tipo cadastrado (Líder / Coordenador / Cabo) + nome + região.
+Esse fallback foi adicionado para migrar registros muito antigos (quando só existia o campo `endereco`). Mas para os 58 cadastros onde o `endereco` foi gerado a partir só do bairro (ex.: `endereco = "Moreninhas"`), o formulário de edição abre com **Rua: Moreninhas / Bairro: Moreninhas**. Se o usuário salvar sem limpar, o `rua` passa a guardar o bairro de verdade e o `endereco` vira `"Moreninhas - Moreninhas"`. O mesmo fallback existe em `src/lib/eleicao-fluxo-cadastro.ts` linha 167 (mensagem de boas-vindas mostra `Rua: Moreninhas`).
 
-**Lista de cartões de envio** (cada um = 1 destinatário, com pré-visualização da mensagem em um `<details>` colapsável):
+Como ainda não há linhas corrompidas no banco, não precisa de backfill — basta corrigir o fallback.
 
-1. **Para o Cadastrado** (sempre) — boas-vindas + link do grupo da região.
-2. **Para o Coordenador** (quando aplicável: novo líder com coordenador) — aviso "novo líder na sua região".
-3. **Para a Secretaria** (quando configurada) — mesma notificação.
-4. **Acesso ao portal** (somente coordenador) — card extra com e-mail + senha (default `coringa15111`, editável inline) e botão "Gerar link e enviar pelo meu WhatsApp" (usa `eleicao-send-credentials` com `channel: "link_only"` e injeta a mensagem retornada num `wa.me` para o telefone do coordenador). Mostra também botão "Copiar link" e "Copiar senha".
+### Plano
 
-Cada cartão tem:
-- Ícone (Crown / User / Building2)
-- Nome + telefone formatado do destinatário
-- Botão primário **"Abrir no WhatsApp"** (`wa.me/<phone>?text=<msg>`)
-- Botão secundário **"Copiar mensagem"**
-- Estado desabilitado com motivo (ex: "sem telefone", "sem coordenador favorito") reutilizando `FluxoDestino.disabled`
+1. **`src/pages/Eleicao.tsx` (linha 270–280, `openEdit`)**
+   - Tratar `endereco` como legado **apenas** quando ele realmente parece conter rua (diferente do bairro e do `"rua - bairro"` que o próprio sistema concatena hoje). Caso contrário, deixar `rua` em branco.
+   - Lógica: `rua: p.rua || (legado && legado !== p.bairro && !legado.endsWith(` - ${p.bairro}`) ? legado : "")`.
 
-**Rodapé:**
-- Checkbox **"Marcar como enviado"** (visual apenas, não persiste) — fica verde quando o usuário clica em "Abrir no WhatsApp".
-- Botão **"Concluir"** fecha o dialog.
-- Link discreto **"Eu já enviei pela instância automática — não preciso disso"** (fecha + lembra a escolha por sessão via `sessionStorage` para os próximos cadastros não abrirem o popup, com um botão pra reativar nas configurações da aba).
+2. **`src/lib/eleicao-fluxo-cadastro.ts` (linha 167, montagem das vars da mensagem)**
+   - Aplicar a mesma proteção: `rua: p.rua || (p.endereco && p.endereco !== p.bairro ? p.endereco : "—")` para a mensagem de boas-vindas não imprimir o bairro como rua.
 
-## Mudanças técnicas
+3. **Sem migração de dados.** Os 58 registros com `endereco = bairro` continuam corretos no banco (rua/numero nulos, bairro preenchido). A correção do fallback impede que futuras edições corrompam esses registros.
 
-### Novo: `src/components/eleicao/PosCadastroEnvioDialog.tsx`
-- Props: `{ open, onOpenChange, pessoa: Pessoa, onPedirCredenciais?: () => void }`.
-- Chama `resolverFluxoCadastro(pessoa)` no `useEffect` (com loading + erro).
-- Renderiza os 3 cartões via os `FluxoDestino` retornados (`coordenador`, `cadastrado`, `secretaria`).
-- Para coordenador: bloco extra **"Acesso ao portal"** que chama `sendCredentials(pessoa, "link_only", { email, password })` para obter `portal_url` + `message`; depois monta `wa.me/<telefone-do-coord>?text=<message>` e abre em nova aba.
-- Estado local de "enviados" (Set de chaves) para feedback visual.
+4. **QA rápido após o build:** abrir um cadastro tipo `Moreninhas` (ex.: João Leite, Vanderley), confirmar que o campo Rua aparece vazio e que salvar mantém `rua = null` no banco.
 
-### `src/pages/Eleicao.tsx`
-- Adicionar estado `posCadastroPessoa: Pessoa | null` e `posCadastroOpen: boolean`.
-- No final de `save()` (após `load()`), quando `!editing` e `savedPessoa`, **substituir** os disparos automáticos atuais (`sendCoordBoasVindas`, `sendCaboBoasVindas`, `sendCredentials` automático) por: setar `posCadastroPessoa = savedPessoa` e `posCadastroOpen = true`. Os disparos automáticos **continuam disponíveis** dentro do dialog (opcionais), mas não acontecem mais por padrão — o usuário decide. Exceção: o `NotifyProgressDialog` (Coordenador → Secretaria → Líder, automático via instância) continua para líderes **se o usuário marcar a opção "Também enviar pela instância"** (checkbox no topo do novo dialog, desligado por padrão).
-- Respeitar `sessionStorage["eleicao:skip-pos-cadastro"]` — se setado, pula o dialog e mantém o fluxo automático antigo.
-- Renderizar `<PosCadastroEnvioDialog ... />` no final do componente.
+### Fora do escopo
 
-### Reaproveitamento
-- `resolverFluxoCadastro` (já existe) — fonte única das mensagens.
-- `eleicao-send-credentials` (já existe, channel `link_only`) — para gerar portal_url + mensagem do coordenador, sem disparar pela instância.
-- `EnviarFluxoMenu` no menu da linha continua existindo (para reenvio posterior), mas pode ser ajustado para abrir o **mesmo** `PosCadastroEnvioDialog` em vez do submenu — assim a UX é consistente entre "logo após cadastrar" e "quero reenviar depois". Substitui o item "Reenviar fluxo de cadastro" também.
-
-### Sem mudanças
-- Edge functions: nada precisa ser deployado.
-- Schema: nenhuma migração.
-- Mensagens / templates: reaproveitadas (não duplicar).
-
-## Critérios de aceitação
-
-- Ao salvar um novo líder/coordenador/cabo, abre o popup com 1–3 cartões prontos + (se coordenador) card de acesso ao portal.
-- Botão "Abrir no WhatsApp" abre `wa.me` em nova aba com a mensagem pré-preenchida e o número do destinatário correto.
-- Coordenador: o card "Acesso ao portal" mostra senha default `coringa15111` editável, e o botão envia a mensagem completa (link + e-mail + senha) pelo WhatsApp do usuário do sistema — **sem alterar a senha já cadastrada** quando o coordenador já tem login (reusa a lógica `reset_password: false`).
-- Disparos automáticos via instância **não acontecem mais por padrão** — só se o usuário marcar a checkbox "Também enviar pela instância". Isso resolve o problema atual de mensagens automáticas saindo sem controle.
-- O dialog é editável: usuário pode fechar sem enviar, pode marcar "não mostrar de novo nesta sessão", e pode reabrir via item de menu da linha ("Enviar fluxo manual").
-- `NotifyProgressDialog` (Coordenador → Secretaria → Líder, automático) só roda quando solicitado explicitamente.
+- Não vou mexer no schema nem rodar UPDATE em massa.
+- Não vou alterar a lógica de salvar (`save()`) — ela já trata `rua` vazio corretamente (`numero: numero || null`, concat opcional).
