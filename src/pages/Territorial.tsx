@@ -935,7 +935,7 @@ export default function Territorial() {
             <MapPin className="w-3.5 h-3.5" /> Cobertura da Cidade
           </TabsTrigger>
           <TabsTrigger value="brasil" className="gap-1.5">
-            <Globe2 className="w-3.5 h-3.5" /> Visão Brasil (macro)
+            <Globe2 className="w-3.5 h-3.5" /> Visão Brasil
           </TabsTrigger>
         </TabsList>
 
