@@ -206,6 +206,9 @@ export default function Eleicao() {
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyPessoaId, setNotifyPessoaId] = useState<string | null>(null);
   const [notifySkip, setNotifySkip] = useState<("coordenador" | "secretaria" | "lider")[]>([]);
+  // Pós-cadastro: popup de envio manual (WhatsApp Web do próprio usuário)
+  const [posCadastroOpen, setPosCadastroOpen] = useState(false);
+  const [posCadastroPessoa, setPosCadastroPessoa] = useState<Pessoa | null>(null);
   const [editing, setEditing] = useState<Pessoa | null>(null);
   const [form, setForm] = useState({
     tipo: "coordenador" as Tipo,
