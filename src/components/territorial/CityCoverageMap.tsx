@@ -379,16 +379,6 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
           <p className="text-2xl font-bold text-primary">{stats.geocoded.toLocaleString("pt-BR")}</p>
           <p className="text-[10px] text-muted-foreground">{stats.exact} exato · {stats.approxBairro} bairro · {stats.approxCidade} cidade</p>
         </CardContent></Card>
-        <Card><CardContent className="pt-4 pb-3 px-4">
-          <p className="text-xs text-muted-foreground">Cobertura por bairro</p>
-          <p className="text-2xl font-bold">{gapAnalysis.coverage}%</p>
-          <p className="text-[10px] text-muted-foreground">{gapAnalysis.bairros.length - gapAnalysis.semCoord.length}/{gapAnalysis.bairros.length} bairros c/ coordenador</p>
-        </CardContent></Card>
-        <Card className={gapAnalysis.semCoord.length > 0 ? "border-amber-500/40" : ""}><CardContent className="pt-4 pb-3 px-4">
-          <p className="text-xs text-muted-foreground">Lacunas</p>
-          <p className="text-2xl font-bold text-amber-600">{gapAnalysis.semCoord.length}</p>
-          <p className="text-[10px] text-muted-foreground">Bairros sem coordenador</p>
-        </CardContent></Card>
       </div>
 
       {/* Aviso geocoding */}
