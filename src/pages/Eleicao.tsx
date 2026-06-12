@@ -19,6 +19,7 @@ import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
 import EnviarFluxoMenu from "@/components/eleicao/EnviarFluxoMenu";
+import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog";
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 import EntradaGrupoPanel from "@/components/eleicao/EntradaGrupoPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
