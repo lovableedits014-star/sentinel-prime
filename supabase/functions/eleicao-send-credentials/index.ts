@@ -204,34 +204,38 @@ Deno.serve(async (req) => {
     }
     if (!canAccess) return new Response(JSON.stringify({ error: "Sem permissão" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
 
-    // Gera senha temporária e cria/atualiza conta
-    const password = passwordInput || genPassword(10);
+    // Decide se a senha será alterada nesta operação.
+    // - Conta nova (sem user_id e sem match por e-mail) → sempre define senha (padrão coringa15111).
+    // - Usuário existente → só altera senha se wantReset (admin clicou em "Redefinir senha").
     const emailNorm = (emailInput || pessoa.email || `coord-${pessoa.id.slice(0,8)}@portal.local`).toLowerCase();
 
     let userId = pessoa.user_id as string | null;
     const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const foundByEmail = list?.users?.find((u: any) => (u.email || "").toLowerCase() === emailNorm) || null;
-
-    // Se o e-mail informado já existir em outra conta, vincula o coordenador a essa conta.
-    // Isso evita o erro atual: a pessoa fica com email correto, mas user_id preso em coord-xxxx@portal.local.
     if (foundByEmail?.id) userId = foundByEmail.id;
 
+    const isNewAccount = !userId;
+    const shouldSetPassword = isNewAccount || wantReset;
+    const password: string | null = shouldSetPassword ? (passwordInput || DEFAULT_PORTAL_PASSWORD) : null;
+
     if (userId) {
-      const { error: uErr } = await admin.auth.admin.updateUserById(userId, {
+      const updates: Record<string, unknown> = {
         email: emailNorm,
-        password,
         email_confirm: true,
         user_metadata: { full_name: pessoa.nome, role: "coordenador", account_type: "portal_pessoa" },
-      });
+      };
+      if (shouldSetPassword && password) updates.password = password;
+      const { error: uErr } = await admin.auth.admin.updateUserById(userId, updates);
       if (uErr) throw uErr;
     } else {
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
-        email: emailNorm, password, email_confirm: true,
+        email: emailNorm, password: password || DEFAULT_PORTAL_PASSWORD, email_confirm: true,
         user_metadata: { full_name: pessoa.nome, role: "coordenador", account_type: "portal_pessoa" },
       });
       if (cErr) throw cErr;
       userId = created.user!.id;
     }
+
     await admin.from("eleicao_pessoas").update({ email: emailNorm, user_id: userId }).eq("id", pessoa_id);
 
     const baseUrl = (app_url || req.headers.get("origin") || Deno.env.get("PUBLIC_APP_URL") || "").replace(/\/$/, "");
