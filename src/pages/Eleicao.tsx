@@ -1171,6 +1171,19 @@ export default function Eleicao() {
         onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); setNotifySkip([]); }}
       />
 
+      <PosCadastroEnvioDialog
+        open={posCadastroOpen}
+        onOpenChange={(o) => { setPosCadastroOpen(o); if (!o) setPosCadastroPessoa(null); }}
+        pessoa={posCadastroPessoa as any}
+        showInstanceOption={posCadastroPessoa?.tipo === "lider"}
+        onTriggerInstanceFlow={(p) => {
+          const isAvulso = !p.parent_id;
+          setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
+          setNotifyPessoaId(p.id);
+          setNotifyOpen(true);
+        }}
+      />
+
       <ExportEleicaoDialog
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
