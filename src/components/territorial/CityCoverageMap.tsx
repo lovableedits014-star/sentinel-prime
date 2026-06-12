@@ -20,6 +20,8 @@ type Pessoa = {
   regiao: string | null;
   cidade: string | null;
   bairro: string | null;
+  rua: string | null;
+  numero: string | null;
   lat: number | null;
   lng: number | null;
   geocode_status: string | null;
@@ -74,7 +76,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     queryFn: async (): Promise<Pessoa[]> => {
       const { data, error } = await supabase
         .from("eleicao_pessoas" as any)
-        .select("id, nome, telefone, tipo, regiao, cidade, bairro, lat, lng, geocode_status")
+        .select("id, nome, telefone, tipo, regiao, cidade, bairro, rua, numero, lat, lng, geocode_status")
         .eq("client_id", clientId)
         .limit(5000);
       if (error) throw error;
@@ -85,9 +87,28 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
   const stats = useMemo(() => {
     const total = pessoas.length;
     const geocoded = pessoas.filter((p) => p.lat != null && p.lng != null).length;
-    const pending = pessoas.filter((p) => p.lat == null && (p.cidade || p.bairro)).length;
-    return { total, geocoded, pending };
+    const pending = pessoas.filter((p) => p.lat == null && (p.cidade || p.bairro || p.rua || p.numero)).length;
+    const semCidade = pessoas.filter((p) => !p.cidade || !p.cidade.trim()).length;
+    const semBairro = pessoas.filter((p) => !p.bairro || !p.bairro.trim()).length;
+    const outOfRegion = pessoas.filter((p) => p.geocode_status === "out_of_region").length;
+    const bairroNaoConfirmado = pessoas.filter((p) => p.geocode_status === "bairro_nao_confirmado").length;
+    return { total, geocoded, pending, semCidade, semBairro, outOfRegion, bairroNaoConfirmado };
   }, [pessoas]);
+
+  const pendingList = useMemo(() => {
+    return pessoas.filter((p) => p.lat == null || p.lng == null).map((p) => ({
+      ...p,
+      motivo:
+        p.geocode_status === "out_of_region" ? "Fora da área esperada" :
+        p.geocode_status === "bairro_nao_confirmado" ? "Bairro não confirmado pelo Google" :
+        p.geocode_status === "no_address" ? "Sem endereço cadastrado" :
+        !p.cidade ? "Sem cidade" :
+        !p.bairro ? "Sem bairro" :
+        p.geocode_status ? `Falha: ${p.geocode_status}` : "Aguardando geocodificação",
+    }));
+  }, [pessoas]);
+
+  const [showPendentes, setShowPendentes] = useState(false);
 
   // Análise de gaps por bairro
   const gapAnalysis = useMemo(() => {
