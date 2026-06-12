@@ -1,53 +1,59 @@
-Plano urgente para corrigir a classificação territorial e impedir novos erros:
+## Diagnóstico confirmado
 
-1. Corrigir os cadastros existentes sem cidade
-- Atualizar todos os registros de `eleicao_pessoas` que estão sem cidade para constar como Campo Grande/MS no cadastro.
-- Hoje há 105 cadastros eleitorais; 103 estão sem cidade preenchida.
-- Isso corrige a classificação territorial que hoje agrupa muita gente como “Sem cidade”, mesmo quando o bairro é de Campo Grande.
+- Rafael Felipe está cadastrado como `cidade = Dourados`, `bairro = Dourados`, mas foi plotado dentro de Campo Grande porque a geocodificação está forçando Campo Grande/MS como padrão e ignorando a cidade do cadastro.
+- 1 cadastro de outra cidade já está contaminado; 56 estão sem coordenada.
+- A geocodificação precisa **respeitar a cidade real** de cada pessoa, e o mapa precisa **mostrar cada pessoa na sua própria cidade**, não jogar todo mundo em Campo Grande.
 
-2. Reprocessar a geocodificação de forma mais rígida por bairro
-- Limpar as coordenadas/geocode dos cadastros afetados para forçar novo processamento.
-- Ajustar a geocodificação para tratar bairro como informação obrigatória/prioritária quando existir.
-- Para cadastros de Campo Grande/MS, montar sempre a busca como: bairro + Campo Grande + MS + Brasil.
-- Validar o retorno do Google para aceitar somente resultados dentro da área esperada de Campo Grande/MS, exceto casos explicitamente marcados como distrito/interior.
-- Se o Google não conseguir confirmar o bairro/cidade com segurança, deixar o cadastro pendente em vez de salvar coordenada duvidosa.
+## Plano de correção
 
-3. Tratar casos como Diego Garcia corretamente
-- Diego Garcia está com bairro `Centro Oeste` e coordenada no centro de Campo Grande; ele não parece estar fora do mapa.
-- O erro principal é que o cadastro dele está sem cidade, então o sistema fica vulnerável a classificação incompleta/ambígua.
-- Após atualizar cidade para Campo Grande/MS e reprocessar/validar, ele deve aparecer classificado por Campo Grande/MS + bairro Centro Oeste.
+### 1. Geocoding fiel à cidade do cadastro
+- A cidade enviada ao Google passa a ser **sempre a cidade do cadastro** (Campo Grande só é usado quando o campo cidade estiver vazio).
+- O `components` filter usa a cidade + UF do cadastro (não mais Campo Grande fixo).
+- A bounding box rígida de Campo Grande deixa de ser aplicada para cadastros de outras cidades — caso contrário Dourados nunca passaria na validação.
+- Validação por camadas:
+  1. País = BR
+  2. UF = MS (ou a UF cadastrada, quando houver)
+  3. Cidade do retorno bate com a cidade cadastrada (locality ou administrative_area_level_2)
+  4. Se houver bairro, tenta confirmar; se não bater, marca `bairro_nao_confirmado` em vez de gravar ponto torto
+- Se a cidade não bate, marca `city_mismatch` e não grava coordenada.
 
-4. Mostrar auditoria clara no mapa
-- Adicionar um painel de qualidade no mapa com contadores separados:
-  - total de cadastros;
-  - no mapa;
-  - sem cidade;
-  - sem bairro;
-  - pendentes de geocodificação;
-  - fora da área esperada.
-- Adicionar uma lista “Ver pendências” para identificar quem não está aparecendo ou quem precisa correção manual.
-- Assim o sistema não fica “parecendo” que faltam pessoas: ele mostra exatamente quantas estão no mapa e por que alguma não aparece.
+### 2. Corrigir registros já contaminados
+- Limpar `lat/lng/geocode_status/geocoded_at` de qualquer cadastro cuja `cidade` não seja Campo Grande mas esteja com coordenadas dentro da bounding box de Campo Grande.
+- Isso devolve Rafael Felipe (e similares) para a fila de geocodificação respeitando Dourados.
 
-5. Ajustar novos cadastros para exigir cidade
-- Na tela Eleição, para Campo Grande, preencher automaticamente cidade como Campo Grande/MS em novos cadastros.
-- No Portal do Coordenador, manter cidade visível e pré-preenchida como Campo Grande/MS quando o escopo for Campo Grande.
-- No diálogo “Nova Pessoa”, adicionar cidade para coordenador/líder/cabo e usar Campo Grande/MS como padrão, permitindo alterar se necessário.
-- Quando o cadastro for Interior, manter a cidade obrigatória e escolhida/preenchida pelo usuário.
+### 3. Mapa mostra todas as cidades
+- O mapa de cobertura passa a plotar pessoas de **qualquer cidade** (Campo Grande, Dourados, Três Lagoas, etc.), cada uma na sua própria localização real.
+- O zoom inicial se ajusta automaticamente para abranger todos os pinos quando houver pessoas fora de Campo Grande.
+- Os ícones por tipo (coordenador, líder, cabo, liderado) continuam iguais — a única diferença é que agora aparecem na cidade correta.
 
-6. Evitar geocode velho após edição
-- Quando bairro, rua, número ou cidade forem alterados em um cadastro, limpar `lat`, `lng`, `geocode_status`, `geocoded_at` e `geocode_endereco_hash` para obrigar nova geocodificação.
-- Isso impede que um cadastro editado continue preso em uma coordenada antiga.
+### 4. Filtros e visão por cidade
+- Acrescentar um seletor de **Cidade** no topo do mapa, com as opções:
+  - Todas as cidades (padrão)
+  - Campo Grande
+  - Cada outra cidade que tiver pelo menos um cadastro
+- Acrescentar KPIs por cidade no painel:
+  - Total de pessoas por cidade
+  - Coordenadores / líderes / cabos por cidade
+  - Cidades com cobertura (pelo menos 1 coordenador) x cidades em lacuna
 
-7. Validar depois da correção
-- Conferir no banco:
-  - zero cadastros eleitorais sem cidade, quando forem de Campo Grande;
-  - zero cadastros Campo Grande/MS fora da área esperada, salvo distrito/interior;
-  - todos os bairros principais agrupando corretamente em Campo Grande/MS;
-  - Diego Garcia em Campo Grande/MS + Centro Oeste.
-- Conferir na interface do mapa se o contador “No mapa” bate com o total esperado e se a lista de pendências explica qualquer exceção.
+### 5. Painel de auditoria atualizado
+- Os contadores deixam de tratar “fora de Campo Grande” como erro.
+- Passam a existir os contadores:
+  - Sem cidade
+  - Sem bairro
+  - Cidade divergente (Google trouxe cidade diferente da cadastrada → pendência)
+  - Bairro não confirmado
+  - Sem coordenada
+- Lista de pendências mostra cidade, bairro, endereço e o motivo exato.
 
-Implementação prevista:
-- Fazer uma atualização de dados nos cadastros existentes.
-- Ajustar `supabase/functions/geocode-eleicao-pessoas/index.ts`.
-- Ajustar `src/components/territorial/CityCoverageMap.tsx`.
-- Ajustar os formulários em `src/pages/Eleicao.tsx`, `src/pages/PortalCoordenador.tsx` e `src/components/pessoas/NovaPessoaDialog.tsx`.
+### 6. Formulários de cadastro
+- Manter o campo Cidade visível e editável em todos os cadastros (Eleicao, Portal do Coordenador, NovaPessoaDialog).
+- Default sugerido continua Campo Grande, mas o usuário pode alterar livremente para Dourados, Três Lagoas, etc.
+- Garantir que ao alterar cidade/bairro/rua o gatilho do banco zere as coordenadas e recoloque na fila.
+
+## Resultado esperado
+
+- Rafael Felipe (Dourados) aparecerá no mapa **em Dourados**, com o pino do tipo correto.
+- Coordenadores e líderes de qualquer cidade entram no mapa, na sua cidade real.
+- Filtro permite olhar a equipe da cidade que você quiser.
+- Nenhuma pessoa de outra cidade é arrastada para Campo Grande por padrão de geocodificação.
