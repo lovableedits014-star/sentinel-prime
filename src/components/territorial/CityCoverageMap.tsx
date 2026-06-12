@@ -256,10 +256,20 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
               ${p.cidade ? `<div>Cidade: ${p.cidade}</div>` : ""}
               ${p.telefone ? `<div style="margin-top:6px;"><a href="https://wa.me/${p.telefone.replace(/\D/g, "")}" target="_blank" style="color:#10b981; text-decoration:none;">📱 WhatsApp</a></div>` : ""}
               ${aproxNota}
+              <button id="edit-pessoa-${p.id}" style="margin-top:10px; width:100%; padding:6px 10px; background:#0f172a; color:white; border:none; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;">
+                ✏️ Editar cadastro
+              </button>
             </div>
           </div>
         `);
         infoWindow.open(mapRef.current, marker);
+        google.maps.event.addListenerOnce(infoWindow, "domready", () => {
+          const btn = document.getElementById(`edit-pessoa-${p.id}`);
+          if (btn) btn.addEventListener("click", () => {
+            infoWindow.close();
+            setEditing(p);
+          });
+        });
       });
       bounds.extend({ lat: Number(p.lat), lng: Number(p.lng) });
       return marker;
