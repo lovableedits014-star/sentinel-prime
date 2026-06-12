@@ -31,7 +31,7 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, onSucce
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [cpf, setCpf] = useState("");
-  const [cidade, setCidade] = useState("");
+  const [cidade, setCidade] = useState("Campo Grande");
   const [bairro, setBairro] = useState("");
   const [tipo, setTipo] = useState("apoiador");
 
@@ -43,7 +43,7 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, onSucce
 
   function resetForm() {
     setNome(""); setEmail(""); setTelefone(""); setCpf("");
-    setCidade(""); setBairro(""); setTipo("apoiador");
+    setCidade("Campo Grande"); setBairro(""); setTipo("apoiador");
   }
 
   async function doInsert(funcionarioId: string | null) {
@@ -85,7 +85,8 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, onSucce
         email: email.trim() || null,
         telefone: telDigits || null,
         cpf: cpfDigits || null,
-        cidade: cidade.trim() || null,
+        cidade: cidade.trim() || "Campo Grande",
+        bairro: bairro.trim() || null,
         tipo,
         funcionario_id: funcionarioId,
       } as any);
