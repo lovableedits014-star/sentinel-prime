@@ -1613,16 +1613,29 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           {p.tipo === "coordenador" && onSend && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onSend(p, "whatsapp")} disabled={isSending}>
-                {isSending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-2" />}
-                Enviar acesso por WhatsApp
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSend(p, "link_only")} disabled={isSending}>
-                <Copy className="w-3.5 h-3.5 mr-2" />Gerar link e copiar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onCredentials(p)}>
-                <KeyRound className="w-3.5 h-3.5 mr-2" />Definir e enviar acesso
-              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={isSending}>
+                  {isSending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-2" />}
+                  Acesso ao portal
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => onSend(p, "whatsapp")} disabled={isSending}>
+                      <Send className="w-3.5 h-3.5 mr-2" />Enviar por WhatsApp
+                      <span className="ml-auto text-[10px] opacity-60">mantém senha</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onSend(p, "link_only")} disabled={isSending}>
+                      <Copy className="w-3.5 h-3.5 mr-2" />Copiar link de acesso
+                      <span className="ml-auto text-[10px] opacity-60">mantém senha</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onCredentials(p)}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-2" />Redefinir senha e enviar…
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+
               <DropdownMenuItem onClick={() => sendCoordBoasVindas(p.id)}>
                 <BellRing className="w-3.5 h-3.5 mr-2" />Enviar boas-vindas (grupo)
               </DropdownMenuItem>
