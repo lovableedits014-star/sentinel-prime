@@ -949,311 +949,381 @@ export default function Territorial() {
 
         <TabsContent value="brasil" className="mt-4 space-y-6">
 
-      {/* Filtro de origem (chips) — apenas filtragem em memória, não altera dados */}
+      {/* ═══════════════════════════════════════ */}
+      {/* CONTROLES: filtro de origem + busca    */}
+      {/* ═══════════════════════════════════════ */}
       <Card>
-        <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-muted-foreground mr-1">Mostrar:</span>
-          {([
-            { v: "todos", label: "Todos" },
-            { v: "crm", label: "CRM" },
-            { v: "apoiador", label: "Apoiadores" },
-            { v: "indicado", label: "Indicados" },
-            { v: "eleicao", label: "Eleição" },
-          ] as const).map((opt) => (
-            <Button
-              key={opt.v}
-              size="sm"
-              variant={originFilter === opt.v ? "default" : "outline"}
-              className="h-7 text-xs"
-              onClick={() => setOriginFilter(opt.v)}
-            >
-              {opt.label}
-            </Button>
-          ))}
-          <span className="text-[10px] text-muted-foreground ml-auto">
-            {displayedGeoEntries.length.toLocaleString("pt-BR")} pessoa{displayedGeoEntries.length === 1 ? "" : "s"} na visão atual
+        <CardContent className="py-3 px-4 flex flex-col md:flex-row md:items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground mr-1">Mostrar:</span>
+            {([
+              { v: "todos", label: "Todos" },
+              { v: "crm", label: "CRM" },
+              { v: "apoiador", label: "Apoiadores" },
+              { v: "indicado", label: "Indicados" },
+              { v: "eleicao", label: "Eleição" },
+            ] as const).map((opt) => (
+              <Button
+                key={opt.v}
+                size="sm"
+                variant={originFilter === opt.v ? "default" : "outline"}
+                className="h-7 text-xs"
+                onClick={() => setOriginFilter(opt.v)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+          <div className="relative flex-1 md:max-w-sm md:ml-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder={selectedUF ? `Buscar em ${selectedUF}...` : "Buscar cidade ou bairro..."}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-8 text-sm"
+            />
+          </div>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+            {displayedGeoEntries.length.toLocaleString("pt-BR")} na visão
           </span>
         </CardContent>
       </Card>
 
-      {/* Aviso: cadastros de Eleição sem cidade definida */}
-      {eleicaoSemCidade > 0 && (originFilter === "todos" || originFilter === "eleicao") && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="py-3 px-4 flex items-start gap-3">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <div className="text-xs">
-              <p className="font-medium">
-                {eleicaoSemCidade} cadastro{eleicaoSemCidade === 1 ? "" : "s"} de Eleição sem cidade definida
-              </p>
-              <p className="text-muted-foreground mt-0.5">
-                Esses registros aparecem na seção <strong>Por Região</strong> abaixo e no contador "Sem localização".
-                A aba de Eleição não é alterada — esta visão é apenas leitura.
-              </p>
+      {/* ═══════════════════════════════════════ */}
+      {/* KPIs NACIONAIS (4 cards)               */}
+      {/* ═══════════════════════════════════════ */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Estados ativos</p>
+            <p className="text-2xl font-bold text-primary">{ufWithData}<span className="text-sm text-muted-foreground font-normal">/27</span></p>
+            <p className="text-[10px] text-muted-foreground">Com pelo menos 1 cadastro</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Cidades distintas</p>
+            <p className="text-2xl font-bold">{cityGroups.length}</p>
+            <p className="text-[10px] text-muted-foreground">{selectedUF ? `Em ${selectedUF}` : "No total"}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Pessoas localizadas</p>
+            <p className="text-2xl font-bold">{totalWithUF.toLocaleString("pt-BR")}</p>
+            <p className="text-[10px] text-muted-foreground">Com estado identificado</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Sem cidade</p>
+            <p className="text-2xl font-bold text-muted-foreground">{totalWithout.toLocaleString("pt-BR")}</p>
+            <p className="text-[10px] text-muted-foreground">Não preencheram</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ═══════════════════════════════════════ */}
+      {/* OPORTUNIDADES & QUALIDADE              */}
+      {/* ═══════════════════════════════════════ */}
+      {(() => {
+        const variantesCidades = cityGroups.filter(c => Object.keys(c.variants).length > 1).length;
+        const variantesBairros = neighborhoodGroups.filter(n => Object.keys(n.variants).length > 1).length;
+        const totalVariantes = variantesCidades + variantesBairros;
+        const semCidadeTotal = totalWithout;
+        const hasAny = coldZones > 0 || semCidadeTotal > 0 || totalVariantes > 0;
+        if (!hasAny) return null;
+        return (
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                Oportunidades & Qualidade
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 pb-3 space-y-1.5">
+              {coldZones > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-amber-700 dark:text-amber-400">⚠</span>
+                  <span><strong>{coldZones}</strong> regiões com poucos apoiadores — oportunidades de expansão em campo</span>
+                </div>
+              )}
+              {semCidadeTotal > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span>📍</span>
+                  <span><strong>{semCidadeTotal.toLocaleString("pt-BR")}</strong> cadastros sem cidade definida — não aparecem no mapa</span>
+                </div>
+              )}
+              {totalVariantes > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span>🔀</span>
+                  <span>
+                    <strong>{totalVariantes}</strong> {selectedUF ? `em ${selectedUF}` : ""} com variantes de escrita (duplicatas) — marque 2+ abaixo para mesclar
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════ */}
+      {/* MAPA DO BRASIL + sidebar (regiões/top) */}
+      {/* ═══════════════════════════════════════ */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2"><Globe2 className="w-4 h-4 text-primary" />Distribuição por Estado</CardTitle>
+            <CardDescription className="text-xs">Passe o mouse para detalhes. Clique num estado para filtrar cidades e bairros abaixo.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {totalWithUF === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Globe2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="font-medium text-sm">Nenhum estado identificado ainda</p>
+                <p className="text-xs mt-1">Cadastre pessoas com o campo <strong>estado</strong> preenchido para ver o mapa colorido.</p>
+              </div>
+            ) : (
+              <BrazilMap
+                data={ufCounts}
+                selectedUF={selectedUF}
+                onSelectUF={(uf) => { setSelectedUF(uf); setSelectedCity(null); }}
+                cities={mapCityMarkers}
+                onSelectCity={(city) => { setDetailLevel("city"); setSelectedCity(city); }}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Por Região</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {regionCounts.length === 0 ? <p className="text-xs text-muted-foreground">Sem dados</p> : (
+                <div className="space-y-2">
+                  {regionCounts.map((r) => <DistributionRow key={r.region} label={r.region} count={r.count} total={totalWithUF} />)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2"><MapPin className="w-4 h-4 text-primary" />Top 10 Estados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {topUFs.length === 0 ? <p className="text-xs text-muted-foreground">Sem dados</p> : (
+                <div className="space-y-1">
+                  {topUFs.map((s, i) => (
+                    <button
+                      key={s.uf}
+                      onClick={() => { setSelectedUF(selectedUF === s.uf ? null : s.uf); setSelectedCity(null); }}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${selectedUF === s.uf ? "bg-primary/10 border border-primary/30" : "hover:bg-muted"}`}
+                    >
+                      <span className="text-muted-foreground w-4 text-right">{i + 1}</span>
+                      <Badge variant="outline" className="h-5 text-[10px] font-mono">{s.uf}</Badge>
+                      <span className="flex-1 text-left truncate">{s.name}</span>
+                      <span className="font-bold">{s.count.toLocaleString("pt-BR")}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════ */}
+      {/* BREADCRUMB de drill-down               */}
+      {/* ═══════════════════════════════════════ */}
+      {(selectedUF || selectedCity) && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">Filtrando:</span>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setSelectedUF(null); setSelectedCity(null); }}>
+              <Globe2 className="w-3 h-3 mr-1" /> Brasil
+            </Button>
+            {selectedUF && (
+              <>
+                <span className="text-muted-foreground">/</span>
+                <Button variant={selectedCity ? "ghost" : "secondary"} size="sm" className="h-7 text-xs" onClick={() => setSelectedCity(null)}>
+                  <Building2 className="w-3 h-3 mr-1" /> {ufName(selectedUF)} ({selectedUF})
+                </Button>
+              </>
+            )}
+            {selectedCity && (
+              <>
+                <span className="text-muted-foreground">/</span>
+                <Badge variant="secondary" className="h-7 px-2 text-xs gap-1"><Home className="w-3 h-3" />{selectedCity}</Badge>
+              </>
+            )}
+            <Button variant="ghost" size="sm" className="h-7 ml-auto text-xs" onClick={() => { setSelectedUF(null); setSelectedCity(null); }}>
+              <X className="w-3 h-3 mr-1" /> Limpar
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══════════════════════════════════════ */}
+      {/* CIDADES do estado selecionado          */}
+      {/* ═══════════════════════════════════════ */}
+      {selectedUF && !selectedCity && cityGroups.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2"><Building2 className="w-4 h-4 text-primary" />Cidades em {ufName(selectedUF)}</CardTitle>
+                <CardDescription className="text-xs">Clique no nome para ver as pessoas. Marque 2+ para mesclar duplicados.</CardDescription>
+              </div>
+              {selectedCityNames.size >= 2 && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const variants = cityGroups
+                      .filter((c) => selectedCityNames.has(c.city))
+                      .flatMap((c) => Object.entries(c.variants).map(([name, count]) => ({ name, count })));
+                    const agg: Record<string, number> = {};
+                    for (const v of variants) agg[v.name] = (agg[v.name] || 0) + v.count;
+                    setMergeVariants(Object.entries(agg).map(([name, count]) => ({ name, count })));
+                    setMergeField("cidade");
+                    setMergeParentCity(null);
+                    setMergeOpen(true);
+                  }}
+                >
+                  <Merge className="w-4 h-4 mr-1.5" /> Mesclar {selectedCityNames.size} cidades
+                </Button>
+              )}
+              {selectedCityNames.size > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setSelectedCityNames(new Set())}>
+                  <X className="w-3.5 h-3.5 mr-1" /> Limpar seleção
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {cityGroups
+                .filter((c) => !search.trim() || c.city.toLowerCase().includes(search.trim().toLowerCase()))
+                .map((c) => {
+                const ratio = c.count / (cityGroups[0]?.count || 1);
+                const isSelected = selectedCityNames.has(c.city);
+                const variantCount = Object.keys(c.variants).length;
+                return (
+                  <div
+                    key={c.city}
+                    className={`p-3 rounded-lg border transition-colors ${isSelected ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                  >
+                    <div className="flex items-start gap-2 mb-1.5">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(v) => {
+                          setSelectedCityNames((prev) => {
+                            const next = new Set(prev);
+                            if (v) next.add(c.city); else next.delete(c.city);
+                            return next;
+                          });
+                        }}
+                        className="mt-0.5"
+                      />
+                      <button
+                        onClick={() => {
+                          setDetailLevel("city");
+                          setDetailCity(c.city);
+                          setDetailNeigh(null);
+                          setDetailOpen(true);
+                        }}
+                        className="flex-1 text-left min-w-0 group"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium truncate group-hover:text-primary">{c.city}</span>
+                          <span className="text-sm font-bold shrink-0">{c.count}</span>
+                        </div>
+                        {variantCount > 1 && (
+                          <p className="text-[10px] text-destructive mt-0.5">⚠ {variantCount} variantes</p>
+                        )}
+                      </button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-[10px]"
+                        onClick={() => setSelectedCity(c.city)}
+                      >
+                        Bairros →
+                      </Button>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(ratio * 100, 3)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
 
-
       {/* ═══════════════════════════════════════ */}
-      {/* CRESCIMENTO DA BASE                    */}
+      {/* BAIRROS da cidade selecionada          */}
       {/* ═══════════════════════════════════════ */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            Crescimento da Base
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Quantos cadastros novos você está recebendo? Acompanhe a evolução diária e identifique quais canais estão trazendo mais pessoas.
-          </p>
-        </div>
-
-        {pessoasLoading ? (
-          <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <MetricCard icon={Users} label="Total de cadastros" value={recruitMetrics.total} description="Todas as pessoas no sistema" />
-              <MetricCard icon={UserPlus} label="Hoje" value={recruitMetrics.today} accent description="Cadastros feitos hoje" />
-              <MetricCard icon={CalendarDays} label="Últimos 7 dias" value={recruitMetrics.week} description="Novos na última semana" />
-              <MetricCard icon={TrendingUp} label="Últimos 30 dias" value={recruitMetrics.month} description="Novos no último mês" />
+      {selectedCity && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2"><Home className="w-4 h-4 text-primary" />Bairros em {selectedCity}</CardTitle>
+                <CardDescription className="text-xs">
+                  {neighborhoodGroups.length === 0
+                    ? "Nenhum bairro detalhado para esta cidade."
+                    : `${neighborhoodGroups.length} bairros. Clique no nome para ver as pessoas. Marque 2+ para mesclar.`}
+                </CardDescription>
+              </div>
+              {selectedNeighNames.size >= 2 && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const variants = neighborhoodGroups
+                      .filter((g) => selectedNeighNames.has(g.neighborhood))
+                      .flatMap((g) => Object.entries(g.variants).map(([name, count]) => ({ name, count })));
+                    const agg: Record<string, number> = {};
+                    for (const v of variants) agg[v.name] = (agg[v.name] || 0) + v.count;
+                    setMergeVariants(Object.entries(agg).map(([name, count]) => ({ name, count })));
+                    setMergeField("bairro");
+                    setMergeParentCity(selectedCity);
+                    setMergeOpen(true);
+                  }}
+                >
+                  <Merge className="w-4 h-4 mr-1.5" /> Mesclar {selectedNeighNames.size} bairros
+                </Button>
+              )}
+              {selectedNeighNames.size > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setSelectedNeighNames(new Set())}>
+                  <X className="w-3.5 h-3.5 mr-1" /> Limpar
+                </Button>
+              )}
             </div>
-
-            {/* Daily chart */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" />Cadastros por Dia</CardTitle>
-                <CardDescription className="text-xs">Últimos 30 dias — cada barra mostra quantas pessoas foram cadastradas naquele dia, de qualquer origem.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64 md:h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dailyChartData} margin={{ top: 5, right: 5, bottom: 20, left: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={typeof window !== "undefined" && window.innerWidth < 768 ? 3 : 1} angle={-45} textAnchor="end" height={50} className="fill-muted-foreground" />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} className="fill-muted-foreground" />
-                      <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))" }} labelFormatter={(l) => `Dia ${l}`} formatter={(v: number) => [`${v} cadastros`, "Cadastros"]} />
-                      <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={28}>
-                        {dailyChartData.map((entry, i) => (
-                          <Cell key={i} fill={entry.count === 0 ? "hsl(var(--muted))" : entry.count >= maxDailyChart * 0.7 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.6)"} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Origem */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />De onde vêm os cadastros?</CardTitle>
-                <CardDescription className="text-xs">Distribuição por canal de origem — mostra se as pessoas estão chegando por formulário público, cadastro manual, redes sociais, etc.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {origemData.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Nenhum dado</p>
-                ) : (
-                  <div className="space-y-2">
-                    {origemData.map((o) => <DistributionRow key={o.name} label={o.name} count={o.count} total={recruitMetrics.total} />)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-
-      {/* Divider */}
-      <div className="border-t" />
-
-      {/* ═══════════════════════════════════════ */}
-      {/* MAPA TERRITORIAL                       */}
-      {/* ═══════════════════════════════════════ */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-primary" />
-            Mapa de Influência
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Cobertura nacional: o mapa do Brasil colore os estados conforme a concentração de pessoas cadastradas.
-            <strong> Clique em um estado</strong> para filtrar cidades e bairros abaixo.
-          </p>
-        </div>
-
-        {/* Stats nacionais */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <Card><CardContent className="pt-4 pb-3 px-4"><p className="text-xs text-muted-foreground">Estados ativos</p><p className="text-2xl font-bold text-primary">{ufWithData}<span className="text-sm text-muted-foreground font-normal">/27</span></p><p className="text-[10px] text-muted-foreground">Com pelo menos 1 cadastro</p></CardContent></Card>
-          <Card><CardContent className="pt-4 pb-3 px-4"><p className="text-xs text-muted-foreground">Pessoas geolocalizadas</p><p className="text-2xl font-bold">{totalWithUF.toLocaleString("pt-BR")}</p><p className="text-[10px] text-muted-foreground">Com estado identificado</p></CardContent></Card>
-          <Card><CardContent className="pt-4 pb-3 px-4"><p className="text-xs text-muted-foreground">Cidades distintas</p><p className="text-2xl font-bold">{cityGroups.length}</p><p className="text-[10px] text-muted-foreground">{selectedUF ? `Em ${selectedUF}` : "No total"}</p></CardContent></Card>
-          <Card><CardContent className="pt-4 pb-3 px-4"><p className="text-xs text-muted-foreground">Sem localização</p><p className="text-2xl font-bold text-muted-foreground">{totalWithout.toLocaleString("pt-BR")}</p><p className="text-[10px] text-muted-foreground">Não preencheram</p></CardContent></Card>
-          <Card className="col-span-2 sm:col-span-1">
-            <CardContent className="pt-4 pb-3 px-4">
-              <p className="text-xs text-muted-foreground">Crescimento 30d</p>
-              <div className="flex items-center gap-1">
-                <p className="text-2xl font-bold">{growthStats?.last30 || 0}</p>
-                {growthStats && growthStats.change !== 0 && (
-                  <Badge variant={growthStats.change > 0 ? "default" : "destructive"} className="text-[10px] px-1.5 h-5">
-                    {growthStats.change > 0 ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
-                    {growthStats.change > 0 ? "+" : ""}{growthStats.change}%
-                  </Badge>
-                )}
-              </div>
-              <p className="text-[10px] text-muted-foreground">vs {growthStats?.prev30 || 0} mês anterior</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Mapa do Brasil + sidebar */}
-        <div className="grid lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2"><Globe2 className="w-4 h-4 text-primary" />Distribuição por Estado</CardTitle>
-              <CardDescription className="text-xs">Mapa interativo. Passe o mouse para detalhes, clique para filtrar cidades.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {totalWithUF === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Globe2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p className="font-medium text-sm">Nenhum estado identificado ainda</p>
-                  <p className="text-xs mt-1">Cadastre apoiadores no portal com o campo <strong>estado</strong> preenchido para ver o mapa colorido.</p>
-                </div>
-              ) : (
-                <BrazilMap
-                  data={ufCounts}
-                  selectedUF={selectedUF}
-                  onSelectUF={(uf) => { setSelectedUF(uf); setSelectedCity(null); }}
-                  cities={mapCityMarkers}
-                  onSelectCity={(city) => { setDetailLevel("city"); setSelectedCity(city); }}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Por Região</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {regionCounts.length === 0 ? <p className="text-xs text-muted-foreground">Sem dados</p> : (
-                  <div className="space-y-2">
-                    {regionCounts.map((r) => <DistributionRow key={r.region} label={r.region} count={r.count} total={totalWithUF} />)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2"><MapPin className="w-4 h-4 text-primary" />Top 10 Estados</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {topUFs.length === 0 ? <p className="text-xs text-muted-foreground">Sem dados</p> : (
-                  <div className="space-y-1">
-                    {topUFs.map((s, i) => (
-                      <button
-                        key={s.uf}
-                        onClick={() => { setSelectedUF(selectedUF === s.uf ? null : s.uf); setSelectedCity(null); }}
-                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${selectedUF === s.uf ? "bg-primary/10 border border-primary/30" : "hover:bg-muted"}`}
-                      >
-                        <span className="text-muted-foreground w-4 text-right">{i + 1}</span>
-                        <Badge variant="outline" className="h-5 text-[10px] font-mono">{s.uf}</Badge>
-                        <span className="flex-1 text-left truncate">{s.name}</span>
-                        <span className="font-bold">{s.count.toLocaleString("pt-BR")}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Drill-down breadcrumb */}
-        {(selectedUF || selectedCity) && (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground">Filtrando:</span>
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setSelectedUF(null); setSelectedCity(null); }}>
-                <Globe2 className="w-3 h-3 mr-1" /> Brasil
-              </Button>
-              {selectedUF && (
-                <>
-                  <span className="text-muted-foreground">/</span>
-                  <Button variant={selectedCity ? "ghost" : "secondary"} size="sm" className="h-7 text-xs" onClick={() => setSelectedCity(null)}>
-                    <Building2 className="w-3 h-3 mr-1" /> {ufName(selectedUF)} ({selectedUF})
-                  </Button>
-                </>
-              )}
-              {selectedCity && (
-                <>
-                  <span className="text-muted-foreground">/</span>
-                  <Badge variant="secondary" className="h-7 px-2 text-xs gap-1"><Home className="w-3 h-3" />{selectedCity}</Badge>
-                </>
-              )}
-              <Button variant="ghost" size="sm" className="h-7 ml-auto text-xs" onClick={() => { setSelectedUF(null); setSelectedCity(null); }}>
-                <X className="w-3 h-3 mr-1" /> Limpar
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Cidades do estado selecionado */}
-        {selectedUF && !selectedCity && cityGroups.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2"><Building2 className="w-4 h-4 text-primary" />Cidades em {ufName(selectedUF)}</CardTitle>
-                  <CardDescription className="text-xs">Clique no nome para ver as pessoas. Marque 2+ para mesclar duplicados.</CardDescription>
-                </div>
-                {selectedCityNames.size >= 2 && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const variants = cityGroups
-                        .filter((c) => selectedCityNames.has(c.city))
-                        .flatMap((c) => Object.entries(c.variants).map(([name, count]) => ({ name, count })));
-                      // Agrega variantes com mesmo nome literal
-                      const agg: Record<string, number> = {};
-                      for (const v of variants) agg[v.name] = (agg[v.name] || 0) + v.count;
-                      setMergeVariants(Object.entries(agg).map(([name, count]) => ({ name, count })));
-                      setMergeField("cidade");
-                      setMergeParentCity(null);
-                      setMergeOpen(true);
-                    }}
-                  >
-                    <Merge className="w-4 h-4 mr-1.5" /> Mesclar {selectedCityNames.size} cidades
-                  </Button>
-                )}
-                {selectedCityNames.size > 0 && (
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedCityNames(new Set())}>
-                    <X className="w-3.5 h-3.5 mr-1" /> Limpar seleção
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
+          </CardHeader>
+          {neighborhoodGroups.length > 0 && (
             <CardContent>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {cityGroups.map((c) => {
-                  const ratio = c.count / (cityGroups[0]?.count || 1);
-                  const isSelected = selectedCityNames.has(c.city);
-                  const variantCount = Object.keys(c.variants).length;
+                {neighborhoodGroups
+                  .filter((g) => !search.trim() || g.neighborhood.toLowerCase().includes(search.trim().toLowerCase()))
+                  .map((g) => {
+                  const isSelected = selectedNeighNames.has(g.neighborhood);
+                  const variantCount = Object.keys(g.variants).length;
                   return (
                     <div
-                      key={c.city}
-                      className={`p-3 rounded-lg border transition-colors ${isSelected ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                      key={g.key}
+                      className={`p-3 rounded-lg border transition-colors ${isSelected ? "border-primary bg-primary/5" : ""}`}
                     >
                       <div className="flex items-start gap-2 mb-1.5">
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={(v) => {
-                            setSelectedCityNames((prev) => {
+                            setSelectedNeighNames((prev) => {
                               const next = new Set(prev);
-                              if (v) next.add(c.city); else next.delete(c.city);
+                              if (v) next.add(g.neighborhood); else next.delete(g.neighborhood);
                               return next;
                             });
                           }}
@@ -1261,377 +1331,36 @@ export default function Territorial() {
                         />
                         <button
                           onClick={() => {
-                            setDetailLevel("city");
-                            setDetailCity(c.city);
-                            setDetailNeigh(null);
+                            setDetailLevel("neighborhood");
+                            setDetailCity(selectedCity);
+                            setDetailNeigh(g.neighborhood);
                             setDetailOpen(true);
                           }}
                           className="flex-1 text-left min-w-0 group"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium truncate group-hover:text-primary">{c.city}</span>
-                            <span className="text-sm font-bold shrink-0">{c.count}</span>
+                            <span className="text-sm font-medium truncate group-hover:text-primary">{g.neighborhood}</span>
+                            <Badge variant={getHeatBadge(g.count)} className="text-[10px] shrink-0">{g.count}</Badge>
                           </div>
                           {variantCount > 1 && (
                             <p className="text-[10px] text-destructive mt-0.5">⚠ {variantCount} variantes</p>
                           )}
                         </button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-[10px]"
-                          onClick={() => setSelectedCity(c.city)}
-                        >
-                          Bairros →
-                        </Button>
                       </div>
                       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(ratio * 100, 3)}%` }} />
+                        <div className={`h-full rounded-full ${getHeatColor(g.count)}`} style={{ width: `${(g.count / maxCount) * 100}%` }} />
                       </div>
                     </div>
                   );
                 })}
               </div>
             </CardContent>
-          </Card>
-        )}
-
-        {/* Bairros da cidade selecionada */}
-        {selectedCity && (
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2"><Home className="w-4 h-4 text-primary" />Bairros em {selectedCity}</CardTitle>
-                  <CardDescription className="text-xs">
-                    {neighborhoodGroups.length === 0
-                      ? "Nenhum bairro detalhado para esta cidade."
-                      : `${neighborhoodGroups.length} bairros. Clique no nome para ver as pessoas. Marque 2+ para mesclar.`}
-                  </CardDescription>
-                </div>
-                {selectedNeighNames.size >= 2 && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const variants = neighborhoodGroups
-                        .filter((g) => selectedNeighNames.has(g.neighborhood))
-                        .flatMap((g) => Object.entries(g.variants).map(([name, count]) => ({ name, count })));
-                      const agg: Record<string, number> = {};
-                      for (const v of variants) agg[v.name] = (agg[v.name] || 0) + v.count;
-                      setMergeVariants(Object.entries(agg).map(([name, count]) => ({ name, count })));
-                      setMergeField("bairro");
-                      setMergeParentCity(selectedCity);
-                      setMergeOpen(true);
-                    }}
-                  >
-                    <Merge className="w-4 h-4 mr-1.5" /> Mesclar {selectedNeighNames.size} bairros
-                  </Button>
-                )}
-                {selectedNeighNames.size > 0 && (
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedNeighNames(new Set())}>
-                    <X className="w-3.5 h-3.5 mr-1" /> Limpar
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            {neighborhoodGroups.length > 0 && (
-              <CardContent>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {neighborhoodGroups.map((g) => {
-                    const isSelected = selectedNeighNames.has(g.neighborhood);
-                    const variantCount = Object.keys(g.variants).length;
-                    return (
-                      <div
-                        key={g.key}
-                        className={`p-3 rounded-lg border transition-colors ${isSelected ? "border-primary bg-primary/5" : ""}`}
-                      >
-                        <div className="flex items-start gap-2 mb-1.5">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(v) => {
-                              setSelectedNeighNames((prev) => {
-                                const next = new Set(prev);
-                                if (v) next.add(g.neighborhood); else next.delete(g.neighborhood);
-                                return next;
-                              });
-                            }}
-                            className="mt-0.5"
-                          />
-                          <button
-                            onClick={() => {
-                              setDetailLevel("neighborhood");
-                              setDetailCity(selectedCity);
-                              setDetailNeigh(g.neighborhood);
-                              setDetailOpen(true);
-                            }}
-                            className="flex-1 text-left min-w-0 group"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-sm font-medium truncate group-hover:text-primary">{g.neighborhood}</span>
-                              <Badge variant={getHeatBadge(g.count)} className="text-[10px] shrink-0">{g.count}</Badge>
-                            </div>
-                            {variantCount > 1 && (
-                              <p className="text-[10px] text-destructive mt-0.5">⚠ {variantCount} variantes</p>
-                            )}
-                          </button>
-                        </div>
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${getHeatColor(g.count)}`} style={{ width: `${(g.count / maxCount) * 100}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            )}
-          </Card>
-        )}
-
-        {/* Top regiões (gráfico — todas as regiões, sem filtro) */}
-        {!selectedUF && geoChartData.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Top Cidades/Bairros — Brasil</CardTitle>
-              <CardDescription className="text-xs">As {geoChartData.length} localidades com mais cadastros em todo o país. A cor indica a intensidade relativa.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer config={{ count: { label: "Apoiadores", color: "hsl(var(--primary))" } }} className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={geoChartData} layout="vertical" margin={{ left: 0, right: 16, top: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                    <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                    <YAxis type="category" dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} width={120} tick={{ fill: "hsl(var(--foreground))" }} />
-                    <ChartTooltip content={<ChartTooltipContent />} formatter={(value: number, _name: string, props: any) => [`${value} apoiadores`, props.payload.fullName]} />
-                    <Bar dataKey="count" name="Apoiadores" radius={[0, 4, 4, 0]}>
-                      {geoChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.ratio >= 0.7 ? "hsl(var(--primary))" : entry.ratio >= 0.4 ? "hsl(38, 92%, 50%)" : "hsl(var(--destructive))"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder={selectedUF ? `Buscar cidade/bairro em ${selectedUF}...` : "Buscar por cidade ou bairro em todo o Brasil..."} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
-        </div>
-
-        {/* Cold zones alert */}
-        {coldZones > 0 && (
-          <Card className="border-destructive/30 bg-destructive/5">
-            <CardContent className="pt-4 pb-3 flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-sm">Zonas frias identificadas</p>
-                <p className="text-xs text-muted-foreground">{coldZones} regiões com poucos apoiadores — são oportunidades de expansão para ações de campo</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Territory cards */}
-        {filtered.length === 0 ? (
-          <Card><CardContent className="py-12 text-center text-muted-foreground"><MapPin className="w-10 h-10 mx-auto mb-3 opacity-30" /><p className="font-medium">Nenhum dado territorial disponível</p><p className="text-xs mt-1">Os apoiadores precisam informar cidade/bairro no cadastro do portal</p></CardContent></Card>
-        ) : (
-          <div className="space-y-3">
-            {selectedLocationKeys.size > 0 && (
-              <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-3 py-2">
-                <span className="text-xs text-muted-foreground">
-                  {selectedLocationKeys.size} localidade{selectedLocationKeys.size === 1 ? "" : "s"} selecionada{selectedLocationKeys.size === 1 ? "" : "s"}
-                </span>
-                <div className="flex items-center gap-2">
-                  {selectedLocationKeys.size >= 2 && (
-                    <Button size="sm" onClick={openSelectedLocationsMerge}>
-                      <Merge className="w-4 h-4 mr-1.5" /> Mesclar selecionados
-                    </Button>
-                  )}
-                  <Button size="sm" variant="ghost" onClick={() => setSelectedLocationKeys(new Set())}>
-                    <X className="w-3.5 h-3.5 mr-1" /> Limpar
-                  </Button>
-                </div>
-              </div>
-            )}
-            <CityGroupedList
-              groups={filtered}
-              maxCount={maxCount}
-              selectedKeys={selectedLocationKeys}
-              onToggleSelect={(key, v) =>
-                setSelectedLocationKeys((prev) => {
-                  const next = new Set(prev);
-                  if (v) next.add(key); else next.delete(key);
-                  return next;
-                })
-              }
-              onOpenDetail={openLocationDetail}
-              getHeatBadge={getHeatBadge}
-              getHeatLabel={getHeatLabel}
-              getHeatColor={getHeatColor}
-              searchTerm={search.trim()}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Divider */}
-      <div className="border-t" />
-
-      {/* ═══════════════════════════════════════ */}
-      {/* POR REGIÃO (microzonas da campanha)    */}
-      {/* ═══════════════════════════════════════ */}
-      {regionGroups.length > 0 && (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-primary" />
-              Por Região
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Microzonas da campanha (cadastradas em Eleição → Configurações).
-              Clique numa região para ver os bairros dela.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <MetricCard icon={MapPin} label="Regiões ativas" value={regionGroups.length} description="Com pelo menos 1 cadastro" />
-            <MetricCard icon={Users} label="Pessoas em regiões" value={regionGroups.reduce((s, r) => s + r.count, 0)} accent description="Soma de todas as regiões" />
-            <MetricCard icon={TrendingUp} label="Maior região" value={regionGroups[0]?.count || 0} description={regionGroups[0]?.label || "—"} />
-            <MetricCard icon={Home} label="Bairros mapeados" value={regionGroups.reduce((s, r) => s + Object.keys(r.neighborhoods).length, 0)} description="Em todas as regiões" />
-          </div>
-
-          <Card>
-            <CardContent className="pt-4 space-y-2">
-              {regionGroups.map((r) => {
-                const isOpen = selectedRegion === r.value;
-                const neighList = Object.values(r.neighborhoods).sort((a, b) => b.count - a.count);
-                const maxR = regionGroups[0]?.count || 1;
-                const ratio = r.count / maxR;
-                return (
-                  <Collapsible
-                    key={r.value}
-                    open={isOpen}
-                    onOpenChange={(o) => setSelectedRegion(o ? r.value : null)}
-                  >
-                    <Card className="overflow-hidden">
-                      <CollapsibleTrigger asChild>
-                        <button
-                          type="button"
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
-                        >
-                          <MapPin className="w-4 h-4 text-primary shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-sm truncate">{r.label}</span>
-                              {r.label !== r.value && (
-                                <Badge variant="outline" className="h-5 text-[10px] font-mono">{r.value}</Badge>
-                              )}
-                            </div>
-                            <div className="h-1.5 mt-1 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(ratio * 100, 3)}%` }} />
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-1">
-                              {neighList.length} bairro{neighList.length === 1 ? "" : "s"} · {r.count} pessoa{r.count === 1 ? "" : "s"}
-                            </p>
-                          </div>
-                          <Badge variant="secondary" className="text-xs shrink-0">{r.count}</Badge>
-                          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                        </button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="border-t bg-muted/20 p-3">
-                          {neighList.length === 0 ? (
-                            <p className="text-xs text-muted-foreground text-center py-4">
-                              Nenhum bairro detalhado nesta região.
-                            </p>
-                          ) : (
-                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                              {neighList.map((n) => (
-                                <div key={n.name} className="rounded-lg border bg-card p-3">
-                                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                                    <span className="text-sm font-medium truncate">{n.name}</span>
-                                    <Badge variant="outline" className="text-[10px] shrink-0">{n.count}</Badge>
-                                  </div>
-                                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max((n.count / (neighList[0]?.count || 1)) * 100, 3)}%` }} />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </CollapsibleContent>
-                    </Card>
-                  </Collapsible>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </div>
+          )}
+        </Card>
       )}
 
-      {/* Divider */}
-      <div className="border-t" />
-
-
-      {/* ═══════════════════════════════════════ */}
-      {/* ÚLTIMOS CADASTROS                      */}
-      {/* ═══════════════════════════════════════ */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
-            Últimos Cadastros
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            As 20 pessoas mais recentes registradas no sistema, independente da origem (formulário, manual, contratado, indicado).
-          </p>
-        </div>
-
-        <Card>
-          <CardContent className="pt-4">
-            {recentPessoas.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">Nenhum cadastro encontrado.</p>
-            ) : (
-              <div className="overflow-x-auto -mx-6">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left">
-                      <th className="pb-2 pl-6 font-medium text-muted-foreground">Nome</th>
-                      <th className="pb-2 font-medium text-muted-foreground hidden sm:table-cell">Cidade</th>
-                      <th className="pb-2 font-medium text-muted-foreground hidden md:table-cell">Telefone</th>
-                      <th className="pb-2 font-medium text-muted-foreground hidden md:table-cell">Tipo</th>
-                      <th className="pb-2 pr-6 font-medium text-muted-foreground text-right">Data</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentPessoas.map((p) => (
-                      <tr key={p.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                        <td className="py-2.5 pl-6 font-medium">{p.nome}</td>
-                        <td className="py-2.5 text-muted-foreground hidden sm:table-cell">{p.cidade || "—"}</td>
-                        <td className="py-2.5 text-muted-foreground hidden md:table-cell font-mono text-xs">{p.telefone || "—"}</td>
-                        <td className="py-2.5 hidden md:table-cell">
-                          <Badge variant="secondary" className="text-xs">{tipoLabels[p.tipo_pessoa] || p.tipo_pessoa}</Badge>
-                        </td>
-                        <td className="py-2.5 pr-6 text-right text-muted-foreground text-xs">
-                          {format(parseISO(p.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
         </TabsContent>
       </Tabs>
-
-      {/* Dialogs */}
-      <LocalityDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}
         clientId={client?.id || null}
