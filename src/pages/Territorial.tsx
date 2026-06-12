@@ -929,6 +929,26 @@ export default function Territorial() {
         </Button>
       </div>
 
+      <Tabs defaultValue="cobertura" className="w-full">
+        <TabsList>
+          <TabsTrigger value="cobertura" className="gap-1.5">
+            <MapPin className="w-3.5 h-3.5" /> Cobertura da Cidade
+          </TabsTrigger>
+          <TabsTrigger value="brasil" className="gap-1.5">
+            <Globe2 className="w-3.5 h-3.5" /> Visão Brasil (macro)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cobertura" className="mt-4">
+          {client?.id ? (
+            <CityCoverageMap clientId={client.id} />
+          ) : (
+            <p className="text-sm text-muted-foreground p-6 text-center">Carregando cliente…</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="brasil" className="mt-4 space-y-6">
+
       {/* Filtro de origem (chips) — apenas filtragem em memória, não altera dados */}
       <Card>
         <CardContent className="py-3 px-4 flex items-center gap-2 flex-wrap">
