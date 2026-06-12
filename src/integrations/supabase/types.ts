@@ -2219,6 +2219,7 @@ export type Database = {
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id: string | null
           geocode_endereco_hash: string | null
+          geocode_precision: string | null
           geocode_status: string | null
           geocoded_at: string | null
           id: string
@@ -2259,6 +2260,7 @@ export type Database = {
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id?: string | null
           geocode_endereco_hash?: string | null
+          geocode_precision?: string | null
           geocode_status?: string | null
           geocoded_at?: string | null
           id?: string
@@ -2299,6 +2301,7 @@ export type Database = {
           escopo?: Database["public"]["Enums"]["eleicao_escopo"]
           funcionario_id?: string | null
           geocode_endereco_hash?: string | null
+          geocode_precision?: string | null
           geocode_status?: string | null
           geocoded_at?: string | null
           id?: string
