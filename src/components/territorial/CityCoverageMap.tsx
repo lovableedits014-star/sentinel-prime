@@ -213,26 +213,34 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     }
   }, [filteredPins, loaded, heatmap]);
 
-  const handleGeocode = async () => {
+  const handleGeocode = async (force = false) => {
     if (geocoding) return;
     setGeocoding(true);
-    let totalSuccess = 0, totalFailed = 0;
+    let totalSuccess = 0, totalFailed = 0, totalOut = 0;
     try {
       let keepGoing = true;
       let rounds = 0;
-      while (keepGoing && rounds < 40) {
+      while (keepGoing && rounds < 60) {
         const { data, error } = await supabase.functions.invoke("geocode-eleicao-pessoas", {
-          body: { clientId, limit: 25 },
+          body: {
+            clientId,
+            limit: 25,
+            force: force && rounds === 0, // só força na 1ª rodada; depois pega pendentes
+            defaultCity: "Campo Grande",
+            defaultState: "MS",
+            defaultCountry: "BR",
+          },
         });
         if (error) throw error;
-        const res = data as { success: number; failed: number; pending: number };
+        const res = data as { success: number; failed: number; pending: number; outOfRegion?: number };
         totalSuccess += res.success;
         totalFailed += res.failed;
+        totalOut += res.outOfRegion || 0;
         toast.info(`Geocodificando… ${totalSuccess} ok · ${res.pending} restantes`);
         keepGoing = (res.success + res.failed) > 0 && res.pending > 0;
         rounds++;
       }
-      toast.success(`Concluído: ${totalSuccess} endereços localizados${totalFailed ? `, ${totalFailed} falhas` : ""}`);
+      toast.success(`Concluído: ${totalSuccess} endereços localizados${totalOut ? ` · ${totalOut} fora da região` : ""}${totalFailed ? ` · ${totalFailed} falhas` : ""}`);
       qc.invalidateQueries({ queryKey: ["coverage-pessoas", clientId] });
     } catch (e: any) {
       toast.error(e?.message || "Falha no geocoding");
