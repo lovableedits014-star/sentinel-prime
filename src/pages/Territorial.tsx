@@ -1361,6 +1361,9 @@ export default function Territorial() {
 
         </TabsContent>
       </Tabs>
+
+      {/* Dialogs */}
+      <LocalityDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}
         clientId={client?.id || null}
