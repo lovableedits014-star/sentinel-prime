@@ -13,6 +13,8 @@ import { ptBR } from "date-fns/locale";
 import { BrazilMap } from "@/components/territorial/BrazilMap";
 import { LocalityDetailDialog } from "@/components/territorial/LocalityDetailDialog";
 import { MergeLocalitiesDialog } from "@/components/territorial/MergeLocalitiesDialog";
+import { CityCoverageMap } from "@/components/territorial/CityCoverageMap";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Merge } from "lucide-react";
