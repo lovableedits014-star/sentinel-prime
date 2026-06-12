@@ -205,7 +205,8 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
       heat.setMap(mapRef.current);
       markersRef.current.push({ setMap: (m: any) => heat.setMap(m) } as any);
     } else {
-      clustererRef.current = new MarkerClusterer({ markers, map: mapRef.current });
+      // Sem cluster — mostra todos os pinos individualmente
+      markers.forEach((m) => m.setMap(mapRef.current));
     }
 
     if (markers.length > 0 && markers.length < 200) {
