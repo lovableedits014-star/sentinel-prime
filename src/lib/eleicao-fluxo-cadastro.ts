@@ -164,7 +164,7 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
     nome: p.nome,
     regiao: regiaoLabel,
     telefone: fmtPhone(p.telefone || ""),
-    rua: p.rua || p.endereco || "—",
+    rua: p.rua || (p.endereco && p.endereco.trim().toLowerCase() !== (p.bairro || "").trim().toLowerCase() ? p.endereco : "—"),
     numero: p.numero || "s/n",
     bairro: p.bairro || "—",
     link_grupo: linkGrupo || "(grupo não configurado)",
