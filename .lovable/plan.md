@@ -1,78 +1,90 @@
-## O problema
+# Reformulação da aba Territorial — Mapa de Cobertura da Equipe
 
-Hoje o reenvio do fluxo de cadastro depende 100% da instância WhatsApp conectada da campanha. Quando a instância cai (e isso tem acontecido bastante), nenhuma das três mensagens do fluxo é entregue. Você quer poder mandar manualmente, **pelo seu próprio WhatsApp Web**, sem depender da instância.
+## Objetivo
+Substituir (ou complementar) o mapa atual do Brasil por um **mapa de rua interativo da cidade** mostrando, com pinos coloridos, exatamente onde estão os coordenadores, líderes e cabos eleitorais cadastrados — para o cliente identificar **lacunas de cobertura por bairro/região** de forma visual.
 
-## O que vai mudar (na visão do usuário)
+## O que temos hoje
+- `src/pages/Territorial.tsx` (1637 linhas): mapa SVG do Brasil (`BrazilMap.tsx`), agrupamento por cidade/bairro em listas colapsáveis, merge de localidades.
+- Dados de equipe na tabela `eleicao_pessoas`: campos `tipo` (coordenador/lider/cabo), `regiao`, `cidade`, `bairro`, `rua`, `numero`, `endereco`. **Sem latitude/longitude.**
+- Regiões customizáveis por cliente em `eleicao_regioes`.
+- Conector Google Maps **não configurado** no projeto.
 
-No dropdown de 3 pontinhos de cada pessoa cadastrada (coordenador / líder / cabo), na página **Eleição**, abaixo das opções existentes vai aparecer um novo bloco:
+## Proposta
 
+### 1. Nova sub-aba "Mapa de Cobertura"
+Dentro da página Territorial, adicionar uma aba no topo:
+- **Brasil (visão macro)** — mantém o que já existe.
+- **Cidade (cobertura da equipe)** — **NOVA**, vira a aba padrão quando o cliente tem cidade-sede definida.
+
+### 2. Mapa de rua da cidade
+- Mapa Google Maps centralizado automaticamente na cidade com mais cadastros (ou na cidade-sede do cliente).
+- **Pinos por papel**, cada um com cor/ícone próprio:
+  - 🟣 Coordenador (maior, com raio de "área de atuação")
+  - 🔵 Líder
+  - 🟢 Cabo eleitoral
+  - ⚪ Pessoa cadastrada (opcional, toggle on/off — pode virar heatmap pra não poluir)
+- **Cluster de marcadores** (MarkerClusterer) pra não travar com milhares de pontos como no print do cliente.
+- Click no pino → popup com nome, telefone, papel, região, botão "Ver perfil" e "WhatsApp".
+
+### 3. Análise de lacunas (o grande valor pro cliente)
+- **Overlay de bairros**: pintar bairros da cidade por densidade de líderes/coordenadores:
+  - 🔴 Vermelho: bairro com pessoas cadastradas mas **sem nenhum líder/coordenador** → lacuna crítica.
+  - 🟡 Amarelo: tem líder mas sem coordenador.
+  - 🟢 Verde: cobertura completa.
+- Painel lateral "Bairros sem cobertura" listando bairros vermelhos ordenados por nº de pessoas órfãs, com botão "Cadastrar líder aqui".
+- KPIs no topo: total de bairros / com cobertura / sem cobertura / % de cobertura.
+
+### 4. Filtros
+- Por região (`eleicao_regioes`)
+- Por papel (mostrar/ocultar coordenadores, líderes, cabos, pessoas)
+- Toggle heatmap de pessoas
+- Busca por nome/bairro com fly-to no mapa
+
+### 5. Geocodificação dos endereços
+Como não temos lat/lng salvos, precisamos geocodificar a partir de `rua + numero + bairro + cidade`:
+- Adicionar colunas `lat numeric`, `lng numeric`, `geocoded_at timestamptz`, `geocode_status text` em `eleicao_pessoas` e `pessoas`.
+- Server function (`createServerFn`) `geocode-pessoa` que chama Google Geocoding via gateway do conector.
+- Geocodificar **on-demand** quando a pessoa é cadastrada/editada e em **batch** retroativo (botão "Geocodificar pendentes" no painel, processando em lotes com throttling pra respeitar quota).
+- Cache: nunca regeocodificar se endereço não mudou.
+- Para quem só tem bairro, usar centroide do bairro (com pequeno jitter pra evitar sobreposição).
+
+## Detalhes técnicos
+
+### Dependências e setup
+1. Conectar o **conector Google Maps** (gateway Lovable) — geocoding via server, render do mapa via browser key `VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY`.
+2. Carregar Maps JS API com `loading=async` + callback (sem `mapId`, usando `google.maps.Marker` clássico — conforme regras do conector).
+3. `@googlemaps/markerclusterer` para clustering.
+
+### Migração SQL
+```sql
+ALTER TABLE public.eleicao_pessoas
+  ADD COLUMN lat numeric, ADD COLUMN lng numeric,
+  ADD COLUMN geocoded_at timestamptz, ADD COLUMN geocode_status text;
+CREATE INDEX eleicao_pessoas_geo_idx ON public.eleicao_pessoas (lat, lng) WHERE lat IS NOT NULL;
+-- mesmas colunas em pessoas, se quisermos plotar a base CRM também
 ```
-📨 Enviar fluxo pelo MEU WhatsApp
-   ↳ Para o Coordenador  (José da Silva · 67 9...)
-   ↳ Para o Cadastrado   (nome · telefone)
-   ↳ Para a Secretaria   (67 9...)
-```
 
-Cada item abre uma nova aba em `https://wa.me/<telefone>?text=<mensagem já pronta>`, usando o WhatsApp Web/celular do usuário logado. A mensagem já vem 100% formatada, igual à que a instância automática enviaria.
+### Arquivos novos
+- `src/components/territorial/CityCoverageMap.tsx` — mapa Google com pinos, cluster, overlay.
+- `src/components/territorial/CoverageGapsPanel.tsx` — lista lateral de bairros sem cobertura.
+- `src/components/territorial/CoverageFilters.tsx` — filtros e legenda.
+- `src/lib/geocode.functions.ts` — `createServerFn` chamando Google Geocoding via gateway.
+- `src/hooks/useCityCoverage.ts` — agrega pessoas/líderes/coordenadores e calcula gaps por bairro.
+- `supabase/migrations/<ts>_geocode_eleicao_pessoas.sql`.
 
-Itens são desabilitados (com tooltip explicando o porquê) quando não há destinatário válido:
-- "Para o Coordenador" → desabilita se a pessoa for um coordenador (não tem coordenador acima) ou se não houver coordenador resolvido na região.
-- "Para a Secretaria" → desabilita se `secretaria_telefone` não estiver configurado em Eleição → Configurações.
-- "Para o Cadastrado" → desabilita só se a pessoa não tiver telefone.
+### Arquivos alterados
+- `src/pages/Territorial.tsx` — envolver conteúdo atual em `<Tabs>` com nova aba "Cidade" como padrão.
 
-## Regras de qual mensagem é enviada pra quem
+## Entregáveis em ordem
+1. Conectar Google Maps (eu vou pedir pra você conectar antes de implementar).
+2. Migração + colunas lat/lng.
+3. Server function de geocoding + botão batch.
+4. Componente `CityCoverageMap` com pinos por papel e cluster.
+5. Overlay de cobertura por bairro + painel de lacunas.
+6. Filtros, busca e KPIs.
+7. Integrar como nova aba na página Territorial.
 
-As mensagens vêm exatamente dos mesmos templates já usados pela edge `eleicao-notify-novo-lider`, lidos da tabela `eleicao_notif_config` do cliente atual. Os placeholders `{nome}`, `{regiao}`, `{telefone}`, `{rua}`, `{numero}`, `{bairro}`, `{link_grupo}` são substituídos do mesmo jeito que a edge faz.
-
-| Pessoa cadastrada | Para o Coordenador | Para o Cadastrado | Para a Secretaria |
-|---|---|---|---|
-| **Líder** | `template_coordenador` (vars do líder) | `template_lider` (vars do líder + link do grupo da região do líder) | `template_coordenador` (vars do líder) |
-| **Cabo eleitoral** | `template_coordenador` (vars do cabo) | `template_cabo_boas_vindas` (vars do cabo + link do grupo) | `template_coordenador` (vars do cabo) |
-| **Coordenador** | _(desabilitado — não tem coordenador acima)_ | `template_coordenador_boas_vindas` (vars dele + link do grupo da região dele) | `template_coordenador` (vars dele) |
-
-Resolução do "Coordenador":
-1. Se `pessoa.parent_id` aponta para um coordenador → usa esse (mesmo dono que registrou). 
-2. Senão, se a pessoa tem região (Campo Grande), tenta o **coordenador favorito** da região (`is_favorito_regiao = true`). 
-3. Senão, fallback: coordenador mais antigo da mesma região. 
-
-Exatamente a mesma cadeia que a edge function já usa (`resolveCoord` em `eleicao-notify-novo-lider/index.ts`).
-
-Resolução do `{link_grupo}`: lê `cfg.grupos_links[regiao]`; se a pessoa não tiver região, sobe pela cadeia `parent_id` (até 3 níveis) procurando uma, exatamente como na edge.
-
-Resolução do `{regiao}` em texto: lê `eleicao_regioes.label` do cliente; fallback pelo dicionário fixo (`Centro`, `Segredo`, etc.); fallback final = `regiao.charAt(0).toUpperCase() + ...`.
-
-## Como será implementado (técnico)
-
-1. **Novo helper** `src/lib/eleicao-fluxo-cadastro.ts` que, dada uma `Pessoa` + `clientId`:
-   - Faz `select *` em `eleicao_notif_config` (RLS já permite — quem está nessa tela é dono/team_member).
-   - Resolve a região efetiva, o `regiaoLabel` (via `eleicao_regioes`), o `linkGrupo` e o coordenador-destino.
-   - Aplica os templates com as mesmas vars da edge.
-   - Retorna `{ coordenador, cadastrado, secretaria }`, cada um com `{ telefone, nome, mensagem, disabled, motivo }`.
-   - 100% client-side: sem edge function nova, sem migration.
-
-2. **Novo componente** `src/components/eleicao/EnviarFluxoMenu.tsx` que recebe a `Pessoa` e renderiza um sub-menu (`DropdownMenuSub` do shadcn) com os 3 itens. Cada item:
-   - Mostra nome + telefone formatado do destinatário.
-   - Quando clicado, abre `https://wa.me/<55…>?text=<encodeURIComponent(mensagem)>` em nova aba.
-   - Mostra `Loader2` enquanto resolve o template (a primeira abertura faz 1–2 selects).
-   - Cacheia a resolução por `pessoa.id` enquanto o menu está montado, então abrir várias vezes não refaz query.
-
-3. **Integração no dropdown atual** em `src/pages/Eleicao.tsx` (`PessoaRow`):
-   - Logo abaixo do `Editar` / `Abrir WhatsApp`, adicionar `<DropdownMenuSeparator />` + `<EnviarFluxoMenu pessoa={p} />`.
-   - Aparece para coordenador, líder e cabo — só a opção "Para o Coordenador" desabilita quando for coordenador.
-
-4. **Sem mudanças** em edge functions, migrations, ou na lógica automática atual. O envio automático pela instância continua funcionando do mesmo jeito; o novo botão é só uma alternativa manual.
-
-## O que **não** vai mudar
-
-- Nenhum envio via instância WhatsApp.
-- Nenhum registro em `eleicao_notif_log` (é envio manual pelo próprio celular do usuário; não temos como confirmar entrega).
-- Nenhum bloqueio por `cfg.envio_*_ativo` — esses flags governam o envio automático; o manual é uma fuga consciente do usuário.
-- A edge `eleicao-notify-novo-lider` continua igual.
-
-## Validação
-
-Após implementar, testar com uma pessoa de cada tipo no preview:
-1. Líder em Campo Grande → 3 opções habilitadas, mensagens com link do grupo da região.
-2. Cabo sem região → "Para Coordenador" desabilitado se não houver favorito; texto do cadastrado usa `template_cabo_boas_vindas`.
-3. Coordenador → "Para Coordenador" desabilitado; "Para o Cadastrado" usa `template_coordenador_boas_vindas`.
-4. Cliente sem `secretaria_telefone` configurado → "Para Secretaria" desabilitado com tooltip.
+## Pontos a confirmar antes de codar
+1. **Conectar Google Maps agora?** (sem ele não dá pra usar o mapa estilo do print nem geocodificar — alternativa gratuita seria Leaflet + OpenStreetMap + Nominatim, mas com limite de 1 req/s no geocoding, ruim pra batch).
+2. Manter o mapa do Brasil atual como aba secundária ou **substituir** totalmente pela visão da cidade?
+3. Plotar também as pessoas comuns (CRM) no mapa ou só equipe (coordenador/líder/cabo)?
