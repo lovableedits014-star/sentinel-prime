@@ -24,6 +24,42 @@ const norm = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const UF_TO_STATE: Record<string, string> = {
+  AC: "Acre",
+  AL: "Alagoas",
+  AP: "Amapá",
+  AM: "Amazonas",
+  BA: "Bahia",
+  CE: "Ceará",
+  DF: "Distrito Federal",
+  ES: "Espírito Santo",
+  GO: "Goiás",
+  MA: "Maranhão",
+  MT: "Mato Grosso",
+  MS: "Mato Grosso do Sul",
+  MG: "Minas Gerais",
+  PA: "Pará",
+  PB: "Paraíba",
+  PR: "Paraná",
+  PE: "Pernambuco",
+  PI: "Piauí",
+  RJ: "Rio de Janeiro",
+  RN: "Rio Grande do Norte",
+  RS: "Rio Grande do Sul",
+  RO: "Rondônia",
+  RR: "Roraima",
+  SC: "Santa Catarina",
+  SP: "São Paulo",
+  SE: "Sergipe",
+  TO: "Tocantins",
+};
+
+function stateAliases(state: string): string[] {
+  const raw = (state || "").trim();
+  const uf = raw.toUpperCase();
+  return [raw, UF_TO_STATE[uf], uf].filter(Boolean).map((v) => norm(v as string));
+}
+
 async function callNominatim(params: Record<string, string>) {
   const qs = new URLSearchParams({
     format: "jsonv2",
@@ -56,12 +92,14 @@ async function callNominatim(params: Record<string, string>) {
 // Verifica se um resultado bate com cidade/estado informados
 function matchesLocation(item: any, city: string, state: string): boolean {
   const cityN = norm(city);
-  const stateN = norm(state);
+  const stateNs = stateAliases(state);
+  const uf = (state || "").trim().toUpperCase();
   const addr = item.address || {};
 
-  const stateCandidates = [addr.state, addr.region].filter(Boolean).map((v: string) => norm(v));
-  const stateOk = !stateN || stateCandidates.some((v: string) =>
-    v === stateN || v.includes(stateN) || stateN.includes(v),
+  const stateCandidates = [addr.state, addr.region, addr["ISO3166-2-lvl4"]].filter(Boolean).map((v: string) => norm(v));
+  const isoOk = uf.length === 2 && norm(addr["ISO3166-2-lvl4"] || "").endsWith(`-${norm(uf)}`);
+  const stateOk = !stateNs.length || isoOk || stateCandidates.some((v: string) =>
+    stateNs.some((stateN) => v === stateN || v.includes(stateN) || stateN.includes(v)),
   );
 
   const cityCandidates = [
@@ -138,8 +176,8 @@ async function geocodeWithFallback(p: any, fallbackCity: string, state: string):
       const data = await callNominatim({
         q: `${bairro}, ${cidade}, ${state}, Brasil`,
       });
-      const picked = pickResult(data, cidade, state, null);
-      if (picked) {
+      const picked = pickResult(data, cidade, state, bairro);
+      if (picked && picked.bairroOk) {
         return { lat: picked.lat, lng: picked.lng, precision: "bairro" };
       }
     } catch (_) { /* tenta nível 3 */ }
