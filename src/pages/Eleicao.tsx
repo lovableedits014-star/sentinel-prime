@@ -438,7 +438,7 @@ export default function Eleicao() {
   }
   // ─── Enviar credenciais (gera senha e envia/copia) ──────────────
   const [sendingId, setSendingId] = useState<string | null>(null);
-  const [credResult, setCredResult] = useState<{ pessoa: Pessoa; portal_url: string; email: string; password: string; message: string; sent: boolean; warning?: string } | null>(null);
+  const [credResult, setCredResult] = useState<{ pessoa: Pessoa; portal_url: string; email: string; password: string | null; message: string; sent: boolean; warning?: string } | null>(null);
 
   async function sendCredentials(
     p: Pessoa,
