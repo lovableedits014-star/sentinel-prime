@@ -63,13 +63,23 @@ async function geocode(
     params.set("bounds", `${bounds.south},${bounds.west}|${bounds.north},${bounds.east}`);
   }
 
-  const r = await fetch(`${GATEWAY}/maps/api/geocode/json?${params.toString()}`, {
-    headers: {
-      Authorization: `Bearer ${lovableKey}`,
-      "X-Connection-Api-Key": gmapsKey,
-    },
-  });
-  if (!r.ok) throw new Error(`Gateway ${r.status}`);
+  let r: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    r = await fetch(`${GATEWAY}/maps/api/geocode/json?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": gmapsKey,
+      },
+    });
+    if (r.ok) break;
+    // Retry em erros transientes do gateway
+    if (r.status === 503 || r.status === 502 || r.status === 504 || r.status === 429) {
+      await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+      continue;
+    }
+    break;
+  }
+  if (!r || !r.ok) throw new Error(`Gateway ${r?.status ?? "no-response"}`);
   const data = await r.json();
   const status = data.status as string;
   if (status !== "OK" || !data.results?.length) {
