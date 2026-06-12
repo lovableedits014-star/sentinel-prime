@@ -526,7 +526,11 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
                   <span className="w-2 h-2 rounded-full" style={{ background: active ? "white" : TIPO_COLOR[t] }} />
                   <Icon className="w-3.5 h-3.5" />
                   {TIPO_LABEL[t]}
-                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{count}</Badge>
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 h-4 px-1 text-[10px]"
+                    title={`${noMapa} no mapa de ${count} cadastrados`}
+                  >{count}</Badge>
                 </Button>
               );
             })}
