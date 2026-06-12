@@ -510,7 +510,10 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
             {(["coordenador", "lider", "cabo"] as const).map((t) => {
               const Icon = TIPO_ICON_RECORD[t];
               const active = activeTipos.has(t);
-              const count = filteredPins.filter((p) => p.tipo === t).length;
+              // Contagem real (todos os cadastros da cidade filtrada), não só pins geocodificados —
+              // bate com o total mostrado na aba Eleição.
+              const count = pessoasNaCidade.filter((p) => p.tipo === t).length;
+              const noMapa = filteredPins.filter((p) => p.tipo === t).length;
               return (
                 <Button
                   key={t}
