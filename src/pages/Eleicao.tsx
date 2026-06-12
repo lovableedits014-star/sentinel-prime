@@ -250,7 +250,8 @@ export default function Eleicao() {
   function openNew(presets?: Partial<typeof form>) {
     setEditing(null);
     setForm({
-      tipo: "coordenador", escopo, regiao: "centro", cidade: "",
+      tipo: "coordenador", escopo, regiao: "centro",
+      cidade: escopo === "campo_grande" ? "Campo Grande" : "",
       nome: "", telefone: "", rua: "", numero: "", bairro: "",
       parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
@@ -305,7 +306,9 @@ export default function Eleicao() {
       tipo: form.tipo,
       escopo: form.escopo,
       regiao: form.escopo === "campo_grande" ? form.regiao : null,
-      cidade: form.escopo === "interior" ? form.cidade.trim() : null,
+      cidade: form.escopo === "interior"
+        ? form.cidade.trim()
+        : (form.cidade.trim() || "Campo Grande"),
       nome: form.nome.trim(),
       telefone: form.telefone.trim(),
       rua, numero: numero || null, bairro,

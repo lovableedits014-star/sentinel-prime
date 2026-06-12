@@ -20,6 +20,8 @@ type Pessoa = {
   regiao: string | null;
   cidade: string | null;
   bairro: string | null;
+  rua: string | null;
+  numero: string | null;
   lat: number | null;
   lng: number | null;
   geocode_status: string | null;
@@ -74,7 +76,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     queryFn: async (): Promise<Pessoa[]> => {
       const { data, error } = await supabase
         .from("eleicao_pessoas" as any)
-        .select("id, nome, telefone, tipo, regiao, cidade, bairro, lat, lng, geocode_status")
+        .select("id, nome, telefone, tipo, regiao, cidade, bairro, rua, numero, lat, lng, geocode_status")
         .eq("client_id", clientId)
         .limit(5000);
       if (error) throw error;
@@ -85,9 +87,28 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
   const stats = useMemo(() => {
     const total = pessoas.length;
     const geocoded = pessoas.filter((p) => p.lat != null && p.lng != null).length;
-    const pending = pessoas.filter((p) => p.lat == null && (p.cidade || p.bairro)).length;
-    return { total, geocoded, pending };
+    const pending = pessoas.filter((p) => p.lat == null && (p.cidade || p.bairro || p.rua || p.numero)).length;
+    const semCidade = pessoas.filter((p) => !p.cidade || !p.cidade.trim()).length;
+    const semBairro = pessoas.filter((p) => !p.bairro || !p.bairro.trim()).length;
+    const outOfRegion = pessoas.filter((p) => p.geocode_status === "out_of_region").length;
+    const bairroNaoConfirmado = pessoas.filter((p) => p.geocode_status === "bairro_nao_confirmado").length;
+    return { total, geocoded, pending, semCidade, semBairro, outOfRegion, bairroNaoConfirmado };
   }, [pessoas]);
+
+  const pendingList = useMemo(() => {
+    return pessoas.filter((p) => p.lat == null || p.lng == null).map((p) => ({
+      ...p,
+      motivo:
+        p.geocode_status === "out_of_region" ? "Fora da área esperada" :
+        p.geocode_status === "bairro_nao_confirmado" ? "Bairro não confirmado pelo Google" :
+        p.geocode_status === "no_address" ? "Sem endereço cadastrado" :
+        !p.cidade ? "Sem cidade" :
+        !p.bairro ? "Sem bairro" :
+        p.geocode_status ? `Falha: ${p.geocode_status}` : "Aguardando geocodificação",
+    }));
+  }, [pessoas]);
+
+  const [showPendentes, setShowPendentes] = useState(false);
 
   // Análise de gaps por bairro
   const gapAnalysis = useMemo(() => {
@@ -315,6 +336,67 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Painel de auditoria de qualidade */}
+      <Card>
+        <CardContent className="py-3 px-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <p className="text-xs font-semibold flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-muted-foreground" />
+              Qualidade dos dados no mapa
+            </p>
+            {pendingList.length > 0 && (
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowPendentes((s) => !s)}>
+                {showPendentes ? "Ocultar pendências" : `Ver ${pendingList.length} pendência${pendingList.length === 1 ? "" : "s"}`}
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center">
+            <div className="rounded-md border bg-card p-2">
+              <p className="text-[10px] text-muted-foreground">Total</p>
+              <p className="text-base font-bold">{stats.total}</p>
+            </div>
+            <div className="rounded-md border bg-card p-2">
+              <p className="text-[10px] text-muted-foreground">No mapa</p>
+              <p className="text-base font-bold text-primary">{stats.geocoded}</p>
+            </div>
+            <div className={`rounded-md border p-2 ${stats.semCidade ? "border-amber-500/40 bg-amber-500/5" : "bg-card"}`}>
+              <p className="text-[10px] text-muted-foreground">Sem cidade</p>
+              <p className="text-base font-bold">{stats.semCidade}</p>
+            </div>
+            <div className={`rounded-md border p-2 ${stats.semBairro ? "border-amber-500/40 bg-amber-500/5" : "bg-card"}`}>
+              <p className="text-[10px] text-muted-foreground">Sem bairro</p>
+              <p className="text-base font-bold">{stats.semBairro}</p>
+            </div>
+            <div className={`rounded-md border p-2 ${stats.outOfRegion ? "border-destructive/40 bg-destructive/5" : "bg-card"}`}>
+              <p className="text-[10px] text-muted-foreground">Fora da área</p>
+              <p className="text-base font-bold text-destructive">{stats.outOfRegion}</p>
+            </div>
+            <div className={`rounded-md border p-2 ${stats.bairroNaoConfirmado ? "border-amber-500/40 bg-amber-500/5" : "bg-card"}`}>
+              <p className="text-[10px] text-muted-foreground">Bairro não confirmado</p>
+              <p className="text-base font-bold">{stats.bairroNaoConfirmado}</p>
+            </div>
+          </div>
+          {showPendentes && pendingList.length > 0 && (
+            <div className="mt-3 border-t pt-3 max-h-[280px] overflow-y-auto divide-y">
+              {pendingList.slice(0, 200).map((p) => (
+                <div key={p.id} className="py-2 text-xs flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{p.nome}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {[p.rua, p.numero].filter(Boolean).join(", ") || "—"} {p.bairro ? `· ${p.bairro}` : ""} {p.cidade ? `· ${p.cidade}` : ""}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] shrink-0">{p.motivo}</Badge>
+                </div>
+              ))}
+              {pendingList.length > 200 && (
+                <p className="text-[10px] text-muted-foreground py-2 text-center">+ {pendingList.length - 200} pendências…</p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Filtros e legenda */}
       <Card>
