@@ -19,6 +19,7 @@ import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
 import EnviarFluxoMenu from "@/components/eleicao/EnviarFluxoMenu";
+import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog";
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 import EntradaGrupoPanel from "@/components/eleicao/EntradaGrupoPanel";
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
@@ -205,6 +206,9 @@ export default function Eleicao() {
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [notifyPessoaId, setNotifyPessoaId] = useState<string | null>(null);
   const [notifySkip, setNotifySkip] = useState<("coordenador" | "secretaria" | "lider")[]>([]);
+  // Pós-cadastro: popup de envio manual (WhatsApp Web do próprio usuário)
+  const [posCadastroOpen, setPosCadastroOpen] = useState(false);
+  const [posCadastroPessoa, setPosCadastroPessoa] = useState<Pessoa | null>(null);
   const [editing, setEditing] = useState<Pessoa | null>(null);
   const [form, setForm] = useState({
     tipo: "coordenador" as Tipo,
@@ -324,43 +328,41 @@ export default function Eleicao() {
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
 
-    // Disparo automático de notificações ao criar novo líder.
-    // Abre o dialog visual de progresso por etapa (Coordenador → Secretaria → Líder).
-    // Para líder avulso (sem coordenador), pula as etapas Coordenador e Secretaria.
-    if (!editing && form.tipo === "lider" && savedPessoa) {
-      toast.success("Líder cadastrado!");
+    // Novo cadastro: abre o popup de envio MANUAL (WhatsApp Web do próprio usuário).
+    // Substitui os disparos automáticos anteriores — o usuário decide o que enviar.
+    // Pode ser desativado por sessão via sessionStorage["eleicao:skip-pos-cadastro"].
+    if (!editing && savedPessoa) {
+      toast.success(`${TIPO_META[form.tipo].label} cadastrado!`);
       setDialogOpen(false);
-      const isAvulso = !payload.parent_id;
-      setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
-      setNotifyPessoaId((savedPessoa as any).id);
-      setNotifyOpen(true);
       load();
+      let skip = false;
+      try { skip = sessionStorage.getItem("eleicao:skip-pos-cadastro") === "1"; } catch {}
+      if (skip) {
+        // Fallback ao comportamento antigo (instância automática).
+        if (form.tipo === "lider") {
+          const isAvulso = !payload.parent_id;
+          setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
+          setNotifyPessoaId((savedPessoa as any).id);
+          setNotifyOpen(true);
+        } else if (form.tipo === "coordenador") {
+          if (form.send_access) {
+            await sendCredentials(savedPessoa as unknown as Pessoa, "whatsapp", {
+              email: form.email.trim(),
+              password: form.password,
+            });
+          }
+          void notifyCoordBoasVindas((savedPessoa as any).id);
+        } else if (form.tipo === "cabo") {
+          void sendCaboBoasVindas((savedPessoa as any).id);
+        }
+        return;
+      }
+      setPosCadastroPessoa(savedPessoa as unknown as Pessoa);
+      setPosCadastroOpen(true);
       return;
     }
 
-    if (!editing && form.tipo === "coordenador" && form.send_access) {
-      await sendCredentials(savedPessoa as unknown as Pessoa, "whatsapp", {
-        email: form.email.trim(),
-        password: form.password,
-        closeRegisterDialog: true,
-      });
-      // Após enviar credenciais, dispara também a mensagem de boas-vindas.
-      void notifyCoordBoasVindas((savedPessoa as any).id);
-      return;
-    }
-
-    // Coordenador novo (sem envio de credenciais): manda apenas a boas-vindas.
-    if (!editing && form.tipo === "coordenador" && savedPessoa) {
-      void notifyCoordBoasVindas((savedPessoa as any).id);
-    }
-
-    // Cabo eleitoral novo: dispara boas-vindas com link do grupo da região.
-    if (!editing && form.tipo === "cabo" && savedPessoa) {
-      void sendCaboBoasVindas((savedPessoa as any).id);
-    }
-
-
-    toast.success(editing ? "Atualizado!" : "Cadastrado!");
+    toast.success("Atualizado!");
     setDialogOpen(false);
     load();
   }
@@ -1167,6 +1169,19 @@ export default function Eleicao() {
         pessoaId={notifyPessoaId}
         skipSteps={notifySkip}
         onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); setNotifySkip([]); }}
+      />
+
+      <PosCadastroEnvioDialog
+        open={posCadastroOpen}
+        onOpenChange={(o) => { setPosCadastroOpen(o); if (!o) setPosCadastroPessoa(null); }}
+        pessoa={posCadastroPessoa as any}
+        showInstanceOption={posCadastroPessoa?.tipo === "lider"}
+        onTriggerInstanceFlow={(p) => {
+          const isAvulso = !p.parent_id;
+          setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
+          setNotifyPessoaId(p.id);
+          setNotifyOpen(true);
+        }}
       />
 
       <ExportEleicaoDialog
