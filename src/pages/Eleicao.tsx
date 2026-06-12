@@ -1133,7 +1133,11 @@ export default function Eleicao() {
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-muted-foreground text-xs">Senha:</span>
-                  <span className="font-bold break-all">{credResult.password}</span>
+                  {credResult.password ? (
+                    <span className="font-bold break-all">{credResult.password}</span>
+                  ) : (
+                    <span className="text-xs italic text-muted-foreground">Senha atual mantida (não foi alterada)</span>
+                  )}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -1146,7 +1150,10 @@ export default function Eleicao() {
                   </Button>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground">Salve esta senha — ela só aparece aqui neste momento.</p>
+              {credResult.password && (
+                <p className="text-[11px] text-muted-foreground">Salve esta senha — ela só aparece aqui neste momento.</p>
+              )}
+
             </div>
           )}
           <DialogFooter>
