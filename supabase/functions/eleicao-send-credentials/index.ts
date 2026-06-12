@@ -240,13 +240,17 @@ Deno.serve(async (req) => {
 
     const baseUrl = (app_url || req.headers.get("origin") || Deno.env.get("PUBLIC_APP_URL") || "").replace(/\/$/, "");
     const portalUrl = `${baseUrl}/portal/${pessoa.client_id}`;
+    const senhaLinha = password
+      ? `🔑 Senha: ${password}\n\n`
+      : `🔑 Use a senha já cadastrada anteriormente.\n\n`;
     const message =
       `🗳️ *Acesso ao Portal da Campanha*\n\n` +
-      `Olá ${pessoa.nome}! Seu acesso de coordenador foi liberado.\n\n` +
+      `Olá ${pessoa.nome}! Seu acesso de coordenador está liberado.\n\n` +
       `🔗 Link: ${portalUrl}\n` +
       `👤 E-mail: ${emailNorm}\n` +
-      `🔑 Senha: ${password}\n\n` +
+      senhaLinha +
       `_Guarde esta mensagem. Você poderá cadastrar seus líderes e cabos eleitorais por lá._`;
+
 
     if (channel === "link_only") {
       return new Response(JSON.stringify({ success: true, portal_url: portalUrl, email: emailNorm, password, message }),
