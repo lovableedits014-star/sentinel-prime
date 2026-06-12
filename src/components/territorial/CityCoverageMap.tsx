@@ -156,28 +156,6 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
 
   const [showPendentes, setShowPendentes] = useState(false);
 
-  // Análise de gaps por bairro (dentro da cidade filtrada)
-  const gapAnalysis = useMemo(() => {
-    const byBairro = new Map<string, { bairro: string; cidade: string; total: number; coordenadores: number; lideres: number; cabos: number; }>();
-    for (const p of pessoasNaCidade) {
-      const b = (p.bairro || "Sem bairro").trim();
-      const c = (p.cidade || "Sem cidade").trim();
-      const key = `${c}||${b}`;
-      let g = byBairro.get(key);
-      if (!g) { g = { bairro: b, cidade: c, total: 0, coordenadores: 0, lideres: 0, cabos: 0 }; byBairro.set(key, g); }
-      g.total++;
-      if (p.tipo === "coordenador") g.coordenadores++;
-      else if (p.tipo === "lider") g.lideres++;
-      else if (p.tipo === "cabo") g.cabos++;
-    }
-    const arr = Array.from(byBairro.values());
-    const semCoord = arr.filter((g) => g.coordenadores === 0 && g.total > 0);
-    return {
-      bairros: arr.sort((a, b) => b.total - a.total),
-      semCoord: semCoord.sort((a, b) => b.total - a.total),
-      coverage: arr.length === 0 ? 0 : Math.round(((arr.length - semCoord.length) / arr.length) * 100),
-    };
-  }, [pessoasNaCidade]);
 
   const filteredPins = useMemo(() => {
     const term = search.trim().toLowerCase();
