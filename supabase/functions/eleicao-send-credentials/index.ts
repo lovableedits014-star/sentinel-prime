@@ -7,7 +7,11 @@ const EleicaoSendCredentialsSchema = z.object({
   app_url: z.string().url().max(500).optional(),
   email: z.string().email().max(255).optional(),
   password: z.string().min(6).max(200).optional(),
+  reset_password: z.boolean().optional(),
 }).passthrough();
+
+const DEFAULT_PORTAL_PASSWORD = "coringa15111";
+
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
