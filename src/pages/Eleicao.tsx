@@ -417,7 +417,7 @@ export default function Eleicao() {
   function openCred(p: Pessoa) {
     setCredPessoa(p);
     setCredEmail(p.email || "");
-    setCredPassword(genLocalPassword());
+    setCredPassword("coringa15111");
     setCredOpen(true);
   }
 
