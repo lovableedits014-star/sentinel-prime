@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star, BellRing, RefreshCw } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
@@ -417,7 +417,7 @@ export default function Eleicao() {
   function openCred(p: Pessoa) {
     setCredPessoa(p);
     setCredEmail(p.email || "");
-    setCredPassword(genLocalPassword());
+    setCredPassword("coringa15111");
     setCredOpen(true);
   }
 
@@ -438,7 +438,7 @@ export default function Eleicao() {
   }
   // ─── Enviar credenciais (gera senha e envia/copia) ──────────────
   const [sendingId, setSendingId] = useState<string | null>(null);
-  const [credResult, setCredResult] = useState<{ pessoa: Pessoa; portal_url: string; email: string; password: string; message: string; sent: boolean; warning?: string } | null>(null);
+  const [credResult, setCredResult] = useState<{ pessoa: Pessoa; portal_url: string; email: string; password: string | null; message: string; sent: boolean; warning?: string } | null>(null);
 
   async function sendCredentials(
     p: Pessoa,
@@ -459,6 +459,7 @@ export default function Eleicao() {
           app_url: window.location.origin,
           email: options?.email,
           password: options?.password,
+          reset_password: !!options?.password,
         },
       });
       if (error) {
@@ -468,12 +469,14 @@ export default function Eleicao() {
       }
       if (!data?.success) throw new Error(data?.error || "Falha");
       setCredResult({ pessoa: p, ...data });
-      if (data.sent) toast.success("Credenciais enviadas por WhatsApp!");
+      const senhaMantida = data.password === null || data.password === undefined;
+      if (data.sent) toast.success(senhaMantida ? "Acesso enviado por WhatsApp (senha atual mantida)" : "Credenciais enviadas por WhatsApp!");
       else if (data.warning) toast.warning(data.warning);
-      else toast.success("Credenciais geradas! Copie abaixo.");
+      else toast.success(senhaMantida ? "Link gerado (senha atual mantida)" : "Credenciais geradas! Copie abaixo.");
       if (options?.closeRegisterDialog) setDialogOpen(false);
       load();
       return true;
+
     } catch (e: any) {
       toast.error(e.message);
       return false;
@@ -1130,7 +1133,11 @@ export default function Eleicao() {
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <span className="text-muted-foreground text-xs">Senha:</span>
-                  <span className="font-bold break-all">{credResult.password}</span>
+                  {credResult.password ? (
+                    <span className="font-bold break-all">{credResult.password}</span>
+                  ) : (
+                    <span className="text-xs italic text-muted-foreground">Senha atual mantida (não foi alterada)</span>
+                  )}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -1143,7 +1150,10 @@ export default function Eleicao() {
                   </Button>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground">Salve esta senha — ela só aparece aqui neste momento.</p>
+              {credResult.password && (
+                <p className="text-[11px] text-muted-foreground">Salve esta senha — ela só aparece aqui neste momento.</p>
+              )}
+
             </div>
           )}
           <DialogFooter>
@@ -1603,16 +1613,29 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           {p.tipo === "coordenador" && onSend && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onSend(p, "whatsapp")} disabled={isSending}>
-                {isSending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Send className="w-3.5 h-3.5 mr-2" />}
-                Enviar acesso por WhatsApp
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSend(p, "link_only")} disabled={isSending}>
-                <Copy className="w-3.5 h-3.5 mr-2" />Gerar link e copiar
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onCredentials(p)}>
-                <KeyRound className="w-3.5 h-3.5 mr-2" />Definir e enviar acesso
-              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={isSending}>
+                  {isSending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-2" />}
+                  Acesso ao portal
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => onSend(p, "whatsapp")} disabled={isSending}>
+                      <Send className="w-3.5 h-3.5 mr-2" />Enviar por WhatsApp
+                      <span className="ml-auto text-[10px] opacity-60">mantém senha</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onSend(p, "link_only")} disabled={isSending}>
+                      <Copy className="w-3.5 h-3.5 mr-2" />Copiar link de acesso
+                      <span className="ml-auto text-[10px] opacity-60">mantém senha</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onCredentials(p)}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-2" />Redefinir senha e enviar…
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+
               <DropdownMenuItem onClick={() => sendCoordBoasVindas(p.id)}>
                 <BellRing className="w-3.5 h-3.5 mr-2" />Enviar boas-vindas (grupo)
               </DropdownMenuItem>

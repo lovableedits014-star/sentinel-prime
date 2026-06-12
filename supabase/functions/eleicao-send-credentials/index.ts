@@ -7,7 +7,11 @@ const EleicaoSendCredentialsSchema = z.object({
   app_url: z.string().url().max(500).optional(),
   email: z.string().email().max(255).optional(),
   password: z.string().min(6).max(200).optional(),
+  reset_password: z.boolean().optional(),
 }).passthrough();
+
+const DEFAULT_PORTAL_PASSWORD = "coringa15111";
+
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -162,9 +166,11 @@ Deno.serve(async (req) => {
   try {
     const rawBody = await req.json();
     validateInput(EleicaoSendCredentialsSchema, rawBody, { fn: "eleicao-send-credentials" });
-    const { pessoa_id, channel, app_url, email, password: providedPassword } = rawBody; // channel: "whatsapp" | "link_only"
+    const { pessoa_id, channel, app_url, email, password: providedPassword, reset_password } = rawBody;
     const emailInput = typeof email === "string" ? email.trim().toLowerCase() : "";
     const passwordInput = typeof providedPassword === "string" ? providedPassword : "";
+    const wantReset = reset_password === true || passwordInput.length > 0;
+
     if (emailInput && !validEmail(emailInput)) {
       return new Response(JSON.stringify({ error: "E-mail inválido" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
     }
@@ -198,45 +204,53 @@ Deno.serve(async (req) => {
     }
     if (!canAccess) return new Response(JSON.stringify({ error: "Sem permissão" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
 
-    // Gera senha temporária e cria/atualiza conta
-    const password = passwordInput || genPassword(10);
+    // Decide se a senha será alterada nesta operação.
+    // - Conta nova (sem user_id e sem match por e-mail) → sempre define senha (padrão coringa15111).
+    // - Usuário existente → só altera senha se wantReset (admin clicou em "Redefinir senha").
     const emailNorm = (emailInput || pessoa.email || `coord-${pessoa.id.slice(0,8)}@portal.local`).toLowerCase();
 
     let userId = pessoa.user_id as string | null;
     const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const foundByEmail = list?.users?.find((u: any) => (u.email || "").toLowerCase() === emailNorm) || null;
-
-    // Se o e-mail informado já existir em outra conta, vincula o coordenador a essa conta.
-    // Isso evita o erro atual: a pessoa fica com email correto, mas user_id preso em coord-xxxx@portal.local.
     if (foundByEmail?.id) userId = foundByEmail.id;
 
+    const isNewAccount = !userId;
+    const shouldSetPassword = isNewAccount || wantReset;
+    const password: string | null = shouldSetPassword ? (passwordInput || DEFAULT_PORTAL_PASSWORD) : null;
+
     if (userId) {
-      const { error: uErr } = await admin.auth.admin.updateUserById(userId, {
+      const updates: Record<string, unknown> = {
         email: emailNorm,
-        password,
         email_confirm: true,
         user_metadata: { full_name: pessoa.nome, role: "coordenador", account_type: "portal_pessoa" },
-      });
+      };
+      if (shouldSetPassword && password) updates.password = password;
+      const { error: uErr } = await admin.auth.admin.updateUserById(userId, updates);
       if (uErr) throw uErr;
     } else {
       const { data: created, error: cErr } = await admin.auth.admin.createUser({
-        email: emailNorm, password, email_confirm: true,
+        email: emailNorm, password: password || DEFAULT_PORTAL_PASSWORD, email_confirm: true,
         user_metadata: { full_name: pessoa.nome, role: "coordenador", account_type: "portal_pessoa" },
       });
       if (cErr) throw cErr;
       userId = created.user!.id;
     }
+
     await admin.from("eleicao_pessoas").update({ email: emailNorm, user_id: userId }).eq("id", pessoa_id);
 
     const baseUrl = (app_url || req.headers.get("origin") || Deno.env.get("PUBLIC_APP_URL") || "").replace(/\/$/, "");
     const portalUrl = `${baseUrl}/portal/${pessoa.client_id}`;
+    const senhaLinha = password
+      ? `🔑 Senha: ${password}\n\n`
+      : `🔑 Use a senha já cadastrada anteriormente.\n\n`;
     const message =
       `🗳️ *Acesso ao Portal da Campanha*\n\n` +
-      `Olá ${pessoa.nome}! Seu acesso de coordenador foi liberado.\n\n` +
+      `Olá ${pessoa.nome}! Seu acesso de coordenador está liberado.\n\n` +
       `🔗 Link: ${portalUrl}\n` +
       `👤 E-mail: ${emailNorm}\n` +
-      `🔑 Senha: ${password}\n\n` +
+      senhaLinha +
       `_Guarde esta mensagem. Você poderá cadastrar seus líderes e cabos eleitorais por lá._`;
+
 
     if (channel === "link_only") {
       return new Response(JSON.stringify({ success: true, portal_url: portalUrl, email: emailNorm, password, message }),
