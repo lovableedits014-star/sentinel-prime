@@ -1,8 +1,10 @@
-// Geocoding em lote para eleicao_pessoas com fallback inteligente:
+// Geocoding em lote para eleicao_pessoas via Nominatim (OpenStreetMap).
+// 100% gratuito, sem cartão de crédito, sem API key.
+// Fallback inteligente:
 //  1. Tenta rua + número + bairro + cidade (precision: 'rua')
 //  2. Se falhar, tenta bairro + cidade (precision: 'bairro')
 //  3. Se falhar, tenta cidade + UF (precision: 'cidade')
-// Assim, todo cadastro com pelo menos a cidade preenchida aparece no mapa.
+// Respeita o limite de uso do Nominatim: 1 requisição por segundo.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -11,7 +13,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const GATEWAY = "https://connector-gateway.lovable.dev/google_maps";
+const NOMINATIM = "https://nominatim.openstreetmap.org/search";
+// Identificação obrigatória conforme política de uso do Nominatim
+const USER_AGENT = "EleicaoApp/1.0 (territorial-coverage-map; contact via lovable.app)";
 
 const norm = (s: string) =>
   (s || "")
@@ -20,82 +24,82 @@ const norm = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-async function callGoogle(address: string, city: string, state: string, country: string) {
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  const gmapsKey = Deno.env.get("GOOGLE_MAPS_API_KEY");
-  if (!lovableKey || !gmapsKey) throw new Error("Credenciais Google Maps não configuradas");
-
-  const components = [
-    `country:${country}`,
-    state ? `administrative_area:${state}` : "",
-    city ? `locality:${city}` : "",
-  ].filter(Boolean).join("|");
-
-  const params = new URLSearchParams({
-    address,
-    region: country.toLowerCase(),
-    language: "pt-BR",
-    components,
+async function callNominatim(params: Record<string, string>) {
+  const qs = new URLSearchParams({
+    format: "jsonv2",
+    addressdetails: "1",
+    limit: "5",
+    "accept-language": "pt-BR",
+    countrycodes: "br",
+    ...params,
   });
 
   let r: Response | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
-    r = await fetch(`${GATEWAY}/maps/api/geocode/json?${params.toString()}`, {
+    r = await fetch(`${NOMINATIM}?${qs.toString()}`, {
       headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": gmapsKey,
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json",
       },
     });
     if (r.ok) break;
     if (r.status === 503 || r.status === 502 || r.status === 504 || r.status === 429) {
-      await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+      await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)));
       continue;
     }
     break;
   }
-  if (!r || !r.ok) throw new Error(`Gateway ${r?.status ?? "no-response"}`);
-  return await r.json();
+  if (!r || !r.ok) throw new Error(`Nominatim ${r?.status ?? "no-response"}`);
+  return await r.json() as any[];
 }
 
-// Procura nos resultados um que bata com a cidade/estado.
-// Retorna lat/lng + indicador se confirmou o bairro (quando informado).
-function pickResult(data: any, city: string, state: string, bairro: string | null):
-  { lat: number; lng: number; bairroOk: boolean } | null {
-  if (data?.status !== "OK" || !data.results?.length) return null;
+// Verifica se um resultado bate com cidade/estado informados
+function matchesLocation(item: any, city: string, state: string): boolean {
   const cityN = norm(city);
   const stateN = norm(state);
-  const bairroN = bairro ? norm(bairro) : "";
+  const addr = item.address || {};
+
+  const stateCandidates = [addr.state, addr.region].filter(Boolean).map((v: string) => norm(v));
+  const stateOk = !stateN || stateCandidates.some((v: string) =>
+    v === stateN || v.includes(stateN) || stateN.includes(v),
+  );
+
+  const cityCandidates = [
+    addr.city, addr.town, addr.village, addr.municipality,
+    addr.county, addr.city_district,
+  ].filter(Boolean).map((v: string) => norm(v));
+  const cityOk = !cityN || cityCandidates.some((v: string) =>
+    v === cityN || v.includes(cityN) || cityN.includes(v),
+  );
+
+  return stateOk && cityOk;
+}
+
+function matchesBairro(item: any, bairro: string): boolean {
+  if (!bairro) return true;
+  const bairroN = norm(bairro);
+  const addr = item.address || {};
+  const cands = [
+    addr.suburb, addr.neighbourhood, addr.quarter, addr.city_district, addr.residential,
+  ].filter(Boolean).map((v: string) => norm(v));
+  return cands.some((v: string) => v === bairroN || v.includes(bairroN) || bairroN.includes(v));
+}
+
+function pickResult(items: any[], city: string, state: string, bairro: string | null):
+  { lat: number; lng: number; bairroOk: boolean } | null {
+  if (!items || items.length === 0) return null;
 
   let fallback: { lat: number; lng: number; bairroOk: boolean } | null = null;
 
-  for (const res of data.results) {
-    const comps = res.address_components || [];
-    const byType = (type: string) =>
-      comps.filter((c: any) => c.types?.includes(type))
-        .flatMap((c: any) => [c.long_name, c.short_name].filter(Boolean));
-    const matchesAny = (type: string, val: string) =>
-      byType(type).some((v: string) => norm(v) === val);
+  for (const item of items) {
+    if (!matchesLocation(item, city, state)) continue;
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
 
-    const stateOk = !stateN || matchesAny("administrative_area_level_1", stateN);
-    const cityOk = !cityN ||
-      matchesAny("locality", cityN) ||
-      matchesAny("administrative_area_level_2", cityN);
+    if (!bairro) return { lat, lng, bairroOk: true };
 
-    if (!stateOk || !cityOk) continue;
-    if (!res.geometry?.location) continue;
-    const { lat, lng } = res.geometry.location;
-
-    if (!bairroN) return { lat, lng, bairroOk: true };
-
-    const bairroCandidates: string[] = [
-      ...byType("sublocality"),
-      ...byType("sublocality_level_1"),
-      ...byType("neighborhood"),
-      ...byType("political"),
-      ...byType("administrative_area_level_4"),
-    ].map((v: string) => norm(v));
-
-    const bairroOk = bairroCandidates.some((v) => v === bairroN || v.includes(bairroN) || bairroN.includes(v));
+    const bairroOk = matchesBairro(item, bairro);
     if (bairroOk) return { lat, lng, bairroOk: true };
     if (!fallback) fallback = { lat, lng, bairroOk: false };
   }
@@ -103,49 +107,52 @@ function pickResult(data: any, city: string, state: string, bairro: string | nul
   return fallback;
 }
 
-// Geocode com fallback em 3 níveis. Sempre devolve lat/lng se houver pelo menos
-// cidade resolvível. precision indica a granularidade real do pino.
-async function geocodeWithFallback(p: any, fallbackCity: string, state: string, country: string):
+async function geocodeWithFallback(p: any, fallbackCity: string, state: string):
   Promise<{ lat: number; lng: number; precision: "rua" | "bairro" | "cidade" } | { error: string }> {
   const cidade = (p.cidade || "").trim() || fallbackCity;
   const bairro = (p.bairro || "").trim() || null;
   const rua = (p.rua || "").trim();
   const numero = (p.numero || "").trim();
 
-  // Nível 1: rua + número + bairro + cidade
+  // Nível 1: rua + número + bairro + cidade (busca estruturada)
   if (rua) {
-    const addr = [
-      `${rua}${numero ? `, ${numero}` : ""}`,
-      bairro ? `Bairro ${bairro}` : "",
-      `${cidade} - ${state}`,
-      "Brasil",
-    ].filter(Boolean).join(", ");
     try {
-      const data = await callGoogle(addr, cidade, state, country);
+      const street = numero ? `${numero} ${rua}` : rua;
+      const data = await callNominatim({
+        street,
+        city: cidade,
+        state,
+        country: "Brasil",
+      });
       const picked = pickResult(data, cidade, state, bairro);
       if (picked && picked.bairroOk) {
         return { lat: picked.lat, lng: picked.lng, precision: "rua" };
       }
-      // Se city+state bateram mas bairro não — segue para o nível 2.
     } catch (_) { /* tenta nível 2 */ }
+    await new Promise((r) => setTimeout(r, 1100));
   }
 
-  // Nível 2: bairro + cidade
+  // Nível 2: bairro + cidade (busca por texto livre para captar bairros populares)
   if (bairro) {
-    const addr = `Bairro ${bairro}, ${cidade} - ${state}, Brasil`;
     try {
-      const data = await callGoogle(addr, cidade, state, country);
+      const data = await callNominatim({
+        q: `${bairro}, ${cidade}, ${state}, Brasil`,
+      });
       const picked = pickResult(data, cidade, state, null);
       if (picked) {
         return { lat: picked.lat, lng: picked.lng, precision: "bairro" };
       }
     } catch (_) { /* tenta nível 3 */ }
+    await new Promise((r) => setTimeout(r, 1100));
   }
 
   // Nível 3: cidade + UF
-  const addr = `${cidade} - ${state}, Brasil`;
   try {
-    const data = await callGoogle(addr, cidade, state, country);
+    const data = await callNominatim({
+      city: cidade,
+      state,
+      country: "Brasil",
+    });
     const picked = pickResult(data, cidade, state, null);
     if (picked) {
       return { lat: picked.lat, lng: picked.lng, precision: "cidade" };
@@ -166,11 +173,10 @@ Deno.serve(async (req) => {
   try {
     const {
       clientId,
-      limit = 25,
+      limit = 15,
       ids,
       defaultCity = "Campo Grande",
       defaultState = "MS",
-      defaultCountry = "BR",
       force = false,
     } = await req.json();
 
@@ -212,7 +218,7 @@ Deno.serve(async (req) => {
         continue;
       }
       try {
-        const g = await geocodeWithFallback(p, defaultCity, defaultState, defaultCountry);
+        const g = await geocodeWithFallback(p, defaultCity, defaultState);
         if ("error" in g) {
           await admin.from("eleicao_pessoas").update({
             lat: null,
@@ -246,7 +252,8 @@ Deno.serve(async (req) => {
         console.error("[geocode] erro:", p.id, e?.message);
         failed++;
       }
-      await new Promise((r) => setTimeout(r, 100));
+      // Respeita rate limit do Nominatim: 1 req/seg entre pessoas distintas
+      await new Promise((r) => setTimeout(r, 1100));
     }
 
     const { count: pending } = await admin

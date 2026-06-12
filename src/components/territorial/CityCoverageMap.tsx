@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useGoogleMaps } from "@/hooks/useGoogleMaps";
-import { MarkerClusterer } from "@googlemaps/markerclusterer";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -57,9 +60,6 @@ const normCity = (s: string | null | undefined) =>
   (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 
 function pinSvg(color: string, size = 36, precision: string | null = "rua"): string {
-  // Precisão 'rua' = pino cheio com brilho normal.
-  // Precisão 'bairro' = pino translúcido com borda tracejada.
-  // Precisão 'cidade' = pino bem translúcido + símbolo "~" central.
   const opacity = precision === "cidade" ? 0.5 : precision === "bairro" ? 0.75 : 1;
   const stroke = precision === "rua" ? "white" : color;
   const strokeDash = precision === "rua" ? "" : `stroke-dasharray="2,1.5"`;
@@ -81,11 +81,9 @@ const PRECISION_LABEL: Record<string, string> = {
 
 export function CityCoverageMap({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
-  const { loaded, error: mapsError } = useGoogleMaps();
   const mapDivRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<any>(null);
-  const clustererRef = useRef<MarkerClusterer | null>(null);
-  const markersRef = useRef<any[]>([]);
+  const mapRef = useRef<L.Map | null>(null);
+  const clusterRef = useRef<any>(null);
 
   const [activeTipos, setActiveTipos] = useState<Set<string>>(new Set(["coordenador", "lider", "cabo"]));
   const [search, setSearch] = useState("");
@@ -107,7 +105,6 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     },
   });
 
-  // Lista de cidades distintas com contagem
   const cidades = useMemo(() => {
     const map = new Map<string, { label: string; total: number; coord: number; lider: number; cabo: number; geocoded: number }>();
     for (const p of pessoas) {
@@ -125,7 +122,6 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     return Array.from(map.entries()).map(([key, v]) => ({ key, ...v })).sort((a, b) => b.total - a.total);
   }, [pessoas]);
 
-  // Filtra pessoas pela cidade selecionada
   const pessoasNaCidade = useMemo(() => {
     if (cityFilter === ALL_CITIES) return pessoas;
     return pessoas.filter((p) => normCity(p.cidade || "Sem cidade") === cityFilter);
@@ -156,7 +152,6 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
 
   const [showPendentes, setShowPendentes] = useState(false);
 
-
   const filteredPins = useMemo(() => {
     const term = search.trim().toLowerCase();
     return pessoasNaCidade.filter((p) => {
@@ -170,100 +165,103 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
     });
   }, [pessoasNaCidade, activeTipos, search]);
 
-  // Inicializa mapa
+  // Inicializa mapa Leaflet uma vez
   useEffect(() => {
-    if (!loaded || !mapDivRef.current || mapRef.current) return;
-    const google = (window as any).google;
+    if (!mapDivRef.current || mapRef.current) return;
 
-    const withCoords = pessoas.filter((p) => p.lat && p.lng);
-    let center = { lat: -20.4697, lng: -54.6201 };
-    if (withCoords.length > 0) {
-      const avgLat = withCoords.reduce((s, p) => s + (p.lat || 0), 0) / withCoords.length;
-      const avgLng = withCoords.reduce((s, p) => s + (p.lng || 0), 0) / withCoords.length;
-      center = { lat: avgLat, lng: avgLng };
-    }
-
-    mapRef.current = new google.maps.Map(mapDivRef.current, {
-      center,
+    const map = L.map(mapDivRef.current, {
+      center: [-20.4697, -54.6201],
       zoom: 7,
-      mapTypeControl: true,
-      streetViewControl: false,
-      fullscreenControl: true,
+      scrollWheelZoom: true,
     });
-  }, [loaded, pessoas]);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    const cluster = (L as any).markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 50,
+    });
+    map.addLayer(cluster);
+
+    mapRef.current = map;
+    clusterRef.current = cluster;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      clusterRef.current = null;
+    };
+  }, []);
 
   // Atualiza pinos
   useEffect(() => {
-    if (!loaded || !mapRef.current) return;
-    const google = (window as any).google;
+    const map = mapRef.current;
+    const cluster = clusterRef.current;
+    if (!map || !cluster) return;
 
-    markersRef.current.forEach((m) => m.setMap?.(null));
-    markersRef.current = [];
-    clustererRef.current?.clearMarkers();
+    cluster.clearLayers();
 
-    const bounds = new google.maps.LatLngBounds();
-    const infoWindow = new google.maps.InfoWindow();
+    const bounds = L.latLngBounds([]);
 
-    const markers = filteredPins.map((p) => {
+    for (const p of filteredPins) {
       const color = TIPO_COLOR[p.tipo] || "#64748b";
       const precision = (p.geocode_precision as "rua" | "bairro" | "cidade" | null) || "rua";
       const baseSize = p.tipo === "coordenador" ? 44 : 32;
       const size = precision === "cidade" ? Math.round(baseSize * 0.8) : baseSize;
-      const marker = new google.maps.Marker({
-        position: { lat: Number(p.lat), lng: Number(p.lng) },
-        icon: {
-          url: pinSvg(color, size, precision),
-          scaledSize: new google.maps.Size(size, size),
-          anchor: new google.maps.Point(size / 2, size),
-        },
-        title: p.nome,
+
+      const icon = L.icon({
+        iconUrl: pinSvg(color, size, precision),
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+        popupAnchor: [0, -size],
       });
-      marker.addListener("click", () => {
-        const aproxNota = precision === "rua" ? "" : `
-          <div style="margin-top:6px; padding:6px 8px; background:#fef3c7; border-radius:6px; font-size:11px; color:#92400e;">
-            📍 ${PRECISION_LABEL[precision]} — endereço não totalmente confirmado.
-          </div>`;
-        infoWindow.setContent(`
-          <div style="font-family: system-ui; min-width: 220px; padding: 4px;">
-            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${p.nome}</div>
-            <div style="font-size: 12px; color: #64748b;">
-              <div><strong>${TIPO_LABEL[p.tipo] || p.tipo}</strong></div>
-              ${p.regiao ? `<div>Região: ${p.regiao}</div>` : ""}
-              ${p.rua ? `<div>${p.rua}${p.numero ? `, ${p.numero}` : ""}</div>` : ""}
-              ${p.bairro ? `<div>Bairro: ${p.bairro}</div>` : ""}
-              ${p.cidade ? `<div>Cidade: ${p.cidade}</div>` : ""}
-              ${p.telefone ? `<div style="margin-top:6px;"><a href="https://wa.me/${p.telefone.replace(/\D/g, "")}" target="_blank" style="color:#10b981; text-decoration:none;">📱 WhatsApp</a></div>` : ""}
-              ${aproxNota}
-              <button id="edit-pessoa-${p.id}" style="margin-top:10px; width:100%; padding:6px 10px; background:#0f172a; color:white; border:none; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;">
-                ✏️ Editar cadastro
-              </button>
-            </div>
+
+      const marker = L.marker([Number(p.lat), Number(p.lng)], { icon, title: p.nome });
+
+      const aproxNota = precision === "rua" ? "" : `
+        <div style="margin-top:6px; padding:6px 8px; background:#fef3c7; border-radius:6px; font-size:11px; color:#92400e;">
+          📍 ${PRECISION_LABEL[precision]} — endereço não totalmente confirmado.
+        </div>`;
+      const html = `
+        <div style="font-family: system-ui; min-width: 220px; padding: 4px;">
+          <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${p.nome}</div>
+          <div style="font-size: 12px; color: #64748b;">
+            <div><strong>${TIPO_LABEL[p.tipo] || p.tipo}</strong></div>
+            ${p.regiao ? `<div>Região: ${p.regiao}</div>` : ""}
+            ${p.rua ? `<div>${p.rua}${p.numero ? `, ${p.numero}` : ""}</div>` : ""}
+            ${p.bairro ? `<div>Bairro: ${p.bairro}</div>` : ""}
+            ${p.cidade ? `<div>Cidade: ${p.cidade}</div>` : ""}
+            ${p.telefone ? `<div style="margin-top:6px;"><a href="https://wa.me/${p.telefone.replace(/\D/g, "")}" target="_blank" style="color:#10b981; text-decoration:none;">📱 WhatsApp</a></div>` : ""}
+            ${aproxNota}
+            <button data-edit-id="${p.id}" style="margin-top:10px; width:100%; padding:6px 10px; background:#0f172a; color:white; border:none; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer;">
+              ✏️ Editar cadastro
+            </button>
           </div>
-        `);
-        infoWindow.open(mapRef.current, marker);
-        google.maps.event.addListenerOnce(infoWindow, "domready", () => {
-          const btn = document.getElementById(`edit-pessoa-${p.id}`);
-          if (btn) btn.addEventListener("click", () => {
-            infoWindow.close();
+        </div>`;
+
+      marker.bindPopup(html);
+      marker.on("popupopen", (e: any) => {
+        const popupEl = e.popup.getElement() as HTMLElement | null;
+        const btn = popupEl?.querySelector(`button[data-edit-id="${p.id}"]`);
+        if (btn) {
+          btn.addEventListener("click", () => {
+            map.closePopup();
             setEditing(p);
-          });
-        });
+          }, { once: true });
+        }
       });
-      bounds.extend({ lat: Number(p.lat), lng: Number(p.lng) });
-      return marker;
-    });
 
-    markersRef.current = markers;
-    markers.forEach((m) => m.setMap(mapRef.current));
-
-    if (markers.length > 0) {
-      mapRef.current.fitBounds(bounds, 60);
-      const listener = google.maps.event.addListenerOnce(mapRef.current, "bounds_changed", () => {
-        if (mapRef.current.getZoom() > 15) mapRef.current.setZoom(15);
-      });
-      void listener;
+      cluster.addLayer(marker);
+      bounds.extend([Number(p.lat), Number(p.lng)]);
     }
-  }, [filteredPins, loaded]);
+
+    if (filteredPins.length > 0 && bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+    }
+  }, [filteredPins]);
 
   const handleGeocode = async (force = false) => {
     if (geocoding) return;
@@ -280,7 +278,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
         const { data, error } = await supabase.functions.invoke("geocode-eleicao-pessoas", {
           body: {
             clientId,
-            limit: 25,
+            limit: 15,
             force: shouldForce,
             defaultCity: "Campo Grande",
             defaultState: "MS",
@@ -388,7 +386,7 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <div className="text-xs flex-1 min-w-[200px]">
               <p className="font-medium">{stats.pending} pessoa{stats.pending === 1 ? "" : "s"} com endereço sem coordenadas</p>
-              <p className="text-muted-foreground">A geocodificação tenta rua → bairro → cidade. Todo cadastro com cidade preenchida vai aparecer no mapa.</p>
+              <p className="text-muted-foreground">A geocodificação tenta rua → bairro → cidade via OpenStreetMap. Pode levar alguns segundos por endereço (limite gratuito).</p>
             </div>
             <Button size="sm" onClick={() => handleGeocode(false)} disabled={geocoding}>
               {geocoding ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
@@ -478,8 +476,6 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
             {(["coordenador", "lider", "cabo"] as const).map((t) => {
               const Icon = TIPO_ICON_RECORD[t];
               const active = activeTipos.has(t);
-              // Contagem real (todos os cadastros da cidade filtrada), não só pins geocodificados —
-              // bate com o total mostrado na aba Eleição.
               const count = pessoasNaCidade.filter((p) => p.tipo === t).length;
               const noMapa = filteredPins.filter((p) => p.tipo === t).length;
               return (
@@ -518,20 +514,12 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
       {/* Mapa */}
       <Card>
         <CardContent className="p-0 relative">
-          {mapsError ? (
-            <div className="h-[600px] flex items-center justify-center text-sm text-destructive p-4 text-center">
-              Erro carregando Google Maps: {mapsError}
-            </div>
-          ) : !loaded ? (
-            <div className="h-[600px] flex items-center justify-center">
+          {isLoading && (
+            <div className="absolute inset-0 z-[500] flex items-center justify-center bg-background/60">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : isLoading ? (
-            <div className="h-[600px] flex items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : null}
-          <div ref={mapDivRef} className="w-full h-[600px] rounded-md" style={{ display: loaded && !mapsError ? "block" : "none" }} />
+          )}
+          <div ref={mapDivRef} className="w-full h-[600px] rounded-md" />
         </CardContent>
       </Card>
 
@@ -587,7 +575,6 @@ function EditEnderecoDialog({
           numero: numero.trim() || null,
           bairro: bairro.trim() || null,
           cidade: cidade.trim() || null,
-          // limpa coordenadas para forçar regeocoding
           lat: null,
           lng: null,
           geocode_status: null,
@@ -599,7 +586,6 @@ function EditEnderecoDialog({
 
       toast.info("Endereço atualizado. Localizando no mapa…");
 
-      // dispara geocode pontual
       const { data, error: gErr } = await supabase.functions.invoke("geocode-eleicao-pessoas", {
         body: {
           clientId,
