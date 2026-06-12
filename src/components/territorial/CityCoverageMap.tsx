@@ -510,7 +510,10 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
             {(["coordenador", "lider", "cabo"] as const).map((t) => {
               const Icon = TIPO_ICON_RECORD[t];
               const active = activeTipos.has(t);
-              const count = filteredPins.filter((p) => p.tipo === t).length;
+              // Contagem real (todos os cadastros da cidade filtrada), não só pins geocodificados —
+              // bate com o total mostrado na aba Eleição.
+              const count = pessoasNaCidade.filter((p) => p.tipo === t).length;
+              const noMapa = filteredPins.filter((p) => p.tipo === t).length;
               return (
                 <Button
                   key={t}
@@ -523,7 +526,11 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
                   <span className="w-2 h-2 rounded-full" style={{ background: active ? "white" : TIPO_COLOR[t] }} />
                   <Icon className="w-3.5 h-3.5" />
                   {TIPO_LABEL[t]}
-                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{count}</Badge>
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 h-4 px-1 text-[10px]"
+                    title={`${noMapa} no mapa de ${count} cadastrados`}
+                  >{count}</Badge>
                 </Button>
               );
             })}
