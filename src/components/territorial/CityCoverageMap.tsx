@@ -285,12 +285,15 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
       let rounds = 0;
       let lastPending = Infinity;
       let stalledRounds = 0;
-      while (rounds < 60) {
+      let forcedRetry = false;
+      while (rounds < 80) {
+        const shouldForce = (force && rounds === 0) || (stalledRounds >= 2 && !forcedRetry);
+        if (shouldForce && rounds > 0) forcedRetry = true;
         const { data, error } = await supabase.functions.invoke("geocode-eleicao-pessoas", {
           body: {
             clientId,
             limit: 25,
-            force: force && rounds === 0,
+            force: shouldForce,
             defaultCity: "Campo Grande",
             defaultState: "MS",
             defaultCountry: "BR",
@@ -304,11 +307,11 @@ export function CityCoverageMap({ clientId }: { clientId: string }) {
         if (res.pending === 0) break;
         if (res.pending >= lastPending) {
           stalledRounds++;
-          if (stalledRounds >= 2) {
-            toast.warning(`Geocoding pausado: ${res.pending} pendentes. Verifique cidade nos cadastros.`);
+          if (stalledRounds >= 4) {
+            toast.warning(`${res.pending} sem cidade reconhecível — abra "Ver pendências" para editar`);
             break;
           }
-          await new Promise((r) => setTimeout(r, 3000));
+          await new Promise((r) => setTimeout(r, 2000));
         } else {
           stalledRounds = 0;
         }
