@@ -1,59 +1,67 @@
-## Diagnóstico confirmado
+## O que muda na página Territorial
 
-- Rafael Felipe está cadastrado como `cidade = Dourados`, `bairro = Dourados`, mas foi plotado dentro de Campo Grande porque a geocodificação está forçando Campo Grande/MS como padrão e ignorando a cidade do cadastro.
-- 1 cadastro de outra cidade já está contaminado; 56 estão sem coordenada.
-- A geocodificação precisa **respeitar a cidade real** de cada pessoa, e o mapa precisa **mostrar cada pessoa na sua própria cidade**, não jogar todo mundo em Campo Grande.
+### 1. Tirar as duas chavinhas redundantes
+No card de filtros do mapa (`CityCoverageMap.tsx`):
+- **Remover "Mostrar liderados"** — quem decide o tipo é o filtro lateral (Coordenador/Líder/Cabo) já existente. Liderados deixam de aparecer no mapa por padrão; se um dia quiserem ver, basta adicionar `liderado` ao mesmo filtro de tipo.
+- **Remover "Heatmap"** — pouco usado e dando erro (depende da lib `visualization` que não está sendo carregada). Some por completo, sem substituto.
 
-## Plano de correção
+O card de filtros fica só com: botões de tipo, busca por nome/bairro.
 
-### 1. Geocoding fiel à cidade do cadastro
-- A cidade enviada ao Google passa a ser **sempre a cidade do cadastro** (Campo Grande só é usado quando o campo cidade estiver vazio).
-- O `components` filter usa a cidade + UF do cadastro (não mais Campo Grande fixo).
-- A bounding box rígida de Campo Grande deixa de ser aplicada para cadastros de outras cidades — caso contrário Dourados nunca passaria na validação.
-- Validação por camadas:
-  1. País = BR
-  2. UF = MS (ou a UF cadastrada, quando houver)
-  3. Cidade do retorno bate com a cidade cadastrada (locality ou administrative_area_level_2)
-  4. Se houver bairro, tenta confirmar; se não bater, marca `bairro_nao_confirmado` em vez de gravar ponto torto
-- Se a cidade não bate, marca `city_mismatch` e não grava coordenada.
+### 2. Geocodificação sempre coloca o pino — fallback inteligente
 
-### 2. Corrigir registros já contaminados
-- Limpar `lat/lng/geocode_status/geocoded_at` de qualquer cadastro cuja `cidade` não seja Campo Grande mas esteja com coordenadas dentro da bounding box de Campo Grande.
-- Isso devolve Rafael Felipe (e similares) para a fila de geocodificação respeitando Dourados.
+Hoje, quando o Google não confirma a rua ou o bairro, a pessoa fica sem coordenada e desaparece do mapa. Vai passar a funcionar em **3 níveis de precisão**, sempre tentando do mais exato para o mais aproximado:
 
-### 3. Mapa mostra todas as cidades
-- O mapa de cobertura passa a plotar pessoas de **qualquer cidade** (Campo Grande, Dourados, Três Lagoas, etc.), cada uma na sua própria localização real.
-- O zoom inicial se ajusta automaticamente para abranger todos os pinos quando houver pessoas fora de Campo Grande.
-- Os ícones por tipo (coordenador, líder, cabo, liderado) continuam iguais — a única diferença é que agora aparecem na cidade correta.
+1. **Rua exata** (rua + número + bairro + cidade) → pino normal (cor cheia, tamanho atual).
+2. **Bairro** — se a rua não for encontrada ou não bater, tenta só `Bairro X, Cidade Y, MS`. Pino com borda tracejada/menor opacidade, indicando "posição aproximada no bairro".
+3. **Cidade** — se nem o bairro for encontrado (ou não houver bairro), cai no centro da cidade. Pino ainda menor/mais translúcido com tooltip "localização aproximada — cidade".
 
-### 4. Filtros e visão por cidade
-- Acrescentar um seletor de **Cidade** no topo do mapa, com as opções:
-  - Todas as cidades (padrão)
-  - Campo Grande
-  - Cada outra cidade que tiver pelo menos um cadastro
-- Acrescentar KPIs por cidade no painel:
-  - Total de pessoas por cidade
-  - Coordenadores / líderes / cabos por cidade
-  - Cidades com cobertura (pelo menos 1 coordenador) x cidades em lacuna
+Cada pessoa ganha um novo campo `geocode_precision` (`rua` | `bairro` | `cidade`) gravado junto com lat/lng. O status `geocode_status` continua existindo para auditoria (`ok`, `bairro_aproximado`, `cidade_aproximada`, `no_address`, `city_mismatch`).
 
-### 5. Painel de auditoria atualizado
-- Os contadores deixam de tratar “fora de Campo Grande” como erro.
-- Passam a existir os contadores:
-  - Sem cidade
-  - Sem bairro
-  - Cidade divergente (Google trouxe cidade diferente da cadastrada → pendência)
-  - Bairro não confirmado
-  - Sem coordenada
-- Lista de pendências mostra cidade, bairro, endereço e o motivo exato.
+Resultado: praticamente todo cadastro com cidade preenchida aparece no mapa. Só fica de fora quem realmente não tem nem cidade.
 
-### 6. Formulários de cadastro
-- Manter o campo Cidade visível e editável em todos os cadastros (Eleicao, Portal do Coordenador, NovaPessoaDialog).
-- Default sugerido continua Campo Grande, mas o usuário pode alterar livremente para Dourados, Três Lagoas, etc.
-- Garantir que ao alterar cidade/bairro/rua o gatilho do banco zere as coordenadas e recoloque na fila.
+No InfoWindow do pino, mostrar um aviso quando a precisão for `bairro` ou `cidade`: "📍 Posição aproximada — endereço sem rua confirmada. [Editar cadastro]".
 
-## Resultado esperado
+Os KPIs e o painel de qualidade passam a separar:
+- **No mapa (rua exata)**
+- **No mapa (aproximado por bairro)**
+- **No mapa (aproximado por cidade)**
+- **Sem cidade** (única categoria que realmente fica fora)
 
-- Rafael Felipe (Dourados) aparecerá no mapa **em Dourados**, com o pino do tipo correto.
-- Coordenadores e líderes de qualquer cidade entram no mapa, na sua cidade real.
-- Filtro permite olhar a equipe da cidade que você quiser.
-- Nenhuma pessoa de outra cidade é arrastada para Campo Grande por padrão de geocodificação.
+### 3. Editar cadastro direto do painel de pendências
+
+No bloco "Qualidade dos dados" → "Ver pendências", cada linha ganha um botão **Editar** ao lado do badge de motivo. Clicar abre o `EditarPessoaDialog` já existente, pré-carregado com a pessoa. Ao salvar, dispara automaticamente o geocode daquele id (`supabase.functions.invoke("geocode-eleicao-pessoas", { body: { clientId, ids: [id], force: true } })`) e atualiza a query do mapa.
+
+Isso fecha o loop: o usuário vê quem está com endereço ruim, corrige na hora e o pino aparece imediatamente.
+
+---
+
+## Detalhes técnicos
+
+**Migração**
+- `ALTER TABLE eleicao_pessoas ADD COLUMN geocode_precision text` (valores: `rua` | `bairro` | `cidade`).
+
+**Edge function `geocode-eleicao-pessoas`**
+- Reescrever `geocode()` para retornar `{ status, lat, lng, precision }`.
+- Fluxo:
+  1. Tenta endereço completo (rua+número+bairro+cidade) com `components` country/state/locality. Se vier `OK` com city match + bairro confirmado → `precision: 'rua'`.
+  2. Se city match mas bairro não confere, ou se results vazios, refaz a chamada com `address = "Bairro X, Cidade Y, MS"`. Sucesso → `precision: 'bairro'`.
+  3. Se ainda falhar, refaz com `address = "Cidade Y, MS"`. Sucesso → `precision: 'cidade'`.
+  4. Só devolve `no_address`/`city_mismatch` se nem a cidade for resolvível.
+- Status gravado: `ok` (rua), `bairro_aproximado`, `cidade_aproximada`, `city_mismatch`, `no_address`.
+
+**`CityCoverageMap.tsx`**
+- Remover `showLiderados` state + Switch.
+- Remover `heatmap` state + Switch + bloco `HeatmapLayer`.
+- `filteredPins` deixa de considerar `showLiderados` (se quiserem liderado, adicionam ao `activeTipos`).
+- Renderização de pino usa `pinSvg(color, size, { precision })`:
+  - `rua` → atual.
+  - `bairro` → mesma cor, opacity 0.7, borda tracejada.
+  - `cidade` → opacity 0.45, ícone menor com símbolo `~`.
+- Adicionar import e estado para abrir `EditarPessoaDialog` a partir da lista de pendências; após `onSaved`, invocar geocode pontual e `qc.invalidateQueries`.
+
+**Sem mudanças** em: filtro lateral de tipos, KPIs principais, painel de lacunas por bairro, fluxo de "Reprocessar tudo".
+
+---
+
+## O que o usuário precisa fazer depois
+Clicar **Reprocessar tudo** uma vez para que as pessoas que estavam travadas em `city_mismatch` / `bairro_nao_confirmado` ganhem coordenada aproximada e apareçam no mapa.
