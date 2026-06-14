@@ -385,6 +385,117 @@ export type Database = {
           },
         ]
       }
+      campaign_photo_galleries: {
+        Row: {
+          client_id: string
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          event_date: string | null
+          frame_id: string | null
+          id: string
+          nome: string
+          slug: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_date?: string | null
+          frame_id?: string | null
+          id?: string
+          nome: string
+          slug: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_date?: string | null
+          frame_id?: string | null
+          id?: string
+          nome?: string
+          slug?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_photo_galleries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_photo_galleries_frame_id_fkey"
+            columns: ["frame_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_frames"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_photo_gallery_items: {
+        Row: {
+          client_id: string
+          created_at: string
+          gallery_id: string
+          height: number | null
+          id: string
+          order_index: number
+          original_file_name: string | null
+          public_url: string
+          storage_path: string
+          width: number | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          gallery_id: string
+          height?: number | null
+          id?: string
+          order_index?: number
+          original_file_name?: string | null
+          public_url: string
+          storage_path: string
+          width?: number | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          gallery_id?: string
+          height?: number | null
+          id?: string
+          order_index?: number
+          original_file_name?: string | null
+          public_url?: string
+          storage_path?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_photo_gallery_items_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_photo_gallery_items_gallery_id_fkey"
+            columns: ["gallery_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_photo_galleries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campanha_tarefa_items: {
         Row: {
           client_id: string
@@ -659,6 +770,7 @@ export type Database = {
           name: string
           presence_absence_days_threshold: number
           presence_absence_message_template: string
+          public_slug: string | null
           updated_at: string | null
           user_id: string
           whatsapp_bridge_api_key: string | null
@@ -679,6 +791,7 @@ export type Database = {
           name: string
           presence_absence_days_threshold?: number
           presence_absence_message_template?: string
+          public_slug?: string | null
           updated_at?: string | null
           user_id: string
           whatsapp_bridge_api_key?: string | null
@@ -699,6 +812,7 @@ export type Database = {
           name?: string
           presence_absence_days_threshold?: number
           presence_absence_message_template?: string
+          public_slug?: string | null
           updated_at?: string | null
           user_id?: string
           whatsapp_bridge_api_key?: string | null
@@ -7928,6 +8042,14 @@ export type Database = {
           person_type: string
           presenca_obrigatoria: boolean
           telefone: string
+        }[]
+      }
+      get_public_client_by_slug: {
+        Args: { _slug: string }
+        Returns: {
+          id: string
+          logo_url: string
+          name: string
         }[]
       }
       get_tse_locais_summary: {
