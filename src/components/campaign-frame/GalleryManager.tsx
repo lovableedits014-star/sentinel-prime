@@ -155,8 +155,8 @@ export default function GalleryManager({ clientId, publicSlug }: Props) {
             size="sm"
             className="gap-1.5"
             onClick={() => {
-              navigator.clipboard.writeText(hubBase);
-              toast.success("Link do hub copiado");
+              navigator.clipboard.writeText(hubShareText);
+              toast.success("Link do hub copiado com convite");
             }}
           >
             <Link2 className="w-4 h-4" /> Copiar link do hub
