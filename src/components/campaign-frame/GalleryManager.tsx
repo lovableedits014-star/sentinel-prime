@@ -62,6 +62,19 @@ interface Props {
   publicSlug: string | null;
 }
 
+const buildShareText = (link: string, galleryName: string) => {
+  const dateStr = new Date().toLocaleDateString("pt-BR");
+  return [
+    `📸 Sua foto de *${galleryName}* já está pronta!`,
+    `Acesse o link e baixe a sua foto com a moldura oficial do evento:`,
+    `${link}`,
+    ``,
+    `✨ Corra antes que o "enviado por" apareça em outra foto! Baixe a sua agora e compartilhe com quem também participou.`,
+    ``,
+    `#FotosDoEvento #MolduraOficial`,
+  ].join("\n");
+};
+
 const getComposition = (f: Frame | null | undefined): FrameComposition => {
   if (!f) return DEFAULT_COMPOSITION;
   if (f.composition) return f.composition;
@@ -129,6 +142,17 @@ export default function GalleryManager({ clientId, publicSlug }: Props) {
     return `${origin}/g/${publicSlug || clientId}`;
   }, [publicSlug, clientId]);
 
+  const hubShareText = useMemo(() => {
+    const lines = [
+      `📸 As fotos do evento já estão disponíveis!`,
+      `Acesse o link e baixe a sua foto com a moldura oficial:`,
+      `${hubBase}`,
+      ``,
+      `✨ Compartilhe com quem também participou!`,
+    ];
+    return lines.join("\n");
+  }, [hubBase]);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -144,8 +168,8 @@ export default function GalleryManager({ clientId, publicSlug }: Props) {
             size="sm"
             className="gap-1.5"
             onClick={() => {
-              navigator.clipboard.writeText(hubBase);
-              toast.success("Link do hub copiado");
+              navigator.clipboard.writeText(hubShareText);
+              toast.success("Link do hub copiado com convite");
             }}
           >
             <Link2 className="w-4 h-4" /> Copiar link do hub
@@ -285,8 +309,9 @@ function GalleryCard({
             variant="outline"
             className="gap-1 h-8"
             onClick={() => {
-              navigator.clipboard.writeText(link);
-              toast.success("Link copiado");
+              const shareText = buildShareText(link, gallery.nome);
+              navigator.clipboard.writeText(shareText);
+              toast.success("Link copiado com convite");
             }}
             disabled={gallery.status !== "published"}
           >
@@ -533,8 +558,9 @@ function GalleryWorkspaceDialog({
               variant="ghost"
               className="h-7 gap-1"
               onClick={() => {
-                navigator.clipboard.writeText(link);
-                toast.success("Link copiado");
+                const shareText = buildShareText(link, gallery.nome);
+                navigator.clipboard.writeText(shareText);
+                toast.success("Link copiado com convite");
               }}
             >
               <Link2 className="w-3.5 h-3.5" /> Copiar link público
