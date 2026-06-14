@@ -20,6 +20,7 @@ export default function GaleriaPublica() {
   );
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [previews, setPreviews] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
