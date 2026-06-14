@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
-import { Camera, Link2 } from "lucide-react";
+import { Camera } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
@@ -27,11 +25,6 @@ export default function FotosCampanha() {
     })();
   }, [clientId]);
 
-  const hubUrl =
-    typeof window !== "undefined" && clientId
-      ? `${window.location.origin}/g/${publicSlug || clientId}`
-      : "";
-
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -46,19 +39,6 @@ export default function FotosCampanha() {
             </p>
           </div>
         </div>
-        {clientId && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => {
-              navigator.clipboard.writeText(hubUrl);
-              toast.success("Link público do candidato copiado");
-            }}
-          >
-            <Link2 className="w-4 h-4" /> Copiar link público
-          </Button>
-        )}
       </header>
 
       {!clientId ? (
