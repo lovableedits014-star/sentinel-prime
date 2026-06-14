@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, RefreshCw, Loader2, Copy, ThumbsUp, ThumbsDown, Wand2, Brain, Flame, HelpCircle, AlertTriangle, Heart, TrendingUp, TrendingDown, Minus, Calendar, Users, Siren, Zap, Telescope, FileAudio, Upload, Download, Trash2, Pencil, Megaphone, Hash, Database, FileText } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Copy, ThumbsUp, ThumbsDown, Wand2, Brain, Flame, HelpCircle, AlertTriangle, Heart, TrendingUp, TrendingDown, Minus, Calendar, Users, Siren, Zap, Telescope, FileAudio, Upload, Download, Trash2, Pencil, Megaphone, Hash, Database, FileText, Camera } from "lucide-react";
 import { MemoriaPanel } from "@/components/inteligencia-conteudo/MemoriaPanel";
 import { MateriasPanel } from "@/components/inteligencia-conteudo/MateriasPanel";
 import { toast } from "sonner";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { useIdeias, useUpdateIdeaStatus, useCreateIdea } from "@/hooks/ic/useIdeias";
 import { groupSegments, blocksToSrt, blocksToVtt, blocksToPlainText, downloadTextFile, type RawSegment, type SrtBlock, formatSrtTime } from "@/lib/srt";
+import FrameEditor from "@/components/campaign-frame/FrameEditor";
 
 const FUNC_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
@@ -58,7 +59,7 @@ export default function InteligenciaConteudo() {
       </header>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid grid-cols-7 w-full max-w-4xl">
+        <TabsList className="grid grid-cols-8 w-full max-w-5xl">
           <TabsTrigger value="radar"><Flame className="w-4 h-4 mr-1.5" />Radar</TabsTrigger>
           <TabsTrigger value="ideias"><Sparkles className="w-4 h-4 mr-1.5" />Ideias</TabsTrigger>
           <TabsTrigger value="estudio"><Wand2 className="w-4 h-4 mr-1.5" />Estúdio</TabsTrigger>
@@ -66,6 +67,7 @@ export default function InteligenciaConteudo() {
           <TabsTrigger value="transcricao"><FileAudio className="w-4 h-4 mr-1.5" />Transcrição</TabsTrigger>
           <TabsTrigger value="memoria"><Database className="w-4 h-4 mr-1.5" />Memória</TabsTrigger>
           <TabsTrigger value="materias"><FileText className="w-4 h-4 mr-1.5" />Matérias</TabsTrigger>
+          <TabsTrigger value="fotos"><Camera className="w-4 h-4 mr-1.5" />Fotos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="radar" className="mt-4">
@@ -88,6 +90,11 @@ export default function InteligenciaConteudo() {
         </TabsContent>
         <TabsContent value="materias" className="mt-4">
           {clientId && <MateriasPanel clientId={clientId} />}
+        </TabsContent>
+        <TabsContent value="fotos" className="mt-4">
+          {clientId ? <FrameEditor clientId={clientId} defaultTab="lote" /> : (
+            <Card><CardContent className="py-8 text-center text-muted-foreground">Sem cliente vinculado.</CardContent></Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

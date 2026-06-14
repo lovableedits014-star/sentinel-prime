@@ -66,6 +66,7 @@ const TelemarketingAdminOperadores = lazy(() => import("./pages/TelemarketingAdm
 const TelemarketingAdminConfig = lazy(() => import("./pages/TelemarketingAdminConfig"));
 const TelemarketingAdminCampanhas = lazy(() => import("./pages/TelemarketingAdminCampanhas"));
 const TelemarketingAdminFilas = lazy(() => import("./pages/TelemarketingAdminFilas"));
+const FotosCampanha = lazy(() => import("./pages/FotosCampanha"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
@@ -162,7 +163,8 @@ const RoutesWithBoundary = () => {
               <Route path="/telemarketing-admin/operadores" element={<TelemarketingAdminOperadores />} />
               <Route path="/telemarketing-admin/configuracoes" element={<TelemarketingAdminConfig />} />
               <Route path="/telemarketing-admin/campanhas" element={<TelemarketingAdminCampanhas />} />
-              <Route path="/telemarketing-admin/filas" element={<TelemarketingAdminFilas />} />
+            <Route path="/telemarketing-admin/filas" element={<TelemarketingAdminFilas />} />
+            <Route path="/fotos-campanha" element={<FotosCampanha />} />
               <Route path="/status-whatsapp" element={<Navigate to="/whatsapp?tab=status" replace />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

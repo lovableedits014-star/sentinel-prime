@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, MessageSquare, Settings, LogOut, Shield,
-  Users, TrendingUp, Crown, Menu, X, MapPin, BookUser, UserPlus, Kanban, Sparkles, Trophy, Target, Briefcase, Send, CalendarCheck, Vote, CalendarDays, Newspaper, Activity, Megaphone, Brain, Headphones,
+  Users, TrendingUp, Crown, Menu, X, MapPin, BookUser, UserPlus, Kanban, Sparkles, Trophy, Target, Briefcase, Send, CalendarCheck, Vote, CalendarDays, Newspaper, Activity, Megaphone, Brain, Headphones, Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -69,6 +69,7 @@ const MENU_SECTIONS: MenuSection[] = [
       { icon: Megaphone, label: "Militância Digital", path: "/militancia" },
       { icon: TrendingUp, label: "Engajamento", path: "/engagement" },
       { icon: Brain, label: "Inteligência de Conteúdo", path: "/inteligencia-conteudo" },
+      { icon: Camera, label: "Fotos de Campanha", path: "/fotos-campanha" },
     ],
   },
   {
