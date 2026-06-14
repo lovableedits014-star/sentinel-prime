@@ -69,6 +69,7 @@ const MENU_SECTIONS: MenuSection[] = [
       { icon: Megaphone, label: "Militância Digital", path: "/militancia" },
       { icon: TrendingUp, label: "Engajamento", path: "/engagement" },
       { icon: Brain, label: "Inteligência de Conteúdo", path: "/inteligencia-conteudo" },
+      { icon: Camera, label: "Fotos de Campanha", path: "/fotos-campanha" },
     ],
   },
   {
