@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { Camera } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
@@ -26,11 +24,6 @@ export default function FotosCampanha() {
       setPublicSlug((data as any)?.public_slug ?? null);
     })();
   }, [clientId]);
-
-  const hubUrl =
-    typeof window !== "undefined" && clientId
-      ? `${window.location.origin}/g/${publicSlug || clientId}`
-      : "";
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
