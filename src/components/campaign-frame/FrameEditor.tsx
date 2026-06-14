@@ -148,7 +148,7 @@ export default function FrameEditor({ clientId, defaultTab = "individual" }: Fra
     setGenerating(true);
     redraw();
     requestAnimationFrame(() => {
-      const url = canvasRef.current?.toDataURL("image/png");
+      const url = canvasRef.current?.toDataURL("image/jpeg", 0.82);
       setResultUrl(url ?? null);
       setGenerating(false);
       toast.success("Foto pronta!");
@@ -159,7 +159,7 @@ export default function FrameEditor({ clientId, defaultTab = "individual" }: Fra
     if (!resultUrl) return;
     const link = document.createElement("a");
     link.href = resultUrl;
-    link.download = `foto-campanha-${Date.now()}.png`;
+    link.download = `foto-campanha-${Date.now()}.jpg`;
     link.click();
   };
 

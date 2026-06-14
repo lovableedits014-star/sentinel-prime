@@ -26,11 +26,11 @@ export async function publishItemsToGallery(opts: {
       const blob = await resp.blob();
       const itemId =
         (crypto as any).randomUUID?.() ?? `${Date.now()}-${i}`;
-      const path = `${opts.clientId}/gallery/${opts.galleryId}/${itemId}.png`;
+      const path = `${opts.clientId}/gallery/${opts.galleryId}/${itemId}.jpg`;
 
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, blob, { contentType: "image/png", upsert: false });
+        .upload(path, blob, { contentType: "image/jpeg", upsert: false });
       if (upErr) throw upErr;
 
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
