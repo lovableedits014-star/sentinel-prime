@@ -125,13 +125,25 @@ export default function GaleriaPublica() {
                   to={`/g/${clientSlug}/${g.slug}`}
                   className="group block rounded-lg overflow-hidden border bg-card hover:shadow-md transition-shadow"
                 >
-                  <div className="aspect-video bg-muted relative">
-                    {g.cover_url ? (
-                      <img
-                        src={g.cover_url}
-                        alt={g.nome}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
+                  <div className="aspect-video bg-muted relative p-1">
+                    {(previews[g.id]?.length ?? 0) > 0 ? (
+                      <div className="grid grid-cols-3 grid-rows-3 gap-0.5 w-full h-full">
+                        {Array.from({ length: 9 }).map((_, i) => {
+                          const url = previews[g.id]?.[i];
+                          return (
+                            <div key={i} className="bg-muted overflow-hidden">
+                              {url && (
+                                <img
+                                  src={url}
+                                  alt=""
+                                  loading="lazy"
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         <ImageIcon className="w-8 h-8 opacity-40" />
