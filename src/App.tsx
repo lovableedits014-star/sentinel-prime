@@ -67,6 +67,8 @@ const TelemarketingAdminConfig = lazy(() => import("./pages/TelemarketingAdminCo
 const TelemarketingAdminCampanhas = lazy(() => import("./pages/TelemarketingAdminCampanhas"));
 const TelemarketingAdminFilas = lazy(() => import("./pages/TelemarketingAdminFilas"));
 const FotosCampanha = lazy(() => import("./pages/FotosCampanha"));
+const GaleriaPublica = lazy(() => import("./pages/GaleriaPublica"));
+const GaleriaEvento = lazy(() => import("./pages/GaleriaEvento"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
@@ -132,6 +134,8 @@ const RoutesWithBoundary = () => {
             <Route path="/portal-apoiador/:clientId" element={<SupporterPortal />} />
             <Route path="/pwa-start" element={<PwaStart />} />
             <Route path="/foto/:clientId" element={<FotoPublica />} />
+            <Route path="/g/:clientSlug" element={<GaleriaPublica />} />
+            <Route path="/g/:clientSlug/:gallerySlug" element={<GaleriaEvento />} />
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/comments" element={<Comments />} />
