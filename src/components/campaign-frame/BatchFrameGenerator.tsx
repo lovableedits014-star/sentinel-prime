@@ -102,6 +102,7 @@ export default function BatchFrameGenerator({ composition, frameName, batch: ext
                 key={it.id}
                 item={it}
                 index={idx}
+                composition={composition}
                 onAdjust={onAdjust}
                 onRemove={batch.removeItem}
                 onDownload={batch.downloadOne}
