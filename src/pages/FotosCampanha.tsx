@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Camera, Link2 } from "lucide-react";
+import { Camera } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -46,19 +46,6 @@ export default function FotosCampanha() {
             </p>
           </div>
         </div>
-        {clientId && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => {
-              navigator.clipboard.writeText(hubUrl);
-              toast.success("Link público do candidato copiado");
-            }}
-          >
-            <Link2 className="w-4 h-4" /> Copiar link público
-          </Button>
-        )}
       </header>
 
       {!clientId ? (
