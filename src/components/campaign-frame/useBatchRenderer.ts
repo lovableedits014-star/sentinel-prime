@@ -80,16 +80,10 @@ export function useBatchRenderer(composition: FrameComposition | null) {
 
   const rerenderItemWith = useCallback(async (id: string, patch: Partial<BatchItem>) => {
     await ensureCache();
-    setItems((cur) => cur.map((it) => (it.id === id ? { ...it, ...patch, status: "processing" } : it)));
-    let target: BatchItem | undefined;
-    setItems((cur) => {
-      target = cur.find((i) => i.id === id);
-      return cur;
-    });
-    // Use updated state by reading inside setItems above isn't reliable; rebuild from items + patch
     const base = items.find((i) => i.id === id);
     if (!base) return;
-    const merged: BatchItem = { ...base, ...patch };
+    const merged: BatchItem = { ...base, ...patch, status: "processing" };
+    setItems((cur) => cur.map((it) => (it.id === id ? merged : it)));
     const fresh = await renderOne(merged);
     setItems((cur) => cur.map((it) => (it.id === id ? fresh : it)));
   }, [ensureCache, items, renderOne]);

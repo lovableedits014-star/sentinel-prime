@@ -265,7 +265,7 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setResultUrl(null); } }}>
       <DialogTrigger asChild>{Trigger}</DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Gerar foto de campanha</DialogTitle>
           <DialogDescription>Suba sua foto, ajuste o enquadramento e baixe pronta para usar no WhatsApp e redes sociais.</DialogDescription>
