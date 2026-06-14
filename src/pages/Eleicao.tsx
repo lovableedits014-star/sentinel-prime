@@ -241,13 +241,19 @@ export default function Eleicao() {
 
   async function load() {
     setLoading(true);
+    // Usa RPC SECURITY DEFINER para garantir que todo team_member ativo do client
+    // veja a árvore completa (coordenadores + líderes + cabos), evitando casos
+    // em que a RLS por linha falha por timing de sessão/JWT.
     const { data, error } = await supabase
-      .from("eleicao_pessoas" as any)
-      .select("*")
-      .eq("client_id", clientId!)
-      .order("created_at", { ascending: false });
-    if (error) toast.error("Erro ao carregar: " + error.message);
-    else setPessoas((data as any) || []);
+      .rpc("get_eleicao_pessoas_for_client" as any, { _client_id: clientId! });
+    if (error) {
+      toast.error("Erro ao carregar: " + error.message);
+      setLoading(false);
+      return;
+    }
+    const rows = ((data as any) || []) as Pessoa[];
+    rows.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    setPessoas(rows);
     setLoading(false);
   }
 
