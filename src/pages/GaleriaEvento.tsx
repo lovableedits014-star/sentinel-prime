@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Sparkles,
   ArrowLeft,
   Download,
   Search,
@@ -148,23 +147,14 @@ export default function GaleriaEvento() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          {client?.logo_url ? (
-            <img src={client.logo_url} alt={client.name} className="w-9 h-9 object-contain" />
-          ) : (
-            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary" />
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <Link
-              to={`/g/${clientSlug}`}
-              className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1"
-            >
-              <ArrowLeft className="w-3 h-3" /> {client?.name}
-            </Link>
-            <h1 className="text-base font-semibold truncate">{gallery?.nome}</h1>
-          </div>
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <Link
+            to={`/g/${clientSlug}`}
+            className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1"
+          >
+            <ArrowLeft className="w-3 h-3" /> {client?.name}
+          </Link>
+          <h1 className="text-base font-semibold truncate">{gallery?.nome}</h1>
         </div>
       </header>
 
