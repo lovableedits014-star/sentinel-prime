@@ -1,30 +1,66 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Download, Loader2, Pencil, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import type { BatchItem } from "./useBatchRenderer";
+import { FrameComposition, preloadComposition, renderComposition } from "./types";
 
 interface Props {
   item: BatchItem;
   index: number;
+  composition: FrameComposition | null;
   onAdjust: (id: string, patch: Partial<BatchItem>) => void;
   onRemove: (id: string) => void;
   onDownload: (id: string) => void;
 }
 
-export default function BatchPhotoCard({ item, index, onAdjust, onRemove, onDownload }: Props) {
+export default function BatchPhotoCard({ item, index, composition, onAdjust, onRemove, onDownload }: Props) {
   const [open, setOpen] = useState(false);
   const [zoom, setZoom] = useState(item.zoom);
   const [offset, setOffset] = useState(item.offset);
-  const [dragging, setDragging] = useState(false);
-  const [start, setStart] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ active: boolean; startX: number; startY: number; baseX: number; baseY: number }>({
+    active: false, startX: 0, startY: 0, baseX: 0, baseY: 0,
+  });
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
+  const [ready, setReady] = useState(false);
+
+  // Preload composition once dialog opens
+  useEffect(() => {
+    if (!open || !composition) return;
+    let cancelled = false;
+    setReady(false);
+    preloadComposition(composition).then((c) => {
+      if (cancelled) return;
+      cacheRef.current = c;
+      setReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [open, composition]);
+
+  // Live redraw
+  useEffect(() => {
+    if (!open || !ready || !composition || !item.image) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    renderComposition(ctx, composition, {
+      photo: item.image,
+      photoZoom: zoom,
+      photoOffset: offset,
+      imageCache: cacheRef.current,
+    });
+  }, [open, ready, composition, item.image, zoom, offset]);
 
   const apply = () => {
     onAdjust(item.id, { zoom, offset });
     setOpen(false);
   };
+
+  const canvasW = composition?.canvas.width ?? 1080;
 
   return (
     <div className="border rounded-lg overflow-hidden bg-card flex flex-col">
@@ -91,25 +127,48 @@ export default function BatchPhotoCard({ item, index, onAdjust, onRemove, onDown
             <div
               className="aspect-square bg-muted rounded-lg overflow-hidden border touch-none select-none cursor-move relative"
               onPointerDown={(e) => {
-                setDragging(true);
-                setStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
-                (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                e.preventDefault();
+                dragRef.current = {
+                  active: true,
+                  startX: e.clientX,
+                  startY: e.clientY,
+                  baseX: offset.x,
+                  baseY: offset.y,
+                };
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
               }}
               onPointerMove={(e) => {
-                if (!dragging) return;
+                const d = dragRef.current;
+                if (!d.active) return;
                 const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-                const ratio = 1080 / rect.width;
-                setOffset({ x: (e.clientX - start.x) * ratio, y: (e.clientY - start.y) * ratio });
+                const ratio = canvasW / rect.width;
+                setOffset({
+                  x: d.baseX + (e.clientX - d.startX) * ratio,
+                  y: d.baseY + (e.clientY - d.startY) * ratio,
+                });
               }}
-              onPointerUp={() => setDragging(false)}
-              onPointerCancel={() => setDragging(false)}
+              onPointerUp={(e) => {
+                dragRef.current.active = false;
+                try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+              }}
+              onPointerCancel={() => { dragRef.current.active = false; }}
+              onWheel={(e) => {
+                e.preventDefault();
+                const delta = -e.deltaY * 0.0015;
+                setZoom((z) => Math.min(3, Math.max(0.5, +(z + delta).toFixed(2))));
+              }}
             >
-              {item.resultUrl && (
-                <img src={item.resultUrl} alt="preview" className="w-full h-full object-cover pointer-events-none opacity-60" />
+              <canvas
+                ref={canvasRef}
+                width={canvasW}
+                height={canvasW}
+                className="w-full h-full pointer-events-none"
+              />
+              {!ready && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/40">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
               )}
-              <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground pointer-events-none">
-                arraste para reposicionar
-              </div>
             </div>
             <div>
               <Label className="text-xs">Zoom ({zoom.toFixed(2)}x)</Label>
