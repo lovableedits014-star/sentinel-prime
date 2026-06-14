@@ -309,8 +309,9 @@ function GalleryCard({
             variant="outline"
             className="gap-1 h-8"
             onClick={() => {
-              navigator.clipboard.writeText(link);
-              toast.success("Link copiado");
+              const shareText = buildShareText(link, gallery.nome);
+              navigator.clipboard.writeText(shareText);
+              toast.success("Link copiado com convite");
             }}
             disabled={gallery.status !== "published"}
           >
@@ -557,8 +558,9 @@ function GalleryWorkspaceDialog({
               variant="ghost"
               className="h-7 gap-1"
               onClick={() => {
-                navigator.clipboard.writeText(link);
-                toast.success("Link copiado");
+                const shareText = buildShareText(link, gallery.nome);
+                navigator.clipboard.writeText(shareText);
+                toast.success("Link copiado com convite");
               }}
             >
               <Link2 className="w-3.5 h-3.5" /> Copiar link público
