@@ -10,11 +10,14 @@ import BatchPhotoCard from "./BatchPhotoCard";
 interface Props {
   composition: FrameComposition | null;
   frameName?: string;
+  /** Optional external batch (lets a parent share/publish the same items). */
+  batch?: ReturnType<typeof useBatchRenderer>;
 }
 
-export default function BatchFrameGenerator({ composition, frameName }: Props) {
+export default function BatchFrameGenerator({ composition, frameName, batch: externalBatch }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const batch = useBatchRenderer(composition);
+  const internalBatch = useBatchRenderer(composition);
+  const batch = externalBatch ?? internalBatch;
 
   const onPick = useCallback(async (files: FileList | null) => {
     if (!files || !files.length) return;
