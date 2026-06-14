@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, RefreshCw, Loader2, Copy, ThumbsUp, ThumbsDown, Wand2, Brain, Flame, HelpCircle, AlertTriangle, Heart, TrendingUp, TrendingDown, Minus, Calendar, Users, Siren, Zap, Telescope, FileAudio, Upload, Download, Trash2, Pencil, Megaphone, Hash, Database, FileText } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Copy, ThumbsUp, ThumbsDown, Wand2, Brain, Flame, HelpCircle, AlertTriangle, Heart, TrendingUp, TrendingDown, Minus, Calendar, Users, Siren, Zap, Telescope, FileAudio, Upload, Download, Trash2, Pencil, Megaphone, Hash, Database, FileText, Camera } from "lucide-react";
 import { MemoriaPanel } from "@/components/inteligencia-conteudo/MemoriaPanel";
 import { MateriasPanel } from "@/components/inteligencia-conteudo/MateriasPanel";
 import { toast } from "sonner";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { useIdeias, useUpdateIdeaStatus, useCreateIdea } from "@/hooks/ic/useIdeias";
 import { groupSegments, blocksToSrt, blocksToVtt, blocksToPlainText, downloadTextFile, type RawSegment, type SrtBlock, formatSrtTime } from "@/lib/srt";
+import FrameEditor from "@/components/campaign-frame/FrameEditor";
 
 const FUNC_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
