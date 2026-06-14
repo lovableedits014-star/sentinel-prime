@@ -129,6 +129,17 @@ export default function GalleryManager({ clientId, publicSlug }: Props) {
     return `${origin}/g/${publicSlug || clientId}`;
   }, [publicSlug, clientId]);
 
+  const hubShareText = useMemo(() => {
+    const lines = [
+      `📸 As fotos do evento já estão disponíveis!`,
+      `Acesse o link e baixe a sua foto com a moldura oficial:`,
+      `${hubBase}`,
+      ``,
+      `✨ Compartilhe com quem também participou!`,
+    ];
+    return lines.join("\n");
+  }, [hubBase]);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
