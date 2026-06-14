@@ -50,11 +50,19 @@ export default function GaleriaPublica() {
       if (list.length) {
         const { data: items } = await supabase
           .from("campaign_photo_gallery_items")
-          .select("gallery_id")
-          .in("gallery_id", list.map((g) => g.id));
+          .select("gallery_id,public_url,order_index")
+          .in("gallery_id", list.map((g) => g.id))
+          .order("order_index");
         const m: Record<string, number> = {};
-        for (const it of items ?? []) m[(it as any).gallery_id] = (m[(it as any).gallery_id] ?? 0) + 1;
+        const p: Record<string, string[]> = {};
+        for (const it of items ?? []) {
+          const gid = (it as any).gallery_id;
+          m[gid] = (m[gid] ?? 0) + 1;
+          if (!p[gid]) p[gid] = [];
+          if (p[gid].length < 9) p[gid].push((it as any).public_url);
+        }
         setCounts(m);
+        setPreviews(p);
       }
       setLoading(false);
     })();
