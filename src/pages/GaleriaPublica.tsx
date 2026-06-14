@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Camera, Image as ImageIcon, ArrowRight } from "lucide-react";
+import { Camera, Image as ImageIcon, ArrowRight } from "lucide-react";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 
 interface Gallery {
@@ -20,6 +20,7 @@ export default function GaleriaPublica() {
   );
   const [galleries, setGalleries] = useState<Gallery[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [previews, setPreviews] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -49,11 +50,19 @@ export default function GaleriaPublica() {
       if (list.length) {
         const { data: items } = await supabase
           .from("campaign_photo_gallery_items")
-          .select("gallery_id")
-          .in("gallery_id", list.map((g) => g.id));
+          .select("gallery_id,public_url,order_index")
+          .in("gallery_id", list.map((g) => g.id))
+          .order("order_index");
         const m: Record<string, number> = {};
-        for (const it of items ?? []) m[(it as any).gallery_id] = (m[(it as any).gallery_id] ?? 0) + 1;
+        const p: Record<string, string[]> = {};
+        for (const it of items ?? []) {
+          const gid = (it as any).gallery_id;
+          m[gid] = (m[gid] ?? 0) + 1;
+          if (!p[gid]) p[gid] = [];
+          if (p[gid].length < 9) p[gid].push((it as any).public_url);
+        }
         setCounts(m);
+        setPreviews(p);
       }
       setLoading(false);
     })();
@@ -72,18 +81,9 @@ export default function GaleriaPublica() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-          {client?.logo_url ? (
-            <img src={client.logo_url} alt={client.name} className="w-10 h-10 object-contain" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Galeria oficial</p>
-            <h1 className="text-base font-semibold truncate">{client?.name ?? "Campanha"}</h1>
-          </div>
+        <div className="max-w-4xl mx-auto px-4 py-3">
+          <p className="text-xs text-muted-foreground">Galeria oficial</p>
+          <h1 className="text-base font-semibold truncate">{client?.name ?? "Campanha"}</h1>
         </div>
       </header>
 
@@ -125,13 +125,25 @@ export default function GaleriaPublica() {
                   to={`/g/${clientSlug}/${g.slug}`}
                   className="group block rounded-lg overflow-hidden border bg-card hover:shadow-md transition-shadow"
                 >
-                  <div className="aspect-video bg-muted relative">
-                    {g.cover_url ? (
-                      <img
-                        src={g.cover_url}
-                        alt={g.nome}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
+                  <div className="aspect-video bg-muted relative p-1">
+                    {(previews[g.id]?.length ?? 0) > 0 ? (
+                      <div className="grid grid-cols-3 grid-rows-3 gap-0.5 w-full h-full">
+                        {Array.from({ length: 9 }).map((_, i) => {
+                          const url = previews[g.id]?.[i];
+                          return (
+                            <div key={i} className="bg-muted overflow-hidden">
+                              {url && (
+                                <img
+                                  src={url}
+                                  alt=""
+                                  loading="lazy"
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         <ImageIcon className="w-8 h-8 opacity-40" />
