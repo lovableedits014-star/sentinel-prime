@@ -14,8 +14,11 @@ export interface BatchItem {
   resultUrl?: string;
 }
 
-export const BATCH_MAX = 30;
+export const BATCH_MAX = 100;
 export const BATCH_MAX_FILE_MB = 10;
+export const OUTPUT_MIME = "image/jpeg";
+export const OUTPUT_QUALITY = 0.82;
+export const OUTPUT_EXT = "jpg";
 const CONCURRENCY = 3;
 const CANVAS_SIZE = 1080;
 
@@ -56,7 +59,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
         photoOffset: item.offset,
         imageCache: cacheRef.current,
       });
-      const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, OUTPUT_MIME, OUTPUT_QUALITY));
       if (!blob) throw new Error("toBlob");
       if (item.resultUrl) URL.revokeObjectURL(item.resultUrl);
       return { ...item, status: "ready", resultUrl: URL.createObjectURL(blob), error: undefined };
@@ -177,7 +180,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
       const resp = await fetch(it.resultUrl!);
       const blob = await resp.blob();
       const safeName = (it.fileName.replace(/\.[^.]+$/, "") || `foto-${i + 1}`).replace(/[^a-z0-9-_]+/gi, "_");
-      zip.file(`${String(i + 1).padStart(2, "0")}-${safeName}.png`, blob);
+      zip.file(`${String(i + 1).padStart(2, "0")}-${safeName}.${OUTPUT_EXT}`, blob);
     }
     const out = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(out);
@@ -193,7 +196,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
     if (!it?.resultUrl) return;
     const a = document.createElement("a");
     a.href = it.resultUrl;
-    a.download = `${it.fileName.replace(/\.[^.]+$/, "") || "foto"}-campanha.png`;
+    a.download = `${it.fileName.replace(/\.[^.]+$/, "") || "foto"}-campanha.${OUTPUT_EXT}`;
     a.click();
   }, [items]);
 
