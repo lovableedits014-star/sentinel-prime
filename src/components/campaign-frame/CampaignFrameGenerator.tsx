@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Camera, Download, ImageIcon, Loader2, Upload, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_COMPOSITION, FrameComposition, preloadComposition, renderComposition } from "./types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BatchFrameGenerator from "./BatchFrameGenerator";
 
 interface Frame {
   id: string;
@@ -276,71 +278,87 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
             <p className="text-xs mt-1">Peça ao administrador para configurar uma moldura.</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Preview canvas */}
-            <div className="space-y-3">
-              <div className="aspect-square w-full bg-muted rounded-lg overflow-hidden border touch-none select-none">
-                <canvas
-                  ref={canvasRef}
-                  width={CANVAS_SIZE}
-                  height={CANVAS_SIZE}
-                  className="w-full h-full cursor-move"
-                  onPointerDown={onPointerDown}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                  onPointerCancel={onPointerUp}
-                />
-              </div>
-              {photoFile && (
-                <div>
-                  <Label className="text-xs">Zoom</Label>
-                  <Slider value={[zoom]} min={0.5} max={3} step={0.05} onValueChange={(v) => setZoom(v[0])} />
-                  <p className="text-[11px] text-muted-foreground mt-1">Arraste a imagem para reposicionar</p>
+          <Tabs defaultValue="individual" className="w-full">
+            <TabsList className="grid grid-cols-2 w-full max-w-sm">
+              <TabsTrigger value="individual">Individual</TabsTrigger>
+              <TabsTrigger value="lote">Lote (várias fotos)</TabsTrigger>
+            </TabsList>
+
+            {frames.length > 1 && (
+              <div className="mt-4">
+                <Label className="text-xs mb-2 block">Moldura</Label>
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {frames.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setSelectedFrame(f)}
+                      className={`aspect-square rounded-md border-2 overflow-hidden transition-all ${selectedFrame?.id === f.id ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"}`}
+                    >
+                      <img src={f.image_url} alt={f.nome} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-
-            {/* Controls */}
-            <div className="space-y-4">
-              <div>
-                <Label className="text-xs mb-2 block">1. Sua foto</Label>
-                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
-                <Button variant="outline" className="w-full gap-2" onClick={() => fileInputRef.current?.click()}>
-                  {photoFile ? <Camera className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
-                  {photoFile ? "Trocar foto" : "Enviar foto"}
-                </Button>
               </div>
+            )}
 
-              {frames.length > 1 && (
-                <div>
-                  <Label className="text-xs mb-2 block">2. Moldura</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {frames.map((f) => (
-                      <button
-                        key={f.id}
-                        onClick={() => setSelectedFrame(f)}
-                        className={`aspect-square rounded-md border-2 overflow-hidden transition-all ${selectedFrame?.id === f.id ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-primary/50"}`}
-                      >
-                        <img src={f.image_url} alt={f.nome} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+            <TabsContent value="individual" className="mt-4">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Preview canvas */}
+                <div className="space-y-3">
+                  <div className="aspect-square w-full bg-muted rounded-lg overflow-hidden border touch-none select-none">
+                    <canvas
+                      ref={canvasRef}
+                      width={CANVAS_SIZE}
+                      height={CANVAS_SIZE}
+                      className="w-full h-full cursor-move"
+                      onPointerDown={onPointerDown}
+                      onPointerMove={onPointerMove}
+                      onPointerUp={onPointerUp}
+                      onPointerCancel={onPointerUp}
+                    />
+                  </div>
+                  {photoFile && (
+                    <div>
+                      <Label className="text-xs">Zoom</Label>
+                      <Slider value={[zoom]} min={0.5} max={3} step={0.05} onValueChange={(v) => setZoom(v[0])} />
+                      <p className="text-[11px] text-muted-foreground mt-1">Arraste a imagem para reposicionar</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Controls */}
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-xs mb-2 block">Sua foto</Label>
+                    <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                    <Button variant="outline" className="w-full gap-2" onClick={() => fileInputRef.current?.click()}>
+                      {photoFile ? <Camera className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
+                      {photoFile ? "Trocar foto" : "Enviar foto"}
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Button onClick={handleGenerate} disabled={!photoFile || generating} className="gap-2">
+                      {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      Gerar imagem final
+                    </Button>
+                    {resultUrl && (
+                      <Button variant="default" onClick={handleDownload} className="gap-2 bg-primary">
+                        <Download className="w-4 h-4" /> Baixar PNG (1080x1080)
+                      </Button>
+                    )}
                   </div>
                 </div>
-              )}
-
-              <div className="flex flex-col gap-2 pt-2">
-                <Button onClick={handleGenerate} disabled={!photoFile || generating} className="gap-2">
-                  {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  Gerar imagem final
-                </Button>
-                {resultUrl && (
-                  <Button variant="default" onClick={handleDownload} className="gap-2 bg-primary">
-                    <Download className="w-4 h-4" /> Baixar PNG (1080x1080)
-                  </Button>
-                )}
               </div>
-            </div>
-          </div>
+            </TabsContent>
+
+            <TabsContent value="lote" className="mt-4">
+              <BatchFrameGenerator
+                composition={selectedFrame ? getComposition(selectedFrame) : null}
+                frameName={selectedFrame?.nome}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </DialogContent>
     </Dialog>
