@@ -566,7 +566,7 @@ function GalleryWorkspaceDialog({
 
         <div className="border-t pt-3">
           <h4 className="text-sm font-semibold mb-2">Adicionar novas fotos</h4>
-          <BatchFrameGenerator composition={composition} frameName={frame?.nome} />
+          <BatchFrameGenerator composition={composition} frameName={frame?.nome} batch={batch} />
         </div>
 
         <DialogFooter className="flex-wrap gap-2">
