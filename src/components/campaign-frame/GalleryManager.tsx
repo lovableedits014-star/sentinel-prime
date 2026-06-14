@@ -60,6 +60,8 @@ interface Gallery {
 interface Props {
   clientId: string;
   publicSlug: string | null;
+}
+
 const buildShareText = (link: string, galleryName: string) => {
   const dateStr = new Date().toLocaleDateString("pt-BR");
   return [
