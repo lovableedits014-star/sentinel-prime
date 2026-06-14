@@ -1,74 +1,67 @@
-## Objetivo
-Adicionar uma aba **"Geração em lote"** ao sistema de molduras: o usuário escolhe uma moldura, sobe várias fotos de uma vez (ex.: 20–30), e o sistema gera automaticamente todas as versões com a moldura aplicada. Depois, em uma grade, ele pode ajustar **zoom e posição** de cada foto individualmente antes de baixar tudo (uma a uma ou em ZIP).
 
-## Fluxo do usuário
-1. Abre o gerador de fotos → nova aba **"Lote"** ao lado de "Individual".
-2. Seleciona a moldura desejada.
-3. Arrasta ou seleciona múltiplas fotos (até 30 por vez; cada uma até ~10MB; JPG/PNG/HEIC).
-4. O sistema processa todas em paralelo (Web Worker / fila) com auto-centralização inteligente da face/centro da imagem.
-5. Exibe uma **grade de miniaturas** com o resultado de cada foto. Cada miniatura mostra:
-   - Preview com a moldura aplicada
-   - Ícone de status (ok / erro / processando)
-   - Botão "Ajustar" → abre editor rápido (zoom + arrastar) só daquela foto
-   - Botão "Baixar"
-   - Botão "Remover"
-6. Botões globais no topo:
-   - **"Baixar todas (ZIP)"** — empacota todos os PNGs gerados
-   - **"Reaplicar a todas"** — caso troque de moldura no meio
-   - **"Limpar lote"**
+# Galerias públicas de fotos de campanha
 
-## Mudanças técnicas
+Hoje você monta as fotos em "Fotos de Campanha" (modo Lote) e precisa enviar uma por uma para cada pessoa. A ideia: criar **pastas/eventos públicos** onde as fotos já montadas ficam disponíveis para baixar via link, sem login.
 
-### Novos arquivos
-- `src/components/campaign-frame/BatchFrameGenerator.tsx` — UI principal do lote (upload, grade, controles globais).
-- `src/components/campaign-frame/BatchPhotoCard.tsx` — miniatura individual com mini-editor (zoom/offset) num popover ou dialog leve.
-- `src/components/campaign-frame/useBatchRenderer.ts` — hook que mantém o estado `BatchItem[]` e expõe `addFiles`, `updateItem`, `renderItem`, `renderAll`, `downloadZip`.
+## Como vai funcionar
 
-### Alteração
-- `src/components/campaign-frame/CampaignFrameGenerator.tsx`: envolver conteúdo do dialog em `<Tabs>` com `"Individual"` (atual) e `"Lote"` (novo `<BatchFrameGenerator />`). Reusar `frames`, `selectedFrame`, helpers `preloadComposition` / `renderComposition` já existentes.
+### 1. Admin (você) — nova aba "Galerias" em Fotos de Campanha
+- Botão **"Nova galeria/evento"** com:
+  - Nome (ex.: "Reunião nas Moreninhas")
+  - Data do evento (ex.: 14/06)
+  - Moldura padrão da galeria (escolhe entre as do cliente)
+  - Status: rascunho / publicada
+- Dentro da galeria, reaproveita o **Lote** atual: você envia 1–30 fotos (ou mais, em vários lotes), o sistema monta com a moldura, você ajusta posicionamento se quiser, e clica **"Publicar galeria"**.
+- Cada foto publicada vira um arquivo no Supabase Storage.
+- Lista de galerias mostra: nome, data, nº de fotos, link público (copiar), QR code, botão arquivar.
 
-### Tipos
-```ts
-interface BatchItem {
-  id: string;
-  fileName: string;
-  originalUrl: string;        // objectURL da foto enviada
-  image: HTMLImageElement | null;
-  zoom: number;               // default 1
-  offset: { x: number; y: number };
-  status: "queued" | "ready" | "error";
-  error?: string;
-  resultBlob?: Blob;           // PNG final
-  resultUrl?: string;          // objectURL do PNG
-}
-```
+### 2. Hub público do candidato — `/g/{clientSlug}`
+- Página pública com:
+  - Logo + nome do candidato (reusa `candidate_identity`)
+  - Bloco em destaque no topo: **"Monte sua foto agora"** (link/embed do `FrameEditor` já existente em `/foto/{clientId}`)
+  - Lista das galerias publicadas (cards com nome, data, miniatura, contagem de fotos), ordenadas por data desc
+- Sem login, sem PIN.
 
-### Renderização
-- Reutiliza `renderComposition()` num `OffscreenCanvas` (fallback: `<canvas>` invisível) de 1080×1080.
-- Pipeline por item: ler arquivo → `createImageBitmap` → render → `canvas.toBlob('image/png')` → guardar em `resultBlob`.
-- Processamento em paralelo limitado (concorrência = 3) para não travar o navegador.
-- Quando o usuário muda zoom/offset numa miniatura, só aquele item é re-renderizado.
+### 3. Página da galeria — `/g/{clientSlug}/{gallerySlug}`
+- Cabeçalho: nome do evento, data, voltar pro hub
+- Grid de miniaturas (todas as fotos montadas). Clique abre lightbox com **"Baixar PNG"** e **"Baixar todas (ZIP)"** no topo.
+- Busca simples por nome do arquivo (caso você nomeie "Maria.jpg" antes de subir, ela acha).
+- Mesmo bloco "Monte a sua" no rodapé.
 
-### Auto-centralização (melhoria)
-- Por padrão, a foto entra com `zoom=1` e centralizada (igual ao individual).
-- **Opcional, simples e sem custo**: detectar borda transparente / proporção e centralizar pelo maior eixo. (Detecção de face fica fora do escopo desta entrega para evitar dependências pesadas — pode ser uma melhoria futura via API.)
+## Detalhes técnicos
 
-### Download em lote
-- Adicionar dependência `jszip` (leve, ~95KB, funciona no browser).
-- Botão **"Baixar todas (ZIP)"** gera `campanha-fotos-{timestamp}.zip` com arquivos `foto-01.png … foto-NN.png` (preserva nome original quando possível).
+### Banco (migration)
+- `campaign_photo_galleries`: `id`, `client_id`, `slug` (único por cliente), `nome`, `event_date`, `frame_id` (fk `campaign_frames`), `status` (draft/published), `cover_photo_id`, `created_at`, `created_by`.
+- `campaign_photo_gallery_items`: `id`, `gallery_id`, `original_file_name`, `storage_path`, `public_url`, `width`, `height`, `order_index`, `created_at`.
+- RLS: leitura pública apenas quando `status='published'` (gallery + items); escrita só pelo time do cliente (segue padrão das demais tabelas).
+- Grants padrão: `authenticated` CRUD; `anon` SELECT só em galerias publicadas.
 
-### Limites e UX
-- Limite recomendado: **30 fotos por lote** (configurável via constante). Acima disso, avisar e cortar.
-- Tamanho máximo por foto: 10MB. Validação no input.
-- Indicador de progresso global: `"Processando 7 de 24..."`.
-- Erros por foto não interrompem o lote (ex.: arquivo corrompido vira card com status "erro" e botão remover).
+### Storage
+- Bucket público novo `campaign-gallery` (ou reusa um existente público se já houver). Caminho: `{clientId}/{galleryId}/{itemId}.png`.
+- Render acontece no browser (já funciona no Lote); ao "Publicar", faz upload do Blob de cada item e cria a linha em `gallery_items`.
 
-## Fora do escopo (sugestões para depois)
-- Detecção automática de face (precisaria de modelo ML no browser ou API).
-- Salvar lote no Supabase para continuar depois.
-- Aplicar molduras diferentes para fotos diferentes no mesmo lote.
+### Rotas TanStack
+- `src/routes/g.$clientSlug.tsx` — hub público (SSR, head com OG do candidato).
+- `src/routes/g.$clientSlug.$gallerySlug.tsx` — galeria pública (SSR, head com nome+data do evento, og:image = capa).
+- Loaders chamam server fns públicas (`createServerFn` + `supabaseAdmin` carregado dentro do handler) que retornam só galerias publicadas.
+- `clientSlug` = novo campo `public_slug` em `clients` (ou usa `id` se vazio — fallback).
 
-## Resumo de arquivos
-- **Criar**: `BatchFrameGenerator.tsx`, `BatchPhotoCard.tsx`, `useBatchRenderer.ts`
-- **Editar**: `CampaignFrameGenerator.tsx` (adicionar Tabs)
-- **Dependência nova**: `jszip`
+### Admin UI
+- Em `src/pages/FotosCampanha.tsx`: nova aba "Galerias" ao lado de Individual/Lote.
+- Novo componente `GalleryManager.tsx` (lista + criar/editar) e `GalleryBatchUploader.tsx` (reusa `useBatchRenderer` + passo final "Publicar").
+- Ao publicar: itera `items.filter(ready)`, faz `fetch(resultUrl).blob()` → `supabase.storage.upload` → `insert gallery_items`.
+
+### Download em massa
+- Reusa lógica do `downloadZip` já existente, mas baixando de `public_url` no client.
+
+## Fora de escopo desta entrega
+- Reconhecimento facial / busca por selfie.
+- PIN / expiração de link (decidido: público por link).
+- Notificação automática (WhatsApp em massa avisando que a galeria saiu) — pode virar próximo passo, conectando ao módulo de disparos existente.
+
+## Entregáveis
+1. Migration (2 tabelas + RLS + grants) e bucket de storage.
+2. Server fns públicas para hub e galeria.
+3. 2 rotas públicas novas (`/g/...`).
+4. Aba "Galerias" no admin com criar / upload em lote / publicar / copiar link.
+5. Botão "Compartilhar galeria" (copia link + abre WhatsApp web com mensagem pronta).
