@@ -81,18 +81,9 @@ export default function GaleriaPublica() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-          {client?.logo_url ? (
-            <img src={client.logo_url} alt={client.name} className="w-10 h-10 object-contain" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Galeria oficial</p>
-            <h1 className="text-base font-semibold truncate">{client?.name ?? "Campanha"}</h1>
-          </div>
+        <div className="max-w-4xl mx-auto px-4 py-3">
+          <p className="text-xs text-muted-foreground">Galeria oficial</p>
+          <h1 className="text-base font-semibold truncate">{client?.name ?? "Campanha"}</h1>
         </div>
       </header>
 
