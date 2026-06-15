@@ -7,10 +7,11 @@ import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import FrameEditor from "@/components/campaign-frame/FrameEditor";
 import GalleryManager from "@/components/campaign-frame/GalleryManager";
+import MaterialsManager from "@/components/campaign-materials/MaterialsManager";
 
 export default function FotosCampanha() {
   const { data: clientId } = useCurrentClientId();
-  const [tab, setTab] = useState<"editor" | "galerias">("editor");
+  const [tab, setTab] = useState<"editor" | "galerias" | "materiais">("editor");
   const [publicSlug, setPublicSlug] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export default function FotosCampanha() {
           <TabsList>
             <TabsTrigger value="editor">Editor (individual/lote)</TabsTrigger>
             <TabsTrigger value="galerias">Galerias públicas</TabsTrigger>
+            <TabsTrigger value="materiais">Materiais</TabsTrigger>
           </TabsList>
           <TabsContent value="editor" className="mt-4 space-y-4">
             <div className="flex items-center gap-2">
@@ -61,6 +63,9 @@ export default function FotosCampanha() {
           </TabsContent>
           <TabsContent value="galerias" className="mt-4">
             <GalleryManager clientId={clientId} publicSlug={publicSlug} />
+          </TabsContent>
+          <TabsContent value="materiais" className="mt-4">
+            <MaterialsManager clientId={clientId} />
           </TabsContent>
         </Tabs>
       )}

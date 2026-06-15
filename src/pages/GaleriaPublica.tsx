@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Image as ImageIcon, ArrowRight } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Camera, Image as ImageIcon, ArrowRight, FileText } from "lucide-react";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
+import PublicMaterialsTab from "@/components/campaign-materials/PublicMaterialsTab";
 
 interface Gallery {
   id: string;
@@ -101,70 +103,92 @@ export default function GaleriaPublica() {
           </section>
         )}
 
-        {/* Galerias */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">Eventos e fotos</h2>
-            <span className="text-xs text-muted-foreground">{galleries.length} galeria(s)</span>
-          </div>
+        {/* Conteúdo: Eventos + Materiais */}
+        <section>
+          <Tabs defaultValue="eventos">
+            <TabsList className="grid w-full grid-cols-2 max-w-sm">
+              <TabsTrigger value="eventos">
+                <Camera className="w-4 h-4 mr-1.5" />Eventos
+              </TabsTrigger>
+              <TabsTrigger value="materiais">
+                <FileText className="w-4 h-4 mr-1.5" />Materiais
+              </TabsTrigger>
+            </TabsList>
 
-          {loading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">Carregando…</div>
-          ) : galleries.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                <ImageIcon className="w-10 h-10 mx-auto opacity-40 mb-2" />
-                Nenhuma galeria publicada ainda. Volte em breve!
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {galleries.map((g) => (
-                <Link
-                  key={g.id}
-                  to={`/g/${clientSlug}/${g.slug}`}
-                  className="group block rounded-lg overflow-hidden border bg-card hover:shadow-md transition-shadow"
-                >
-                  <div className="aspect-video bg-muted relative p-1">
-                    {(previews[g.id]?.length ?? 0) > 0 ? (
-                      <div className="grid grid-cols-3 grid-rows-3 gap-0.5 w-full h-full">
-                        {Array.from({ length: 9 }).map((_, i) => {
-                          const url = previews[g.id]?.[i];
-                          return (
-                            <div key={i} className="bg-muted overflow-hidden">
-                              {url && (
-                                <img
-                                  src={url}
-                                  alt=""
-                                  loading="lazy"
-                                  className="w-full h-full object-cover"
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
+            <TabsContent value="eventos" className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold">Eventos e fotos</h2>
+                <span className="text-xs text-muted-foreground">{galleries.length} galeria(s)</span>
+              </div>
+
+              {loading ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">Carregando…</div>
+              ) : galleries.length === 0 ? (
+                <Card>
+                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                    <ImageIcon className="w-10 h-10 mx-auto opacity-40 mb-2" />
+                    Nenhuma galeria publicada ainda. Volte em breve!
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {galleries.map((g) => (
+                    <Link
+                      key={g.id}
+                      to={`/g/${clientSlug}/${g.slug}`}
+                      className="group block rounded-lg overflow-hidden border bg-card hover:shadow-md transition-shadow"
+                    >
+                      <div className="aspect-video bg-muted relative p-1">
+                        {(previews[g.id]?.length ?? 0) > 0 ? (
+                          <div className="grid grid-cols-3 grid-rows-3 gap-0.5 w-full h-full">
+                            {Array.from({ length: 9 }).map((_, i) => {
+                              const url = previews[g.id]?.[i];
+                              return (
+                                <div key={i} className="bg-muted overflow-hidden">
+                                  {url && (
+                                    <img
+                                      src={url}
+                                      alt=""
+                                      loading="lazy"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <ImageIcon className="w-8 h-8 opacity-40" />
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        <ImageIcon className="w-8 h-8 opacity-40" />
+                      <div className="p-3">
+                        <p className="font-medium truncate">{g.nome}</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Camera className="w-3 h-3" />
+                          {counts[g.id] ?? 0} fotos
+                          {g.event_date && (
+                            <> · {new Date(g.event_date + "T00:00:00").toLocaleDateString("pt-BR")}</>
+                          )}
+                          <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </p>
                       </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <p className="font-medium truncate">{g.nome}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Camera className="w-3 h-3" />
-                      {counts[g.id] ?? 0} fotos
-                      {g.event_date && (
-                        <> · {new Date(g.event_date + "T00:00:00").toLocaleDateString("pt-BR")}</>
-                      )}
-                      <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="materiais" className="mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold">Materiais para baixar</h2>
+              </div>
+              {client && (
+                <PublicMaterialsTab clientId={client.id} clientName={client.name} />
+              )}
+            </TabsContent>
+          </Tabs>
         </section>
       </main>
 
