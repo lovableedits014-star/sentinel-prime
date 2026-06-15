@@ -385,6 +385,74 @@ export type Database = {
           },
         ]
       }
+      campaign_materials: {
+        Row: {
+          client_id: string
+          cover_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          download_count: number
+          id: string
+          kind: string
+          mime_type: string
+          order_index: number
+          public_url: string
+          size_bytes: number
+          status: string
+          storage_path: string
+          tags: string[]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          download_count?: number
+          id?: string
+          kind: string
+          mime_type: string
+          order_index?: number
+          public_url: string
+          size_bytes?: number
+          status?: string
+          storage_path: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          cover_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          download_count?: number
+          id?: string
+          kind?: string
+          mime_type?: string
+          order_index?: number
+          public_url?: string
+          size_bytes?: number
+          status?: string
+          storage_path?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_materials_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_photo_galleries: {
         Row: {
           client_id: string
@@ -8151,6 +8219,10 @@ export type Database = {
         Returns: boolean
       }
       ic_trigger_monthly_drift: { Args: never; Returns: undefined }
+      increment_material_download: {
+        Args: { _material_id: string }
+        Returns: undefined
+      }
       is_client_manager: {
         Args: { _client_id: string; _user_id: string }
         Returns: boolean
