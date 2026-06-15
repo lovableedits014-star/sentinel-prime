@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
-import { Camera, Image as ImageIcon, ArrowRight } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Camera, Image as ImageIcon, ArrowRight, FileText } from "lucide-react";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
+import PublicMaterialsTab from "@/components/campaign-materials/PublicMaterialsTab";
 
 interface Gallery {
   id: string;
