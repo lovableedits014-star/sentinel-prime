@@ -7,10 +7,11 @@ import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import FrameEditor from "@/components/campaign-frame/FrameEditor";
 import GalleryManager from "@/components/campaign-frame/GalleryManager";
+import MaterialsManager from "@/components/campaign-materials/MaterialsManager";
 
 export default function FotosCampanha() {
   const { data: clientId } = useCurrentClientId();
-  const [tab, setTab] = useState<"editor" | "galerias">("editor");
+  const [tab, setTab] = useState<"editor" | "galerias" | "materiais">("editor");
   const [publicSlug, setPublicSlug] = useState<string | null>(null);
 
   useEffect(() => {
