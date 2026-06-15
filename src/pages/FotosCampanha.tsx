@@ -53,6 +53,7 @@ export default function FotosCampanha() {
           <TabsList>
             <TabsTrigger value="editor">Editor (individual/lote)</TabsTrigger>
             <TabsTrigger value="galerias">Galerias públicas</TabsTrigger>
+            <TabsTrigger value="materiais">Materiais</TabsTrigger>
           </TabsList>
           <TabsContent value="editor" className="mt-4 space-y-4">
             <div className="flex items-center gap-2">
@@ -62,6 +63,9 @@ export default function FotosCampanha() {
           </TabsContent>
           <TabsContent value="galerias" className="mt-4">
             <GalleryManager clientId={clientId} publicSlug={publicSlug} />
+          </TabsContent>
+          <TabsContent value="materiais" className="mt-4">
+            <MaterialsManager clientId={clientId} />
           </TabsContent>
         </Tabs>
       )}
