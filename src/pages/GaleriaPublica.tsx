@@ -1,9 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Camera, Image as ImageIcon, ArrowRight, FileText } from "lucide-react";
+import {
+  Camera,
+  Image as ImageIcon,
+  ArrowRight,
+  FileText,
+  Download,
+  ArrowDown,
+  Gift,
+} from "lucide-react";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import PublicMaterialsTab from "@/components/campaign-materials/PublicMaterialsTab";
 
@@ -25,6 +35,9 @@ export default function GaleriaPublica() {
   const [previews, setPreviews] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [materialCount, setMaterialCount] = useState<number>(0);
+  const [tab, setTab] = useState<"eventos" | "materiais">("eventos");
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!clientSlug) return;
@@ -39,15 +52,25 @@ export default function GaleriaPublica() {
         return;
       }
       setClient(c as any);
-      const { data: gs } = await supabase
-        .from("campaign_photo_galleries")
-        .select("id,slug,nome,event_date,cover_url")
-        .eq("client_id", (c as any).id)
-        .eq("status", "published")
-        .order("event_date", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false });
+      const clientId = (c as any).id;
+
+      const [{ data: gs }, { count: matCount }] = await Promise.all([
+        supabase
+          .from("campaign_photo_galleries")
+          .select("id,slug,nome,event_date,cover_url")
+          .eq("client_id", clientId)
+          .eq("status", "published")
+          .order("event_date", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("campaign_materials")
+          .select("id", { count: "exact", head: true })
+          .eq("client_id", clientId)
+          .eq("status", "published"),
+      ]);
       const list = (gs ?? []) as any as Gallery[];
       setGalleries(list);
+      setMaterialCount(matCount ?? 0);
 
       if (list.length) {
         const { data: items } = await supabase
@@ -80,16 +103,36 @@ export default function GaleriaPublica() {
     );
   }
 
+  const goToMateriais = () => {
+    setTab("materiais");
+    setTimeout(() => {
+      tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3">
-          <p className="text-xs text-muted-foreground">Galeria oficial</p>
-          <h1 className="text-base font-semibold truncate">{client?.name ?? "Campanha"}</h1>
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">Galeria oficial</p>
+            <h1 className="text-base font-semibold truncate">{client?.name ?? "Campanha"}</h1>
+          </div>
+          {materialCount > 0 && (
+            <Button
+              size="sm"
+              onClick={goToMateriais}
+              className="shrink-0 gap-1.5 animate-pulse"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Baixar materiais</span>
+              <span className="sm:hidden">Materiais</span>
+            </Button>
+          )}
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Featured: gerar sua foto */}
         {client && (
           <section className="space-y-3">
@@ -103,15 +146,46 @@ export default function GaleriaPublica() {
           </section>
         )}
 
+        {/* CTA destacado para materiais */}
+        {materialCount > 0 && (
+          <button
+            type="button"
+            onClick={goToMateriais}
+            className="w-full rounded-xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors p-4 flex items-center gap-3 text-left"
+          >
+            <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+              <Gift className="w-6 h-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-base">
+                👇 Baixe {materialCount} material{materialCount > 1 ? "is" : ""} de campanha
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Imagens, vídeos e PDFs prontos para compartilhar no WhatsApp
+              </p>
+            </div>
+            <ArrowDown className="w-5 h-5 text-primary shrink-0 animate-bounce" />
+          </button>
+        )}
+
         {/* Conteúdo: Eventos + Materiais */}
-        <section>
-          <Tabs defaultValue="eventos">
-            <TabsList className="grid w-full grid-cols-2 max-w-sm">
+        <section ref={tabsRef} className="scroll-mt-20">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "eventos" | "materiais")}>
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
               <TabsTrigger value="eventos">
                 <Camera className="w-4 h-4 mr-1.5" />Eventos
               </TabsTrigger>
-              <TabsTrigger value="materiais">
-                <FileText className="w-4 h-4 mr-1.5" />Materiais
+              <TabsTrigger value="materiais" className="relative">
+                <FileText className="w-4 h-4 mr-1.5" />
+                Materiais
+                {materialCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="ml-1.5 h-5 px-1.5 text-[10px] font-bold"
+                  >
+                    {materialCount}
+                  </Badge>
+                )}
               </TabsTrigger>
             </TabsList>
 
@@ -180,10 +254,15 @@ export default function GaleriaPublica() {
               )}
             </TabsContent>
 
-            <TabsContent value="materiais" className="mt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold">Materiais para baixar</h2>
+            <TabsContent value="materiais" className="mt-4 space-y-3">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <Download className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-bold">Materiais para baixar e compartilhar</h2>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Clique em <strong>Baixar</strong> e depois compartilhe nos seus grupos. Toque no
+                botão verde para enviar direto no WhatsApp.
+              </p>
               {client && (
                 <PublicMaterialsTab clientId={client.id} clientName={client.name} />
               )}
