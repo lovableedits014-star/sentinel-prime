@@ -137,6 +137,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       envio_cabo_boas_vindas_ativo: cfg.envio_cabo_boas_vindas_ativo,
       cadastro_lider_ativo: cfg.cadastro_lider_ativo,
       cadastro_cabo_ativo: cfg.cadastro_cabo_ativo,
+      cadastro_voluntario_ativo: cfg.cadastro_voluntario_ativo,
     };
     const q = cfg.id
       ? supabase.from("eleicao_notif_config" as any).update(payload).eq("id", cfg.id)
