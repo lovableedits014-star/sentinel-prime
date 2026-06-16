@@ -567,7 +567,7 @@ function PessoaRow({ p, onDelete, clientId, small, linkGrupo, gruposLinks, regia
         variant="ghost"
         className="h-7 w-7 text-emerald-600 opacity-70 hover:opacity-100"
         title={linkGrupo ? "Enviar boas-vindas (grupo + foto) via WhatsApp" : "Enviar link da foto via WhatsApp"}
-        onClick={() => sendBoasVindasWhats(p, clientId, { linkGrupo, regiao, candidatoNome })}
+        onClick={() => sendBoasVindasWhats(p, clientId, { linkGrupo, gruposLinks, regiao, candidatoNome })}
       >
         <Send className="w-3.5 h-3.5" />
       </Button>
