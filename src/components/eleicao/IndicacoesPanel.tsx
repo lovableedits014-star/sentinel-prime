@@ -86,6 +86,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [savingConfig, setSavingConfig] = useState(false);
   const [gerando, setGerando] = useState<string | null>(null);
   const [candidatoNome, setCandidatoNome] = useState<string>("");
+  const [addingFor, setAddingFor] = useState<string | null>(null);
 
   // ===== Disparo em massa =====
   const TEMPLATE_PADRAO = {
