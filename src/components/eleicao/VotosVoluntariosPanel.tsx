@@ -411,12 +411,11 @@ export default function VotosVoluntariosPanel({
                       </Button>
                     </div>
                   </div>
-                  {expanded && r.token && (
+                  {expanded && r.token && !bloqueado && (
                     <div className="px-2.5 pb-2.5">
                       <QuickAddIndicado
                         token={r.token}
                         nomePessoa={r.nome}
-                        disabled={bloqueado}
                         onAdded={(id) => onIndicadoAdded(r.token!, id)}
                       />
                     </div>
