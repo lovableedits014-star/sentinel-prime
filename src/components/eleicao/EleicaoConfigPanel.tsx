@@ -233,6 +233,17 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
             </div>
             <Switch checked={cfg.cadastro_cabo_ativo} onCheckedChange={(v) => setCfg(c => ({ ...c, cadastro_cabo_ativo: v }))} />
           </label>
+          <label className="flex items-center justify-between gap-3 p-3 rounded-md border bg-muted/30 sm:col-span-2">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Cadastro de Votos Voluntários</div>
+              <div className="text-[11px] text-muted-foreground">
+                {cfg.cadastro_voluntario_ativo
+                  ? "Coordenadores, líderes e cabos podem cadastrar eleitores indicados pelos links pessoais"
+                  : "Bloqueado em todos os links de indicação (portal do coordenador e página pública)"}
+              </div>
+            </div>
+            <Switch checked={cfg.cadastro_voluntario_ativo} onCheckedChange={(v) => setCfg(c => ({ ...c, cadastro_voluntario_ativo: v }))} />
+          </label>
         </div>
         <p className="text-[11px] text-muted-foreground">
           Dica: para travar somente <em>um</em> coordenador, use o menu de ações dele na lista de pessoas em "Eleição".
