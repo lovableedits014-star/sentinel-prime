@@ -772,7 +772,7 @@ export default function Eleicao() {
       </Tabs>
 
       {view === "custos" ? (
-        <PrevisaoCustos pessoas={pessoas as any} />
+        <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
       ) : view === "pendentes" ? (
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
       ) : view === "grupo" ? (
