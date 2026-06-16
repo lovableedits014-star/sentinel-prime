@@ -471,7 +471,7 @@ export default function PortalCoordenador() {
         )}
 
         {/* Votos voluntários — eleitores que NÃO são contratados */}
-        <VotosVoluntariosPanel coordenadorId={me.id} candidatoNome={candidatoNome} />
+        <VotosVoluntariosPanel coordenadorId={me.id} candidatoNome={candidatoNome} bloqueado={!globalCfg.cadastro_voluntario_ativo} />
       </main>
 
       {/* Dialog de cadastro */}
