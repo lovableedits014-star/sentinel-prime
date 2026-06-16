@@ -1,80 +1,108 @@
-## Contexto
+## Modelo: dobradinha herdada da "raiz"
 
-A campanha é do **estadual principal** (sempre o "dono" da operação). Alguns coordenadores/líderes/cabos trabalham também para um **deputado federal parceiro** (dobradinha). O federal entra ajudando a bancar parte dos custos dessas pessoas. A arte e os fluxos de divulgação **não mudam** — continuam centralizados no estadual; o que muda é a **gestão financeira e o relatório por candidato**.
+A dobradinha passa a ser uma decisão da **raiz do time**:
 
-## O que já existe
+- **Coordenadores** são raízes.
+- **Líderes avulsos** (sem coordenador) também são raízes independentes.
+- Líderes vinculados a um coordenador e todos os cabos **herdam** o federal + rateio da sua raiz. Não é possível sobrescrever individualmente.
 
-- `eleicao_pessoas` com `valor_contratacao`, `escopo`, `regiao/cidade`, `parent_id` (hierarquia coord → líder → cabo).
-- Aba "Previsão de custos" (`PrevisaoCustos.tsx`) somando totais por tipo / escopo / região.
-- `PendentesValorPanel`, `IndicacoesPanel`, `EntradaGrupoPanel`, etc.
-- Não há nenhuma noção de "candidato parceiro" hoje — todo custo é tratado como único.
+Visualmente, o "time" do coordenador (ele + líderes + cabos abaixo) inteiro vira a unidade de cálculo dos custos para aquele federal.
 
-## Modelo proposto
+## Mudanças de banco
 
-### 1. Cadastro de candidatos parceiros (federais)
+### 1. Marcar quem é "raiz" da dobradinha (conceito implícito, sem nova coluna)
+- Coordenador: sempre raiz.
+- Líder com `parent_id IS NULL` (avulso): raiz.
+- Demais: herdam — `parceiro_id` / `rateio_*` deixam de ser editáveis na UI individual, mas continuam armazenados (servem como "cache" propagado, mais simples de consultar).
 
-Nova tabela `eleicao_candidatos_parceiros` por `client_id`:
-- `nome`, `cargo` (ex.: "Deputado Federal"), `partido`, `numero_urna`, `foto_url`, `cor` (badge), `ativo`.
-- Permite cadastrar quantos federais quiserem; cada um aparece como chip colorido no app.
+### 2. RPC `eleicao_aplicar_dobradinha_raiz`
+SECURITY DEFINER, recebe `_raiz_id`, `_parceiro_id`, `_rateio_estadual`, `_rateio_parceiro`, `_propagar boolean`.
+- Atualiza a raiz.
+- Se `_propagar = true`: atualiza recursivamente todos os descendentes (líderes → cabos) com o mesmo federal/rateio.
+- Se `_propagar = false`: só a raiz; descendentes mantêm o que tinham (útil quando o usuário responder "não" no diálogo de propagação).
+- Valida que a raiz é coordenador ou líder avulso e que o cliente bate.
+- Retorna a contagem de pessoas atualizadas (para o toast: "12 pessoas do time foram atualizadas").
 
-### 2. Vínculo pessoa ↔ federal + rateio
+### 3. Trigger de coerência no cadastro de pessoa
+Quando uma pessoa não-raiz (líder com `parent_id` ou cabo) é inserida ou tem o `parent_id` alterado:
+- O trigger preenche automaticamente `parceiro_id`, `rateio_estadual`, `rateio_parceiro` com os valores da raiz (sobe na árvore até achar coordenador ou líder avulso).
+- Garante que um líder/cabo nunca fique "desalinhado" da sua raiz sem que o usuário escolha.
 
-Acrescentar em `eleicao_pessoas`:
-- `parceiro_id uuid` (nullable) → referência ao federal da dobradinha (ou NULL = só estadual).
-- `rateio_estadual numeric default 100` (0–100) — % que o estadual paga.
-- `rateio_parceiro numeric default 0` — % que o federal paga (soma deve dar 100, validado por trigger).
-- Atalhos no formulário: botões "100% estadual", "100% federal", "50/50", "custom".
+## Mudanças na UI
 
-Hierarquia: ao criar um líder/cabo abaixo de um coordenador já vinculado a um federal, o sistema **sugere** o mesmo federal (mas permite trocar — útil para o cenário "coordenador do estadual com líderes que trabalham pro federal").
+### 1. Formulário de pessoa (`Eleicao.tsx`)
+- A seção "Dobradinha" **só aparece** quando `tipo === "coordenador"` OU (`tipo === "lider"` e `liderAvulso` marcado).
+- Para líder/cabo vinculado: aparece um aviso somente-leitura mostrando o federal/rateio herdado da raiz, com um link "editar no coordenador".
+- Ao salvar uma raiz com dobradinha **alterada** (em edição), dispara o **diálogo de propagação** (item 3 abaixo) antes de gravar.
 
-### 3. Previsão de custos repensada
+### 2. Nova aba "Dobradinhas" (visão central de gestão)
+Adicionar `<TabsTrigger value="dobradinhas">Dobradinhas</TabsTrigger>` na barra de abas da Eleição (ao lado de "Previsão de custos").
 
-Reformular `PrevisaoCustos.tsx` para mostrar:
+Conteúdo da aba — componente novo `DobradinhasManagerPanel.tsx`:
+- Tabela de **raízes** (coordenadores + líderes avulsos), com: nome, escopo/região, qtd de pessoas no time, custo total do time, federal designado (badge colorido), rateio.
+- Filtros: escopo, região/cidade, "só sem dobradinha", "só com dobradinha do federal X".
+- Ações por linha:
+  - Select inline do federal parceiro.
+  - Atalhos de rateio (100/0, 70/30, 50/50, 0/100, custom).
+  - Botão "Aplicar" → chama a RPC com `_propagar=true`.
+- **Ação em massa** no topo: selecionar várias raízes via checkbox → "Designar federal X com rateio Y para selecionadas".
+- Card-resumo no topo da aba: "X coordenadores sem dobradinha · Y times designados · Total já comprometido com cada federal".
 
-- **Card-resumo por candidato** (estadual + cada federal): total a pagar, qtd de pessoas envolvidas, % do bolo total.
-- Gráfico de barras empilhadas: por tipo (coord/líder/cabo) × candidato pagador.
-- Tabela "Quem paga quem": linha por pessoa com colunas `valor total | estadual paga | federal paga | federal nome`.
-- Filtro no topo da aba: "Ver custos de: [Todos | Estadual | Federal X | Federal Y]" — recalcula todos os gráficos.
-- Por região/cidade: mantém, mas com toggle "consolidado / só estadual / só federal X".
+### 3. Diálogo de propagação (`DobradinhaPropagarDialog.tsx`)
+Disparado quando:
+- Usuário edita uma raiz no formulário e muda federal ou rateio E a raiz já tem descendentes.
+- Usuário muda federal de uma raiz na aba "Dobradinhas" e ela já tem descendentes.
 
-### 4. Indicações e ranking
+Conteúdo:
+- "O time de [Nome] tem **N líderes e M cabos**. Aplicar a nova dobradinha para todos?"
+- Lista resumida dos descendentes que serão alterados.
+- Botões: "Sim, aplicar para o time todo" (propagar=true) · "Não, só este coordenador" (propagar=false) · "Cancelar".
 
-- `IndicacoesPanel` e ranking de telemarketing: adicionar filtro por `parceiro_id` para responder "quantos votos o time do Federal X está trazendo".
-- Os indicados continuam únicos (estamos pedindo voto pros dois), só muda a atribuição de quem trouxe.
+### 4. Cadastro de novo coordenador/líder avulso
+- Mantém a seção dobradinha visível.
+- Ao salvar, descendentes ainda não existem, então não precisa de diálogo — só grava.
 
-### 5. Exportações
+### 5. Listagem de pessoas (RegionBlock e afins)
+- Badge colorido do federal ao lado do nome **da raiz**.
+- Líderes/cabos abaixo herdam visualmente: badge menor "↳ [cor do federal]" ou tooltip "Time do federal X".
 
-- `ExportEleicaoDialog` ganha opção "Separar por candidato" → gera um PDF/Excel por candidato com pessoas, custos e indicações daquele federal + o estadual.
-- Útil na hora de prestar contas e mostrar pro federal o que ele está bancando.
+## Mudanças em `PrevisaoCustos`
 
-### 6. UI — onde isso aparece
+Hoje já soma `valor * rateio / 100` por pessoa. Como a propagação garante que cada descendente tem o `parceiro_id` correto, o cálculo atual continua funcionando — mas precisa de uma camada de agrupamento por "time da raiz":
 
-- **Nova mini-aba** "Dobradinhas" dentro de Configurações da Eleição → CRUD dos federais parceiros.
-- Formulário de cadastro de pessoa (`NovaPessoaDialog` da eleição): nova seção "Dobradinha" com select do federal + sliders/atalhos de rateio.
-- Listagem de pessoas: badge colorido do federal ao lado do nome quando houver.
-- "Previsão de custos": filtro de candidato no topo + cards-resumo por candidato.
+- **Novo card** "Custo por time" mostrando: nome do coordenador/líder avulso + federal + custo total do time + qtd de pessoas. Ordenado pelo custo decrescente.
+- O breakdown por candidato (cards no topo) já funciona corretamente.
+- Tabela "Quem paga quem" ganha coluna "Time de" (mostra o nome da raiz quando a pessoa for descendente).
+- Mantém todos os outros gráficos.
+
+## Migração de dados existentes
+
+Migration adicional para alinhar quem já está cadastrado:
+- Para cada coordenador e líder avulso existente: mantém seus valores atuais como "verdade da raiz".
+- Para cada líder vinculado e cabo: sobrescreve `parceiro_id`/rateio com os da raiz (ascendente). Garante consistência inicial.
+
+## Fora do escopo
+
+- Sobrescrita individual (já decidido: "coordenador manda no time").
+- Designação por região inteira em vez de por raiz (pode virar atalho no futuro se você pedir).
+- Mudanças em artes, fluxos de WhatsApp, links públicos — continua tudo centralizado no estadual.
 
 ## Detalhes técnicos
 
-- Migrations:
-  1. `CREATE TABLE eleicao_candidatos_parceiros` (com GRANTs + RLS por client_id, espelhando o padrão de `eleicao_regioes`).
-  2. `ALTER TABLE eleicao_pessoas ADD COLUMN parceiro_id`, `rateio_estadual`, `rateio_parceiro` + trigger validando soma = 100 e parceiro_id consistente com rateio>0.
-- Backfill: todas as pessoas existentes ficam com `parceiro_id NULL`, `rateio_estadual=100`, `rateio_parceiro=0` (comportamento atual preservado).
-- `useRegioesEleicao`-equivalente: criar `useCandidatosParceiros` (CRUD + cache).
-- `PrevisaoCustos.tsx`: refator do `useMemo` para agrupar por `parceiro_id` calculando `valor * rateio_x / 100`.
-- Sem mudanças em: artes, frames, materiais, disparos, fluxos de WhatsApp (conforme combinado).
-
-## Fora do escopo (não vou mexer agora)
-
-- Arte e materiais da dobradinha (federal traz por fora).
-- Links públicos / grupos separados por federal.
-- Disparos segmentados por federal.
+- **Migration 1**: cria a RPC `eleicao_aplicar_dobradinha_raiz` (recursive CTE descendo pela árvore `parent_id`).
+- **Migration 2**: trigger `BEFORE INSERT OR UPDATE OF parent_id` em `eleicao_pessoas` que herda da raiz quando a pessoa não é raiz.
+- **Migration 3**: backfill alinhando descendentes às raízes atuais.
+- **Frontend**:
+  - `useDobradinhaRaizes(clientId)` — hook agregando raízes com qtd de descendentes e custo do time (cálculo client-side a partir das pessoas já carregadas).
+  - `DobradinhasManagerPanel.tsx` — nova aba.
+  - `DobradinhaPropagarDialog.tsx` — diálogo reutilizado pelo form e pela aba.
+  - Ajustes em `Eleicao.tsx` (form: esconder/exibir dobradinha por tipo, hook do diálogo) e `PrevisaoCustos.tsx` (card "Custo por time").
 
 ## Entregáveis
 
-1. Migration criando tabela de parceiros + colunas de dobradinha em `eleicao_pessoas`.
-2. CRUD de candidatos parceiros (config).
-3. Campo de dobradinha + rateio no cadastro/edição de pessoa.
-4. `PrevisaoCustos` reformulado com filtro por candidato e visão "quem paga quem".
-5. Filtro por parceiro em Indicações e ranking.
-6. Exportação separada por candidato.
+1. Migration: RPC de aplicação + trigger de herança + backfill.
+2. Aba "Dobradinhas" com listagem de raízes, filtros e ação em massa.
+3. Diálogo de propagação (raiz alterada vs. time montado).
+4. Form ajustado: só raízes editam dobradinha; descendentes mostram herança em modo leitura.
+5. `PrevisaoCustos`: card "Custo por time" + coluna "Time de" na tabela de dobradinhas.
+6. Badge colorido do federal na listagem (raiz com badge cheio, descendentes com indicador menor).
