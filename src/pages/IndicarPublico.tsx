@@ -110,6 +110,7 @@ export default function IndicarPublico() {
         limite_diario: "Você atingiu o limite diário de indicações — tente amanhã",
         token_invalido: "Link inválido",
         token_revogado: "Esse link foi desativado pelo administrador",
+        cadastros_bloqueados: "Cadastros temporariamente bloqueados pela administração da campanha. Tente novamente em alguns minutos.",
       };
       toast.warning(msg[r?.motivo] || "Não foi possível registrar");
       return;
