@@ -12,6 +12,7 @@ import { Crown, Users, UserCheck, LogOut, Plus, Trash2, Phone, MapPin, Loader2, 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
+import VotosVoluntariosPanel from "@/components/eleicao/VotosVoluntariosPanel";
 
 function buildFotoLink(clientId: string) {
   const base = (typeof window !== "undefined" ? window.location.origin : "").replace(/\/$/, "");
@@ -23,10 +24,37 @@ function waPhone(p: string) {
   if (d.startsWith("55")) return d;
   return d.length <= 11 ? "55" + d : d;
 }
-function sendFotoWhats(pessoa: { nome: string; telefone: string }, clientId: string) {
+
+/**
+ * Mensagem combinada de boas-vindas: (1) convite para o grupo da região +
+ * (2) link da foto/moldura de perfil oficial. Se o grupo não estiver
+ * configurado, envia só a parte da foto.
+ */
+function sendBoasVindasWhats(
+  pessoa: { nome: string; telefone: string },
+  clientId: string,
+  ctx: { linkGrupo: string | null; regiao: string | null; candidatoNome: string },
+) {
   const phone = waPhone(pessoa.telefone);
-  const link = buildFotoLink(clientId);
-  const msg = `Oi ${pessoa.nome}! Gere sua foto de perfil oficial da campanha aqui: ${link}`;
+  const linkFoto = buildFotoLink(clientId);
+  const primeiro = pessoa.nome.split(" ")[0] || pessoa.nome;
+  const candidato = ctx.candidatoNome ? ` da campanha do ${ctx.candidatoNome}` : "";
+  const regiaoLbl = ctx.regiao ? ` da região ${ctx.regiao}` : "";
+
+  let msg: string;
+  if (ctx.linkGrupo) {
+    msg =
+      `Oi ${primeiro}! Que bom ter você com a gente${candidato}. 🙌\n\n` +
+      `1) Entre no nosso grupo de WhatsApp${regiaoLbl} — é por lá que a gente alinha as missões, manda os conteúdos pra você compartilhar nas redes e tira dúvidas em tempo real:\n` +
+      `${ctx.linkGrupo}\n\n` +
+      `2) Aproveite e já troque sua foto de perfil pela moldura oficial — ajuda muito a fortalecer nossa presença nas redes:\n` +
+      `${linkFoto}`;
+  } else {
+    msg =
+      `Oi ${primeiro}! Que bom ter você com a gente${candidato}. 🙌\n\n` +
+      `Já troque sua foto de perfil pela moldura oficial — ajuda muito a fortalecer nossa presença nas redes:\n` +
+      `${linkFoto}`;
+  }
   const url = phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
     : `https://wa.me/?text=${encodeURIComponent(msg)}`;
@@ -61,6 +89,8 @@ export default function PortalCoordenador() {
   const [clientName, setClientName] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [globalCfg, setGlobalCfg] = useState<{ cadastro_lider_ativo: boolean; cadastro_cabo_ativo: boolean }>({ cadastro_lider_ativo: true, cadastro_cabo_ativo: true });
+  const [linkGrupo, setLinkGrupo] = useState<string | null>(null);
+  const [candidatoNome, setCandidatoNome] = useState<string>("");
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -84,13 +114,27 @@ export default function PortalCoordenador() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { navigate(`/portal/${clientId}`); return; }
     const { data: cl } = await supabase.from("clients").select("name").eq("id", clientId!).maybeSingle();
-    if (cl) setClientName(cl.name);
+    if (cl) {
+      setClientName(cl.name);
+      setCandidatoNome(cl.name || "");
+    }
+
+    // Link do grupo da região (eleicao_notif_config.grupos_links: { regiao: url })
+    const { data: notifCfg } = await supabase
+      .from("eleicao_notif_config" as any)
+      .select("grupos_links")
+      .eq("client_id", clientId!)
+      .maybeSingle();
 
     const { data: meRow } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("user_id", session.user.id).eq("client_id", clientId!).eq("tipo", "coordenador")
       .maybeSingle();
     if (!meRow) { navigate(`/portal/${clientId}`); return; }
     setMe(meRow as any);
+
+    const grupos = ((notifCfg as any)?.grupos_links ?? {}) as Record<string, string>;
+    const reg = (meRow as any).regiao as string | null;
+    setLinkGrupo(reg && grupos[reg] ? grupos[reg] : null);
 
     const { data: tr } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("client_id", clientId!).order("nome");
@@ -303,6 +347,15 @@ export default function PortalCoordenador() {
             <p className="text-xs text-muted-foreground mb-2">
               Gere sua foto com a moldura oficial ou copie o link acima e envie para apoiadores.
             </p>
+            {linkGrupo ? (
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mb-2">
+                ✓ Ao clicar no botão verde de WhatsApp ao lado de cada líder/cabo, a mensagem já vai com <strong>convite para o grupo da região</strong> + <strong>link da foto</strong> juntos.
+              </p>
+            ) : (
+              <p className="text-[11px] text-amber-700 dark:text-amber-400 mb-2">
+                ⚠️ Grupo da região {me.regiao || ""} não configurado — peça ao administrador para incluí-lo e o convite vai junto com a foto automaticamente.
+              </p>
+            )}
             {clientId && <CampaignFrameGenerator clientId={clientId} variant="showcase" />}
           </CardContent>
         </Card>
@@ -339,8 +392,8 @@ export default function PortalCoordenador() {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-emerald-600"
-                        title="Enviar link da foto via WhatsApp"
-                        onClick={() => sendFotoWhats(l, clientId!)}
+                        title={linkGrupo ? "Enviar boas-vindas (grupo + foto) via WhatsApp" : "Enviar link da foto via WhatsApp"}
+                        onClick={() => sendBoasVindasWhats(l, clientId!, { linkGrupo, regiao: me.regiao, candidatoNome })}
                       >
                         <Send className="w-4 h-4" />
                       </Button>
@@ -349,7 +402,7 @@ export default function PortalCoordenador() {
                       <div className="px-3 pb-3 pt-1 border-t bg-muted/20">
                         <div className="ml-2 space-y-1">
                           {cabosDoLider.length === 0 && <p className="text-xs text-muted-foreground py-1">Sem cabos vinculados.</p>}
-                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small />)}
+                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small linkGrupo={linkGrupo} regiao={me.regiao} candidatoNome={candidatoNome} />)}
                         </div>
                         <div className="flex gap-2 mt-2">
                           <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)} disabled={!permiteCabo} title={motivoCabo || undefined}>
@@ -373,10 +426,13 @@ export default function PortalCoordenador() {
             <CardHeader className="pb-2"><CardTitle className="text-base">Cabos diretos</CardTitle></CardHeader>
             <CardContent className="space-y-1">
               {myCabosDir.length === 0 && <p className="text-sm text-muted-foreground">Nenhum cabo direto.</p>}
-              {myCabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} />)}
+              {myCabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} linkGrupo={linkGrupo} regiao={me.regiao} candidatoNome={candidatoNome} />)}
             </CardContent>
           </Card>
         )}
+
+        {/* Votos voluntários — eleitores que NÃO são contratados */}
+        <VotosVoluntariosPanel coordenadorId={me.id} candidatoNome={candidatoNome} />
       </main>
 
       {/* Dialog de cadastro */}
@@ -466,7 +522,15 @@ export default function PortalCoordenador() {
   );
 }
 
-function PessoaRow({ p, onDelete, clientId, small }: { p: Pessoa; onDelete: (id: string) => void; clientId: string; small?: boolean }) {
+function PessoaRow({ p, onDelete, clientId, small, linkGrupo, regiao, candidatoNome }: {
+  p: Pessoa;
+  onDelete: (id: string) => void;
+  clientId: string;
+  small?: boolean;
+  linkGrupo: string | null;
+  regiao: string | null;
+  candidatoNome: string;
+}) {
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
   return (
@@ -485,8 +549,8 @@ function PessoaRow({ p, onDelete, clientId, small }: { p: Pessoa; onDelete: (id:
         size="icon"
         variant="ghost"
         className="h-7 w-7 text-emerald-600 opacity-70 hover:opacity-100"
-        title="Enviar link da foto via WhatsApp"
-        onClick={() => sendFotoWhats(p, clientId)}
+        title={linkGrupo ? "Enviar boas-vindas (grupo + foto) via WhatsApp" : "Enviar link da foto via WhatsApp"}
+        onClick={() => sendBoasVindasWhats(p, clientId, { linkGrupo, regiao, candidatoNome })}
       >
         <Send className="w-3.5 h-3.5" />
       </Button>

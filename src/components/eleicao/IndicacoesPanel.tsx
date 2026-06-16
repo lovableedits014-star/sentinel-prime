@@ -89,10 +89,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
   // ===== Disparo em massa =====
   const TEMPLATE_PADRAO = {
-    zerados: "Oi {primeiro_nome}! Ainda não recebemos nenhuma indicação sua para {candidato}. Sua meta é de {meta} indicações. Use seu link para começar agora: {link}",
-    abaixo: "Olá {primeiro_nome}! Faltam {faltam} indicações para você bater sua meta de {meta} para {candidato}. Vamos lá! 👉 {link}",
-    ok: "Obrigado pelas {total} indicações, {primeiro_nome}! Continue compartilhando seu link para {candidato}: {link}",
-    all: "Olá {primeiro_nome}! Compartilhe seu link de indicação para {candidato}: {link}",
+    zerados: "Oi {primeiro_nome}! Ainda não recebemos nenhuma indicação de voto voluntário sua para {candidato}. Lembrando: aqui você cadastra ELEITORES (pessoas que vão votar de verdade, não contratadas). Sua meta é {meta}. Use seu link: {link}",
+    abaixo: "Olá {primeiro_nome}! Faltam {faltam} indicações de votos voluntários (eleitores reais) para bater sua meta de {meta} em {candidato}. 👉 {link}",
+    ok: "Obrigado pelas {total} indicações de votos voluntários, {primeiro_nome}! Continue cadastrando eleitores em {candidato}: {link}",
+    all: "Olá {primeiro_nome}! Use seu link para cadastrar votos voluntários (eleitores) em {candidato}: {link}",
   } as const;
   const [massOpen, setMassOpen] = useState(false);
   const [massTemplate, setMassTemplate] = useState<string>(TEMPLATE_PADRAO.abaixo);
@@ -167,8 +167,8 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     const link = r.token ? buildLink(r.token) : "";
     const falta = Math.max(0, r.meta - r.total_indicacoes);
     const msg = falta > 0
-      ? `Olá ${r.nome.split(" ")[0]}! Faltam ${falta} indicações para sua meta${candidatoNome ? ` de votos em ${candidatoNome}` : ""}. Use seu link: ${link}`
-      : `Olá ${r.nome.split(" ")[0]}! Obrigado pelas suas indicações${candidatoNome ? ` para ${candidatoNome}` : ""}. Continue indicando: ${link}`;
+      ? `Olá ${r.nome.split(" ")[0]}! Faltam ${falta} indicações de votos voluntários (eleitores reais, não contratados)${candidatoNome ? ` para ${candidatoNome}` : ""}. Use seu link: ${link}`
+      : `Olá ${r.nome.split(" ")[0]}! Obrigado pelas indicações de votos voluntários${candidatoNome ? ` para ${candidatoNome}` : ""}. Continue cadastrando eleitores: ${link}`;
     return waLink(r.telefone || "", msg);
   }
 
@@ -413,18 +413,18 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                               </Button>
                               {r.telefone && (
                                 <a href={whatsCobranca(r)} target="_blank" rel="noreferrer">
-                                  <Button size="sm" variant="ghost" title="Cobrar via WhatsApp">
+                                  <Button size="sm" variant="ghost" title="Enviar link via WhatsApp">
                                     <MessageCircle className="w-4 h-4 text-emerald-600" />
                                   </Button>
                                 </a>
                               )}
-                              <Button size="sm" variant="ghost" title="Regenerar link" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
+                              <Button size="sm" variant="ghost" title="Regenerar link (avançado — invalida o anterior)" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
                                 {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                               </Button>
                             </>
                           ) : (
-                            <Button size="sm" variant="outline" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
-                              {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><LinkIcon className="w-4 h-4 mr-1.5" />Gerar link</>}
+                            <Button size="sm" variant="outline" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id} title="Link ainda não criado">
+                              {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><LinkIcon className="w-4 h-4 mr-1.5" />Criar link</>}
                             </Button>
                           )}
                         </div>
