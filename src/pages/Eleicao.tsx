@@ -1117,7 +1117,41 @@ export default function Eleicao() {
 
 
 
-            {PARCEIROS.length > 0 && (
+            {(() => {
+              const isRaiz = form.tipo === "coordenador" || (form.tipo === "lider" && form.liderAvulso);
+              if (!isRaiz) {
+                // Mostra dobradinha herdada da raiz (sobe a árvore)
+                if (!form.parent_id) return null;
+                let parent = pessoas.find(p => p.id === form.parent_id);
+                while (parent && parent.parent_id) {
+                  parent = pessoas.find(p => p.id === parent!.parent_id);
+                }
+                if (!parent) return null;
+                const parc = PARCEIROS.find(p => p.id === parent!.parceiro_id);
+                return (
+                  <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                      <Handshake className="w-3.5 h-3.5" />
+                      Dobradinha herdada do time de <strong className="text-foreground">{parent.nome}</strong>
+                    </div>
+                    {parc ? (
+                      <div className="inline-flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: parc.cor }} />
+                        <span className="font-medium">{parc.nome}</span>
+                        <span className="text-muted-foreground">
+                          · {parent.rateio_estadual ?? 100}% estadual / {parent.rateio_parceiro ?? 0}% federal
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground italic">Sem dobradinha (100% estadual)</span>
+                    )}
+                    <p className="text-[10px] text-muted-foreground/70">
+                      Para alterar, edite a dobradinha do coordenador na aba "Dobradinhas".
+                    </p>
+                  </div>
+                );
+              }
+              return PARCEIROS.length > 0 && (
               <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Handshake className="w-4 h-4 text-primary" />
@@ -1204,7 +1238,8 @@ export default function Eleicao() {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
 
             <div>
               <Label>Observações</Label>
