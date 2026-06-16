@@ -473,8 +473,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                 })}
               </div>
             )}
-            <div className="p-2 text-[11px] text-muted-foreground border-t bg-muted/30">
-              Mostrando {filtered.length} de {rows.length} indicadores
+            <div className="p-2 text-[11px] text-muted-foreground border-t bg-muted/30 flex items-center justify-between">
+              <span>Mostrando {filtered.length} de {rows.length} indicadores</span>
+              <span className="inline-flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" />
+                atualizado há {Math.max(0, Math.floor((nowTick - lastRefresh) / 1000))}s · auto a cada 30s
+              </span>
             </div>
           </Card>
 
