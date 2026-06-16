@@ -65,6 +65,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     envio_cabo_boas_vindas_ativo: true,
     cadastro_lider_ativo: true,
     cadastro_cabo_ativo: true,
+    cadastro_voluntario_ativo: true,
   });
   const [grupos, setGrupos] = useState<GroupOption[]>([]);
 
