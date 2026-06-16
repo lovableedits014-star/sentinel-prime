@@ -89,10 +89,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
   // ===== Disparo em massa =====
   const TEMPLATE_PADRAO = {
-    zerados: "Oi {primeiro_nome}! Ainda não recebemos nenhuma indicação sua para {candidato}. Sua meta é de {meta} indicações. Use seu link para começar agora: {link}",
-    abaixo: "Olá {primeiro_nome}! Faltam {faltam} indicações para você bater sua meta de {meta} para {candidato}. Vamos lá! 👉 {link}",
-    ok: "Obrigado pelas {total} indicações, {primeiro_nome}! Continue compartilhando seu link para {candidato}: {link}",
-    all: "Olá {primeiro_nome}! Compartilhe seu link de indicação para {candidato}: {link}",
+    zerados: "Oi {primeiro_nome}! Ainda não recebemos nenhuma indicação de voto voluntário sua para {candidato}. Lembrando: aqui você cadastra ELEITORES (pessoas que vão votar de verdade, não contratadas). Sua meta é {meta}. Use seu link: {link}",
+    abaixo: "Olá {primeiro_nome}! Faltam {faltam} indicações de votos voluntários (eleitores reais) para bater sua meta de {meta} em {candidato}. 👉 {link}",
+    ok: "Obrigado pelas {total} indicações de votos voluntários, {primeiro_nome}! Continue cadastrando eleitores em {candidato}: {link}",
+    all: "Olá {primeiro_nome}! Use seu link para cadastrar votos voluntários (eleitores) em {candidato}: {link}",
   } as const;
   const [massOpen, setMassOpen] = useState(false);
   const [massTemplate, setMassTemplate] = useState<string>(TEMPLATE_PADRAO.abaixo);
