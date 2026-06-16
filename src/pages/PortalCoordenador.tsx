@@ -347,6 +347,15 @@ export default function PortalCoordenador() {
             <p className="text-xs text-muted-foreground mb-2">
               Gere sua foto com a moldura oficial ou copie o link acima e envie para apoiadores.
             </p>
+            {linkGrupo ? (
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mb-2">
+                ✓ Ao clicar no botão verde de WhatsApp ao lado de cada líder/cabo, a mensagem já vai com <strong>convite para o grupo da região</strong> + <strong>link da foto</strong> juntos.
+              </p>
+            ) : (
+              <p className="text-[11px] text-amber-700 dark:text-amber-400 mb-2">
+                ⚠️ Grupo da região {me.regiao || ""} não configurado — peça ao administrador para incluí-lo e o convite vai junto com a foto automaticamente.
+              </p>
+            )}
             {clientId && <CampaignFrameGenerator clientId={clientId} variant="showcase" />}
           </CardContent>
         </Card>
