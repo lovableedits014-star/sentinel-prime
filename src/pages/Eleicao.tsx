@@ -520,7 +520,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config" | "indicacoes">("cadastros");
+  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config" | "indicacoes" | "dobradinhas">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
