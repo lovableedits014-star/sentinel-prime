@@ -417,10 +417,13 @@ export default function PortalCoordenador() {
             <CardHeader className="pb-2"><CardTitle className="text-base">Cabos diretos</CardTitle></CardHeader>
             <CardContent className="space-y-1">
               {myCabosDir.length === 0 && <p className="text-sm text-muted-foreground">Nenhum cabo direto.</p>}
-              {myCabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} />)}
+              {myCabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} linkGrupo={linkGrupo} regiao={me.regiao} candidatoNome={candidatoNome} />)}
             </CardContent>
           </Card>
         )}
+
+        {/* Votos voluntários — eleitores que NÃO são contratados */}
+        <VotosVoluntariosPanel coordenadorId={me.id} candidatoNome={candidatoNome} />
       </main>
 
       {/* Dialog de cadastro */}
