@@ -29,6 +29,7 @@ import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/Exp
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
 import IndicacoesPanel from "@/components/eleicao/IndicacoesPanel";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
+import { useCandidatosParceiros } from "@/hooks/useCandidatosParceiros";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -203,6 +204,7 @@ export default function Eleicao() {
   const [escopo, setEscopo] = useState<Escopo>("campo_grande");
   const [regiaoFilter, setRegiaoFilter] = useState<Regiao | "all">("all");
   const { regioes: REGIOES } = useRegioesEleicao(clientId || undefined);
+  const { parceirosAtivos: PARCEIROS } = useCandidatosParceiros(clientId || undefined);
 
   // dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
