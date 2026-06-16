@@ -19,6 +19,7 @@ import {
   UserPlus,
   Trash2,
   ChevronUp,
+  Lock,
 } from "lucide-react";
 
 type Tipo = "coordenador" | "lider" | "cabo";
