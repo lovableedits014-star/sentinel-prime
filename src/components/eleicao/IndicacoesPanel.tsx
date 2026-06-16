@@ -167,8 +167,8 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     const link = r.token ? buildLink(r.token) : "";
     const falta = Math.max(0, r.meta - r.total_indicacoes);
     const msg = falta > 0
-      ? `Olá ${r.nome.split(" ")[0]}! Faltam ${falta} indicações para sua meta${candidatoNome ? ` de votos em ${candidatoNome}` : ""}. Use seu link: ${link}`
-      : `Olá ${r.nome.split(" ")[0]}! Obrigado pelas suas indicações${candidatoNome ? ` para ${candidatoNome}` : ""}. Continue indicando: ${link}`;
+      ? `Olá ${r.nome.split(" ")[0]}! Faltam ${falta} indicações de votos voluntários (eleitores reais, não contratados)${candidatoNome ? ` para ${candidatoNome}` : ""}. Use seu link: ${link}`
+      : `Olá ${r.nome.split(" ")[0]}! Obrigado pelas indicações de votos voluntários${candidatoNome ? ` para ${candidatoNome}` : ""}. Continue cadastrando eleitores: ${link}`;
     return waLink(r.telefone || "", msg);
   }
 
