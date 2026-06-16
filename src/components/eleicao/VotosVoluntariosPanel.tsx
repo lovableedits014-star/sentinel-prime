@@ -110,9 +110,11 @@ function buildMessage(r: Row, candidato: string, link: string) {
 export default function VotosVoluntariosPanel({
   coordenadorId,
   candidatoNome,
+  bloqueado = false,
 }: {
   coordenadorId: string;
   candidatoNome: string;
+  bloqueado?: boolean;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
