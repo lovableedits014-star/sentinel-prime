@@ -217,6 +217,13 @@ export default function Eleicao() {
   const [posCadastroOpen, setPosCadastroOpen] = useState(false);
   const [posCadastroPessoa, setPosCadastroPessoa] = useState<Pessoa | null>(null);
   const [editing, setEditing] = useState<Pessoa | null>(null);
+  const [propagarRaiz, setPropagarRaiz] = useState<{
+    raiz: Pessoa;
+    parceiroId: string | null;
+    rateioEstadual: number;
+    rateioParceiro: number;
+  } | null>(null);
+  const [propagandoLoading, setPropagandoLoading] = useState(false);
   const [form, setForm] = useState({
     tipo: "coordenador" as Tipo,
     escopo: "campo_grande" as Escopo,
