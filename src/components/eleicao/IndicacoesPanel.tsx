@@ -413,18 +413,18 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                               </Button>
                               {r.telefone && (
                                 <a href={whatsCobranca(r)} target="_blank" rel="noreferrer">
-                                  <Button size="sm" variant="ghost" title="Cobrar via WhatsApp">
+                                  <Button size="sm" variant="ghost" title="Enviar link via WhatsApp">
                                     <MessageCircle className="w-4 h-4 text-emerald-600" />
                                   </Button>
                                 </a>
                               )}
-                              <Button size="sm" variant="ghost" title="Regenerar link" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
+                              <Button size="sm" variant="ghost" title="Regenerar link (avançado — invalida o anterior)" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
                                 {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                               </Button>
                             </>
                           ) : (
-                            <Button size="sm" variant="outline" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
-                              {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><LinkIcon className="w-4 h-4 mr-1.5" />Gerar link</>}
+                            <Button size="sm" variant="outline" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id} title="Link ainda não criado">
+                              {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><LinkIcon className="w-4 h-4 mr-1.5" />Criar link</>}
                             </Button>
                           )}
                         </div>
