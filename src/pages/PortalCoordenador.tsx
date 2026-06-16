@@ -25,6 +25,32 @@ function waPhone(p: string) {
   return d.length <= 11 ? "55" + d : d;
 }
 
+function normalizeRegiaoKey(s: string | null | undefined) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function resolveGrupoLink(grupos: Record<string, string> | undefined, ...regioes: Array<string | null | undefined>) {
+  if (!grupos || typeof grupos !== "object") return null;
+  for (const regiao of regioes) {
+    if (!regiao) continue;
+    const tentativas = [regiao, regiao.trim(), normalizeRegiaoKey(regiao)].filter(Boolean);
+    for (const key of tentativas) {
+      const direct = grupos[key];
+      if (typeof direct === "string" && direct.trim()) return direct.trim();
+    }
+    const alvo = normalizeRegiaoKey(regiao);
+    const loose = Object.entries(grupos).find(([key, value]) => normalizeRegiaoKey(key) === alvo && value?.trim());
+    if (loose) return loose[1].trim();
+  }
+  return null;
+}
+
 /**
  * Mensagem combinada de boas-vindas: (1) convite para o grupo da região +
  * (2) link da foto/moldura de perfil oficial. Se o grupo não estiver
@@ -42,7 +68,7 @@ function sendBoasVindasWhats(
   // Prioriza grupo da região da PRÓPRIA pessoa; senão, usa o do coordenador
   const regiaoEscolhida = pessoa.regiao || ctx.regiao || null;
   const grupoLink =
-    (regiaoEscolhida && ctx.gruposLinks?.[regiaoEscolhida]) ||
+    resolveGrupoLink(ctx.gruposLinks, pessoa.regiao, ctx.regiao, regiaoEscolhida) ||
     ctx.linkGrupo ||
     null;
   const regiaoLbl = regiaoEscolhida ? ` da região ${regiaoEscolhida}` : "";
