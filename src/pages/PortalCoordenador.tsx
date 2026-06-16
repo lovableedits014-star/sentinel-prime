@@ -128,7 +128,7 @@ export default function PortalCoordenador() {
   const [team, setTeam] = useState<Pessoa[]>([]);
   const [clientName, setClientName] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [globalCfg, setGlobalCfg] = useState<{ cadastro_lider_ativo: boolean; cadastro_cabo_ativo: boolean }>({ cadastro_lider_ativo: true, cadastro_cabo_ativo: true });
+  const [globalCfg, setGlobalCfg] = useState<{ cadastro_lider_ativo: boolean; cadastro_cabo_ativo: boolean; cadastro_voluntario_ativo: boolean }>({ cadastro_lider_ativo: true, cadastro_cabo_ativo: true, cadastro_voluntario_ativo: true });
   const [linkGrupo, setLinkGrupo] = useState<string | null>(null);
   const [gruposLinks, setGruposLinks] = useState<Record<string, string>>({});
   const [candidatoNome, setCandidatoNome] = useState<string>("");
@@ -185,6 +185,7 @@ export default function PortalCoordenador() {
       setGlobalCfg({
         cadastro_lider_ativo: (portalCfgRow as any).cadastro_lider_ativo ?? true,
         cadastro_cabo_ativo: (portalCfgRow as any).cadastro_cabo_ativo ?? true,
+        cadastro_voluntario_ativo: (portalCfgRow as any).cadastro_voluntario_ativo ?? true,
       });
     }
     setLoading(false);
@@ -470,7 +471,7 @@ export default function PortalCoordenador() {
         )}
 
         {/* Votos voluntários — eleitores que NÃO são contratados */}
-        <VotosVoluntariosPanel coordenadorId={me.id} candidatoNome={candidatoNome} />
+        <VotosVoluntariosPanel coordenadorId={me.id} candidatoNome={candidatoNome} bloqueado={!globalCfg.cadastro_voluntario_ativo} />
       </main>
 
       {/* Dialog de cadastro */}

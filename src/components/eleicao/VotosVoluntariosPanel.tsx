@@ -110,9 +110,11 @@ function buildMessage(r: Row, candidato: string, link: string) {
 export default function VotosVoluntariosPanel({
   coordenadorId,
   candidatoNome,
+  bloqueado = false,
 }: {
   coordenadorId: string;
   candidatoNome: string;
+  bloqueado?: boolean;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -228,6 +230,17 @@ export default function VotosVoluntariosPanel({
           Você pode enviar o link de cada um pelo WhatsApp com 1 clique.
         </div>
 
+        {bloqueado && (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/15 text-amber-900 dark:text-amber-200 p-3 text-xs flex items-start gap-2">
+            <span className="text-base leading-none">🔒</span>
+            <div>
+              <strong>Cadastro de votos voluntários temporariamente bloqueado pela administração da campanha.</strong>
+              <div className="mt-1 opacity-90">Os links continuam abrindo, mas nenhuma nova indicação será aceita até a administração liberar.</div>
+            </div>
+          </div>
+        )}
+
+
         {/* Resumo */}
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="rounded-md bg-muted/40 p-2">
@@ -280,6 +293,7 @@ export default function VotosVoluntariosPanel({
               <QuickAddIndicado
                 token={me.token}
                 inOwnCard
+                disabled={bloqueado}
                 onAdded={(id) => onIndicadoAdded(me.token!, id)}
               />
             )}
@@ -394,6 +408,7 @@ export default function VotosVoluntariosPanel({
                       <QuickAddIndicado
                         token={r.token}
                         nomePessoa={r.nome}
+                        disabled={bloqueado}
                         onAdded={(id) => onIndicadoAdded(r.token!, id)}
                       />
                     </div>
@@ -425,11 +440,13 @@ function QuickAddIndicado({
   token,
   nomePessoa,
   inOwnCard,
+  disabled = false,
   onAdded,
 }: {
   token: string;
   nomePessoa?: string;
   inOwnCard?: boolean;
+  disabled?: boolean;
   onAdded: (newId?: string) => void | Promise<void>;
 }) {
   const [nome, setNome] = useState("");
@@ -441,7 +458,7 @@ function QuickAddIndicado({
   const digits = telefone.replace(/\D/g, "");
   const telOk = digits.length === 10 || digits.length === 11;
   const nomeOk = nome.trim().length >= 2;
-  const podeEnviar = telOk && nomeOk && !saving;
+  const podeEnviar = telOk && nomeOk && !saving && !disabled;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -476,6 +493,7 @@ function QuickAddIndicado({
         limite_diario: "Limite diário de indicações atingido (tente amanhã)",
         token_invalido: "Link inválido",
         token_revogado: "Link desativado",
+        cadastros_bloqueados: "Cadastros temporariamente bloqueados pela administração da campanha",
       };
       toast.warning(msg[r?.motivo] || `Não foi possível registrar (${r?.motivo || "erro"})`);
       return;
@@ -511,6 +529,7 @@ function QuickAddIndicado({
           onChange={(e) => setNome(e.target.value)}
           className="h-9"
           maxLength={120}
+          disabled={disabled}
         />
         <Input
           placeholder="(DD) 9XXXX-XXXX"
@@ -519,6 +538,7 @@ function QuickAddIndicado({
           className="h-9"
           inputMode="tel"
           maxLength={16}
+          disabled={disabled}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
@@ -528,10 +548,11 @@ function QuickAddIndicado({
           onChange={(e) => setBairro(e.target.value)}
           className="h-9"
           maxLength={80}
+          disabled={disabled}
         />
-        <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={!podeEnviar}>
+        <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={!podeEnviar} title={disabled ? "Cadastros bloqueados pela administração" : undefined}>
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          Cadastrar
+          {disabled ? "Bloqueado" : "Cadastrar"}
         </Button>
       </div>
       {(nome || telefone) && !podeEnviar && !saving && (

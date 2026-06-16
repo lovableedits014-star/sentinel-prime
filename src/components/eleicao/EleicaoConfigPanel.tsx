@@ -38,6 +38,7 @@ interface Cfg {
   envio_cabo_boas_vindas_ativo: boolean;
   cadastro_lider_ativo: boolean;
   cadastro_cabo_ativo: boolean;
+  cadastro_voluntario_ativo: boolean;
 }
 
 type GroupOption = { group_jid: string; name: string | null };
@@ -64,6 +65,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     envio_cabo_boas_vindas_ativo: true,
     cadastro_lider_ativo: true,
     cadastro_cabo_ativo: true,
+    cadastro_voluntario_ativo: true,
   });
   const [grupos, setGrupos] = useState<GroupOption[]>([]);
 
@@ -93,6 +95,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         envio_cabo_boas_vindas_ativo: d.envio_cabo_boas_vindas_ativo ?? true,
         cadastro_lider_ativo: d.cadastro_lider_ativo ?? true,
         cadastro_cabo_ativo: d.cadastro_cabo_ativo ?? true,
+        cadastro_voluntario_ativo: d.cadastro_voluntario_ativo ?? true,
       });
     }
     // Carrega grupos do WhatsApp disponíveis
@@ -134,6 +137,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       envio_cabo_boas_vindas_ativo: cfg.envio_cabo_boas_vindas_ativo,
       cadastro_lider_ativo: cfg.cadastro_lider_ativo,
       cadastro_cabo_ativo: cfg.cadastro_cabo_ativo,
+      cadastro_voluntario_ativo: cfg.cadastro_voluntario_ativo,
     };
     const q = cfg.id
       ? supabase.from("eleicao_notif_config" as any).update(payload).eq("id", cfg.id)
@@ -228,6 +232,17 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
               <div className="text-[11px] text-muted-foreground">{cfg.cadastro_cabo_ativo ? "Coordenadores podem cadastrar novos cabos" : "Bloqueado para todos os coordenadores"}</div>
             </div>
             <Switch checked={cfg.cadastro_cabo_ativo} onCheckedChange={(v) => setCfg(c => ({ ...c, cadastro_cabo_ativo: v }))} />
+          </label>
+          <label className="flex items-center justify-between gap-3 p-3 rounded-md border bg-muted/30 sm:col-span-2">
+            <div className="min-w-0">
+              <div className="text-sm font-medium">Cadastro de Votos Voluntários</div>
+              <div className="text-[11px] text-muted-foreground">
+                {cfg.cadastro_voluntario_ativo
+                  ? "Coordenadores, líderes e cabos podem cadastrar eleitores indicados pelos links pessoais"
+                  : "Bloqueado em todos os links de indicação (portal do coordenador e página pública)"}
+              </div>
+            </div>
+            <Switch checked={cfg.cadastro_voluntario_ativo} onCheckedChange={(v) => setCfg(c => ({ ...c, cadastro_voluntario_ativo: v }))} />
           </label>
         </div>
         <p className="text-[11px] text-muted-foreground">
