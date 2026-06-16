@@ -377,7 +377,7 @@ export default function VotosVoluntariosPanel({
                       </div>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
-                      {r.token && (
+                      {r.token && !bloqueado && (
                         <Button
                           size="icon"
                           variant={expanded ? "secondary" : "ghost"}
