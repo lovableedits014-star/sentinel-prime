@@ -148,6 +148,7 @@ export default function PortalCoordenador() {
     setMe(meRow as any);
 
     const grupos = ((notifCfg as any)?.grupos_links ?? {}) as Record<string, string>;
+    setGruposLinks(grupos);
     const reg = (meRow as any).regiao as string | null;
     setLinkGrupo(reg && grupos[reg] ? grupos[reg] : null);
 
