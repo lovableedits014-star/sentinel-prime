@@ -528,6 +528,7 @@ function QuickAddIndicado({
           onChange={(e) => setNome(e.target.value)}
           className="h-9"
           maxLength={120}
+          disabled={disabled}
         />
         <Input
           placeholder="(DD) 9XXXX-XXXX"
@@ -536,6 +537,7 @@ function QuickAddIndicado({
           className="h-9"
           inputMode="tel"
           maxLength={16}
+          disabled={disabled}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
@@ -545,10 +547,11 @@ function QuickAddIndicado({
           onChange={(e) => setBairro(e.target.value)}
           className="h-9"
           maxLength={80}
+          disabled={disabled}
         />
-        <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={!podeEnviar}>
+        <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={!podeEnviar} title={disabled ? "Cadastros bloqueados pela administração" : undefined}>
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          Cadastrar
+          {disabled ? "Bloqueado" : "Cadastrar"}
         </Button>
       </div>
       {(nome || telefone) && !podeEnviar && !saving && (
