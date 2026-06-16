@@ -114,7 +114,17 @@ export default function PortalCoordenador() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { navigate(`/portal/${clientId}`); return; }
     const { data: cl } = await supabase.from("clients").select("name").eq("id", clientId!).maybeSingle();
-    if (cl) setClientName(cl.name);
+    if (cl) {
+      setClientName(cl.name);
+      setCandidatoNome(cl.name || "");
+    }
+
+    // Link do grupo da região (eleicao_notif_config.grupos_links: { regiao: url })
+    const { data: notifCfg } = await supabase
+      .from("eleicao_notif_config" as any)
+      .select("grupos_links")
+      .eq("client_id", clientId!)
+      .maybeSingle();
 
     const { data: meRow } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("user_id", session.user.id).eq("client_id", clientId!).eq("tipo", "coordenador")
