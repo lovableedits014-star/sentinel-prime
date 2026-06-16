@@ -31,22 +31,28 @@ function waPhone(p: string) {
  * configurado, envia só a parte da foto.
  */
 function sendBoasVindasWhats(
-  pessoa: { nome: string; telefone: string },
+  pessoa: { nome: string; telefone: string; regiao?: string | null },
   clientId: string,
-  ctx: { linkGrupo: string | null; regiao: string | null; candidatoNome: string },
+  ctx: { linkGrupo: string | null; gruposLinks?: Record<string, string>; regiao: string | null; candidatoNome: string },
 ) {
   const phone = waPhone(pessoa.telefone);
   const linkFoto = buildFotoLink(clientId);
   const primeiro = pessoa.nome.split(" ")[0] || pessoa.nome;
   const candidato = ctx.candidatoNome ? ` da campanha do ${ctx.candidatoNome}` : "";
-  const regiaoLbl = ctx.regiao ? ` da região ${ctx.regiao}` : "";
+  // Prioriza grupo da região da PRÓPRIA pessoa; senão, usa o do coordenador
+  const regiaoEscolhida = pessoa.regiao || ctx.regiao || null;
+  const grupoLink =
+    (regiaoEscolhida && ctx.gruposLinks?.[regiaoEscolhida]) ||
+    ctx.linkGrupo ||
+    null;
+  const regiaoLbl = regiaoEscolhida ? ` da região ${regiaoEscolhida}` : "";
 
   let msg: string;
-  if (ctx.linkGrupo) {
+  if (grupoLink) {
     msg =
       `Oi ${primeiro}! Que bom ter você com a gente${candidato}. 🙌\n\n` +
       `1) Entre no nosso grupo de WhatsApp${regiaoLbl} — é por lá que a gente alinha as missões, manda os conteúdos pra você compartilhar nas redes e tira dúvidas em tempo real:\n` +
-      `${ctx.linkGrupo}\n\n` +
+      `${grupoLink}\n\n` +
       `2) Aproveite e já troque sua foto de perfil pela moldura oficial — ajuda muito a fortalecer nossa presença nas redes:\n` +
       `${linkFoto}`;
   } else {
@@ -58,7 +64,15 @@ function sendBoasVindasWhats(
   const url = phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
     : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-  window.open(url, "_blank");
+  console.log("[PortalCoordenador] WhatsApp send", { phone, grupoLink, linkFoto, regiaoEscolhida });
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win) {
+    // Pop-up bloqueado — copia o link como fallback
+    navigator.clipboard?.writeText(url).catch(() => {});
+    toast.warning("Pop-up bloqueado pelo navegador. Link copiado — cole no WhatsApp.");
+  } else {
+    toast.success(grupoLink ? "Mensagem aberta (grupo + foto)" : "Mensagem aberta (foto)");
+  }
 }
 
 type Tipo = "coordenador" | "lider" | "cabo";
@@ -90,6 +104,7 @@ export default function PortalCoordenador() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [globalCfg, setGlobalCfg] = useState<{ cadastro_lider_ativo: boolean; cadastro_cabo_ativo: boolean }>({ cadastro_lider_ativo: true, cadastro_cabo_ativo: true });
   const [linkGrupo, setLinkGrupo] = useState<string | null>(null);
+  const [gruposLinks, setGruposLinks] = useState<Record<string, string>>({});
   const [candidatoNome, setCandidatoNome] = useState<string>("");
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -133,6 +148,7 @@ export default function PortalCoordenador() {
     setMe(meRow as any);
 
     const grupos = ((notifCfg as any)?.grupos_links ?? {}) as Record<string, string>;
+    setGruposLinks(grupos);
     const reg = (meRow as any).regiao as string | null;
     setLinkGrupo(reg && grupos[reg] ? grupos[reg] : null);
 
@@ -393,7 +409,7 @@ export default function PortalCoordenador() {
                         variant="ghost"
                         className="h-8 w-8 text-emerald-600"
                         title={linkGrupo ? "Enviar boas-vindas (grupo + foto) via WhatsApp" : "Enviar link da foto via WhatsApp"}
-                        onClick={() => sendBoasVindasWhats(l, clientId!, { linkGrupo, regiao: me.regiao, candidatoNome })}
+                        onClick={() => sendBoasVindasWhats(l, clientId!, { linkGrupo, gruposLinks, regiao: me.regiao, candidatoNome })}
                       >
                         <Send className="w-4 h-4" />
                       </Button>
@@ -402,7 +418,7 @@ export default function PortalCoordenador() {
                       <div className="px-3 pb-3 pt-1 border-t bg-muted/20">
                         <div className="ml-2 space-y-1">
                           {cabosDoLider.length === 0 && <p className="text-xs text-muted-foreground py-1">Sem cabos vinculados.</p>}
-                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small linkGrupo={linkGrupo} regiao={me.regiao} candidatoNome={candidatoNome} />)}
+                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small linkGrupo={linkGrupo} gruposLinks={gruposLinks} regiao={me.regiao} candidatoNome={candidatoNome} />)}
                         </div>
                         <div className="flex gap-2 mt-2">
                           <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)} disabled={!permiteCabo} title={motivoCabo || undefined}>
@@ -426,7 +442,7 @@ export default function PortalCoordenador() {
             <CardHeader className="pb-2"><CardTitle className="text-base">Cabos diretos</CardTitle></CardHeader>
             <CardContent className="space-y-1">
               {myCabosDir.length === 0 && <p className="text-sm text-muted-foreground">Nenhum cabo direto.</p>}
-              {myCabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} linkGrupo={linkGrupo} regiao={me.regiao} candidatoNome={candidatoNome} />)}
+              {myCabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} linkGrupo={linkGrupo} gruposLinks={gruposLinks} regiao={me.regiao} candidatoNome={candidatoNome} />)}
             </CardContent>
           </Card>
         )}
@@ -522,12 +538,13 @@ export default function PortalCoordenador() {
   );
 }
 
-function PessoaRow({ p, onDelete, clientId, small, linkGrupo, regiao, candidatoNome }: {
+function PessoaRow({ p, onDelete, clientId, small, linkGrupo, gruposLinks, regiao, candidatoNome }: {
   p: Pessoa;
   onDelete: (id: string) => void;
   clientId: string;
   small?: boolean;
   linkGrupo: string | null;
+  gruposLinks?: Record<string, string>;
   regiao: string | null;
   candidatoNome: string;
 }) {
@@ -550,7 +567,7 @@ function PessoaRow({ p, onDelete, clientId, small, linkGrupo, regiao, candidatoN
         variant="ghost"
         className="h-7 w-7 text-emerald-600 opacity-70 hover:opacity-100"
         title={linkGrupo ? "Enviar boas-vindas (grupo + foto) via WhatsApp" : "Enviar link da foto via WhatsApp"}
-        onClick={() => sendBoasVindasWhats(p, clientId, { linkGrupo, regiao, candidatoNome })}
+        onClick={() => sendBoasVindasWhats(p, clientId, { linkGrupo, gruposLinks, regiao, candidatoNome })}
       >
         <Send className="w-3.5 h-3.5" />
       </Button>
