@@ -538,12 +538,13 @@ export default function PortalCoordenador() {
   );
 }
 
-function PessoaRow({ p, onDelete, clientId, small, linkGrupo, regiao, candidatoNome }: {
+function PessoaRow({ p, onDelete, clientId, small, linkGrupo, gruposLinks, regiao, candidatoNome }: {
   p: Pessoa;
   onDelete: (id: string) => void;
   clientId: string;
   small?: boolean;
   linkGrupo: string | null;
+  gruposLinks?: Record<string, string>;
   regiao: string | null;
   candidatoNome: string;
 }) {
