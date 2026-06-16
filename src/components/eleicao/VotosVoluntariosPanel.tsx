@@ -293,6 +293,7 @@ export default function VotosVoluntariosPanel({
               <QuickAddIndicado
                 token={me.token}
                 inOwnCard
+                disabled={bloqueado}
                 onAdded={(id) => onIndicadoAdded(me.token!, id)}
               />
             )}
