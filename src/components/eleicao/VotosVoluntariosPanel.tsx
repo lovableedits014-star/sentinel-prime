@@ -298,11 +298,10 @@ export default function VotosVoluntariosPanel({
             </div>
 
             {/* Form rápido para o coordenador cadastrar indicados aqui mesmo */}
-            {me.token && (
+            {me.token && !bloqueado && (
               <QuickAddIndicado
                 token={me.token}
                 inOwnCard
-                disabled={bloqueado}
                 onAdded={(id) => onIndicadoAdded(me.token!, id)}
               />
             )}
