@@ -31,22 +31,28 @@ function waPhone(p: string) {
  * configurado, envia só a parte da foto.
  */
 function sendBoasVindasWhats(
-  pessoa: { nome: string; telefone: string },
+  pessoa: { nome: string; telefone: string; regiao?: string | null },
   clientId: string,
-  ctx: { linkGrupo: string | null; regiao: string | null; candidatoNome: string },
+  ctx: { linkGrupo: string | null; gruposLinks?: Record<string, string>; regiao: string | null; candidatoNome: string },
 ) {
   const phone = waPhone(pessoa.telefone);
   const linkFoto = buildFotoLink(clientId);
   const primeiro = pessoa.nome.split(" ")[0] || pessoa.nome;
   const candidato = ctx.candidatoNome ? ` da campanha do ${ctx.candidatoNome}` : "";
-  const regiaoLbl = ctx.regiao ? ` da região ${ctx.regiao}` : "";
+  // Prioriza grupo da região da PRÓPRIA pessoa; senão, usa o do coordenador
+  const regiaoEscolhida = pessoa.regiao || ctx.regiao || null;
+  const grupoLink =
+    (regiaoEscolhida && ctx.gruposLinks?.[regiaoEscolhida]) ||
+    ctx.linkGrupo ||
+    null;
+  const regiaoLbl = regiaoEscolhida ? ` da região ${regiaoEscolhida}` : "";
 
   let msg: string;
-  if (ctx.linkGrupo) {
+  if (grupoLink) {
     msg =
       `Oi ${primeiro}! Que bom ter você com a gente${candidato}. 🙌\n\n` +
       `1) Entre no nosso grupo de WhatsApp${regiaoLbl} — é por lá que a gente alinha as missões, manda os conteúdos pra você compartilhar nas redes e tira dúvidas em tempo real:\n` +
-      `${ctx.linkGrupo}\n\n` +
+      `${grupoLink}\n\n` +
       `2) Aproveite e já troque sua foto de perfil pela moldura oficial — ajuda muito a fortalecer nossa presença nas redes:\n` +
       `${linkFoto}`;
   } else {
@@ -58,7 +64,15 @@ function sendBoasVindasWhats(
   const url = phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
     : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-  window.open(url, "_blank");
+  console.log("[PortalCoordenador] WhatsApp send", { phone, grupoLink, linkFoto, regiaoEscolhida });
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win) {
+    // Pop-up bloqueado — copia o link como fallback
+    navigator.clipboard?.writeText(url).catch(() => {});
+    toast.warning("Pop-up bloqueado pelo navegador. Link copiado — cole no WhatsApp.");
+  } else {
+    toast.success(grupoLink ? "Mensagem aberta (grupo + foto)" : "Mensagem aberta (foto)");
+  }
 }
 
 type Tipo = "coordenador" | "lider" | "cabo";
