@@ -718,14 +718,15 @@ function QuickAddIndicadoInline({
     if (nome.trim().length < 2) { toast.error("Informe o nome completo"); return; }
     if (d.length < 10 || d.length > 11) { toast.error("Telefone inválido — use DDD + número"); return; }
     setSaving(true);
-    const { data, error } = await supabase.rpc("eleicao_indicar_via_token", {
+    const payload: Record<string, any> = {
       _token: token,
       _nome: nome.trim(),
       _telefone: telefone,
-      _bairro: bairro || undefined,
-    } as any);
+    };
+    if (bairro.trim()) payload._bairro = bairro.trim();
+    const { data, error } = await supabase.rpc("eleicao_indicar_via_token", payload as any);
     setSaving(false);
-    if (error) { toast.error("Falha ao registrar"); return; }
+    if (error) { console.error("[Indicacoes] indicar error", error); toast.error("Falha ao registrar"); return; }
     const r = data as any;
     if (!r?.ok) {
       const msg: Record<string, string> = {
