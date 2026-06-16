@@ -418,7 +418,7 @@ export default function PortalCoordenador() {
                       <div className="px-3 pb-3 pt-1 border-t bg-muted/20">
                         <div className="ml-2 space-y-1">
                           {cabosDoLider.length === 0 && <p className="text-xs text-muted-foreground py-1">Sem cabos vinculados.</p>}
-                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small linkGrupo={linkGrupo} regiao={me.regiao} candidatoNome={candidatoNome} />)}
+                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small linkGrupo={linkGrupo} gruposLinks={gruposLinks} regiao={me.regiao} candidatoNome={candidatoNome} />)}
                         </div>
                         <div className="flex gap-2 mt-2">
                           <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)} disabled={!permiteCabo} title={motivoCabo || undefined}>
