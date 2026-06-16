@@ -8021,6 +8021,10 @@ export type Database = {
         }
         Returns: number
       }
+      eleicao_garantir_token_indicador: {
+        Args: { _indicador_id: string }
+        Returns: string
+      }
       eleicao_gerar_token_indicador: {
         Args: { _indicador_id: string }
         Returns: string
@@ -8045,6 +8049,25 @@ export type Database = {
           id: string
           nome: string
           telefone: string
+        }[]
+      }
+      eleicao_listar_indicadores_team: {
+        Args: { _coordenador_id: string }
+        Returns: {
+          cidade: string
+          client_id: string
+          cobrancas_enviadas: number
+          indicador_id: string
+          meta: number
+          nome: string
+          parent_id: string
+          regiao: string
+          telefone: string
+          tipo: string
+          token: string
+          total_indicacoes: number
+          ultima_cobranca_em: string
+          ultimo_acesso_em: string
         }[]
       }
       eleicao_pessoa_in_user_tree: {
