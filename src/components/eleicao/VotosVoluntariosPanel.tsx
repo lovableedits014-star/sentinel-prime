@@ -230,6 +230,17 @@ export default function VotosVoluntariosPanel({
           Você pode enviar o link de cada um pelo WhatsApp com 1 clique.
         </div>
 
+        {bloqueado && (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/15 text-amber-900 dark:text-amber-200 p-3 text-xs flex items-start gap-2">
+            <span className="text-base leading-none">🔒</span>
+            <div>
+              <strong>Cadastro de votos voluntários temporariamente bloqueado pela administração da campanha.</strong>
+              <div className="mt-1 opacity-90">Os links continuam abrindo, mas nenhuma nova indicação será aceita até a administração liberar.</div>
+            </div>
+          </div>
+        )}
+
+
         {/* Resumo */}
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="rounded-md bg-muted/40 p-2">
