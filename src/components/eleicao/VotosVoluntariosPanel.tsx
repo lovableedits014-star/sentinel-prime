@@ -19,6 +19,7 @@ import {
   UserPlus,
   Trash2,
   ChevronUp,
+  Lock,
 } from "lucide-react";
 
 type Tipo = "coordenador" | "lider" | "cabo";
@@ -212,33 +213,41 @@ export default function VotosVoluntariosPanel({
   }
 
   return (
-    <Card>
+    <Card className={bloqueado ? "opacity-70" : undefined}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className={`text-base flex items-center gap-2 ${bloqueado ? "text-muted-foreground" : ""}`}>
           <Megaphone className="w-4 h-4 text-primary" />
           Votos voluntários (eleitores que não são contratados)
+          {bloqueado && (
+            <Badge variant="outline" className="ml-1 gap-1 text-[10px] font-normal text-muted-foreground border-muted-foreground/30">
+              <Lock className="w-3 h-3" /> Desativado
+            </Badge>
+          )}
           <Button size="icon" variant="ghost" className="h-7 w-7 ml-auto" onClick={load} title="Atualizar">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 p-3 text-xs">
-          ⚠️ <strong>Atenção:</strong> esta seção é diferente do cadastro de líderes e cabos contratados.
-          Aqui são <strong>eleitores voluntários</strong> — pessoas que vão votar no candidato por convicção (família,
-          amigos, vizinhos). Cada pessoa do seu time tem um <strong>link pessoal</strong> para cadastrar suas indicações.
-          Você pode enviar o link de cada um pelo WhatsApp com 1 clique.
-        </div>
-
-        {bloqueado && (
-          <div className="rounded-md border border-amber-500/50 bg-amber-500/15 text-amber-900 dark:text-amber-200 p-3 text-xs flex items-start gap-2">
-            <span className="text-base leading-none">🔒</span>
-            <div>
-              <strong>Cadastro de votos voluntários temporariamente bloqueado pela administração da campanha.</strong>
-              <div className="mt-1 opacity-90">Os links continuam abrindo, mas nenhuma nova indicação será aceita até a administração liberar.</div>
-            </div>
+        {bloqueado ? (
+          <div className="rounded-md border-2 border-dashed border-muted-foreground/30 bg-muted/40 p-5 text-center space-y-2">
+            <Lock className="w-7 h-7 mx-auto text-muted-foreground/70" />
+            <p className="text-sm font-medium text-muted-foreground">
+              Cadastro de votos voluntários temporariamente desativado
+            </p>
+            <p className="text-xs text-muted-foreground/80 max-w-md mx-auto">
+              O administrador vai liberar esta área no momento certo. Por enquanto, você não precisa fazer nada aqui — pode acompanhar os números abaixo apenas para conferência.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 p-3 text-xs">
+            ⚠️ <strong>Atenção:</strong> esta seção é diferente do cadastro de líderes e cabos contratados.
+            Aqui são <strong>eleitores voluntários</strong> — pessoas que vão votar no candidato por convicção (família,
+            amigos, vizinhos). Cada pessoa do seu time tem um <strong>link pessoal</strong> para cadastrar suas indicações.
+            Você pode enviar o link de cada um pelo WhatsApp com 1 clique.
           </div>
         )}
+
 
 
         {/* Resumo */}
@@ -289,11 +298,10 @@ export default function VotosVoluntariosPanel({
             </div>
 
             {/* Form rápido para o coordenador cadastrar indicados aqui mesmo */}
-            {me.token && (
+            {me.token && !bloqueado && (
               <QuickAddIndicado
                 token={me.token}
                 inOwnCard
-                disabled={bloqueado}
                 onAdded={(id) => onIndicadoAdded(me.token!, id)}
               />
             )}
@@ -369,7 +377,7 @@ export default function VotosVoluntariosPanel({
                       </div>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
-                      {r.token && (
+                      {r.token && !bloqueado && (
                         <Button
                           size="icon"
                           variant={expanded ? "secondary" : "ghost"}
@@ -403,12 +411,11 @@ export default function VotosVoluntariosPanel({
                       </Button>
                     </div>
                   </div>
-                  {expanded && r.token && (
+                  {expanded && r.token && !bloqueado && (
                     <div className="px-2.5 pb-2.5">
                       <QuickAddIndicado
                         token={r.token}
                         nomePessoa={r.nome}
-                        disabled={bloqueado}
                         onAdded={(id) => onIndicadoAdded(r.token!, id)}
                       />
                     </div>
