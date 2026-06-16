@@ -166,8 +166,8 @@ export default function IndicarPublico() {
 
   const saudacaoRaw = info.page_saudacao || "Olá, {nome}!";
   const subtituloRaw = info.page_subtitulo || (candidatoNome
-    ? "Cadastre quem você sabe que vai votar em {candidato}."
-    : "Cadastre quem você sabe que vai votar.");
+    ? "Cadastre eleitores que vão votar em {candidato} por convicção — pessoas reais, não contratadas."
+    : "Cadastre eleitores que vão votar — pessoas reais, não contratadas.");
   const funcaoLabel = info.page_funcao_label || "Sua função:";
   const progressoTitulo = info.page_progresso_titulo || "Suas indicações";
   const botaoLabel = info.page_botao_label || "Indicar e adicionar outra";
