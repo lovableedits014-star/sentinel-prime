@@ -1392,6 +1392,41 @@ export default function Eleicao() {
         onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); setNotifySkip([]); }}
       />
 
+      <DobradinhaPropagarDialog
+        open={!!propagarRaiz}
+        raizNome={propagarRaiz?.raiz.nome || ""}
+        raizId={propagarRaiz?.raiz.id || null}
+        parceiro={
+          propagarRaiz?.parceiroId
+            ? (PARCEIROS.find(p => p.id === propagarRaiz.parceiroId) || null)
+            : null
+        }
+        rateioEstadual={propagarRaiz?.rateioEstadual || 100}
+        rateioParceiro={propagarRaiz?.rateioParceiro || 0}
+        pessoas={pessoas as any}
+        loading={propagandoLoading}
+        onCancel={() => setPropagarRaiz(null)}
+        onChoose={async (propagar) => {
+          if (!propagarRaiz) return;
+          setPropagandoLoading(true);
+          const { data, error } = await supabase.rpc("eleicao_aplicar_dobradinha_raiz" as any, {
+            _raiz_id: propagarRaiz.raiz.id,
+            _parceiro_id: propagarRaiz.parceiroId,
+            _rateio_estadual: propagarRaiz.rateioEstadual,
+            _rateio_parceiro: propagarRaiz.rateioParceiro,
+            _propagar: propagar,
+          });
+          setPropagandoLoading(false);
+          if (error) {
+            toast.error(error.message);
+            return;
+          }
+          toast.success(`${data} pessoa(s) atualizada(s).`);
+          setPropagarRaiz(null);
+          load();
+        }}
+      />
+
       <PosCadastroEnvioDialog
         open={posCadastroOpen}
         onOpenChange={(o) => { setPosCadastroOpen(o); if (!o) setPosCadastroPessoa(null); }}
