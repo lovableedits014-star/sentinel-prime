@@ -287,3 +287,77 @@ function ProgressBar({ total, meta, compact }: { total: number; meta: number; co
     </div>
   );
 }
+
+function QuickAddIndicado({ token, onAdded }: { token: string; onAdded: () => void | Promise<void> }) {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const d = telefone.replace(/\D/g, "");
+    if (nome.trim().length < 2) { toast.error("Informe o nome completo"); return; }
+    if (d.length < 10 || d.length > 11) { toast.error("Telefone inválido — use DDD + número"); return; }
+    setSaving(true);
+    const { data, error } = await supabase.rpc("eleicao_indicar_via_token" as any, {
+      _token: token,
+      _nome: nome.trim(),
+      _telefone: telefone,
+      _bairro: bairro || undefined,
+    } as any);
+    setSaving(false);
+    if (error) { toast.error("Falha ao registrar — tente novamente"); return; }
+    const r = data as any;
+    if (!r?.ok) {
+      const msg: Record<string, string> = {
+        duplicado: "Esse telefone já foi indicado anteriormente",
+        telefone_invalido: "Telefone inválido",
+        nome_invalido: "Nome inválido",
+        limite_diario: "Você atingiu o limite diário de indicações",
+        token_invalido: "Link inválido",
+        token_revogado: "Esse link foi desativado",
+      };
+      toast.warning(msg[r?.motivo] || "Não foi possível registrar");
+      return;
+    }
+    toast.success("Indicação registrada! ✓");
+    setNome(""); setTelefone(""); setBairro("");
+    await onAdded();
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-md border bg-background p-2.5 space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <UserPlus className="w-3.5 h-3.5" /> Adicionar indicação de voto voluntário
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Input
+          placeholder="Nome completo do eleitor"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          className="h-9"
+        />
+        <Input
+          placeholder="Telefone com DDD"
+          value={telefone}
+          onChange={(e) => setTelefone(e.target.value)}
+          className="h-9"
+          inputMode="tel"
+        />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+        <Input
+          placeholder="Bairro (opcional)"
+          value={bairro}
+          onChange={(e) => setBairro(e.target.value)}
+          className="h-9"
+        />
+        <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={saving}>
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          Cadastrar
+        </Button>
+      </div>
+    </form>
+  );
+}
