@@ -119,10 +119,28 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     if (cfg.data) setConfig(cfg.data as any);
     setCandidatoNome((cli.data as any)?.name || "");
     setHistorico((hist.data as any) || []);
+    setLastRefresh(Date.now());
     setLoading(false);
   }
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
+
+  // Auto-refresh a cada 30s na aba de cobrança (quando a página está visível)
+  useEffect(() => {
+    if (tab !== "cobranca") return;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible" && clientId) load();
+    }, 30000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, clientId]);
+
+  // Tick para o indicador "atualizado há Xs"
+  useEffect(() => {
+    if (tab !== "cobranca") return;
+    const id = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [tab]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
