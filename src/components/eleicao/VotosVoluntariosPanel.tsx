@@ -492,6 +492,7 @@ function QuickAddIndicado({
         limite_diario: "Limite diário de indicações atingido (tente amanhã)",
         token_invalido: "Link inválido",
         token_revogado: "Link desativado",
+        cadastros_bloqueados: "Cadastros temporariamente bloqueados pela administração da campanha",
       };
       toast.warning(msg[r?.motivo] || `Não foi possível registrar (${r?.motivo || "erro"})`);
       return;
