@@ -8227,6 +8227,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_eleicao_portal_config: {
+        Args: { _client_id: string }
+        Returns: {
+          cadastro_cabo_ativo: boolean
+          cadastro_lider_ativo: boolean
+          grupos_links: Json
+        }[]
+      }
       get_migracoes_partidarias: {
         Args: { p_min_votos?: number; p_uf?: string }
         Returns: {
