@@ -30,6 +30,8 @@ import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog"
 import IndicacoesPanel from "@/components/eleicao/IndicacoesPanel";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 import { useCandidatosParceiros } from "@/hooks/useCandidatosParceiros";
+import DobradinhasManagerPanel from "@/components/eleicao/DobradinhasManagerPanel";
+import DobradinhaPropagarDialog from "@/components/eleicao/DobradinhaPropagarDialog";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -215,6 +217,13 @@ export default function Eleicao() {
   const [posCadastroOpen, setPosCadastroOpen] = useState(false);
   const [posCadastroPessoa, setPosCadastroPessoa] = useState<Pessoa | null>(null);
   const [editing, setEditing] = useState<Pessoa | null>(null);
+  const [propagarRaiz, setPropagarRaiz] = useState<{
+    raiz: Pessoa;
+    parceiroId: string | null;
+    rateioEstadual: number;
+    rateioParceiro: number;
+  } | null>(null);
+  const [propagandoLoading, setPropagandoLoading] = useState(false);
   const [form, setForm] = useState({
     tipo: "coordenador" as Tipo,
     escopo: "campo_grande" as Escopo,
@@ -333,6 +342,7 @@ export default function Eleicao() {
     const numero = form.numero.trim();
     const bairro = form.bairro.trim();
     const enderecoConcat = [rua ? `${rua}${numero ? ", " + numero : ""}` : "", bairro].filter(Boolean).join(" - ");
+    const isRaiz = form.tipo === "coordenador" || (form.tipo === "lider" && form.liderAvulso);
     const payload: any = {
       client_id: clientId,
       tipo: form.tipo,
@@ -349,19 +359,67 @@ export default function Eleicao() {
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
-      parceiro_id: form.parceiro_id || null,
-      rateio_estadual: form.parceiro_id ? form.rateio_estadual : 100,
-      rateio_parceiro: form.parceiro_id ? form.rateio_parceiro : 0,
     };
+
+    // Dobradinha:
+    // - Raiz nova: inclui no payload (não há descendentes pra propagar).
+    // - Raiz editando: salva campos base aqui, dobradinha aplicada via RPC após (com diálogo se houver descendentes).
+    // - Não-raiz: omite — trigger BEFORE INSERT/UPDATE herda da raiz automaticamente.
+    if (isRaiz && !editing) {
+      payload.parceiro_id = form.parceiro_id || null;
+      payload.rateio_estadual = form.parceiro_id ? form.rateio_estadual : 100;
+      payload.rateio_parceiro = form.parceiro_id ? form.rateio_parceiro : 0;
+    }
+
     const q = editing
       ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
       : supabase.from("eleicao_pessoas" as any).insert(payload).select().single();
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
 
+    // Se está editando uma raiz e a dobradinha mudou, dispara fluxo de propagação
+    if (editing && isRaiz) {
+      const dobradinhaAtual = {
+        parceiro_id: editing.parceiro_id || "",
+        rateio_estadual: editing.rateio_estadual ?? 100,
+        rateio_parceiro: editing.rateio_parceiro ?? 0,
+      };
+      const dobradinhaNova = {
+        parceiro_id: form.parceiro_id || "",
+        rateio_estadual: form.parceiro_id ? form.rateio_estadual : 100,
+        rateio_parceiro: form.parceiro_id ? form.rateio_parceiro : 0,
+      };
+      const mudou =
+        dobradinhaAtual.parceiro_id !== dobradinhaNova.parceiro_id ||
+        dobradinhaAtual.rateio_estadual !== dobradinhaNova.rateio_estadual ||
+        dobradinhaAtual.rateio_parceiro !== dobradinhaNova.rateio_parceiro;
+      if (mudou) {
+        const temDescs = pessoas.some(p => p.parent_id === editing.id);
+        if (!temDescs) {
+          // Aplica direto, sem diálogo
+          await supabase.rpc("eleicao_aplicar_dobradinha_raiz" as any, {
+            _raiz_id: editing.id,
+            _parceiro_id: dobradinhaNova.parceiro_id || null,
+            _rateio_estadual: dobradinhaNova.rateio_estadual,
+            _rateio_parceiro: dobradinhaNova.rateio_parceiro,
+            _propagar: false,
+          });
+        } else {
+          // Abre diálogo de propagação
+          setPropagarRaiz({
+            raiz: editing,
+            parceiroId: dobradinhaNova.parceiro_id || null,
+            rateioEstadual: dobradinhaNova.rateio_estadual,
+            rateioParceiro: dobradinhaNova.rateio_parceiro,
+          });
+          setDialogOpen(false);
+          load();
+          return;
+        }
+      }
+    }
+
     // Novo cadastro: abre o popup de envio MANUAL (WhatsApp Web do próprio usuário).
-    // Substitui os disparos automáticos anteriores — o usuário decide o que enviar.
-    // Pode ser desativado por sessão via sessionStorage["eleicao:skip-pos-cadastro"].
     if (!editing && savedPessoa) {
       toast.success(`${TIPO_META[form.tipo].label} cadastrado!`);
       setDialogOpen(false);
@@ -369,7 +427,6 @@ export default function Eleicao() {
       let skip = false;
       try { skip = sessionStorage.getItem("eleicao:skip-pos-cadastro") === "1"; } catch {}
       if (skip) {
-        // Fallback ao comportamento antigo (instância automática).
         if (form.tipo === "lider") {
           const isAvulso = !payload.parent_id;
           setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
@@ -518,7 +575,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config" | "indicacoes">("cadastros");
+  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config" | "indicacoes" | "dobradinhas">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
@@ -754,7 +811,7 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-6 w-full max-w-4xl">
+        <TabsList className="grid grid-cols-7 w-full max-w-5xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -766,6 +823,10 @@ export default function Eleicao() {
           </TabsTrigger>
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
+          <TabsTrigger value="dobradinhas" className="gap-1.5">
+            <Handshake className="w-3.5 h-3.5" />
+            Dobradinhas
+          </TabsTrigger>
           <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
           <TabsTrigger value="config">Configurações</TabsTrigger>
         </TabsList>
@@ -779,6 +840,8 @@ export default function Eleicao() {
         clientId ? <EntradaGrupoPanel clientId={clientId} /> : null
       ) : view === "indicacoes" ? (
         clientId ? <IndicacoesPanel clientId={clientId} /> : null
+      ) : view === "dobradinhas" ? (
+        clientId ? <DobradinhasManagerPanel clientId={clientId} pessoas={pessoas as any} onChanged={load} /> : null
       ) : view === "config" ? (
         clientId ? <EleicaoConfigPanel clientId={clientId} /> : null
       ) : (
@@ -1109,7 +1172,41 @@ export default function Eleicao() {
 
 
 
-            {PARCEIROS.length > 0 && (
+            {(() => {
+              const isRaiz = form.tipo === "coordenador" || (form.tipo === "lider" && form.liderAvulso);
+              if (!isRaiz) {
+                // Mostra dobradinha herdada da raiz (sobe a árvore)
+                if (!form.parent_id) return null;
+                let parent = pessoas.find(p => p.id === form.parent_id);
+                while (parent && parent.parent_id) {
+                  parent = pessoas.find(p => p.id === parent!.parent_id);
+                }
+                if (!parent) return null;
+                const parc = PARCEIROS.find(p => p.id === parent!.parceiro_id);
+                return (
+                  <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                      <Handshake className="w-3.5 h-3.5" />
+                      Dobradinha herdada do time de <strong className="text-foreground">{parent.nome}</strong>
+                    </div>
+                    {parc ? (
+                      <div className="inline-flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: parc.cor }} />
+                        <span className="font-medium">{parc.nome}</span>
+                        <span className="text-muted-foreground">
+                          · {parent.rateio_estadual ?? 100}% estadual / {parent.rateio_parceiro ?? 0}% federal
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground italic">Sem dobradinha (100% estadual)</span>
+                    )}
+                    <p className="text-[10px] text-muted-foreground/70">
+                      Para alterar, edite a dobradinha do coordenador na aba "Dobradinhas".
+                    </p>
+                  </div>
+                );
+              }
+              return PARCEIROS.length > 0 && (
               <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Handshake className="w-4 h-4 text-primary" />
@@ -1196,7 +1293,8 @@ export default function Eleicao() {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
 
             <div>
               <Label>Observações</Label>
@@ -1292,6 +1390,41 @@ export default function Eleicao() {
         pessoaId={notifyPessoaId}
         skipSteps={notifySkip}
         onClose={() => { setNotifyOpen(false); setNotifyPessoaId(null); setNotifySkip([]); }}
+      />
+
+      <DobradinhaPropagarDialog
+        open={!!propagarRaiz}
+        raizNome={propagarRaiz?.raiz.nome || ""}
+        raizId={propagarRaiz?.raiz.id || null}
+        parceiro={
+          propagarRaiz?.parceiroId
+            ? (PARCEIROS.find(p => p.id === propagarRaiz.parceiroId) || null)
+            : null
+        }
+        rateioEstadual={propagarRaiz?.rateioEstadual || 100}
+        rateioParceiro={propagarRaiz?.rateioParceiro || 0}
+        pessoas={pessoas as any}
+        loading={propagandoLoading}
+        onCancel={() => setPropagarRaiz(null)}
+        onChoose={async (propagar) => {
+          if (!propagarRaiz) return;
+          setPropagandoLoading(true);
+          const { data, error } = await supabase.rpc("eleicao_aplicar_dobradinha_raiz" as any, {
+            _raiz_id: propagarRaiz.raiz.id,
+            _parceiro_id: propagarRaiz.parceiroId,
+            _rateio_estadual: propagarRaiz.rateioEstadual,
+            _rateio_parceiro: propagarRaiz.rateioParceiro,
+            _propagar: propagar,
+          });
+          setPropagandoLoading(false);
+          if (error) {
+            toast.error(error.message);
+            return;
+          }
+          toast.success(`${data} pessoa(s) atualizada(s).`);
+          setPropagarRaiz(null);
+          load();
+        }}
       />
 
       <PosCadastroEnvioDialog

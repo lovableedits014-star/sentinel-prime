@@ -8011,6 +8011,16 @@ export type Database = {
           severity: string
         }[]
       }
+      eleicao_aplicar_dobradinha_raiz: {
+        Args: {
+          _parceiro_id: string
+          _propagar?: boolean
+          _raiz_id: string
+          _rateio_estadual: number
+          _rateio_parceiro: number
+        }
+        Returns: number
+      }
       eleicao_gerar_token_indicador: {
         Args: { _indicador_id: string }
         Returns: string
