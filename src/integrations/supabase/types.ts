@@ -2256,6 +2256,7 @@ export type Database = {
           auto_enviar: boolean
           cadastro_cabo_ativo: boolean
           cadastro_lider_ativo: boolean
+          cadastro_voluntario_ativo: boolean
           client_id: string
           created_at: string
           envio_cabo_boas_vindas_ativo: boolean
@@ -2276,6 +2277,7 @@ export type Database = {
           auto_enviar?: boolean
           cadastro_cabo_ativo?: boolean
           cadastro_lider_ativo?: boolean
+          cadastro_voluntario_ativo?: boolean
           client_id: string
           created_at?: string
           envio_cabo_boas_vindas_ativo?: boolean
@@ -2296,6 +2298,7 @@ export type Database = {
           auto_enviar?: boolean
           cadastro_cabo_ativo?: boolean
           cadastro_lider_ativo?: boolean
+          cadastro_voluntario_ativo?: boolean
           client_id?: string
           created_at?: string
           envio_cabo_boas_vindas_ativo?: boolean
@@ -8242,6 +8245,7 @@ export type Database = {
         Returns: {
           cadastro_cabo_ativo: boolean
           cadastro_lider_ativo: boolean
+          cadastro_voluntario_ativo: boolean
           grupos_links: Json
         }[]
       }
