@@ -1,126 +1,80 @@
-# Materiais de Campanha para Download
+## Contexto
 
-Adicionar uma nova aba **"Materiais"** dentro da página pública `/g/:clientSlug` (`GaleriaPublica.tsx`), ao lado das seções já existentes (Moldura + Eventos). Apoiadores poderão visualizar e baixar peças de campanha e pré-campanha (PDF, imagens, vídeos) para compartilhar.
+A campanha é do **estadual principal** (sempre o "dono" da operação). Alguns coordenadores/líderes/cabos trabalham também para um **deputado federal parceiro** (dobradinha). O federal entra ajudando a bancar parte dos custos dessas pessoas. A arte e os fluxos de divulgação **não mudam** — continuam centralizados no estadual; o que muda é a **gestão financeira e o relatório por candidato**.
 
-## Como vai funcionar
+## O que já existe
 
-### Visitante público (`/g/:clientSlug`)
-- A página passa a ter **abas**: "Eventos" (atual) e **"Materiais"** (nova).
-- Aba Materiais mostra **uma lista única** com filtros no topo:
-  - Busca por nome
-  - Tipo: Todos · Imagem · Vídeo · PDF
-  - Chips de tags clicáveis (ex.: "Santinho", "Stories", "Pré-campanha")
-- Cada material vira um **card** com:
-  - **Preview inline** antes do download:
-    - Imagem → miniatura grande
-    - Vídeo → `<video controls>` com poster
-    - PDF → 1ª página renderizada (capa enviada no upload) + botão "Abrir PDF"
-  - Título, tags, tamanho do arquivo
-  - **Contador** "X downloads"
-  - Botões: **Baixar** · **Compartilhar no WhatsApp**
+- `eleicao_pessoas` com `valor_contratacao`, `escopo`, `regiao/cidade`, `parent_id` (hierarquia coord → líder → cabo).
+- Aba "Previsão de custos" (`PrevisaoCustos.tsx`) somando totais por tipo / escopo / região.
+- `PendentesValorPanel`, `IndicacoesPanel`, `EntradaGrupoPanel`, etc.
+- Não há nenhuma noção de "candidato parceiro" hoje — todo custo é tratado como único.
 
-### Admin (`/fotos-campanha`)
-- Nova aba **"Materiais"** no `FotosCampanha.tsx` (hoje tem "Editor" e "Galerias públicas").
-- Qualquer `team_member` ativo do cliente pode:
-  - Subir arquivo (PDF, PNG, JPEG, WEBP, MP4) — limite 100 MB por arquivo
-  - Preencher: título, tags (multi), capa opcional (imagem para PDF/vídeo), publicar sim/não
-  - Reordenar, editar, despublicar e remover
-- Tabela com nome, tipo, tags, downloads, status, ações.
+## Modelo proposto
+
+### 1. Cadastro de candidatos parceiros (federais)
+
+Nova tabela `eleicao_candidatos_parceiros` por `client_id`:
+- `nome`, `cargo` (ex.: "Deputado Federal"), `partido`, `numero_urna`, `foto_url`, `cor` (badge), `ativo`.
+- Permite cadastrar quantos federais quiserem; cada um aparece como chip colorido no app.
+
+### 2. Vínculo pessoa ↔ federal + rateio
+
+Acrescentar em `eleicao_pessoas`:
+- `parceiro_id uuid` (nullable) → referência ao federal da dobradinha (ou NULL = só estadual).
+- `rateio_estadual numeric default 100` (0–100) — % que o estadual paga.
+- `rateio_parceiro numeric default 0` — % que o federal paga (soma deve dar 100, validado por trigger).
+- Atalhos no formulário: botões "100% estadual", "100% federal", "50/50", "custom".
+
+Hierarquia: ao criar um líder/cabo abaixo de um coordenador já vinculado a um federal, o sistema **sugere** o mesmo federal (mas permite trocar — útil para o cenário "coordenador do estadual com líderes que trabalham pro federal").
+
+### 3. Previsão de custos repensada
+
+Reformular `PrevisaoCustos.tsx` para mostrar:
+
+- **Card-resumo por candidato** (estadual + cada federal): total a pagar, qtd de pessoas envolvidas, % do bolo total.
+- Gráfico de barras empilhadas: por tipo (coord/líder/cabo) × candidato pagador.
+- Tabela "Quem paga quem": linha por pessoa com colunas `valor total | estadual paga | federal paga | federal nome`.
+- Filtro no topo da aba: "Ver custos de: [Todos | Estadual | Federal X | Federal Y]" — recalcula todos os gráficos.
+- Por região/cidade: mantém, mas com toggle "consolidado / só estadual / só federal X".
+
+### 4. Indicações e ranking
+
+- `IndicacoesPanel` e ranking de telemarketing: adicionar filtro por `parceiro_id` para responder "quantos votos o time do Federal X está trazendo".
+- Os indicados continuam únicos (estamos pedindo voto pros dois), só muda a atribuição de quem trouxe.
+
+### 5. Exportações
+
+- `ExportEleicaoDialog` ganha opção "Separar por candidato" → gera um PDF/Excel por candidato com pessoas, custos e indicações daquele federal + o estadual.
+- Útil na hora de prestar contas e mostrar pro federal o que ele está bancando.
+
+### 6. UI — onde isso aparece
+
+- **Nova mini-aba** "Dobradinhas" dentro de Configurações da Eleição → CRUD dos federais parceiros.
+- Formulário de cadastro de pessoa (`NovaPessoaDialog` da eleição): nova seção "Dobradinha" com select do federal + sliders/atalhos de rateio.
+- Listagem de pessoas: badge colorido do federal ao lado do nome quando houver.
+- "Previsão de custos": filtro de candidato no topo + cards-resumo por candidato.
 
 ## Detalhes técnicos
 
-### Banco (migração)
+- Migrations:
+  1. `CREATE TABLE eleicao_candidatos_parceiros` (com GRANTs + RLS por client_id, espelhando o padrão de `eleicao_regioes`).
+  2. `ALTER TABLE eleicao_pessoas ADD COLUMN parceiro_id`, `rateio_estadual`, `rateio_parceiro` + trigger validando soma = 100 e parceiro_id consistente com rateio>0.
+- Backfill: todas as pessoas existentes ficam com `parceiro_id NULL`, `rateio_estadual=100`, `rateio_parceiro=0` (comportamento atual preservado).
+- `useRegioesEleicao`-equivalente: criar `useCandidatosParceiros` (CRUD + cache).
+- `PrevisaoCustos.tsx`: refator do `useMemo` para agrupar por `parceiro_id` calculando `valor * rateio_x / 100`.
+- Sem mudanças em: artes, frames, materiais, disparos, fluxos de WhatsApp (conforme combinado).
 
-```sql
-create table public.campaign_materials (
-  id uuid primary key default gen_random_uuid(),
-  client_id uuid not null references public.clients(id) on delete cascade,
-  title text not null,
-  description text,
-  tags text[] not null default '{}',
-  kind text not null check (kind in ('image','video','pdf')),
-  mime_type text not null,
-  storage_path text not null,
-  public_url text not null,
-  cover_url text,                 -- capa opcional (para PDF/vídeo)
-  size_bytes bigint not null default 0,
-  download_count int not null default 0,
-  order_index int not null default 0,
-  status text not null default 'published' check (status in ('draft','published')),
-  created_by uuid,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+## Fora do escopo (não vou mexer agora)
 
-grant select on public.campaign_materials to anon;          -- leitura pública
-grant select, insert, update, delete on public.campaign_materials to authenticated;
-grant all on public.campaign_materials to service_role;
+- Arte e materiais da dobradinha (federal traz por fora).
+- Links públicos / grupos separados por federal.
+- Disparos segmentados por federal.
 
-alter table public.campaign_materials enable row level security;
+## Entregáveis
 
--- Público lê apenas materiais publicados
-create policy "public read published"
-  on public.campaign_materials for select to anon
-  using (status = 'published');
-
--- Equipe do cliente lê tudo
-create policy "team read all"
-  on public.campaign_materials for select to authenticated
-  using (user_can_access_client(client_id));
-
--- Equipe gerencia
-create policy "team insert"  on public.campaign_materials for insert to authenticated with check (user_can_access_client(client_id));
-create policy "team update"  on public.campaign_materials for update to authenticated using (user_can_access_client(client_id));
-create policy "team delete"  on public.campaign_materials for delete to authenticated using (user_can_access_client(client_id));
-
--- RPC para incrementar downloads sem precisar de UPDATE público
-create or replace function public.increment_material_download(_material_id uuid)
-returns void language sql security definer set search_path = public as $$
-  update public.campaign_materials
-     set download_count = download_count + 1
-   where id = _material_id and status = 'published';
-$$;
-grant execute on function public.increment_material_download(uuid) to anon, authenticated;
-```
-
-### Storage
-- Novo bucket **público** `campaign-materials` (criado via `storage_create_bucket`, public=true).
-- Path: `{client_id}/{material_id}/{filename}`.
-- Capas (quando enviadas): `{client_id}/{material_id}/cover.{ext}`.
-- RLS de `storage.objects`: insert/update/delete restritos a `user_can_access_client(...)` via prefixo do path; select público (bucket público).
-
-### Frontend
-- **Admin** — `src/components/campaign-materials/MaterialsManager.tsx`:
-  - Form de upload (drag-and-drop), grid/tabela, edição inline, reorder com drag handle.
-  - Reaproveita padrões de `GalleryManager.tsx`.
-  - Aba registrada em `src/pages/FotosCampanha.tsx`.
-- **Público** — `src/components/campaign-materials/PublicMaterialsTab.tsx`:
-  - Lista + filtros + cards com preview.
-  - WhatsApp share via `https://wa.me/?text=` com `encodeURIComponent` (título + link público).
-  - Download: `<a download>` apontando para `public_url`; em paralelo dispara `supabase.rpc("increment_material_download", { _material_id })`.
-- **`GaleriaPublica.tsx`** ganha `<Tabs>` "Eventos" / "Materiais".
-- Validação com **zod** no form de upload (título 1–120 chars, tags ≤ 8, tamanho ≤ 100 MB, mime na allowlist).
-
-### Segurança / cuidados
-- Nada de `service_role` no cliente; incremento de downloads passa pela RPC `security definer`.
-- Mime/extensão validados no client antes do upload (não confia no nome).
-- `created_by = auth.uid()` setado no insert para auditoria.
-- Sem PII pública — só metadados de campanha.
-
-## Arquivos afetados
-
-- **Novo**: migração SQL (tabela + policies + RPC)
-- **Novo**: `src/components/campaign-materials/MaterialsManager.tsx`
-- **Novo**: `src/components/campaign-materials/PublicMaterialsTab.tsx`
-- **Novo**: `src/components/campaign-materials/types.ts`
-- **Editado**: `src/pages/FotosCampanha.tsx` (3ª aba)
-- **Editado**: `src/pages/GaleriaPublica.tsx` (abas Eventos/Materiais)
-- **Editado**: `src/integrations/supabase/types.ts` (auto-regenerado)
-
-## Fora do escopo (posso adicionar depois se quiser)
-- Categorias/pastas explícitas (vamos usar tags por enquanto)
-- Baixar tudo em ZIP
-- Estatísticas detalhadas por material (quem baixou, quando)
-- Watermark automático em imagens
-
-Posso seguir com a implementação?
+1. Migration criando tabela de parceiros + colunas de dobradinha em `eleicao_pessoas`.
+2. CRUD de candidatos parceiros (config).
+3. Campo de dobradinha + rateio no cadastro/edição de pessoa.
+4. `PrevisaoCustos` reformulado com filtro por candidato e visão "quem paga quem".
+5. Filtro por parceiro em Indicações e ranking.
+6. Exportação separada por candidato.
