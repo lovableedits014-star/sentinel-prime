@@ -168,6 +168,9 @@ interface Pessoa {
   is_favorito_regiao?: boolean | null;
   pode_cadastrar_lider?: boolean | null;
   pode_cadastrar_cabo?: boolean | null;
+  parceiro_id?: string | null;
+  rateio_estadual?: number | null;
+  rateio_parceiro?: number | null;
   created_at: string;
 }
 
@@ -227,6 +230,9 @@ export default function Eleicao() {
     password: "",
     send_access: true,
     valor_contratacao: "" as string,
+    parceiro_id: "" as string,
+    rateio_estadual: 100 as number,
+    rateio_parceiro: 0 as number,
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
@@ -266,6 +272,9 @@ export default function Eleicao() {
       parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
+      parceiro_id: "",
+      rateio_estadual: 100,
+      rateio_parceiro: 0,
       ...presets,
     });
     setDialogOpen(true);
@@ -298,6 +307,9 @@ export default function Eleicao() {
       password: "",
       send_access: false,
       valor_contratacao: p.valor_contratacao != null ? String(p.valor_contratacao) : "",
+      parceiro_id: p.parceiro_id || "",
+      rateio_estadual: p.rateio_estadual ?? 100,
+      rateio_parceiro: p.rateio_parceiro ?? 0,
     });
     setDialogOpen(true);
   }
@@ -335,6 +347,9 @@ export default function Eleicao() {
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
+      parceiro_id: form.parceiro_id || null,
+      rateio_estadual: form.parceiro_id ? form.rateio_estadual : 100,
+      rateio_parceiro: form.parceiro_id ? form.rateio_parceiro : 0,
     };
     const q = editing
       ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
