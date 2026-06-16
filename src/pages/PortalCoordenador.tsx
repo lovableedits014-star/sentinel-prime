@@ -12,6 +12,7 @@ import { Crown, Users, UserCheck, LogOut, Plus, Trash2, Phone, MapPin, Loader2, 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
+import VotosVoluntariosPanel from "@/components/eleicao/VotosVoluntariosPanel";
 
 function buildFotoLink(clientId: string) {
   const base = (typeof window !== "undefined" ? window.location.origin : "").replace(/\/$/, "");
@@ -23,10 +24,37 @@ function waPhone(p: string) {
   if (d.startsWith("55")) return d;
   return d.length <= 11 ? "55" + d : d;
 }
-function sendFotoWhats(pessoa: { nome: string; telefone: string }, clientId: string) {
+
+/**
+ * Mensagem combinada de boas-vindas: (1) convite para o grupo da região +
+ * (2) link da foto/moldura de perfil oficial. Se o grupo não estiver
+ * configurado, envia só a parte da foto.
+ */
+function sendBoasVindasWhats(
+  pessoa: { nome: string; telefone: string },
+  clientId: string,
+  ctx: { linkGrupo: string | null; regiao: string | null; candidatoNome: string },
+) {
   const phone = waPhone(pessoa.telefone);
-  const link = buildFotoLink(clientId);
-  const msg = `Oi ${pessoa.nome}! Gere sua foto de perfil oficial da campanha aqui: ${link}`;
+  const linkFoto = buildFotoLink(clientId);
+  const primeiro = pessoa.nome.split(" ")[0] || pessoa.nome;
+  const candidato = ctx.candidatoNome ? ` da campanha do ${ctx.candidatoNome}` : "";
+  const regiaoLbl = ctx.regiao ? ` da região ${ctx.regiao}` : "";
+
+  let msg: string;
+  if (ctx.linkGrupo) {
+    msg =
+      `Oi ${primeiro}! Que bom ter você com a gente${candidato}. 🙌\n\n` +
+      `1) Entre no nosso grupo de WhatsApp${regiaoLbl} — é por lá que a gente alinha as missões, manda os conteúdos pra você compartilhar nas redes e tira dúvidas em tempo real:\n` +
+      `${ctx.linkGrupo}\n\n` +
+      `2) Aproveite e já troque sua foto de perfil pela moldura oficial — ajuda muito a fortalecer nossa presença nas redes:\n` +
+      `${linkFoto}`;
+  } else {
+    msg =
+      `Oi ${primeiro}! Que bom ter você com a gente${candidato}. 🙌\n\n` +
+      `Já troque sua foto de perfil pela moldura oficial — ajuda muito a fortalecer nossa presença nas redes:\n` +
+      `${linkFoto}`;
+  }
   const url = phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
     : `https://wa.me/?text=${encodeURIComponent(msg)}`;
