@@ -513,7 +513,15 @@ export default function PortalCoordenador() {
   );
 }
 
-function PessoaRow({ p, onDelete, clientId, small }: { p: Pessoa; onDelete: (id: string) => void; clientId: string; small?: boolean }) {
+function PessoaRow({ p, onDelete, clientId, small, linkGrupo, regiao, candidatoNome }: {
+  p: Pessoa;
+  onDelete: (id: string) => void;
+  clientId: string;
+  small?: boolean;
+  linkGrupo: string | null;
+  regiao: string | null;
+  candidatoNome: string;
+}) {
   const meta = TIPO_META[p.tipo];
   const Icon = meta.icon;
   return (
@@ -532,8 +540,8 @@ function PessoaRow({ p, onDelete, clientId, small }: { p: Pessoa; onDelete: (id:
         size="icon"
         variant="ghost"
         className="h-7 w-7 text-emerald-600 opacity-70 hover:opacity-100"
-        title="Enviar link da foto via WhatsApp"
-        onClick={() => sendFotoWhats(p, clientId)}
+        title={linkGrupo ? "Enviar boas-vindas (grupo + foto) via WhatsApp" : "Enviar link da foto via WhatsApp"}
+        onClick={() => sendBoasVindasWhats(p, clientId, { linkGrupo, regiao, candidatoNome })}
       >
         <Send className="w-3.5 h-3.5" />
       </Button>
