@@ -25,6 +25,32 @@ function waPhone(p: string) {
   return d.length <= 11 ? "55" + d : d;
 }
 
+function normalizeRegiaoKey(s: string | null | undefined) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function resolveGrupoLink(grupos: Record<string, string> | undefined, ...regioes: Array<string | null | undefined>) {
+  if (!grupos || typeof grupos !== "object") return null;
+  for (const regiao of regioes) {
+    if (!regiao) continue;
+    const tentativas = [regiao, regiao.trim(), normalizeRegiaoKey(regiao)].filter(Boolean);
+    for (const key of tentativas) {
+      const direct = grupos[key];
+      if (typeof direct === "string" && direct.trim()) return direct.trim();
+    }
+    const alvo = normalizeRegiaoKey(regiao);
+    const loose = Object.entries(grupos).find(([key, value]) => normalizeRegiaoKey(key) === alvo && value?.trim());
+    if (loose) return loose[1].trim();
+  }
+  return null;
+}
+
 /**
  * Mensagem combinada de boas-vindas: (1) convite para o grupo da região +
  * (2) link da foto/moldura de perfil oficial. Se o grupo não estiver
@@ -42,7 +68,7 @@ function sendBoasVindasWhats(
   // Prioriza grupo da região da PRÓPRIA pessoa; senão, usa o do coordenador
   const regiaoEscolhida = pessoa.regiao || ctx.regiao || null;
   const grupoLink =
-    (regiaoEscolhida && ctx.gruposLinks?.[regiaoEscolhida]) ||
+    resolveGrupoLink(ctx.gruposLinks, pessoa.regiao, ctx.regiao, regiaoEscolhida) ||
     ctx.linkGrupo ||
     null;
   const regiaoLbl = regiaoEscolhida ? ` da região ${regiaoEscolhida}` : "";
@@ -134,35 +160,31 @@ export default function PortalCoordenador() {
       setCandidatoNome(cl.name || "");
     }
 
-    // Link do grupo da região (eleicao_notif_config.grupos_links: { regiao: url })
-    const { data: notifCfg } = await supabase
-      .from("eleicao_notif_config" as any)
-      .select("grupos_links")
-      .eq("client_id", clientId!)
-      .maybeSingle();
-
     const { data: meRow } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("user_id", session.user.id).eq("client_id", clientId!).eq("tipo", "coordenador")
       .maybeSingle();
     if (!meRow) { navigate(`/portal/${clientId}`); return; }
     setMe(meRow as any);
 
-    const grupos = ((notifCfg as any)?.grupos_links ?? {}) as Record<string, string>;
+    // Config do portal via RPC SECURITY DEFINER: coordenador pode ler links dos grupos sem depender da RLS administrativa.
+    const { data: portalCfg, error: portalCfgError } = await supabase
+      .rpc("get_eleicao_portal_config" as any, { _client_id: clientId! });
+    if (portalCfgError) console.warn("[PortalCoordenador] Falha ao carregar config do portal", portalCfgError);
+    const portalCfgRow = Array.isArray(portalCfg) ? portalCfg[0] : portalCfg;
+
+    const grupos = ((portalCfgRow as any)?.grupos_links ?? {}) as Record<string, string>;
     setGruposLinks(grupos);
     const reg = (meRow as any).regiao as string | null;
-    setLinkGrupo(reg && grupos[reg] ? grupos[reg] : null);
+    setLinkGrupo(resolveGrupoLink(grupos, reg));
 
     const { data: tr } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("client_id", clientId!).order("nome");
     setTeam((tr as any) || []);
 
-    const { data: cfg } = await supabase
-      .rpc("get_eleicao_cadastro_flags" as any, { _client_id: clientId! });
-    const row = Array.isArray(cfg) ? cfg[0] : cfg;
-    if (row) {
+    if (portalCfgRow) {
       setGlobalCfg({
-        cadastro_lider_ativo: (row as any).cadastro_lider_ativo ?? true,
-        cadastro_cabo_ativo: (row as any).cadastro_cabo_ativo ?? true,
+        cadastro_lider_ativo: (portalCfgRow as any).cadastro_lider_ativo ?? true,
+        cadastro_cabo_ativo: (portalCfgRow as any).cadastro_cabo_ativo ?? true,
       });
     }
     setLoading(false);
