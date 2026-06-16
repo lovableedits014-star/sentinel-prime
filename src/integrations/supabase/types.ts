@@ -8070,6 +8070,16 @@ export type Database = {
           ultimo_acesso_em: string
         }[]
       }
+      eleicao_listar_indicados_token: {
+        Args: { _token: string }
+        Returns: {
+          bairro: string
+          created_at: string
+          id: string
+          nome: string
+          telefone: string
+        }[]
+      }
       eleicao_pessoa_in_user_tree: {
         Args: { _pessoa_id: string; _user_id: string }
         Returns: boolean
