@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import {
   UserCheck,
   Plus,
   UserPlus,
+  Trash2,
+  ChevronUp,
 } from "lucide-react";
 
 type Tipo = "coordenador" | "lider" | "cabo";
@@ -38,6 +40,14 @@ type Row = {
   cobrancas_enviadas: number;
 };
 
+type Indicado = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  bairro: string | null;
+  created_at: string;
+};
+
 const TIPO_META: Record<Tipo, { label: string; color: string; icon: any }> = {
   coordenador: { label: "Coordenador", color: "text-red-600 border-red-500/30 bg-red-500/10", icon: Crown },
   lider: { label: "Líder", color: "text-blue-600 border-blue-500/30 bg-blue-500/10", icon: Users },
@@ -53,6 +63,25 @@ function waPhone(p: string) {
   if (!d) return "";
   if (d.startsWith("55")) return d;
   return d.length <= 11 ? "55" + d : d;
+}
+
+function maskTelefone(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+function fmtAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `${min}min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
 }
 
 function buildMessage(r: Row, candidato: string, link: string) {
@@ -87,6 +116,9 @@ export default function VotosVoluntariosPanel({
 }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedFor, setExpandedFor] = useState<string | null>(null);
+  const [meusIndicados, setMeusIndicados] = useState<Indicado[]>([]);
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -103,6 +135,15 @@ export default function VotosVoluntariosPanel({
     setLoading(false);
   }
 
+  async function loadMeusIndicados(token: string) {
+    const { data, error } = await supabase.rpc("eleicao_listar_indicados_token" as any, { _token: token });
+    if (error) {
+      console.warn("[VotosVoluntarios] listar indicados falhou", error);
+      return;
+    }
+    setMeusIndicados(((data as any) || []) as Indicado[]);
+  }
+
   useEffect(() => {
     if (coordenadorId) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,6 +154,10 @@ export default function VotosVoluntariosPanel({
     () => rows.filter((r) => r.indicador_id !== coordenadorId),
     [rows, coordenadorId],
   );
+
+  useEffect(() => {
+    if (me?.token) loadMeusIndicados(me.token);
+  }, [me?.token]);
 
   const totalGeral = useMemo(() => rows.reduce((s, r) => s + (r.total_indicacoes || 0), 0), [rows]);
   const metaGeral = useMemo(() => rows.reduce((s, r) => s + (r.meta || 0), 0), [rows]);
@@ -134,6 +179,34 @@ export default function VotosVoluntariosPanel({
       ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(url, "_blank");
+  }
+
+  async function removerIndicado(token: string, indicadoId: string) {
+    if (!confirm("Remover essa indicação? (só funciona até 1h após o cadastro)")) return;
+    const { data } = await supabase.rpc("eleicao_remover_indicacao_token" as any, {
+      _token: token,
+      _indicado_id: indicadoId,
+    });
+    const r = data as any;
+    if (r?.ok) {
+      toast.success("Removida");
+      await Promise.all([load(), loadMeusIndicados(token)]);
+    } else if (r?.motivo === "prazo_expirado") {
+      toast.warning("Prazo de remoção expirou (1h)");
+    } else {
+      toast.error("Não foi possível remover");
+    }
+  }
+
+  async function onIndicadoAdded(forToken: string, newId?: string) {
+    if (newId) {
+      setLastAddedId(newId);
+      setTimeout(() => setLastAddedId(null), 2500);
+    }
+    await load();
+    if (me?.token && forToken === me.token) {
+      await loadMeusIndicados(me.token);
+    }
   }
 
   return (
@@ -204,7 +277,46 @@ export default function VotosVoluntariosPanel({
 
             {/* Form rápido para o coordenador cadastrar indicados aqui mesmo */}
             {me.token && (
-              <QuickAddIndicado token={me.token} onAdded={load} />
+              <QuickAddIndicado
+                token={me.token}
+                inOwnCard
+                onAdded={(id) => onIndicadoAdded(me.token!, id)}
+              />
+            )}
+
+            {/* Últimos cadastrados pelo coordenador */}
+            {me.token && meusIndicados.length > 0 && (
+              <div className="rounded-md border bg-background">
+                <div className="px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground border-b">
+                  Últimos eleitores que você cadastrou ({meusIndicados.length})
+                </div>
+                <div className="divide-y max-h-[220px] overflow-y-auto">
+                  {meusIndicados.map((ind) => (
+                    <div
+                      key={ind.id}
+                      className={`px-2.5 py-1.5 flex items-center gap-2 text-xs transition-colors ${
+                        lastAddedId === ind.id ? "bg-emerald-100 dark:bg-emerald-950/40" : ""
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{ind.nome}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {ind.telefone || "—"}{ind.bairro ? ` · ${ind.bairro}` : ""} · há {fmtAgo(ind.created_at)}
+                        </p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-destructive"
+                        title="Remover (até 1h após cadastro)"
+                        onClick={() => removerIndicado(me.token!, ind.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -222,9 +334,10 @@ export default function VotosVoluntariosPanel({
           <div className="divide-y border rounded-md overflow-hidden">
             {equipe.map((r) => {
               const Icon = TIPO_META[r.tipo].icon;
+              const expanded = expandedFor === r.indicador_id;
               return (
-                <div key={r.indicador_id} className="p-2.5 hover:bg-muted/40 transition-colors">
-                  <div className="flex items-center gap-2">
+                <div key={r.indicador_id} className="hover:bg-muted/40 transition-colors">
+                  <div className="p-2.5 flex items-center gap-2">
                     <div className={`rounded-full flex items-center justify-center shrink-0 border w-7 h-7 ${TIPO_META[r.tipo].color}`}>
                       <Icon className="w-3.5 h-3.5" />
                     </div>
@@ -242,6 +355,17 @@ export default function VotosVoluntariosPanel({
                       </div>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
+                      {r.token && (
+                        <Button
+                          size="icon"
+                          variant={expanded ? "secondary" : "ghost"}
+                          className="h-8 w-8"
+                          title={expanded ? "Fechar" : "Cadastrar voto voluntário em nome desta pessoa"}
+                          onClick={() => setExpandedFor(expanded ? null : r.indicador_id)}
+                        >
+                          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
+                        </Button>
+                      )}
                       {r.token && (
                         <Button
                           size="icon"
@@ -265,6 +389,15 @@ export default function VotosVoluntariosPanel({
                       </Button>
                     </div>
                   </div>
+                  {expanded && r.token && (
+                    <div className="px-2.5 pb-2.5">
+                      <QuickAddIndicado
+                        token={r.token}
+                        nomePessoa={r.nome}
+                        onAdded={(id) => onIndicadoAdded(r.token!, id)}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -288,62 +421,104 @@ function ProgressBar({ total, meta, compact }: { total: number; meta: number; co
   );
 }
 
-function QuickAddIndicado({ token, onAdded }: { token: string; onAdded: () => void | Promise<void> }) {
+function QuickAddIndicado({
+  token,
+  nomePessoa,
+  inOwnCard,
+  onAdded,
+}: {
+  token: string;
+  nomePessoa?: string;
+  inOwnCard?: boolean;
+  onAdded: (newId?: string) => void | Promise<void>;
+}) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [bairro, setBairro] = useState("");
   const [saving, setSaving] = useState(false);
+  const nomeRef = useRef<HTMLInputElement>(null);
+
+  const digits = telefone.replace(/\D/g, "");
+  const telOk = digits.length === 10 || digits.length === 11;
+  const nomeOk = nome.trim().length >= 2;
+  const podeEnviar = telOk && nomeOk && !saving;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const d = telefone.replace(/\D/g, "");
-    if (nome.trim().length < 2) { toast.error("Informe o nome completo"); return; }
-    if (d.length < 10 || d.length > 11) { toast.error("Telefone inválido — use DDD + número"); return; }
+    if (!nomeOk) { toast.error("Informe o nome completo"); return; }
+    if (!telOk) {
+      toast.error(digits.length < 10 ? "Faltou o DDD — use (DD) 9XXXX-XXXX" : "Telefone muito longo");
+      return;
+    }
     setSaving(true);
-    const { data, error } = await supabase.rpc("eleicao_indicar_via_token" as any, {
+    const payload: Record<string, any> = {
       _token: token,
       _nome: nome.trim(),
       _telefone: telefone,
-      _bairro: bairro || undefined,
-    } as any);
+    };
+    if (bairro.trim()) payload._bairro = bairro.trim();
+
+    const { data, error } = await supabase.rpc("eleicao_indicar_via_token" as any, payload as any);
     setSaving(false);
-    if (error) { toast.error("Falha ao registrar — tente novamente"); return; }
-    const r = data as any;
-    if (!r?.ok) {
-      const msg: Record<string, string> = {
-        duplicado: "Esse telefone já foi indicado anteriormente",
-        telefone_invalido: "Telefone inválido",
-        nome_invalido: "Nome inválido",
-        limite_diario: "Você atingiu o limite diário de indicações",
-        token_invalido: "Link inválido",
-        token_revogado: "Esse link foi desativado",
-      };
-      toast.warning(msg[r?.motivo] || "Não foi possível registrar");
+
+    if (error) {
+      console.error("[VotosVoluntarios] indicar error", error);
+      toast.error("Falha ao registrar — tente novamente");
       return;
     }
-    toast.success("Indicação registrada! ✓");
+    const r = data as any;
+    if (!r?.ok) {
+      console.log("[VotosVoluntarios] indicar nao-ok", r);
+      const msg: Record<string, string> = {
+        duplicado: "Esse telefone já foi indicado anteriormente",
+        telefone_invalido: "Telefone inválido — confira DDD e número",
+        nome_invalido: "Nome inválido",
+        limite_diario: "Limite diário de indicações atingido (tente amanhã)",
+        token_invalido: "Link inválido",
+        token_revogado: "Link desativado",
+      };
+      toast.warning(msg[r?.motivo] || `Não foi possível registrar (${r?.motivo || "erro"})`);
+      return;
+    }
+    toast.success(
+      nomePessoa
+        ? `Cadastrado em nome de ${nomePessoa.split(" ")[0]} ✓`
+        : "Indicação registrada! ✓",
+    );
     setNome(""); setTelefone(""); setBairro("");
-    await onAdded();
+    nomeRef.current?.focus();
+    await onAdded(r.id);
   }
 
   return (
-    <form onSubmit={submit} className="rounded-md border bg-background p-2.5 space-y-2">
+    <form
+      onSubmit={submit}
+      className={`rounded-md border p-2.5 space-y-2 ${inOwnCard ? "bg-background" : "bg-muted/30"}`}
+    >
       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        <UserPlus className="w-3.5 h-3.5" /> Adicionar indicação de voto voluntário
+        <UserPlus className="w-3.5 h-3.5" />
+        {nomePessoa ? (
+          <span>Cadastrar em nome de <strong className="text-foreground">{nomePessoa}</strong></span>
+        ) : (
+          <span>Adicionar indicação de voto voluntário</span>
+        )}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
+          ref={nomeRef}
           placeholder="Nome completo do eleitor"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
           className="h-9"
+          maxLength={120}
         />
         <Input
-          placeholder="Telefone com DDD"
+          placeholder="(DD) 9XXXX-XXXX"
           value={telefone}
-          onChange={(e) => setTelefone(e.target.value)}
+          onChange={(e) => setTelefone(maskTelefone(e.target.value))}
           className="h-9"
           inputMode="tel"
+          maxLength={16}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
@@ -352,12 +527,19 @@ function QuickAddIndicado({ token, onAdded }: { token: string; onAdded: () => vo
           value={bairro}
           onChange={(e) => setBairro(e.target.value)}
           className="h-9"
+          maxLength={80}
         />
-        <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={saving}>
+        <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={!podeEnviar}>
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
           Cadastrar
         </Button>
       </div>
+      {(nome || telefone) && !podeEnviar && !saving && (
+        <p className="text-[10px] text-muted-foreground">
+          {!nomeOk && "Nome muito curto. "}
+          {!telOk && digits.length > 0 && "Telefone precisa ter DDD + 8 ou 9 dígitos."}
+        </p>
+      )}
     </form>
   );
 }

@@ -87,6 +87,8 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [gerando, setGerando] = useState<string | null>(null);
   const [candidatoNome, setCandidatoNome] = useState<string>("");
   const [addingFor, setAddingFor] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
+  const [nowTick, setNowTick] = useState<number>(Date.now());
 
   // ===== Disparo em massa =====
   const TEMPLATE_PADRAO = {
@@ -117,10 +119,28 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     if (cfg.data) setConfig(cfg.data as any);
     setCandidatoNome((cli.data as any)?.name || "");
     setHistorico((hist.data as any) || []);
+    setLastRefresh(Date.now());
     setLoading(false);
   }
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
+
+  // Auto-refresh a cada 30s na aba de cobrança (quando a página está visível)
+  useEffect(() => {
+    if (tab !== "cobranca") return;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible" && clientId) load();
+    }, 30000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, clientId]);
+
+  // Tick para o indicador "atualizado há Xs"
+  useEffect(() => {
+    if (tab !== "cobranca") return;
+    const id = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, [tab]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -453,8 +473,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                 })}
               </div>
             )}
-            <div className="p-2 text-[11px] text-muted-foreground border-t bg-muted/30">
-              Mostrando {filtered.length} de {rows.length} indicadores
+            <div className="p-2 text-[11px] text-muted-foreground border-t bg-muted/30 flex items-center justify-between">
+              <span>Mostrando {filtered.length} de {rows.length} indicadores</span>
+              <span className="inline-flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" />
+                atualizado há {Math.max(0, Math.floor((nowTick - lastRefresh) / 1000))}s · auto a cada 30s
+              </span>
             </div>
           </Card>
 
@@ -694,14 +718,15 @@ function QuickAddIndicadoInline({
     if (nome.trim().length < 2) { toast.error("Informe o nome completo"); return; }
     if (d.length < 10 || d.length > 11) { toast.error("Telefone inválido — use DDD + número"); return; }
     setSaving(true);
-    const { data, error } = await supabase.rpc("eleicao_indicar_via_token", {
+    const payload: Record<string, any> = {
       _token: token,
       _nome: nome.trim(),
       _telefone: telefone,
-      _bairro: bairro || undefined,
-    } as any);
+    };
+    if (bairro.trim()) payload._bairro = bairro.trim();
+    const { data, error } = await supabase.rpc("eleicao_indicar_via_token", payload as any);
     setSaving(false);
-    if (error) { toast.error("Falha ao registrar"); return; }
+    if (error) { console.error("[Indicacoes] indicar error", error); toast.error("Falha ao registrar"); return; }
     const r = data as any;
     if (!r?.ok) {
       const msg: Record<string, string> = {
