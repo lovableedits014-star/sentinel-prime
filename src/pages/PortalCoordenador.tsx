@@ -383,8 +383,8 @@ export default function PortalCoordenador() {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-emerald-600"
-                        title="Enviar link da foto via WhatsApp"
-                        onClick={() => sendFotoWhats(l, clientId!)}
+                        title={linkGrupo ? "Enviar boas-vindas (grupo + foto) via WhatsApp" : "Enviar link da foto via WhatsApp"}
+                        onClick={() => sendBoasVindasWhats(l, clientId!, { linkGrupo, regiao: me.regiao, candidatoNome })}
                       >
                         <Send className="w-4 h-4" />
                       </Button>
@@ -393,7 +393,7 @@ export default function PortalCoordenador() {
                       <div className="px-3 pb-3 pt-1 border-t bg-muted/20">
                         <div className="ml-2 space-y-1">
                           {cabosDoLider.length === 0 && <p className="text-xs text-muted-foreground py-1">Sem cabos vinculados.</p>}
-                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small />)}
+                          {cabosDoLider.map(cb => <PessoaRow key={cb.id} p={cb} onDelete={remove} clientId={clientId!} small linkGrupo={linkGrupo} regiao={me.regiao} candidatoNome={candidatoNome} />)}
                         </div>
                         <div className="flex gap-2 mt-2">
                           <Button size="sm" variant="ghost" onClick={() => openNew("cabo", l.id)} disabled={!permiteCabo} title={motivoCabo || undefined}>
