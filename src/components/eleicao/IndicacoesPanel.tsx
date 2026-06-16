@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye } from "lucide-react";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye, UserPlus, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import CobrancaAutoConfig from "./CobrancaAutoConfig";
 import IndicarPaginaConfig from "./IndicarPaginaConfig";
 
@@ -86,6 +86,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [savingConfig, setSavingConfig] = useState(false);
   const [gerando, setGerando] = useState<string | null>(null);
   const [candidatoNome, setCandidatoNome] = useState<string>("");
+  const [addingFor, setAddingFor] = useState<string | null>(null);
 
   // ===== Disparo em massa =====
   const TEMPLATE_PADRAO = {
@@ -406,6 +407,17 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
+                          {r.token && (
+                            <Button
+                              size="sm"
+                              variant={addingFor === r.indicador_id ? "secondary" : "ghost"}
+                              title="Cadastrar voto voluntário em nome desta pessoa"
+                              onClick={() => setAddingFor(addingFor === r.indicador_id ? null : r.indicador_id)}
+                            >
+                              <UserPlus className="w-4 h-4" />
+                              {addingFor === r.indicador_id ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+                            </Button>
+                          )}
                           {r.token ? (
                             <>
                               <Button size="sm" variant="ghost" title="Copiar link" onClick={() => copiarLink(r.token!)}>
@@ -429,6 +441,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                           )}
                         </div>
                       </div>
+                      {addingFor === r.indicador_id && r.token && (
+                        <QuickAddIndicadoInline
+                          token={r.token}
+                          nomePessoa={r.nome}
+                          onSaved={async () => { await load(); }}
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -652,5 +671,73 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function QuickAddIndicadoInline({
+  token,
+  nomePessoa,
+  onSaved,
+}: {
+  token: string;
+  nomePessoa: string;
+  onSaved: () => void | Promise<void>;
+}) {
+  const [nome, setNome] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const d = telefone.replace(/\D/g, "");
+    if (nome.trim().length < 2) { toast.error("Informe o nome completo"); return; }
+    if (d.length < 10 || d.length > 11) { toast.error("Telefone inválido — use DDD + número"); return; }
+    setSaving(true);
+    const { data, error } = await supabase.rpc("eleicao_indicar_via_token", {
+      _token: token,
+      _nome: nome.trim(),
+      _telefone: telefone,
+      _bairro: bairro || undefined,
+    } as any);
+    setSaving(false);
+    if (error) { toast.error("Falha ao registrar"); return; }
+    const r = data as any;
+    if (!r?.ok) {
+      const msg: Record<string, string> = {
+        duplicado: "Esse telefone já foi indicado anteriormente",
+        telefone_invalido: "Telefone inválido",
+        nome_invalido: "Nome inválido",
+        limite_diario: "Limite diário atingido para esse link",
+        token_invalido: "Link inválido",
+        token_revogado: "Link desativado",
+      };
+      toast.warning(msg[r?.motivo] || "Não foi possível registrar");
+      return;
+    }
+    toast.success(`Indicação registrada em nome de ${nomePessoa.split(" ")[0]} ✓`);
+    setNome(""); setTelefone(""); setBairro("");
+    await onSaved();
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-2 rounded-md border bg-muted/30 p-2.5 space-y-2">
+      <div className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+        <UserPlus className="w-3.5 h-3.5" />
+        Cadastrar voto voluntário em nome de <strong className="text-foreground">{nomePessoa}</strong>
+        <span className="text-[10px]">(contabiliza na meta dele/dela)</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <Input placeholder="Nome completo do eleitor" value={nome} onChange={(e) => setNome(e.target.value)} className="h-9" />
+        <Input placeholder="Telefone com DDD" value={telefone} onChange={(e) => setTelefone(e.target.value)} className="h-9" inputMode="tel" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+        <Input placeholder="Bairro (opcional)" value={bairro} onChange={(e) => setBairro(e.target.value)} className="h-9" />
+        <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={saving}>
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          Cadastrar
+        </Button>
+      </div>
+    </form>
   );
 }
