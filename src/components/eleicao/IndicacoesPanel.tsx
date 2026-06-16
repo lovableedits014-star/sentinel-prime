@@ -407,6 +407,17 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
+                          {r.token && (
+                            <Button
+                              size="sm"
+                              variant={addingFor === r.indicador_id ? "secondary" : "ghost"}
+                              title="Cadastrar voto voluntário em nome desta pessoa"
+                              onClick={() => setAddingFor(addingFor === r.indicador_id ? null : r.indicador_id)}
+                            >
+                              <UserPlus className="w-4 h-4" />
+                              {addingFor === r.indicador_id ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+                            </Button>
+                          )}
                           {r.token ? (
                             <>
                               <Button size="sm" variant="ghost" title="Copiar link" onClick={() => copiarLink(r.token!)}>
@@ -430,6 +441,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                           )}
                         </div>
                       </div>
+                      {addingFor === r.indicador_id && r.token && (
+                        <QuickAddIndicadoInline
+                          token={r.token}
+                          nomePessoa={r.nome}
+                          onSaved={async () => { await load(); }}
+                        />
+                      )}
                     </div>
                   );
                 })}
