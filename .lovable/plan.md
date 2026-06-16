@@ -1,108 +1,86 @@
-## Modelo: dobradinha herdada da "raiz"
+## Visão geral
 
-A dobradinha passa a ser uma decisão da **raiz do time**:
+Duas mudanças independentes, sem misturar com a estrutura de "contratados" (coordenador/líder/cabo já existente):
 
-- **Coordenadores** são raízes.
-- **Líderes avulsos** (sem coordenador) também são raízes independentes.
-- Líderes vinculados a um coordenador e todos os cabos **herdam** o federal + rateio da sua raiz. Não é possível sobrescrever individualmente.
+1. **Indicações de votos voluntários**: cada coordenador/líder/cabo passa a ter **link já pronto** (sem botão "Gerar link"). O fluxo vira "enviar o link via WhatsApp" para que a pessoa cadastre seus indicados orgânicos. O coordenador também acessa essa área dentro do **Portal do Coordenador** (separada visualmente dos cadastros de líderes/cabos contratados).
+2. **Mensagem única "Grupo + Foto"**: o botão atual de "enviar link da foto" no Portal do Coordenador passa a enviar **uma única mensagem combinada** — primeiro o convite para o grupo da região (prioridade), depois o link da foto de perfil da campanha.
 
-Visualmente, o "time" do coordenador (ele + líderes + cabos abaixo) inteiro vira a unidade de cálculo dos custos para aquele federal.
+---
 
-## Mudanças de banco
+## Parte 1 — Links de indicação automáticos
 
-### 1. Marcar quem é "raiz" da dobradinha (conceito implícito, sem nova coluna)
-- Coordenador: sempre raiz.
-- Líder com `parent_id IS NULL` (avulso): raiz.
-- Demais: herdam — `parceiro_id` / `rateio_*` deixam de ser editáveis na UI individual, mas continuam armazenados (servem como "cache" propagado, mais simples de consultar).
+### 1.1 Banco (migration)
 
-### 2. RPC `eleicao_aplicar_dobradinha_raiz`
-SECURITY DEFINER, recebe `_raiz_id`, `_parceiro_id`, `_rateio_estadual`, `_rateio_parceiro`, `_propagar boolean`.
-- Atualiza a raiz.
-- Se `_propagar = true`: atualiza recursivamente todos os descendentes (líderes → cabos) com o mesmo federal/rateio.
-- Se `_propagar = false`: só a raiz; descendentes mantêm o que tinham (útil quando o usuário responder "não" no diálogo de propagação).
-- Valida que a raiz é coordenador ou líder avulso e que o cliente bate.
-- Retorna a contagem de pessoas atualizadas (para o toast: "12 pessoas do time foram atualizadas").
+- **Função `eleicao_garantir_token_indicador(_indicador_id uuid)`**: igual à `eleicao_gerar_token_indicador`, mas **idempotente** — se já existe token ativo (`revoked_at IS NULL`), retorna o existente em vez de revogar e criar outro. (Mantemos `eleicao_gerar_token_indicador` para o caso de "regenerar manualmente" no painel admin.)
+- **Trigger `AFTER INSERT` em `eleicao_pessoas`**: para todo novo coordenador/líder/cabo, chama `eleicao_garantir_token_indicador(NEW.id)`. Roda como `SECURITY DEFINER` para não esbarrar em RLS.
+- **Backfill**: cria token para todo `eleicao_pessoas` que ainda não tem linha ativa em `eleicao_indicacao_tokens`.
+- **Nova RPC `eleicao_listar_indicadores_team(_coordenador_id uuid)`** (`SECURITY DEFINER`): retorna a mesma shape de `v_eleicao_indicadores_cobranca`, filtrada para o coordenador logado + descendentes (líderes e cabos abaixo dele, via CTE recursiva). Valida `auth.uid() = (SELECT user_id FROM eleicao_pessoas WHERE id = _coordenador_id)`.
+- **Grant `EXECUTE`** das novas funções para `authenticated`.
 
-### 3. Trigger de coerência no cadastro de pessoa
-Quando uma pessoa não-raiz (líder com `parent_id` ou cabo) é inserida ou tem o `parent_id` alterado:
-- O trigger preenche automaticamente `parceiro_id`, `rateio_estadual`, `rateio_parceiro` com os valores da raiz (sobe na árvore até achar coordenador ou líder avulso).
-- Garante que um líder/cabo nunca fique "desalinhado" da sua raiz sem que o usuário escolha.
+### 1.2 Painel admin (`IndicacoesPanel.tsx`)
 
-## Mudanças na UI
+- Remover o botão **"Gerar link"** quando `r.token` é `null` — nunca mais vai aparecer null após o backfill + trigger.
+- Manter o botão **"Regenerar"** (ícone `RefreshCw`) como ação avançada.
+- Renomear copy para **"Votos voluntários — cobrança"**, ajustar template padrão para deixar claro que são **votos voluntários (orgânicos, não contratados)**.
 
-### 1. Formulário de pessoa (`Eleicao.tsx`)
-- A seção "Dobradinha" **só aparece** quando `tipo === "coordenador"` OU (`tipo === "lider"` e `liderAvulso` marcado).
-- Para líder/cabo vinculado: aparece um aviso somente-leitura mostrando o federal/rateio herdado da raiz, com um link "editar no coordenador".
-- Ao salvar uma raiz com dobradinha **alterada** (em edição), dispara o **diálogo de propagação** (item 3 abaixo) antes de gravar.
+### 1.3 Página pública (`IndicarPublico.tsx`)
 
-### 2. Nova aba "Dobradinhas" (visão central de gestão)
-Adicionar `<TabsTrigger value="dobradinhas">Dobradinhas</TabsTrigger>` na barra de abas da Eleição (ao lado de "Previsão de custos").
+- Ajustar copy do subtítulo padrão para "Cadastre pessoas que vão votar em {candidato} por convicção — eleitores, não contratados". Sem mudança estrutural.
 
-Conteúdo da aba — componente novo `DobradinhasManagerPanel.tsx`:
-- Tabela de **raízes** (coordenadores + líderes avulsos), com: nome, escopo/região, qtd de pessoas no time, custo total do time, federal designado (badge colorido), rateio.
-- Filtros: escopo, região/cidade, "só sem dobradinha", "só com dobradinha do federal X".
-- Ações por linha:
-  - Select inline do federal parceiro.
-  - Atalhos de rateio (100/0, 70/30, 50/50, 0/100, custom).
-  - Botão "Aplicar" → chama a RPC com `_propagar=true`.
-- **Ação em massa** no topo: selecionar várias raízes via checkbox → "Designar federal X com rateio Y para selecionadas".
-- Card-resumo no topo da aba: "X coordenadores sem dobradinha · Y times designados · Total já comprometido com cada federal".
+### 1.4 Portal do Coordenador (`PortalCoordenador.tsx`)
 
-### 3. Diálogo de propagação (`DobradinhaPropagarDialog.tsx`)
-Disparado quando:
-- Usuário edita uma raiz no formulário e muda federal ou rateio E a raiz já tem descendentes.
-- Usuário muda federal de uma raiz na aba "Dobradinhas" e ela já tem descendentes.
+- Nova seção **"Votos voluntários"**, separada da árvore de contratados, com aviso explicativo.
+- Tabela compacta com o coordenador + cada líder/cabo do time:
+  - Nome, tipo, meta, total indicado, progresso.
+  - Botão **"Enviar link via WhatsApp"** (mensagem padrão + link de indicação).
+  - Botão **"Copiar link"**.
+  - Para o próprio coordenador no topo, com "Abrir minha página de indicação".
+- Dados via `eleicao_listar_indicadores_team`.
 
-Conteúdo:
-- "O time de [Nome] tem **N líderes e M cabos**. Aplicar a nova dobradinha para todos?"
-- Lista resumida dos descendentes que serão alterados.
-- Botões: "Sim, aplicar para o time todo" (propagar=true) · "Não, só este coordenador" (propagar=false) · "Cancelar".
+---
 
-### 4. Cadastro de novo coordenador/líder avulso
-- Mantém a seção dobradinha visível.
-- Ao salvar, descendentes ainda não existem, então não precisa de diálogo — só grava.
+## Parte 2 — Mensagem combinada "Grupo + Foto" no Portal do Coordenador
 
-### 5. Listagem de pessoas (RegionBlock e afins)
-- Badge colorido do federal ao lado do nome **da raiz**.
-- Líderes/cabos abaixo herdam visualmente: badge menor "↳ [cor do federal]" ou tooltip "Time do federal X".
+### 2.1 Dados
 
-## Mudanças em `PrevisaoCustos`
+- Reutilizar `eleicao_notif_config.grupos_links` (`Record<regiao, url>`) — mesma fonte do fluxo de cadastro.
+- No `load()` do `PortalCoordenador`, buscar `grupos_links` e resolver `linkGrupo = grupos_links[me.regiao]`.
 
-Hoje já soma `valor * rateio / 100` por pessoa. Como a propagação garante que cada descendente tem o `parceiro_id` correto, o cálculo atual continua funcionando — mas precisa de uma camada de agrupamento por "time da raiz":
+### 2.2 UI — sem botão novo
 
-- **Novo card** "Custo por time" mostrando: nome do coordenador/líder avulso + federal + custo total do time + qtd de pessoas. Ordenado pelo custo decrescente.
-- O breakdown por candidato (cards no topo) já funciona corretamente.
-- Tabela "Quem paga quem" ganha coluna "Time de" (mostra o nome da raiz quando a pessoa for descendente).
-- Mantém todos os outros gráficos.
+- O botão atual **"Enviar link da foto via WhatsApp"** (linhas 342 e 488 de `PortalCoordenador.tsx`) **continua sendo um único botão**, mas o `sendFotoWhats` é substituído por `sendBoasVindasWhats(pessoa, linkGrupo, linkFoto, clientName)`, que monta **uma só mensagem** com as duas partes:
 
-## Migração de dados existentes
+  > Oi {primeiro_nome}! Que bom ter você com a gente na campanha do {candidato}. 🙌
+  >
+  > **1) Entre no nosso grupo de WhatsApp da região {regiao}** — é por lá que a gente alinha as missões, manda os conteúdos para você compartilhar nas redes e tira dúvidas em tempo real:
+  > {link_grupo}
+  >
+  > **2) Aproveite e já troque sua foto de perfil pela moldura oficial da campanha** — ajuda muito a fortalecer nossa presença nas redes:
+  > {link_foto}
 
-Migration adicional para alinhar quem já está cadastrado:
-- Para cada coordenador e líder avulso existente: mantém seus valores atuais como "verdade da raiz".
-- Para cada líder vinculado e cabo: sobrescreve `parceiro_id`/rateio com os da raiz (ascendente). Garante consistência inicial.
+- Se `linkGrupo` não existir para a região do coordenador:
+  - O botão **continua funcionando**, mas envia só a parte da foto (mensagem reduzida) e mostra um aviso discreto no card "Foto de perfil da campanha": "Grupo da região {regiao} não configurado — peça ao administrador para incluir e o convite vai junto automaticamente".
+- Ícone e label do botão atualizados para refletir o novo conteúdo (ex.: "Enviar boas-vindas + grupo + foto" / ícone `Send`).
+- Tooltip também atualizado.
 
-## Fora do escopo
-
-- Sobrescrita individual (já decidido: "coordenador manda no time").
-- Designação por região inteira em vez de por raiz (pode virar atalho no futuro se você pedir).
-- Mudanças em artes, fluxos de WhatsApp, links públicos — continua tudo centralizado no estadual.
+---
 
 ## Detalhes técnicos
 
-- **Migration 1**: cria a RPC `eleicao_aplicar_dobradinha_raiz` (recursive CTE descendo pela árvore `parent_id`).
-- **Migration 2**: trigger `BEFORE INSERT OR UPDATE OF parent_id` em `eleicao_pessoas` que herda da raiz quando a pessoa não é raiz.
-- **Migration 3**: backfill alinhando descendentes às raízes atuais.
-- **Frontend**:
-  - `useDobradinhaRaizes(clientId)` — hook agregando raízes com qtd de descendentes e custo do time (cálculo client-side a partir das pessoas já carregadas).
-  - `DobradinhasManagerPanel.tsx` — nova aba.
-  - `DobradinhaPropagarDialog.tsx` — diálogo reutilizado pelo form e pela aba.
-  - Ajustes em `Eleicao.tsx` (form: esconder/exibir dobradinha por tipo, hook do diálogo) e `PrevisaoCustos.tsx` (card "Custo por time").
+- **Migration ordem**: criar `eleicao_garantir_token_indicador` → trigger → backfill → RPC `eleicao_listar_indicadores_team` → grants. Tudo em uma só migration.
+- **Trigger idempotente**: `ON CONFLICT DO NOTHING` no índice parcial `eleicao_indicacao_tokens_indicador_ativo`.
+- **RLS**: novas RPCs `SECURITY DEFINER` com `SET search_path = public`.
+- **Tipos Supabase** regeneram após a migration; código novo usa cast `as any` enquanto isso.
 
-## Entregáveis
+## Arquivos tocados
 
-1. Migration: RPC de aplicação + trigger de herança + backfill.
-2. Aba "Dobradinhas" com listagem de raízes, filtros e ação em massa.
-3. Diálogo de propagação (raiz alterada vs. time montado).
-4. Form ajustado: só raízes editam dobradinha; descendentes mostram herança em modo leitura.
-5. `PrevisaoCustos`: card "Custo por time" + coluna "Time de" na tabela de dobradinhas.
-6. Badge colorido do federal na listagem (raiz com badge cheio, descendentes com indicador menor).
+- `supabase/migrations/<nova>.sql`
+- `src/components/eleicao/IndicacoesPanel.tsx`
+- `src/pages/IndicarPublico.tsx`
+- `src/pages/PortalCoordenador.tsx`
+
+## Fora do escopo
+
+- Não criar botão novo "Convidar para o grupo" — o convite vira parte da mensagem do botão de foto.
+- Não mexer em Dobradinhas, fluxo de contratados, custos ou árvore do time.
+- Não criar nova tabela.
