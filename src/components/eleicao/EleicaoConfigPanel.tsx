@@ -95,6 +95,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         envio_cabo_boas_vindas_ativo: d.envio_cabo_boas_vindas_ativo ?? true,
         cadastro_lider_ativo: d.cadastro_lider_ativo ?? true,
         cadastro_cabo_ativo: d.cadastro_cabo_ativo ?? true,
+        cadastro_voluntario_ativo: d.cadastro_voluntario_ativo ?? true,
       });
     }
     // Carrega grupos do WhatsApp disponíveis
