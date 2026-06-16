@@ -132,6 +132,10 @@ export default function PortalCoordenador() {
     if (!meRow) { navigate(`/portal/${clientId}`); return; }
     setMe(meRow as any);
 
+    const grupos = ((notifCfg as any)?.grupos_links ?? {}) as Record<string, string>;
+    const reg = (meRow as any).regiao as string | null;
+    setLinkGrupo(reg && grupos[reg] ? grupos[reg] : null);
+
     const { data: tr } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("client_id", clientId!).order("nome");
     setTeam((tr as any) || []);
