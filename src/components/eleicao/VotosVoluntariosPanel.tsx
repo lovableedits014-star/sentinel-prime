@@ -201,6 +201,11 @@ export default function VotosVoluntariosPanel({
                 </>
               )}
             </div>
+
+            {/* Form rápido para o coordenador cadastrar indicados aqui mesmo */}
+            {me.token && (
+              <QuickAddIndicado token={me.token} onAdded={load} />
+            )}
           </div>
         )}
 
