@@ -160,35 +160,31 @@ export default function PortalCoordenador() {
       setCandidatoNome(cl.name || "");
     }
 
-    // Link do grupo da região (eleicao_notif_config.grupos_links: { regiao: url })
-    const { data: notifCfg } = await supabase
-      .from("eleicao_notif_config" as any)
-      .select("grupos_links")
-      .eq("client_id", clientId!)
-      .maybeSingle();
-
     const { data: meRow } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("user_id", session.user.id).eq("client_id", clientId!).eq("tipo", "coordenador")
       .maybeSingle();
     if (!meRow) { navigate(`/portal/${clientId}`); return; }
     setMe(meRow as any);
 
-    const grupos = ((notifCfg as any)?.grupos_links ?? {}) as Record<string, string>;
+    // Config do portal via RPC SECURITY DEFINER: coordenador pode ler links dos grupos sem depender da RLS administrativa.
+    const { data: portalCfg, error: portalCfgError } = await supabase
+      .rpc("get_eleicao_portal_config" as any, { _client_id: clientId! });
+    if (portalCfgError) console.warn("[PortalCoordenador] Falha ao carregar config do portal", portalCfgError);
+    const portalCfgRow = Array.isArray(portalCfg) ? portalCfg[0] : portalCfg;
+
+    const grupos = ((portalCfgRow as any)?.grupos_links ?? {}) as Record<string, string>;
     setGruposLinks(grupos);
     const reg = (meRow as any).regiao as string | null;
-    setLinkGrupo(reg && grupos[reg] ? grupos[reg] : null);
+    setLinkGrupo(resolveGrupoLink(grupos, reg));
 
     const { data: tr } = await supabase.from("eleicao_pessoas" as any)
       .select("*").eq("client_id", clientId!).order("nome");
     setTeam((tr as any) || []);
 
-    const { data: cfg } = await supabase
-      .rpc("get_eleicao_cadastro_flags" as any, { _client_id: clientId! });
-    const row = Array.isArray(cfg) ? cfg[0] : cfg;
-    if (row) {
+    if (portalCfgRow) {
       setGlobalCfg({
-        cadastro_lider_ativo: (row as any).cadastro_lider_ativo ?? true,
-        cadastro_cabo_ativo: (row as any).cadastro_cabo_ativo ?? true,
+        cadastro_lider_ativo: (portalCfgRow as any).cadastro_lider_ativo ?? true,
+        cadastro_cabo_ativo: (portalCfgRow as any).cadastro_cabo_ativo ?? true,
       });
     }
     setLoading(false);
