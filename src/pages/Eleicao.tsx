@@ -335,6 +335,7 @@ export default function Eleicao() {
     const numero = form.numero.trim();
     const bairro = form.bairro.trim();
     const enderecoConcat = [rua ? `${rua}${numero ? ", " + numero : ""}` : "", bairro].filter(Boolean).join(" - ");
+    const isRaiz = form.tipo === "coordenador" || (form.tipo === "lider" && form.liderAvulso);
     const payload: any = {
       client_id: clientId,
       tipo: form.tipo,
@@ -351,19 +352,67 @@ export default function Eleicao() {
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
-      parceiro_id: form.parceiro_id || null,
-      rateio_estadual: form.parceiro_id ? form.rateio_estadual : 100,
-      rateio_parceiro: form.parceiro_id ? form.rateio_parceiro : 0,
     };
+
+    // Dobradinha:
+    // - Raiz nova: inclui no payload (não há descendentes pra propagar).
+    // - Raiz editando: salva campos base aqui, dobradinha aplicada via RPC após (com diálogo se houver descendentes).
+    // - Não-raiz: omite — trigger BEFORE INSERT/UPDATE herda da raiz automaticamente.
+    if (isRaiz && !editing) {
+      payload.parceiro_id = form.parceiro_id || null;
+      payload.rateio_estadual = form.parceiro_id ? form.rateio_estadual : 100;
+      payload.rateio_parceiro = form.parceiro_id ? form.rateio_parceiro : 0;
+    }
+
     const q = editing
       ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
       : supabase.from("eleicao_pessoas" as any).insert(payload).select().single();
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
 
+    // Se está editando uma raiz e a dobradinha mudou, dispara fluxo de propagação
+    if (editing && isRaiz) {
+      const dobradinhaAtual = {
+        parceiro_id: editing.parceiro_id || "",
+        rateio_estadual: editing.rateio_estadual ?? 100,
+        rateio_parceiro: editing.rateio_parceiro ?? 0,
+      };
+      const dobradinhaNova = {
+        parceiro_id: form.parceiro_id || "",
+        rateio_estadual: form.parceiro_id ? form.rateio_estadual : 100,
+        rateio_parceiro: form.parceiro_id ? form.rateio_parceiro : 0,
+      };
+      const mudou =
+        dobradinhaAtual.parceiro_id !== dobradinhaNova.parceiro_id ||
+        dobradinhaAtual.rateio_estadual !== dobradinhaNova.rateio_estadual ||
+        dobradinhaAtual.rateio_parceiro !== dobradinhaNova.rateio_parceiro;
+      if (mudou) {
+        const temDescs = pessoas.some(p => p.parent_id === editing.id);
+        if (!temDescs) {
+          // Aplica direto, sem diálogo
+          await supabase.rpc("eleicao_aplicar_dobradinha_raiz" as any, {
+            _raiz_id: editing.id,
+            _parceiro_id: dobradinhaNova.parceiro_id || null,
+            _rateio_estadual: dobradinhaNova.rateio_estadual,
+            _rateio_parceiro: dobradinhaNova.rateio_parceiro,
+            _propagar: false,
+          });
+        } else {
+          // Abre diálogo de propagação
+          setPropagarRaiz({
+            raiz: editing,
+            parceiroId: dobradinhaNova.parceiro_id || null,
+            rateioEstadual: dobradinhaNova.rateio_estadual,
+            rateioParceiro: dobradinhaNova.rateio_parceiro,
+          });
+          setDialogOpen(false);
+          load();
+          return;
+        }
+      }
+    }
+
     // Novo cadastro: abre o popup de envio MANUAL (WhatsApp Web do próprio usuário).
-    // Substitui os disparos automáticos anteriores — o usuário decide o que enviar.
-    // Pode ser desativado por sessão via sessionStorage["eleicao:skip-pos-cadastro"].
     if (!editing && savedPessoa) {
       toast.success(`${TIPO_META[form.tipo].label} cadastrado!`);
       setDialogOpen(false);
@@ -371,7 +420,6 @@ export default function Eleicao() {
       let skip = false;
       try { skip = sessionStorage.getItem("eleicao:skip-pos-cadastro") === "1"; } catch {}
       if (skip) {
-        // Fallback ao comportamento antigo (instância automática).
         if (form.tipo === "lider") {
           const isAvulso = !payload.parent_id;
           setNotifySkip(isAvulso ? ["coordenador", "secretaria"] : []);
