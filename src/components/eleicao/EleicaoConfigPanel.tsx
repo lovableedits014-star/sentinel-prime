@@ -10,6 +10,7 @@ import { Loader2, Save, MessageSquare, Phone, Link as LinkIcon, Plus, X } from "
 import { toast } from "sonner";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ParceirosManager from "@/components/eleicao/ParceirosManager";
 
 const DEFAULT_TPL_COORD =
   "Foi adicionado novo líder na região: *{regiao}*\n\nNome: {nome}\nTelefone: {telefone}\nRua: {rua}, {numero}\nBairro: {bairro}";
@@ -189,6 +190,8 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
 
   return (
     <div className="space-y-4">
+      <ParceirosManager clientId={clientId} />
+
       <Card className="p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
