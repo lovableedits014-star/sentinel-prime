@@ -439,11 +439,13 @@ function QuickAddIndicado({
   token,
   nomePessoa,
   inOwnCard,
+  disabled = false,
   onAdded,
 }: {
   token: string;
   nomePessoa?: string;
   inOwnCard?: boolean;
+  disabled?: boolean;
   onAdded: (newId?: string) => void | Promise<void>;
 }) {
   const [nome, setNome] = useState("");
@@ -455,7 +457,7 @@ function QuickAddIndicado({
   const digits = telefone.replace(/\D/g, "");
   const telOk = digits.length === 10 || digits.length === 11;
   const nomeOk = nome.trim().length >= 2;
-  const podeEnviar = telOk && nomeOk && !saving;
+  const podeEnviar = telOk && nomeOk && !saving && !disabled;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
