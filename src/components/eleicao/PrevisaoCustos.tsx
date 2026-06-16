@@ -1,7 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Crown, Users, UserCheck, DollarSign, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Crown, Users, UserCheck, DollarSign, TrendingUp, Handshake } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
+import { useCandidatosParceiros, type CandidatoParceiro } from "@/hooks/useCandidatosParceiros";
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
@@ -15,6 +18,9 @@ interface Pessoa {
   nome: string;
   parent_id?: string | null;
   valor_contratacao?: number | null;
+  parceiro_id?: string | null;
+  rateio_estadual?: number | null;
+  rateio_parceiro?: number | null;
 }
 
 const fmt = (v: number) =>
@@ -38,17 +44,74 @@ const TIPO_ICON = {
   cabo: UserCheck,
 };
 
-export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
+const COR_ESTADUAL = "#7c3aed";
+
+export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[]; clientId?: string }) {
+  const { parceiros } = useCandidatosParceiros(clientId);
+  const [filtroCandidato, setFiltroCandidato] = useState<string>("todos"); // 'todos' | 'estadual' | parceiro_id
+
+  // Mapa de parceiros por id
+  const parceiroById = useMemo(() => {
+    const m: Record<string, CandidatoParceiro> = {};
+    parceiros.forEach(p => { m[p.id] = p; });
+    return m;
+  }, [parceiros]);
+
   const data = useMemo(() => {
     const valor = (p: Pessoa) => Number(p.valor_contratacao || 0);
-    const byTipo = (t: Tipo) => pessoas.filter(p => p.tipo === t);
+    const parteEstadual = (p: Pessoa) => valor(p) * Number(p.rateio_estadual ?? 100) / 100;
+    const parteParceiro = (p: Pessoa) => valor(p) * Number(p.rateio_parceiro ?? 0) / 100;
 
+    // Valor que conta dado o filtro (parte do total que cabe ao candidato filtrado)
+    const valorFiltrado = (p: Pessoa) => {
+      if (filtroCandidato === "todos") return valor(p);
+      if (filtroCandidato === "estadual") return parteEstadual(p);
+      // filtro = parceiro_id específico
+      return p.parceiro_id === filtroCandidato ? parteParceiro(p) : 0;
+    };
+
+    // Pessoas relevantes ao filtro
+    const pessoasFiltradas = pessoas.filter(p => valorFiltrado(p) > 0 || filtroCandidato === "todos");
+
+    // === Breakdown por candidato pagador (sempre calculado, ignora filtro) ===
+    const porCandidato: Array<{
+      key: string;
+      label: string;
+      cor: string;
+      total: number;
+      pessoas: number;
+    }> = [];
+    const estadualTotal = pessoas.reduce((s, p) => s + parteEstadual(p), 0);
+    const estadualPessoas = pessoas.filter(p => parteEstadual(p) > 0).length;
+    porCandidato.push({
+      key: "estadual",
+      label: "Estadual (principal)",
+      cor: COR_ESTADUAL,
+      total: estadualTotal,
+      pessoas: estadualPessoas,
+    });
+    parceiros.forEach(parc => {
+      const ps = pessoas.filter(p => p.parceiro_id === parc.id);
+      const total = ps.reduce((s, p) => s + parteParceiro(p), 0);
+      const pessoasCount = ps.filter(p => parteParceiro(p) > 0).length;
+      porCandidato.push({
+        key: parc.id,
+        label: parc.nome + (parc.partido ? ` (${parc.partido})` : ""),
+        cor: parc.cor,
+        total,
+        pessoas: pessoasCount,
+      });
+    });
+    const totalGeralBruto = porCandidato.reduce((s, x) => s + x.total, 0);
+
+    // === Métricas afetadas pelo filtro ===
+    const byTipo = (t: Tipo) => pessoasFiltradas.filter(p => p.tipo === t);
     const porTipo = (["coordenador", "lider", "cabo"] as Tipo[]).map(t => {
       const list = byTipo(t);
-      const total = list.reduce((s, p) => s + valor(p), 0);
-      const pagos = list.filter(p => valor(p) > 0).length;
+      const total = list.reduce((s, p) => s + valorFiltrado(p), 0);
+      const pagos = list.filter(p => valorFiltrado(p) > 0).length;
       const avulsos = t === "lider" ? list.filter(p => !p.parent_id) : [];
-      const avulsosTotal = avulsos.reduce((s, p) => s + valor(p), 0);
+      const avulsosTotal = avulsos.reduce((s, p) => s + valorFiltrado(p), 0);
       return {
         tipo: t,
         label: TIPO_LABEL[t],
@@ -67,36 +130,92 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
     // Por escopo
     const porEscopo = (["campo_grande", "interior"] as Escopo[]).map(e => ({
       escopo: e === "campo_grande" ? "Campo Grande" : "Interior",
-      total: pessoas.filter(p => p.escopo === e).reduce((s, p) => s + valor(p), 0),
+      total: pessoasFiltradas.filter(p => p.escopo === e).reduce((s, p) => s + valorFiltrado(p), 0),
     }));
 
-    // Top 10 mais caros
-    const top = [...pessoas]
-      .filter(p => valor(p) > 0)
-      .sort((a, b) => valor(b) - valor(a))
+    // Top 10
+    const top = [...pessoasFiltradas]
+      .filter(p => valorFiltrado(p) > 0)
+      .sort((a, b) => valorFiltrado(b) - valorFiltrado(a))
       .slice(0, 10)
-      .map(p => ({ nome: p.nome, valor: valor(p), tipo: p.tipo }));
+      .map(p => ({ nome: p.nome, valor: valorFiltrado(p), tipo: p.tipo, parceiro_id: p.parceiro_id }));
 
     // Por região/cidade
     const agrupado: Record<string, number> = {};
-    pessoas.forEach(p => {
-      const key =
-        p.escopo === "campo_grande"
-          ? p.regiao || "Sem região"
-          : p.cidade || "Sem cidade";
-      agrupado[key] = (agrupado[key] || 0) + valor(p);
+    pessoasFiltradas.forEach(p => {
+      const key = p.escopo === "campo_grande" ? p.regiao || "Sem região" : p.cidade || "Sem cidade";
+      agrupado[key] = (agrupado[key] || 0) + valorFiltrado(p);
     });
     const porRegiao = Object.entries(agrupado)
       .filter(([, v]) => v > 0)
       .map(([nome, total]) => ({ nome, total }))
       .sort((a, b) => b.total - a.total);
 
-    return { porTipo, totalGeral, porEscopo, top, porRegiao };
-  }, [pessoas]);
+    // === Tabela "Quem paga quem" — só quando há dobradinhas ===
+    const dobradinhas = pessoas
+      .filter(p => p.parceiro_id && (parteParceiro(p) > 0 || parteEstadual(p) > 0) && valor(p) > 0)
+      .sort((a, b) => valor(b) - valor(a));
+
+    return { porTipo, totalGeral, porEscopo, top, porRegiao, porCandidato, totalGeralBruto, dobradinhas, pessoasFiltradas };
+  }, [pessoas, parceiros, filtroCandidato]);
+
+  const filtroLabel =
+    filtroCandidato === "todos" ? "Custo total previsto" :
+    filtroCandidato === "estadual" ? "Custo do Estadual (principal)" :
+    `Custo do ${parceiroById[filtroCandidato]?.nome || "parceiro"}`;
 
   return (
     <div className="space-y-4">
-      {/* Total geral */}
+      {/* === Cards por candidato pagador === */}
+      {parceiros.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Handshake className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-sm">Custos por candidato (dobradinhas)</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {data.porCandidato.map(c => {
+              const pct = data.totalGeralBruto > 0 ? (c.total / data.totalGeralBruto) * 100 : 0;
+              const ativo = filtroCandidato === c.key;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setFiltroCandidato(ativo ? "todos" : c.key)}
+                  className="text-left rounded-lg border p-3 transition-all hover:shadow-md"
+                  style={{
+                    borderColor: ativo ? c.cor : undefined,
+                    borderWidth: ativo ? 2 : 1,
+                    backgroundColor: ativo ? `${c.cor}10` : undefined,
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.cor }} />
+                    <span className="text-sm font-medium truncate">{c.label}</span>
+                  </div>
+                  <p className="text-xl font-bold tabular-nums">{fmt(c.total)}</p>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-1">
+                    <span>{c.pessoas} {c.pessoas === 1 ? "pessoa" : "pessoas"}</span>
+                    <span>{pct.toFixed(1)}% do total</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {filtroCandidato !== "todos" && (
+            <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+              <span className="text-muted-foreground">
+                Filtros abaixo mostram apenas <strong>{filtroLabel.toLowerCase()}</strong>.
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => setFiltroCandidato("todos")}>
+                Limpar filtro
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Total geral (respeita filtro) */}
       <Card className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
@@ -104,7 +223,7 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
               <DollarSign className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Custo total previsto</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{filtroLabel}</p>
               <p className="text-3xl font-bold tabular-nums">{fmt(data.totalGeral)}</p>
             </div>
           </div>
@@ -113,7 +232,7 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
             <p className="text-lg font-semibold">
               {data.porTipo.reduce((s, x) => s + x.pagos, 0)}
               <span className="text-muted-foreground text-sm font-normal">
-                {" "}/ {pessoas.length}
+                {" "}/ {data.pessoasFiltradas.length}
               </span>
             </p>
           </div>
@@ -233,10 +352,71 @@ export default function PrevisaoCustos({ pessoas }: { pessoas: Pessoa[] }) {
                   style={{ backgroundColor: TIPO_COLOR[p.tipo] }}
                 />
                 <span className="text-sm font-medium flex-1 truncate">{p.nome}</span>
-                <span className="text-xs text-muted-foreground capitalize">{TIPO_LABEL[p.tipo]}</span>
+                {p.parceiro_id && parceiroById[p.parceiro_id] && (
+                  <Badge variant="outline" className="text-[10px]" style={{ borderColor: parceiroById[p.parceiro_id].cor, color: parceiroById[p.parceiro_id].cor }}>
+                    {parceiroById[p.parceiro_id].nome.split(" ")[0]}
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground capitalize hidden sm:inline">{TIPO_LABEL[p.tipo]}</span>
                 <span className="text-sm font-bold tabular-nums">{fmt(p.valor)}</span>
               </div>
             ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Tabela "Quem paga quem" — dobradinhas detalhadas */}
+      {data.dobradinhas.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Handshake className="w-4 h-4 text-primary" />
+            <p className="font-medium text-sm">Quem paga quem — detalhamento das dobradinhas</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-muted-foreground border-b">
+                <tr>
+                  <th className="text-left py-2 px-2 font-medium">Pessoa</th>
+                  <th className="text-left py-2 px-2 font-medium">Parceiro</th>
+                  <th className="text-right py-2 px-2 font-medium">Valor total</th>
+                  <th className="text-right py-2 px-2 font-medium" style={{ color: COR_ESTADUAL }}>Estadual paga</th>
+                  <th className="text-right py-2 px-2 font-medium">Federal paga</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.dobradinhas.map(p => {
+                  const total = Number(p.valor_contratacao || 0);
+                  const est = total * Number(p.rateio_estadual ?? 100) / 100;
+                  const par = total * Number(p.rateio_parceiro ?? 0) / 100;
+                  const parc = p.parceiro_id ? parceiroById[p.parceiro_id] : null;
+                  return (
+                    <tr key={p.id} className="border-b last:border-0 hover:bg-muted/40">
+                      <td className="py-2 px-2">
+                        <div className="font-medium truncate">{p.nome}</div>
+                        <div className="text-[10px] text-muted-foreground capitalize">{TIPO_LABEL[p.tipo]} · {p.regiao || p.cidade}</div>
+                      </td>
+                      <td className="py-2 px-2">
+                        {parc ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: parc.cor }} />
+                            {parc.nome}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="text-right py-2 px-2 tabular-nums font-medium">{fmt(total)}</td>
+                      <td className="text-right py-2 px-2 tabular-nums" style={{ color: COR_ESTADUAL }}>
+                        {fmt(est)} <span className="text-[10px] text-muted-foreground">({p.rateio_estadual ?? 100}%)</span>
+                      </td>
+                      <td className="text-right py-2 px-2 tabular-nums" style={{ color: parc?.cor }}>
+                        {fmt(par)} <span className="text-[10px] text-muted-foreground">({p.rateio_parceiro ?? 0}%)</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}

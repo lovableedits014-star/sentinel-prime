@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star, BellRing, RefreshCw } from "lucide-react";
+import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star, BellRing, RefreshCw, Handshake } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/Exp
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
 import IndicacoesPanel from "@/components/eleicao/IndicacoesPanel";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
+import { useCandidatosParceiros } from "@/hooks/useCandidatosParceiros";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -168,6 +169,9 @@ interface Pessoa {
   is_favorito_regiao?: boolean | null;
   pode_cadastrar_lider?: boolean | null;
   pode_cadastrar_cabo?: boolean | null;
+  parceiro_id?: string | null;
+  rateio_estadual?: number | null;
+  rateio_parceiro?: number | null;
   created_at: string;
 }
 
@@ -200,6 +204,7 @@ export default function Eleicao() {
   const [escopo, setEscopo] = useState<Escopo>("campo_grande");
   const [regiaoFilter, setRegiaoFilter] = useState<Regiao | "all">("all");
   const { regioes: REGIOES } = useRegioesEleicao(clientId || undefined);
+  const { parceirosAtivos: PARCEIROS } = useCandidatosParceiros(clientId || undefined);
 
   // dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -227,6 +232,9 @@ export default function Eleicao() {
     password: "",
     send_access: true,
     valor_contratacao: "" as string,
+    parceiro_id: "" as string,
+    rateio_estadual: 100 as number,
+    rateio_parceiro: 0 as number,
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
@@ -266,6 +274,9 @@ export default function Eleicao() {
       parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
+      parceiro_id: "",
+      rateio_estadual: 100,
+      rateio_parceiro: 0,
       ...presets,
     });
     setDialogOpen(true);
@@ -298,6 +309,9 @@ export default function Eleicao() {
       password: "",
       send_access: false,
       valor_contratacao: p.valor_contratacao != null ? String(p.valor_contratacao) : "",
+      parceiro_id: p.parceiro_id || "",
+      rateio_estadual: p.rateio_estadual ?? 100,
+      rateio_parceiro: p.rateio_parceiro ?? 0,
     });
     setDialogOpen(true);
   }
@@ -335,6 +349,9 @@ export default function Eleicao() {
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
+      parceiro_id: form.parceiro_id || null,
+      rateio_estadual: form.parceiro_id ? form.rateio_estadual : 100,
+      rateio_parceiro: form.parceiro_id ? form.rateio_parceiro : 0,
     };
     const q = editing
       ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
@@ -755,7 +772,7 @@ export default function Eleicao() {
       </Tabs>
 
       {view === "custos" ? (
-        <PrevisaoCustos pessoas={pessoas as any} />
+        <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
       ) : view === "pendentes" ? (
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
       ) : view === "grupo" ? (
@@ -1089,6 +1106,98 @@ export default function Eleicao() {
               <Label>Bairro *</Label>
               <Input value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: e.target.value }))} placeholder="Centro" />
             </div>
+
+
+
+            {PARCEIROS.length > 0 && (
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Handshake className="w-4 h-4 text-primary" />
+                  Dobradinha (opcional)
+                </div>
+                <div>
+                  <Label className="text-xs">Candidato federal parceiro</Label>
+                  <Select
+                    value={form.parceiro_id || "none"}
+                    onValueChange={(v) => setForm(f => ({
+                      ...f,
+                      parceiro_id: v === "none" ? "" : v,
+                      rateio_estadual: v === "none" ? 100 : (f.rateio_parceiro > 0 ? f.rateio_estadual : 50),
+                      rateio_parceiro: v === "none" ? 0 : (f.rateio_parceiro > 0 ? f.rateio_parceiro : 50),
+                    }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Sem dobradinha — só estadual" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Sem dobradinha (100% estadual) —</SelectItem>
+                      {PARCEIROS.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <span className="inline-flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.cor }} />
+                            {p.nome}{p.partido ? ` (${p.partido})` : ""}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.parceiro_id && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Quem paga os custos?</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {[
+                        { e: 100, p: 0, label: "100% Estadual" },
+                        { e: 70, p: 30, label: "70 / 30" },
+                        { e: 50, p: 50, label: "50 / 50" },
+                        { e: 0, p: 100, label: "100% Federal" },
+                      ].map(opt => {
+                        const active = form.rateio_estadual === opt.e && form.rateio_parceiro === opt.p;
+                        return (
+                          <Button
+                            key={opt.label}
+                            type="button"
+                            size="sm"
+                            variant={active ? "default" : "outline"}
+                            className="text-xs h-8"
+                            onClick={() => setForm(f => ({ ...f, rateio_estadual: opt.e, rateio_parceiro: opt.p }))}
+                          >
+                            {opt.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div>
+                        <Label className="text-[10px] uppercase text-muted-foreground">Estadual paga (%)</Label>
+                        <Input
+                          type="number" min={0} max={100}
+                          value={form.rateio_estadual}
+                          onChange={(e) => {
+                            const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                            setForm(f => ({ ...f, rateio_estadual: v, rateio_parceiro: 100 - v }));
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] uppercase text-muted-foreground">Federal paga (%)</Label>
+                        <Input
+                          type="number" min={0} max={100}
+                          value={form.rateio_parceiro}
+                          onChange={(e) => {
+                            const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                            setForm(f => ({ ...f, rateio_parceiro: v, rateio_estadual: 100 - v }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      A soma sempre é 100%. Ao definir um lado, o outro ajusta automaticamente.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div>
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} />
