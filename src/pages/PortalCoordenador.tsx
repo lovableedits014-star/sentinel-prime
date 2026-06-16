@@ -185,6 +185,7 @@ export default function PortalCoordenador() {
       setGlobalCfg({
         cadastro_lider_ativo: (portalCfgRow as any).cadastro_lider_ativo ?? true,
         cadastro_cabo_ativo: (portalCfgRow as any).cadastro_cabo_ativo ?? true,
+        cadastro_voluntario_ativo: (portalCfgRow as any).cadastro_voluntario_ativo ?? true,
       });
     }
     setLoading(false);
