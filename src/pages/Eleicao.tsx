@@ -1106,7 +1106,8 @@ export default function Eleicao() {
               <Label>Bairro *</Label>
               <Input value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: e.target.value }))} placeholder="Centro" />
             </div>
-            </div>
+
+
 
             {PARCEIROS.length > 0 && (
               <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-3">
