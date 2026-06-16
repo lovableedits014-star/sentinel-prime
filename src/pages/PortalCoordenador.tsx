@@ -409,7 +409,7 @@ export default function PortalCoordenador() {
                         variant="ghost"
                         className="h-8 w-8 text-emerald-600"
                         title={linkGrupo ? "Enviar boas-vindas (grupo + foto) via WhatsApp" : "Enviar link da foto via WhatsApp"}
-                        onClick={() => sendBoasVindasWhats(l, clientId!, { linkGrupo, regiao: me.regiao, candidatoNome })}
+                        onClick={() => sendBoasVindasWhats(l, clientId!, { linkGrupo, gruposLinks, regiao: me.regiao, candidatoNome })}
                       >
                         <Send className="w-4 h-4" />
                       </Button>
