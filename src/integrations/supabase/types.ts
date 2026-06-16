@@ -1856,6 +1856,59 @@ export type Database = {
           },
         ]
       }
+      eleicao_candidatos_parceiros: {
+        Row: {
+          ativo: boolean
+          cargo: string
+          client_id: string
+          cor: string
+          created_at: string
+          foto_url: string | null
+          id: string
+          nome: string
+          numero_urna: string | null
+          ordem: number
+          partido: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cargo?: string
+          client_id: string
+          cor?: string
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          nome: string
+          numero_urna?: string | null
+          ordem?: number
+          partido?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cargo?: string
+          client_id?: string
+          cor?: string
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          nome?: string
+          numero_urna?: string | null
+          ordem?: number
+          partido?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_candidatos_parceiros_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eleicao_cobranca_auto_config: {
         Row: {
           ativo: boolean
@@ -2415,10 +2468,13 @@ export type Database = {
           observacao_tele: string | null
           observacoes: string | null
           operador_nome: string | null
+          parceiro_id: string | null
           parent_id: string | null
           pode_cadastrar_cabo: boolean
           pode_cadastrar_lider: boolean
           proxima_tentativa_em: string | null
+          rateio_estadual: number
+          rateio_parceiro: number
           regiao: string | null
           rua: string | null
           telefone: string
@@ -2456,10 +2512,13 @@ export type Database = {
           observacao_tele?: string | null
           observacoes?: string | null
           operador_nome?: string | null
+          parceiro_id?: string | null
           parent_id?: string | null
           pode_cadastrar_cabo?: boolean
           pode_cadastrar_lider?: boolean
           proxima_tentativa_em?: string | null
+          rateio_estadual?: number
+          rateio_parceiro?: number
           regiao?: string | null
           rua?: string | null
           telefone: string
@@ -2497,10 +2556,13 @@ export type Database = {
           observacao_tele?: string | null
           observacoes?: string | null
           operador_nome?: string | null
+          parceiro_id?: string | null
           parent_id?: string | null
           pode_cadastrar_cabo?: boolean
           pode_cadastrar_lider?: boolean
           proxima_tentativa_em?: string | null
+          rateio_estadual?: number
+          rateio_parceiro?: number
           regiao?: string | null
           rua?: string | null
           telefone?: string
@@ -2531,6 +2593,13 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_pessoas_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_candidatos_parceiros"
             referencedColumns: ["id"]
           },
           {
@@ -8101,10 +8170,13 @@ export type Database = {
           observacao_tele: string | null
           observacoes: string | null
           operador_nome: string | null
+          parceiro_id: string | null
           parent_id: string | null
           pode_cadastrar_cabo: boolean
           pode_cadastrar_lider: boolean
           proxima_tentativa_em: string | null
+          rateio_estadual: number
+          rateio_parceiro: number
           regiao: string | null
           rua: string | null
           telefone: string
