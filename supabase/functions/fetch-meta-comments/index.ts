@@ -284,12 +284,12 @@ async function fetchInstagramMediaWithComments(
   const log: string[] = [];
 
   const mediaUrl = buildGraphUrl(`${igAccountId}/media`, {
-    fields: 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp',
+    fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp',
     limit: String(postsLimit),
     access_token: accessToken,
   });
 
-  log.push(`[IG] Endpoint: /${igAccountId}/media`);
+  log.push(`[IG] Endpoint: /${igAccountId}/media (fields incluem media_product_type p/ Reels)`);
 
   const resp = await fetch(mediaUrl);
   if (!resp.ok) {
@@ -302,6 +302,21 @@ async function fetchInstagramMediaWithComments(
   const json = await resp.json();
   const media = json?.data ?? [];
   log.push(`[IG] Media returned: ${media.length}`);
+  if (media.length > 0) {
+    const newest = media[0]?.timestamp ?? 'desconhecido';
+    const oldest = media[media.length - 1]?.timestamp ?? 'desconhecido';
+    const types = media.reduce((acc: Record<string, number>, m: any) => {
+      const k = m.media_product_type || m.media_type || 'unknown';
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+    log.push(`[IG] Mais recente devolvido pelo Meta: ${newest}`);
+    log.push(`[IG] Mais antigo devolvido pelo Meta: ${oldest}`);
+    log.push(`[IG] Tipos: ${JSON.stringify(types)}`);
+    console.log(`[IG] Newest from Meta: ${newest} | types:`, types);
+  } else {
+    log.push('[IG] Meta não devolveu nenhuma mídia.');
+  }
 
   // Fetch comments for each media - in parallel batches of 3
   for (const batch of chunkArray(media, 3)) {
