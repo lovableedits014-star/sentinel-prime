@@ -492,6 +492,47 @@ export default function Disparos() {
     }
   };
 
+  const handleResumeDispatch = async (dispatchId: string, titulo: string) => {
+    try {
+      // Reativa itens que foram marcados como cancelados ao parar o disparo
+      const { data: resetItems, error: resetErr } = await supabase
+        .from("whatsapp_dispatch_items" as any)
+        .update({ status: "pendente", erro: null })
+        .eq("dispatch_id", dispatchId)
+        .eq("status", "cancelado")
+        .select("id");
+      if (resetErr) throw resetErr;
+      const resetCount = resetItems?.length || 0;
+      if (resetCount === 0) {
+        toast.info("Nenhum envio pendente para retomar neste disparo.");
+        return;
+      }
+
+      // Volta o disparo para em_andamento e limpa motivo de pausa
+      const { error: e2 } = await supabase
+        .from("whatsapp_dispatches" as any)
+        .update({
+          status: "em_andamento",
+          pause_reason: null,
+          completed_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", dispatchId);
+      if (e2) throw e2;
+
+      // Dispara o processamento (resume)
+      const { error: invErr } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+        body: { resume_dispatch_id: dispatchId },
+      });
+      if (invErr) throw invErr;
+
+      toast.success(`Retomando "${titulo}" — ${resetCount} envio(s) restantes.`);
+      refetch();
+    } catch (err: any) {
+      toast.error("Erro ao retomar: " + (err.message || "tente novamente"));
+    }
+  };
+
   const isConnected = !!bridgeConfigured;
   const activeDispatch = activeQueueDispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
   const queuedDispatches = activeQueueDispatches.filter((d) => d.status === "enfileirado");
