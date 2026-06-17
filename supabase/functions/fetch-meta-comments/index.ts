@@ -210,14 +210,16 @@ async function fetchFacebookPostsWithComments(
   const commentFields = 'id,message,created_time,from{id,name,picture.width(100).height(100)},comment_count,is_hidden';
   const postFields = `id,message,created_time,full_picture,permalink_url,attachments{media_type},comments.limit(50){${commentFields}}`;
 
-  const pageSize = Math.min(postsLimit, 10);
+  // Garantir mínimo de 25 itens para nunca perder os últimos posts
+  const effectiveLimit = Math.max(postsLimit, 25);
+  const pageSize = Math.min(effectiveLimit, 10);
   const url = buildGraphUrl(`${pageId}/posts`, {
     fields: postFields,
     limit: String(pageSize),
     access_token: accessToken,
   });
 
-  log.push(`[FB] Endpoint: /${pageId}/posts?fields=...&limit=${pageSize} (target: ${postsLimit})`);
+  log.push(`[FB] Endpoint: /${pageId}/posts?fields=...&limit=${pageSize} (target: ${effectiveLimit})`);
 
   const resp = await fetch(url);
   if (!resp.ok) {
@@ -230,16 +232,16 @@ async function fetchFacebookPostsWithComments(
   const json = await resp.json();
   let posts = json?.data ?? [];
   
-  if (posts.length < postsLimit && json?.paging?.next) {
+  if (posts.length < effectiveLimit && json?.paging?.next) {
     let nextUrl: string | null = json.paging.next;
-    while (posts.length < postsLimit && nextUrl && hasTimeLeft()) {
+    while (posts.length < effectiveLimit && nextUrl && hasTimeLeft()) {
       const nextResp = await fetch(nextUrl);
       if (!nextResp.ok) break;
       const nextJson = await nextResp.json();
       posts = [...posts, ...(nextJson?.data ?? [])];
       nextUrl = nextJson?.paging?.next ?? null;
     }
-    posts = posts.slice(0, postsLimit);
+    posts = posts.slice(0, effectiveLimit);
   }
   
   log.push(`[FB] Posts returned: ${posts.length}`);
