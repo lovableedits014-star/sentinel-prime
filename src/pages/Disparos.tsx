@@ -663,6 +663,42 @@ export default function Disparos() {
           </div>
 
 
+          {politica === "personalizado" && (
+            <div className="border rounded-md p-3 bg-muted/20 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Settings2 className="w-4 h-4" /> Política personalizada
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tamanho do lote</Label>
+                  <Input type="number" min={1} value={customPol.batch_size}
+                    onChange={(e) => setCustomPol((p) => ({ ...p, batch_size: Math.max(1, Number(e.target.value) || 1) }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Delay mín (s)</Label>
+                  <Input type="number" min={1} value={customPol.delay_min}
+                    onChange={(e) => setCustomPol((p) => ({ ...p, delay_min: Math.max(1, Number(e.target.value) || 1) }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Delay máx (s)</Label>
+                  <Input type="number" min={1} value={customPol.delay_max}
+                    onChange={(e) => setCustomPol((p) => ({ ...p, delay_max: Math.max(1, Number(e.target.value) || 1) }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Pausa entre lotes (s)</Label>
+                  <Input type="number" min={0} value={customPol.batch_pause}
+                    onChange={(e) => setCustomPol((p) => ({ ...p, batch_pause: Math.max(0, Number(e.target.value) || 0) }))} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Para parecer mais humano, use uma faixa <strong>ampla</strong> de delay (ex.: 20–120s) — quanto mais aleatório, menor o risco de ban.
+                {customPol.delay_max < customPol.delay_min && (
+                  <span className="block text-destructive mt-1">⚠️ Delay máximo precisa ser maior ou igual ao mínimo.</span>
+                )}
+              </p>
+            </div>
+          )}
+
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
             <div className="space-y-2 border rounded-md p-3 bg-muted/20">
