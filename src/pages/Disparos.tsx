@@ -49,8 +49,19 @@ const POLICIES = {
     desc: "2-5s entre msgs, lotes de 30, pausa de 15s (~600 msgs/hora). Risco maior de ban!",
     batch_size: 30, delay_min: 2, delay_max: 5, batch_pause: 15,
   },
+  furtivo: {
+    label: "🥷 Furtivo (anti-ban)",
+    desc: "25-90s entre msgs, lotes de 5, pausa de 180s (~80 msgs/h). Intervalos bem variados para parecer humano.",
+    batch_size: 5, delay_min: 25, delay_max: 90, batch_pause: 180,
+  },
+  personalizado: {
+    label: "⚙️ Personalizado",
+    desc: "Defina manualmente lote, delay mín/máx e pausa entre lotes.",
+    batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120,
+  },
 } as const;
 type PolicyKey = keyof typeof POLICIES;
+
 
 type DispatchRow = {
   id: string;
