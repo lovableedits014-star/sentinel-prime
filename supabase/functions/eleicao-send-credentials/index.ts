@@ -133,7 +133,6 @@ async function tryReconnectInstance(admin: any, inst: any) {
 
 async function preflightInstance(admin: any, inst: any) {
   if (!inst?.bridge_url || !inst?.bridge_api_key) return { status: "disconnected", reconnected: false, detail: "sem credenciais" };
-  // Cache: se a instância foi validada como connected há menos de 30s, reusa.
   const cached = preflightCache.get(inst.id);
   if (cached && Date.now() - cached.ts < PREFLIGHT_CACHE_TTL_MS && cached.status === "connected") {
     return { status: cached.status, reconnected: false, detail: cached.detail + " (cached)" };
@@ -149,16 +148,17 @@ async function preflightInstance(admin: any, inst: any) {
     }
     if (isExplicitOfflineStatus(raw) || res.status === 401) {
       await updateInstanceStatus(admin, inst, "disconnected");
+      return { status: "disconnected", reconnected: false, detail: raw || `http_${res.status}` };
     }
+    // Status transitório (connecting/qr/vazio): NÃO chama reconnect automático.
+    // Tratar como connected para seguir o envio; se falhar de verdade, o caller
+    // cuida (já marca offline quando o envio devolve erro de instância).
+    console.log(`[eleicao-send-credentials] inst=${inst.id} transient (status=${raw || "vazio"}) — seguindo sem reconnect`);
+    return { status: "connected", reconnected: false, detail: `transient:${raw || "vazio"}` };
   } catch (err) {
-    console.warn("[eleicao-send-credentials] preflight status falhou:", (err as Error).message);
+    console.warn("[eleicao-send-credentials] preflight status falhou (transient):", (err as Error).message);
+    return { status: "connected", reconnected: false, detail: `transient_error:${(err as Error).message}` };
   }
-  preflightCache.delete(inst.id);
-  const reconnect = await tryReconnectInstance(admin, inst);
-  if (reconnect.status === "connected") {
-    preflightCache.set(inst.id, { ts: Date.now(), status: "connected", reconnected: true, detail: reconnect.detail });
-  }
-  return reconnect;
 }
 
 Deno.serve(async (req) => {
