@@ -631,14 +631,29 @@ export default function Disparos() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="centro">Centro</SelectItem>
-                        <SelectItem value="segredo">Segredo</SelectItem>
-                        <SelectItem value="prosa">Prosa</SelectItem>
-                        <SelectItem value="bandeira">Bandeira</SelectItem>
-                        <SelectItem value="anhanduizinho">Anhanduizinho</SelectItem>
-                        <SelectItem value="lagoa">Lagoa</SelectItem>
-                        <SelectItem value="imbirussu">Imbirussu</SelectItem>
-                        <SelectItem value="moreninha">Moreninha</SelectItem>
+                        {(() => {
+                          const defaults = [
+                            { value: "centro", label: "Centro" },
+                            { value: "segredo", label: "Segredo" },
+                            { value: "prosa", label: "Prosa" },
+                            { value: "bandeira", label: "Bandeira" },
+                            { value: "anhanduizinho", label: "Anhanduizinho" },
+                            { value: "lagoa", label: "Lagoa" },
+                            { value: "imbirussu", label: "Imbirussu" },
+                            { value: "moreninha", label: "Moreninha" },
+                          ];
+                          const seen = new Set<string>();
+                          const merged: { value: string; label: string }[] = [];
+                          for (const r of [...regioesCadastradas, ...defaults]) {
+                            if (!r.value || seen.has(r.value)) continue;
+                            seen.add(r.value);
+                            merged.push({ value: r.value, label: r.label });
+                          }
+                          merged.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+                          return merged.map((r) => (
+                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                          ));
+                        })()}
                       </SelectContent>
                     </Select>
                   </div>
@@ -646,6 +661,7 @@ export default function Disparos() {
               </>
             )}
           </div>
+
 
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
