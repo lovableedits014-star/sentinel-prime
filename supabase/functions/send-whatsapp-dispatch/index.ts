@@ -924,6 +924,7 @@ Deno.serve(async (req) => {
       let lastInstanceId: string | null = null;
       // Cache do último preflight por instância (resetado se trocar de chip).
       let preflightByInstance: Record<string, PreflightResult> = {};
+      const preflightCacheAt: Record<string, number> = {};
       // Instâncias já tentadas (e que falharam) para um group_jid neste disparo.
       // Permite failover: se a instância X falha ao enviar pro grupo G,
       // não tenta de novo com X nesse mesmo grupo.
