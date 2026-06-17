@@ -38,7 +38,7 @@ const Comments = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sentimentFilter, setSentimentFilter] = useState<string>("all");
   const [platformFilter, setPlatformFilter] = useState<string>("all");
-  const [postsLimit, setPostsLimit] = useState<number>(6);
+  const [postsLimit, setPostsLimit] = useState<number>(25);
   const [generatingResponse, setGeneratingResponse] = useState<string | null>(null);
   const [responding, setResponding] = useState<string | null>(null);
   const [managingComment, setManagingComment] = useState<string | null>(null);
@@ -935,10 +935,10 @@ const Comments = () => {
                 <SelectValue placeholder="Posts" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="5">5 postagens</SelectItem>
                 <SelectItem value="10">10 postagens</SelectItem>
-                <SelectItem value="20">20 postagens</SelectItem>
-                <SelectItem value="30">30 postagens</SelectItem>
+                <SelectItem value="25">25 postagens</SelectItem>
+                <SelectItem value="50">50 postagens</SelectItem>
+                <SelectItem value="100">100 postagens</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sentimentFilter} onValueChange={setSentimentFilter}>

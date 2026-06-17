@@ -20,7 +20,7 @@ const corsHeaders = {
 
 const RequestSchema = z.object({
   clientId: z.string().uuid(),
-  postsLimit: z.coerce.number().int().min(1).max(30).optional(),
+  postsLimit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 const MAX_RUNTIME_MS = 50_000; // 50s safety margin (edge functions timeout at ~60s)
@@ -210,14 +210,16 @@ async function fetchFacebookPostsWithComments(
   const commentFields = 'id,message,created_time,from{id,name,picture.width(100).height(100)},comment_count,is_hidden';
   const postFields = `id,message,created_time,full_picture,permalink_url,attachments{media_type},comments.limit(50){${commentFields}}`;
 
-  const pageSize = Math.min(postsLimit, 10);
+  // Garantir mínimo de 25 itens para nunca perder os últimos posts
+  const effectiveLimit = Math.max(postsLimit, 25);
+  const pageSize = Math.min(effectiveLimit, 10);
   const url = buildGraphUrl(`${pageId}/posts`, {
     fields: postFields,
     limit: String(pageSize),
     access_token: accessToken,
   });
 
-  log.push(`[FB] Endpoint: /${pageId}/posts?fields=...&limit=${pageSize} (target: ${postsLimit})`);
+  log.push(`[FB] Endpoint: /${pageId}/posts?fields=...&limit=${pageSize} (target: ${effectiveLimit})`);
 
   const resp = await fetch(url);
   if (!resp.ok) {
@@ -230,16 +232,16 @@ async function fetchFacebookPostsWithComments(
   const json = await resp.json();
   let posts = json?.data ?? [];
   
-  if (posts.length < postsLimit && json?.paging?.next) {
+  if (posts.length < effectiveLimit && json?.paging?.next) {
     let nextUrl: string | null = json.paging.next;
-    while (posts.length < postsLimit && nextUrl && hasTimeLeft()) {
+    while (posts.length < effectiveLimit && nextUrl && hasTimeLeft()) {
       const nextResp = await fetch(nextUrl);
       if (!nextResp.ok) break;
       const nextJson = await nextResp.json();
       posts = [...posts, ...(nextJson?.data ?? [])];
       nextUrl = nextJson?.paging?.next ?? null;
     }
-    posts = posts.slice(0, postsLimit);
+    posts = posts.slice(0, effectiveLimit);
   }
   
   log.push(`[FB] Posts returned: ${posts.length}`);
@@ -283,25 +285,44 @@ async function fetchInstagramMediaWithComments(
 ): Promise<{ media: any[]; log: string[] }> {
   const log: string[] = [];
 
-  const mediaUrl = buildGraphUrl(`${igAccountId}/media`, {
+  // Garantir mínimo de 25 itens para nunca perder os últimos posts,
+  // mesmo quando a UI manda um limite pequeno (ex: 6).
+  const effectiveLimit = Math.max(postsLimit, 25);
+  const pageSize = Math.min(effectiveLimit, 50);
+
+  const firstUrl = buildGraphUrl(`${igAccountId}/media`, {
     fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp',
-    limit: String(postsLimit),
+    limit: String(pageSize),
     access_token: accessToken,
   });
 
-  log.push(`[IG] Endpoint: /${igAccountId}/media (fields incluem media_product_type p/ Reels)`);
+  log.push(`[IG] Endpoint: /${igAccountId}/media (target: ${effectiveLimit}, pageSize: ${pageSize})`);
 
-  const resp = await fetch(mediaUrl);
-  if (!resp.ok) {
-    const errBody = await resp.text();
-    log.push(`[IG] Error ${resp.status}: ${errBody}`);
-    console.error('Error fetching Instagram media:', errBody);
-    return { media: [], log };
+  let media: any[] = [];
+  let nextUrl: string | null = firstUrl;
+  let pages = 0;
+
+  while (nextUrl && media.length < effectiveLimit && hasTimeLeft()) {
+    const resp = await fetch(nextUrl);
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      log.push(`[IG] Error ${resp.status}: ${errBody}`);
+      console.error('Error fetching Instagram media:', errBody);
+      break;
+    }
+    const json = await resp.json();
+    const page = json?.data ?? [];
+    media = [...media, ...page];
+    pages++;
+    nextUrl = json?.paging?.next ?? null;
+    if (page.length === 0) break;
   }
 
-  const json = await resp.json();
-  const media = json?.data ?? [];
-  log.push(`[IG] Media returned: ${media.length}`);
+  // Ordenar por timestamp desc para garantir que os mais recentes nunca se percam
+  media.sort((a, b) => (b?.timestamp || '').localeCompare(a?.timestamp || ''));
+  media = media.slice(0, effectiveLimit);
+
+  log.push(`[IG] Pages fetched: ${pages} | Media returned: ${media.length}`);
   if (media.length > 0) {
     const newest = media[0]?.timestamp ?? 'desconhecido';
     const oldest = media[media.length - 1]?.timestamp ?? 'desconhecido';
@@ -313,7 +334,7 @@ async function fetchInstagramMediaWithComments(
     log.push(`[IG] Mais recente devolvido pelo Meta: ${newest}`);
     log.push(`[IG] Mais antigo devolvido pelo Meta: ${oldest}`);
     log.push(`[IG] Tipos: ${JSON.stringify(types)}`);
-    console.log(`[IG] Newest from Meta: ${newest} | types:`, types);
+    console.log(`[IG] Newest from Meta: ${newest} | pages: ${pages} | count: ${media.length} | types:`, types);
   } else {
     log.push('[IG] Meta não devolveu nenhuma mídia.');
   }
