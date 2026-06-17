@@ -160,12 +160,23 @@ function isInstanceDisconnectedError(res: Response, data: any): boolean {
 
 // ============================================================
 // Pré-checagem (preflight) de saúde da instância antes do envio.
-// Consulta a bridge para confirmar que a instância está de pé, e
-// se necessário tenta uma reconexão silenciosa. Retorna uma string
-// resumindo o resultado para gravar no log de envios.
+//
+// IMPORTANTE: NÃO chama mais `reconnect` automaticamente durante
+// disparo. Forçar reconnect/handshake várias vezes seguidas é um
+// dos gatilhos clássicos de queda real da sessão (e até de ban).
+//
+// Política:
+//  - connected/open   → "connected"
+//  - terminal offline → "disconnected" (e o caller marca no banco)
+//  - connecting/qr/vazio/erro de rede → "transient" (segue o envio;
+//    só marca offline se o envio real falhar com erro de instância)
 // ============================================================
+const TERMINAL_OFFLINE_STATUSES = new Set([
+  "disconnected", "offline", "closed", "logged_out", "logout", "banned",
+]);
+
 type PreflightResult = {
-  status: "connected" | "reconnected" | "disconnected" | "skipped" | "error";
+  status: "connected" | "transient" | "disconnected" | "skipped" | "error";
   reconnected: boolean;
   detail?: string;
 };
@@ -179,45 +190,33 @@ async function preflightInstance(params: {
   const { bridgeUrl, bridgeApiKey, instanceId, apelido } = params;
   const tag = `[preflight] inst=${apelido || instanceId}`;
 
-  // 1) Status atual na bridge
   let statusRaw = "";
   try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 8000);
     const res = await fetch(bridgeUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Api-Key": bridgeApiKey },
       body: JSON.stringify({ action: "instance_status" }),
+      signal: ctrl.signal,
     });
+    clearTimeout(tid);
     const data = await res.json().catch(() => ({}));
     statusRaw = String(data?.status || data?.instance?.status || "").toLowerCase();
+
     if (statusRaw === "connected" || statusRaw === "open") {
-      console.log(`${tag} ✅ saudável (status=${statusRaw})`);
       return { status: "connected", reconnected: false, detail: statusRaw };
     }
-  } catch (err) {
-    console.warn(`${tag} ⚠️ erro ao consultar status:`, (err as Error).message);
-    return { status: "error", reconnected: false, detail: (err as Error).message };
-  }
-
-  console.warn(`${tag} ⚠️ não-conectada (status=${statusRaw || "desconhecido"}). Tentando reconectar...`);
-
-  // 2) Tenta reconectar silenciosamente
-  try {
-    const recRes = await fetch(bridgeUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": bridgeApiKey },
-      body: JSON.stringify({ action: "reconnect" }),
-    });
-    const recData = await recRes.json().catch(() => ({}));
-    const newStatus = String(recData?.status || recData?.instance?.status || "").toLowerCase();
-    if (newStatus === "connected" || newStatus === "open") {
-      console.log(`${tag} ♻️ reconectada com sucesso (status=${newStatus})`);
-      return { status: "reconnected", reconnected: true, detail: newStatus };
+    if (TERMINAL_OFFLINE_STATUSES.has(statusRaw) || res.status === 401) {
+      console.warn(`${tag} ❌ offline confirmado (status=${statusRaw || res.status})`);
+      return { status: "disconnected", reconnected: false, detail: statusRaw || `http_${res.status}` };
     }
-    console.warn(`${tag} ❌ reconexão não estabilizou (status=${newStatus || "vazio"})`);
-    return { status: "disconnected", reconnected: true, detail: newStatus || "no_status" };
+    // connecting / qr / vazio / desconhecido → não mexe na sessão, segue o envio
+    console.log(`${tag} ⏳ transient (status=${statusRaw || "vazio"}) — seguindo envio sem reconnect`);
+    return { status: "transient", reconnected: false, detail: statusRaw || "no_status" };
   } catch (err) {
-    console.warn(`${tag} ❌ erro ao reconectar:`, (err as Error).message);
-    return { status: "disconnected", reconnected: true, detail: (err as Error).message };
+    console.warn(`${tag} ⚠️ erro ao consultar status (transient):`, (err as Error).message);
+    return { status: "transient", reconnected: false, detail: (err as Error).message };
   }
 }
 
