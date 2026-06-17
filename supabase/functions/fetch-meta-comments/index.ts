@@ -283,25 +283,44 @@ async function fetchInstagramMediaWithComments(
 ): Promise<{ media: any[]; log: string[] }> {
   const log: string[] = [];
 
-  const mediaUrl = buildGraphUrl(`${igAccountId}/media`, {
+  // Garantir mínimo de 25 itens para nunca perder os últimos posts,
+  // mesmo quando a UI manda um limite pequeno (ex: 6).
+  const effectiveLimit = Math.max(postsLimit, 25);
+  const pageSize = Math.min(effectiveLimit, 50);
+
+  const firstUrl = buildGraphUrl(`${igAccountId}/media`, {
     fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp',
-    limit: String(postsLimit),
+    limit: String(pageSize),
     access_token: accessToken,
   });
 
-  log.push(`[IG] Endpoint: /${igAccountId}/media (fields incluem media_product_type p/ Reels)`);
+  log.push(`[IG] Endpoint: /${igAccountId}/media (target: ${effectiveLimit}, pageSize: ${pageSize})`);
 
-  const resp = await fetch(mediaUrl);
-  if (!resp.ok) {
-    const errBody = await resp.text();
-    log.push(`[IG] Error ${resp.status}: ${errBody}`);
-    console.error('Error fetching Instagram media:', errBody);
-    return { media: [], log };
+  let media: any[] = [];
+  let nextUrl: string | null = firstUrl;
+  let pages = 0;
+
+  while (nextUrl && media.length < effectiveLimit && hasTimeLeft()) {
+    const resp = await fetch(nextUrl);
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      log.push(`[IG] Error ${resp.status}: ${errBody}`);
+      console.error('Error fetching Instagram media:', errBody);
+      break;
+    }
+    const json = await resp.json();
+    const page = json?.data ?? [];
+    media = [...media, ...page];
+    pages++;
+    nextUrl = json?.paging?.next ?? null;
+    if (page.length === 0) break;
   }
 
-  const json = await resp.json();
-  const media = json?.data ?? [];
-  log.push(`[IG] Media returned: ${media.length}`);
+  // Ordenar por timestamp desc para garantir que os mais recentes nunca se percam
+  media.sort((a, b) => (b?.timestamp || '').localeCompare(a?.timestamp || ''));
+  media = media.slice(0, effectiveLimit);
+
+  log.push(`[IG] Pages fetched: ${pages} | Media returned: ${media.length}`);
   if (media.length > 0) {
     const newest = media[0]?.timestamp ?? 'desconhecido';
     const oldest = media[media.length - 1]?.timestamp ?? 'desconhecido';
@@ -313,7 +332,7 @@ async function fetchInstagramMediaWithComments(
     log.push(`[IG] Mais recente devolvido pelo Meta: ${newest}`);
     log.push(`[IG] Mais antigo devolvido pelo Meta: ${oldest}`);
     log.push(`[IG] Tipos: ${JSON.stringify(types)}`);
-    console.log(`[IG] Newest from Meta: ${newest} | types:`, types);
+    console.log(`[IG] Newest from Meta: ${newest} | pages: ${pages} | count: ${media.length} | types:`, types);
   } else {
     log.push('[IG] Meta não devolveu nenhuma mídia.');
   }
