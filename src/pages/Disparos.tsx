@@ -231,6 +231,7 @@ export default function Disparos() {
   const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
+  const [customPol, setCustomPol] = useState({ batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120 });
   const [groupSearch, setGroupSearch] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
