@@ -1,43 +1,67 @@
-## Objetivo
+## Diagnóstico
 
-Na Central WhatsApp → Disparos:
-1. Permitir enviar mensagem (texto + imagem) para **todos os cadastrados de uma região da Eleição** — incluindo "Moreninhas" e qualquer região que o cliente cadastrar.
-2. Adicionar uma **política de envio "Furtivo"** com intervalos maiores e mais aleatórios, mais um modo **Personalizado** para o usuário definir os tempos.
+O problema não parece ser só “falso desconectado” na tela. A instância também está perdendo sessão durante o disparo porque o sistema está chamando `instance_status` e `reconnect` repetidamente enquanto envia.
 
-A funcionalidade de anexar imagem já existe (`mediaUrl` é enviado ao backend). O filtro por região também já funciona no backend (`eleicao_regiao` no payload). O problema é só na UI: o seletor de Região está com lista **hardcoded** (só tem "Moreninha" singular, sem as regiões personalizadas do cliente).
+Hoje, quando a ponte retorna `connecting` ou resposta vazia, o código tenta reconectar imediatamente. Fazer isso várias vezes durante um disparo pode reiniciar/forçar handshake da sessão e acabar derrubando a instância de verdade, mesmo que no celular pareça conectada por alguns instantes.
 
----
+Também há outro ponto perigoso: o webhook marca a instância como `disconnected` imediatamente ao receber evento de desconexão, sem confirmar se foi uma queda real ou uma oscilação curta.
 
-## Alterações
+## Plano de correção
 
-### 1. `src/pages/Disparos.tsx` — Região dinâmica
-Substituir a lista fixa de regiões de Campo Grande (linhas 603-621) por dados reais da tabela `eleicao_regioes` via hook `useRegioesEleicao(clientId)` (já existe). Isso fará aparecer "Moreninhas" e qualquer outra região cadastrada pelo cliente.
+### 1. Parar de reconectar automaticamente durante envio
 
-Também adicionar suporte ao escopo **Interior**: quando selecionado, exibir um campo de **município** (texto livre ou lista) para filtrar por `municipio` na tabela `eleicao_pessoas`. Hoje o escopo "interior" envia para todo interior sem refinamento.
+Em `supabase/functions/send-whatsapp-dispatch/index.ts`:
 
-### 2. `src/pages/Disparos.tsx` — Política "Furtivo" + Personalizada
-Adicionar duas opções em `POLICIES`:
+- O preflight do disparo vai consultar o status, mas não deve chamar `reconnect` automaticamente a cada destinatário.
+- Status `connecting`, vazio, `unknown` ou erro temporário será tratado como `transient`, não como desconectado.
+- Com `transient`, o envio continua normalmente; só se o envio real retornar erro explícito de instância offline é que o sistema marca como desconectada.
+- Isso evita que o próprio disparador fique derrubando a sessão com reconexões repetidas.
 
-- **🥷 Furtivo (anti-ban)** — `batch_size: 5`, `delay_min: 25`, `delay_max: 90`, `batch_pause: 180` (~80 msgs/h, intervalos muito variados para não parecer bot).
-- **⚙️ Personalizado** — abre 4 inputs numéricos onde o usuário define: tamanho do lote, delay mínimo (s), delay máximo (s), pausa entre lotes (s). Validações: `delay_max ≥ delay_min`, valores ≥ 1.
+### 2. Só marcar `disconnected` quando for queda confirmada
 
-O payload já carrega `batch_size/delay_min/delay_max/batch_pause` para a edge function `send-whatsapp-dispatch`, então **nenhuma mudança no backend** é necessária para essa parte.
+Ainda em `send-whatsapp-dispatch`:
 
-### 3. (Opcional, recomendado) Jitter adicional no worker
-Verificar se a edge function `send-whatsapp-dispatch` já randomiza dentro de `[delay_min, delay_max]`. Se sim, nada a fazer. Se estiver usando média fixa, ajustar para `Math.random()` real entre os limites + um micro-jitter de 0-2s para imitar humano. (Confirmo isso na fase de build antes de mexer.)
+- Não atualizar `whatsapp_instances.status = disconnected` apenas porque `instance_status` retornou `connecting` ou vazio.
+- Marcar como `disconnected` somente quando a resposta for claramente terminal: `disconnected`, `offline`, `closed`, `logged_out`, `logout`, `banned`, ou quando o envio retornar erro explícito de instância desconectada.
 
----
+### 3. Melhorar cache do preflight
 
-## Fora do escopo
+- Cachear status por alguns segundos por instância durante o disparo.
+- Evitar consultar a ponte antes de cada mensagem quando a mesma instância acabou de ser verificada.
+- Isso reduz chamadas na bridge e diminui chance de instabilidade depois de 7, 10, 20 envios.
 
-- Não vou criar tela nova de gerenciamento de regiões — já existe em outro lugar do app (Eleição). Aqui só consumimos a lista.
-- Não vou mudar o fluxo de upload de imagem (já funciona).
-- Não vou mexer no agendamento automático de cobrança.
+### 4. Proteger o webhook contra eventos falsos/curtos de desconexão
 
----
+Em `supabase/functions/whatsapp-inbound-webhook/index.ts`:
+
+- Quando chegar evento `disconnected`, não marcar offline de imediato.
+- Primeiro consultar `instance_status` na ponte, com pequena espera/rechecagem.
+- Se continuar realmente offline, aí sim marcar `disconnected`.
+- Se voltar `connected/open/connecting`, registrar apenas health check e manter a instância ativa.
+
+### 5. Ajustar funções auxiliares que também mexem na sessão
+
+Em funções de envio auxiliar, como `supabase/functions/eleicao-send-credentials/index.ts`:
+
+- Aplicar a mesma regra: não chamar `reconnect` automaticamente em status transitório durante envio.
+- Não transformar `connecting` em `disconnected`.
+
+### 6. Retomar fila sem travar no 7
+
+- Se o disparo já estiver `pausado_sem_instancia`, quando uma instância voltar para `connected`, o sistema deve retomar automaticamente.
+- Confirmar que o fluxo de resume já inclui `pausado_sem_instancia`; se necessário, ajustar para reativar esses disparos.
+
+## Resultado esperado
+
+- O disparo não deve mais parar no 7 por oscilação de status.
+- A instância não deve mais ser forçada a reconectar várias vezes durante o envio.
+- O banco não deve marcar `disconnected` enquanto a ponte estiver apenas em `connecting`.
+- Quedas reais continuam sendo detectadas e pausam o disparo com segurança.
 
 ## Validação
 
-- Selecionar **Eleição → Campo Grande → Moreninhas**, anexar imagem, escrever texto → contagem de destinatários atualiza e disparo é criado.
-- Escolher política **Furtivo** → enviar para 20 pessoas e confirmar nos logs que os intervalos ficam entre 25-90s.
-- **Personalizado** com valores inválidos (delay_max < delay_min) → botão de envio bloqueado com mensagem clara.
+1. Fazer um disparo de teste com mais de 20 destinatários.
+2. Verificar nos logs que não há sequência repetida de `Tentando reconectar...` durante o disparo.
+3. Confirmar que `whatsapp_instances.status` permanece `connected` ou no máximo `connecting/transient`, sem virar `disconnected` por resposta vazia.
+4. Confirmar que a fila continua enviando após o 7º contato.
+5. Se a instância cair de verdade, confirmar que o disparo pausa e retoma quando reconectar.
