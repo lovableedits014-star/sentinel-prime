@@ -20,7 +20,7 @@ const corsHeaders = {
 
 const RequestSchema = z.object({
   clientId: z.string().uuid(),
-  postsLimit: z.coerce.number().int().min(1).max(30).optional(),
+  postsLimit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 const MAX_RUNTIME_MS = 50_000; // 50s safety margin (edge functions timeout at ~60s)
