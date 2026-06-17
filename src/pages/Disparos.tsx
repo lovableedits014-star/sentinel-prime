@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { useWhatsAppGroups } from "@/hooks/useWhatsAppGroups";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BordoesBairrosWidget } from "@/components/memoria-widgets/BordoesBairrosWidget";
+import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
