@@ -1433,7 +1433,32 @@ export default function Disparos() {
 
                         {(d.status === "enviando" || d.status === "concluido") && d.total_destinatarios > 0 && (
                           <Progress value={progress} className="h-1.5" />
-                        )}
+                          )}
+                          {d.status === "cancelado" && (d.total_destinatarios - d.enviados - d.falhas) > 0 && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-emerald-600 hover:text-emerald-600">
+                                  <Send className="h-3 w-3" /> Retomar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Retomar disparo?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    "{d.titulo}" continuará de onde parou. {Math.max(0, d.total_destinatarios - d.enviados - d.falhas)} envio(s) restante(s) serão enviados.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Voltar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleResumeDispatch(d.id, d.titulo)}
+                                  >
+                                    Sim, retomar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
 
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>👥 {d.total_destinatarios}</span>
