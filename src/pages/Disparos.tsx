@@ -409,7 +409,15 @@ export default function Disparos() {
 
     setSending(true);
     try {
-      const pol = POLICIES[politica];
+      const basePol = POLICIES[politica];
+      const pol = politica === "personalizado" ? { ...basePol, ...customPol } : basePol;
+      if (politica === "personalizado") {
+        if (customPol.delay_max < customPol.delay_min || customPol.delay_min < 1 || customPol.batch_size < 1 || customPol.batch_pause < 0) {
+          toast.error("Valores inválidos na política personalizada (delay máx ≥ delay mín, valores ≥ 1).");
+          setSending(false);
+          return;
+        }
+      }
       const tituloFinal = titulo.trim() || (hasMedia && !hasText ? "Imagem" : (mensagem.trim().slice(0, 60) || "Disparo"));
       const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
         body: {
