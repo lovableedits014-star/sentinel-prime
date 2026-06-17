@@ -577,6 +577,8 @@ export default function Disparos() {
                   <SelectItem value="conservador">🛡️ Conservador</SelectItem>
                   <SelectItem value="moderado">⚡ Moderado</SelectItem>
                   <SelectItem value="agressivo">🔥 Agressivo</SelectItem>
+                  <SelectItem value="furtivo">🥷 Furtivo (anti-ban)</SelectItem>
+                  <SelectItem value="personalizado">⚙️ Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
