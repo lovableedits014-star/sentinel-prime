@@ -149,14 +149,62 @@ Deno.serve(async (req) => {
     }
 
     if (instanceId && instanceOwnedByClient && (eventName === "disconnected" || eventName.includes("logout") || eventName.includes("banned"))) {
-      const { error: upErr } = await admin.from("whatsapp_instances").update({
-        status: "disconnected",
-        connected_since: null,
-        last_disconnected_at: new Date().toISOString(),
-      }).eq("id", instanceId).eq("client_id", clientId);
-      if (upErr) console.error("[whatsapp-inbound-webhook] failed to mark disconnected:", upErr);
-      else console.log("[whatsapp-inbound-webhook] instance marked disconnected:", instanceId, "reason=", payload?.data?.reason);
-      return json({ ok: true, handled: "disconnected", instance_id: instanceId });
+      // Eventos `logout`/`banned` são terminais — marca offline imediatamente.
+      const isTerminal = eventName.includes("logout") || eventName.includes("banned");
+      let confirmedOffline = isTerminal;
+
+      if (!isTerminal) {
+        // Para `disconnected` simples, re-checa na ponte antes de marcar offline,
+        // pois a bridge costuma emitir esse evento em oscilações curtas (sessão volta
+        // sozinha em alguns segundos). Marcar `disconnected` cedo demais derruba
+        // disparos em andamento sem necessidade.
+        try {
+          const { data: instRow } = await admin
+            .from("whatsapp_instances")
+            .select("bridge_url, bridge_api_key")
+            .eq("id", instanceId)
+            .maybeSingle();
+          if (instRow?.bridge_url && instRow?.bridge_api_key) {
+            // pequena espera para a sessão se reestabilizar
+            await new Promise((r) => setTimeout(r, 3000));
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), 8000);
+            const verifyRes = await fetch((instRow as any).bridge_url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Api-Key": (instRow as any).bridge_api_key },
+              body: JSON.stringify({ action: "instance_status" }),
+              signal: ctrl.signal,
+            }).catch(() => null);
+            clearTimeout(tid);
+            const vData = verifyRes ? await verifyRes.json().catch(() => ({})) : {};
+            const vStatus = String((vData as any)?.status || (vData as any)?.instance?.status || "").toLowerCase();
+            if (vStatus === "connected" || vStatus === "open") {
+              console.log("[whatsapp-inbound-webhook] disconnected event ignorado — bridge confirmou online:", instanceId, vStatus);
+              await admin.from("whatsapp_instances").update({
+                last_health_check_at: new Date().toISOString(),
+              }).eq("id", instanceId).eq("client_id", clientId);
+              return json({ ok: true, handled: "disconnected_ignored", instance_id: instanceId, verified_status: vStatus });
+            }
+            confirmedOffline = true;
+          } else {
+            confirmedOffline = true;
+          }
+        } catch (err) {
+          console.warn("[whatsapp-inbound-webhook] falha ao reverificar status, mantendo evento:", (err as Error).message);
+          confirmedOffline = true;
+        }
+      }
+
+      if (confirmedOffline) {
+        const { error: upErr } = await admin.from("whatsapp_instances").update({
+          status: "disconnected",
+          connected_since: null,
+          last_disconnected_at: new Date().toISOString(),
+        }).eq("id", instanceId).eq("client_id", clientId);
+        if (upErr) console.error("[whatsapp-inbound-webhook] failed to mark disconnected:", upErr);
+        else console.log("[whatsapp-inbound-webhook] instance marked disconnected:", instanceId, "reason=", payload?.data?.reason);
+        return json({ ok: true, handled: "disconnected", instance_id: instanceId });
+      }
     }
 
     if (instanceId && instanceOwnedByClient && (eventName === "connected" || eventName === "ready" || eventName === "open")) {
