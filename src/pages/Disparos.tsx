@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { useWhatsAppGroups } from "@/hooks/useWhatsAppGroups";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BordoesBairrosWidget } from "@/components/memoria-widgets/BordoesBairrosWidget";
+import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,8 +50,19 @@ const POLICIES = {
     desc: "2-5s entre msgs, lotes de 30, pausa de 15s (~600 msgs/hora). Risco maior de ban!",
     batch_size: 30, delay_min: 2, delay_max: 5, batch_pause: 15,
   },
+  furtivo: {
+    label: "🥷 Furtivo (anti-ban)",
+    desc: "25-90s entre msgs, lotes de 5, pausa de 180s (~80 msgs/h). Intervalos bem variados para parecer humano.",
+    batch_size: 5, delay_min: 25, delay_max: 90, batch_pause: 180,
+  },
+  personalizado: {
+    label: "⚙️ Personalizado",
+    desc: "Defina manualmente lote, delay mín/máx e pausa entre lotes.",
+    batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120,
+  },
 } as const;
 type PolicyKey = keyof typeof POLICIES;
+
 
 type DispatchRow = {
   id: string;
@@ -219,6 +231,8 @@ export default function Disparos() {
   const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("conservador");
+  const [customPol, setCustomPol] = useState({ batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120 });
+  const { regioes: regioesCadastradas } = useRegioesEleicao(clientId);
   const [groupSearch, setGroupSearch] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [selectedGroupJids, setSelectedGroupJids] = useState<string[]>([]);
@@ -396,7 +410,15 @@ export default function Disparos() {
 
     setSending(true);
     try {
-      const pol = POLICIES[politica];
+      const basePol = POLICIES[politica];
+      const pol = politica === "personalizado" ? { ...basePol, ...customPol } : basePol;
+      if (politica === "personalizado") {
+        if (customPol.delay_max < customPol.delay_min || customPol.delay_min < 1 || customPol.batch_size < 1 || customPol.batch_pause < 0) {
+          toast.error("Valores inválidos na política personalizada (delay máx ≥ delay mín, valores ≥ 1).");
+          setSending(false);
+          return;
+        }
+      }
       const tituloFinal = titulo.trim() || (hasMedia && !hasText ? "Imagem" : (mensagem.trim().slice(0, 60) || "Disparo"));
       const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
         body: {
@@ -556,6 +578,8 @@ export default function Disparos() {
                   <SelectItem value="conservador">🛡️ Conservador</SelectItem>
                   <SelectItem value="moderado">⚡ Moderado</SelectItem>
                   <SelectItem value="agressivo">🔥 Agressivo</SelectItem>
+                  <SelectItem value="furtivo">🥷 Furtivo (anti-ban)</SelectItem>
+                  <SelectItem value="personalizado">⚙️ Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -607,14 +631,29 @@ export default function Disparos() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todas</SelectItem>
-                        <SelectItem value="centro">Centro</SelectItem>
-                        <SelectItem value="segredo">Segredo</SelectItem>
-                        <SelectItem value="prosa">Prosa</SelectItem>
-                        <SelectItem value="bandeira">Bandeira</SelectItem>
-                        <SelectItem value="anhanduizinho">Anhanduizinho</SelectItem>
-                        <SelectItem value="lagoa">Lagoa</SelectItem>
-                        <SelectItem value="imbirussu">Imbirussu</SelectItem>
-                        <SelectItem value="moreninha">Moreninha</SelectItem>
+                        {(() => {
+                          const defaults = [
+                            { value: "centro", label: "Centro" },
+                            { value: "segredo", label: "Segredo" },
+                            { value: "prosa", label: "Prosa" },
+                            { value: "bandeira", label: "Bandeira" },
+                            { value: "anhanduizinho", label: "Anhanduizinho" },
+                            { value: "lagoa", label: "Lagoa" },
+                            { value: "imbirussu", label: "Imbirussu" },
+                            { value: "moreninha", label: "Moreninha" },
+                          ];
+                          const seen = new Set<string>();
+                          const merged: { value: string; label: string }[] = [];
+                          for (const r of [...regioesCadastradas, ...defaults]) {
+                            if (!r.value || seen.has(r.value)) continue;
+                            seen.add(r.value);
+                            merged.push({ value: r.value, label: r.label });
+                          }
+                          merged.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+                          return merged.map((r) => (
+                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                          ));
+                        })()}
                       </SelectContent>
                     </Select>
                   </div>
@@ -622,6 +661,43 @@ export default function Disparos() {
               </>
             )}
           </div>
+
+
+          {politica === "personalizado" && (
+            <div className="border rounded-md p-3 bg-muted/20 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Settings2 className="w-4 h-4" /> Política personalizada
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tamanho do lote</Label>
+                  <Input type="number" min={1} value={customPol.batch_size}
+                    onChange={(e) => setCustomPol((p) => ({ ...p, batch_size: Math.max(1, Number(e.target.value) || 1) }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Delay mín (s)</Label>
+                  <Input type="number" min={1} value={customPol.delay_min}
+                    onChange={(e) => setCustomPol((p) => ({ ...p, delay_min: Math.max(1, Number(e.target.value) || 1) }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Delay máx (s)</Label>
+                  <Input type="number" min={1} value={customPol.delay_max}
+                    onChange={(e) => setCustomPol((p) => ({ ...p, delay_max: Math.max(1, Number(e.target.value) || 1) }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Pausa entre lotes (s)</Label>
+                  <Input type="number" min={0} value={customPol.batch_pause}
+                    onChange={(e) => setCustomPol((p) => ({ ...p, batch_pause: Math.max(0, Number(e.target.value) || 0) }))} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Para parecer mais humano, use uma faixa <strong>ampla</strong> de delay (ex.: 20–120s) — quanto mais aleatório, menor o risco de ban.
+                {customPol.delay_max < customPol.delay_min && (
+                  <span className="block text-destructive mt-1">⚠️ Delay máximo precisa ser maior ou igual ao mínimo.</span>
+                )}
+              </p>
+            </div>
+          )}
 
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
