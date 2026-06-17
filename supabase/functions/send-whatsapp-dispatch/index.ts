@@ -1210,9 +1210,10 @@ Deno.serve(async (req) => {
               const disconnectErr = isInstanceDisconnectedError(sendRes, sendData);
               if (instanceId && disconnectErr) {
                 await adminClient.from("whatsapp_instances")
-                  .update({ status: "disconnected" })
+                  .update({ status: "disconnected", last_disconnected_at: new Date().toISOString() })
                   .eq("id", instanceId);
                 delete preflightByInstance[instanceId];
+                delete preflightCacheAt[instanceId];
               }
               if (instanceId) {
                 await adminClient.rpc("log_whatsapp_send", {
