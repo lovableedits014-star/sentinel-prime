@@ -1123,22 +1123,26 @@ Deno.serve(async (req) => {
             }
             lastInstanceId = instanceId;
 
-            // ===== PREFLIGHT =====
+            // ===== PREFLIGHT (não-invasivo: não chama reconnect durante o envio) =====
             let preflight: PreflightResult = { status: "skipped", reconnected: false };
             if (instanceId && bridgeUrl && bridgeApiKey) {
               const cached = preflightByInstance[instanceId];
-              if (cached && cached.status === "connected") {
+              const cachedAt = (preflightCacheAt as any)[instanceId] as number | undefined;
+              const fresh = cached && cachedAt && (Date.now() - cachedAt) < 20_000;
+              if (fresh && (cached.status === "connected" || cached.status === "transient")) {
                 preflight = cached;
               } else {
                 preflight = await preflightInstance({
                   bridgeUrl, bridgeApiKey, instanceId,
                 });
                 preflightByInstance[instanceId] = preflight;
+                (preflightCacheAt as any)[instanceId] = Date.now();
               }
 
               if (preflight.status === "disconnected") {
+                // Só marca offline no banco quando a ponte CONFIRMOU status terminal.
                 await adminClient.from("whatsapp_instances")
-                  .update({ status: "disconnected" })
+                  .update({ status: "disconnected", last_disconnected_at: new Date().toISOString() })
                   .eq("id", instanceId);
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
@@ -1148,14 +1152,14 @@ Deno.serve(async (req) => {
                   p_preflight_reconnected: preflight.reconnected,
                 });
                 delete preflightByInstance[instanceId];
+                delete (preflightCacheAt as any)[instanceId];
                 if (isGroup) {
-                  // Exclui esta instância para este grupo e tenta outra
                   (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
                   continue;
                 }
-                // Telefone: deixa pra próxima rodada (próximo recipient)
                 break;
               }
+              // status === "transient" ou "connected": segue o envio normalmente.
             }
 
             try {
