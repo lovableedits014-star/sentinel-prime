@@ -1214,20 +1214,14 @@ Deno.serve(async (req) => {
       if (!instance_id || !activeInstanceRow) {
         return jsonResponse({ success: false, error: "instance_id obrigatório" }, 400);
       }
+      // Verificação não invasiva: apenas consulta saúde, NÃO chama reconnect automático.
+      // Reconexões automáticas derrubam a sessão real do WhatsApp e são gatilho de ban.
+      // O usuário deve reconectar manualmente via UI (botão Reconectar).
       const health = await syncInstanceHealth(adminClient, activeInstanceRow);
-      if (health.status === "connected") return jsonResponse({ success: true, status: "connected", health });
-      if (!clientApiKey) {
-        return jsonResponse({ success: false, status: "disconnected", error: "Instância sem credencial; conecte novamente pelo QR Code." });
-      }
-      const reconnect = await tryReconnectInstance(adminClient, activeInstanceRow);
-      const bridgeData = reconnect.details || {};
-      if (isQrPendingResponse(bridgeData)) return awaitingQrResponse("Instância caiu. Reconexão iniciada; escaneie o QR Code para estabilizar.");
       return jsonResponse({
-        success: reconnect.ok && bridgeData?.success !== false,
-        status: reconnect.status || bridgeData?.status || bridgeData?.instance?.status || "connecting",
-        qrcode: bridgeData?.qrcode || bridgeData?.instance?.qrcode,
-        instance: bridgeData?.instance,
-        error: !reconnect.ok || bridgeData?.success === false ? (bridgeData?.error || "Erro ao reconectar") : undefined,
+        success: health.status === "connected",
+        status: health.status,
+        health,
       });
     }
 
@@ -1403,20 +1397,9 @@ Deno.serve(async (req) => {
       const failure = getSendFailure(bridgeRes.status, bridgeData);
       if (failure) {
         if (isInstanceDisconnectedError(bridgeRes.status, bridgeData)) {
-          const reconnect = await tryReconnectInstance(adminClient, activeInstanceRow);
-          if (reconnect.status === "connected") {
-            await sleep(1500);
-            const retry = await fetchBridgeAction({ action, apiKey: clientApiKey, body: proxyBody, retries: 1 });
-            const retryFailure = getSendFailure(retry.bridgeRes.status, retry.bridgeData);
-            if (!retryFailure) {
-              await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: true });
-              return jsonResponse(retry.bridgeData);
-            }
-          }
-          const bridgeState = String(reconnect.details?.status || reconnect.details?.instance?.status || bridgeData?.status || bridgeData?.instance?.status || "").toLowerCase();
-          // Se o ENVIO real diz "Instance not connected", ele é a prova mais forte.
-          // Mesmo que o endpoint de status/reconnect diga "connected", não podemos
-          // manter a tela como OK enquanto o socket de envio está recusando entrega.
+          // NÃO chamamos reconnect automático: cada handshake forçado pode derrubar
+          // a sessão real do WhatsApp. Apenas marcamos como desconectado e o usuário
+          // reconecta manualmente via UI.
           await markInstanceDisconnected(adminClient, instance_id);
         }
         await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error: failure });
