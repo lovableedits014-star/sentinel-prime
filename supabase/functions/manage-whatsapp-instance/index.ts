@@ -296,8 +296,31 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
     body: { action: "instance_status" },
   });
 
-  const rawStatus = String(bridgeData?.status || bridgeData?.instance?.status || "").toLowerCase();
+  let rawStatus = String(bridgeData?.status || bridgeData?.instance?.status || "").toLowerCase();
   const wasConnected = isConnectedStatus(inst.status);
+
+  // Dupla confirmação: só rebaixa para `disconnected` se a bridge confirmar
+  // estado terminal em DUAS leituras seguidas. Uma única resposta "offline"
+  // pode ser oscilação curta da ponte e não significa que a sessão caiu.
+  if (wasConnected && isExplicitOfflineStatus(rawStatus) && !isInvalidApiKeyResponse(bridgeRes.status, bridgeData)) {
+    await sleep(3000);
+    try {
+      const recheck = await fetchBridgeAction({
+        action: "instance_status",
+        apiKey: inst.bridge_api_key,
+        body: { action: "instance_status" },
+      });
+      const recheckStatus = String(recheck.bridgeData?.status || recheck.bridgeData?.instance?.status || "").toLowerCase();
+      if (!isExplicitOfflineStatus(recheckStatus)) {
+        console.log(`[syncInstanceHealth] oscilação ignorada inst=${inst.id} first=${rawStatus} recheck=${recheckStatus || "vazio"}`);
+        rawStatus = recheckStatus || "connecting";
+      }
+    } catch (err) {
+      console.warn(`[syncInstanceHealth] recheck falhou inst=${inst.id} — preservando status anterior:`, (err as Error).message);
+      rawStatus = "connected";
+    }
+  }
+
   let status = isConnectedStatus(rawStatus)
     ? "connected"
     : rawStatus === "connecting" || rawStatus === "qr" || rawStatus === "awaiting_qr"
@@ -344,6 +367,14 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
   if (status === "disconnected") {
     updates.connected_since = null;
     updates.last_disconnected_at = new Date().toISOString();
+    try {
+      await adminClient.from("action_logs").insert({
+        client_id: inst.client_id || null,
+        action: "whatsapp_instance_marked_disconnected",
+        status: "ok",
+        details: { instance_id: inst.id, source: "syncInstanceHealth", raw_status: rawStatus },
+      });
+    } catch {}
   }
 
   await adminClient.from("whatsapp_instances").update(updates).eq("id", inst.id);

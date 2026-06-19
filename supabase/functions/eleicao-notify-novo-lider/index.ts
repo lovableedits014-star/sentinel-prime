@@ -121,6 +121,8 @@ async function updateInstanceStatus(admin: any, instId: string, status: "connect
 }
 
 async function preflightInstance(admin: any, bridge: any) {
+  // Verificação não invasiva: NÃO chama reconnect automático.
+  // Reconexões forçadas derrubam a sessão real do WhatsApp e podem causar ban.
   try {
     const { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key, { action: "instance_status" }, 1);
     const raw = bridgeStatusOf(data);
@@ -130,15 +132,14 @@ async function preflightInstance(admin: any, bridge: any) {
     }
     if (isExplicitOfflineStatus(raw) || res.status === 401) {
       await updateInstanceStatus(admin, bridge.id, "disconnected");
+      return { status: "disconnected", reconnected: false, detail: raw || `http_${res.status}` };
     }
+    // Transient (connecting/qr/vazio): segue como connected para tentar o envio.
+    return { status: "connected", reconnected: false, detail: `transient:${raw || "vazio"}` };
   } catch (e) {
-    console.warn("[eleicao-notify-novo-lider] preflight status falhou:", (e as Error).message);
+    console.warn("[eleicao-notify-novo-lider] preflight status falhou (transient):", (e as Error).message);
+    return { status: "connected", reconnected: false, detail: `transient_error:${(e as Error).message}` };
   }
-  const { res, data } = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key, { action: "reconnect" }, 1);
-  const raw = bridgeStatusOf(data);
-  const status = isConnectedStatus(raw) ? "connected" : (isExplicitOfflineStatus(raw) || res.status === 401 ? "disconnected" : "connecting");
-  await updateInstanceStatus(admin, bridge.id, status as any);
-  return { status, reconnected: status === "connected", detail: raw || data?.error || data?.message || "sem status" };
 }
 
 // Seleção de instância idêntica ao eleicao-send-credentials/send-whatsapp-dispatch:
@@ -180,19 +181,10 @@ async function bridgeSend(admin: any, bridge: any, phone: string, message: strin
     { action: "send", phone: cleaned, message }, 2);
   let failure = sendFailure(res, data);
 
-  // Se a ponte indicou que a instância caiu, tenta reconectar e reenviar uma vez.
+  // Se a ponte indicou que a instância caiu, apenas marca offline — sem reconnect automático.
   if (failure && isInstanceDisconnectedFailure(res, data, failure)) {
-    console.warn("[eleicao-notify-novo-lider] retry após desconexão", { phone: cleaned, status: res.status, error: failure });
-    const reconnect = await preflightInstance(admin, bridge);
-    if (reconnect.status === "connected") {
-      await sleep(1500);
-      const r2 = await bridgeAction(bridge.bridge_url, bridge.bridge_api_key,
-        { action: "send", phone: cleaned, message }, 1);
-      res = r2.res; data = r2.data;
-      failure = sendFailure(res, data);
-    } else {
-      await updateInstanceStatus(admin, bridge.id, "disconnected");
-    }
+    console.warn("[eleicao-notify-novo-lider] envio falhou por desconexão", { phone: cleaned, status: res.status, error: failure });
+    await updateInstanceStatus(admin, bridge.id, "disconnected");
   }
 
   const messageId = data?.messageId || data?.message_id || data?.id || data?.key?.id || null;

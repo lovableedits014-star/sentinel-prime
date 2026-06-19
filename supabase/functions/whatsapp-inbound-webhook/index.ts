@@ -215,6 +215,7 @@ Deno.serve(async (req) => {
       await admin.from("whatsapp_instances").update({
         status: "connected",
         connected_since: new Date().toISOString(),
+        last_disconnected_at: null,
         last_health_check_at: new Date().toISOString(),
       }).eq("id", instanceId).eq("client_id", clientId);
       return json({ ok: true, handled: "connected", instance_id: instanceId });
