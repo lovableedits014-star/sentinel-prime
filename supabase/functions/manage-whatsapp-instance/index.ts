@@ -1068,7 +1068,8 @@ Deno.serve(async (req) => {
       if (!activeInstanceRow.bridge_api_key) {
         return jsonResponse({ success: false, error: "Instância sem API key — conecte primeiro" }, 400);
       }
-      const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${resolvedClientId}`;
+      const tokenParam = bridgeToken ? `&token=${encodeURIComponent(bridgeToken)}` : "";
+      const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${resolvedClientId}${tokenParam}`;
       const bridgeRes = await fetch(BRIDGE_URL, {
         method: "POST",
         headers: {
