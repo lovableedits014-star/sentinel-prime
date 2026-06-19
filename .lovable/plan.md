@@ -1,36 +1,43 @@
-## Diagnóstico inicial
+## Diagnóstico encontrado
 
-A instância principal está no banco como `connecting`, com `connected_since` vazio, `last_disconnected_at` recente e 2 tentativas de reconexão hoje. O envio mais recente completou 27/30, mas houve falhas de mídia e números inválidos. O ponto mais perigoso encontrado é que ainda existem fluxos fora do disparo que podem forçar `reconnect`/`create_instance` ou marcar a instância como instável quando a bridge retorna `connecting`, mesmo se o celular aparenta conectado.
+- A instância atual `Mayer` está no banco como `disconnected` desde `19/06 15:24:03`, com `last_health_check_at` no mesmo segundo.
+- Não houve falha de envio registrada hoje: os últimos envios registrados foram ontem e estavam com `preflight_status=connected` e `success=true`.
+- Isso indica que a queda mais recente provavelmente foi causada por uma verificação de status/health check, não por um disparo.
+- Ainda existem fluxos que podem marcar a instância como `disconnected` com apenas uma confirmação da ponte, e dois fluxos eleitorais ainda podem tentar `reconnect` automaticamente.
+- O webhook configurado para a bridge não inclui o token na URL; se a bridge não enviar o header secreto, o webhook rejeita eventos e o sistema perde sinais confiáveis de `connected/ready/open`.
 
-## Plano de correção
+## Plano de correção definitiva
 
-1. **Tornar o monitoramento menos agressivo**
-   - Ajustar `manage-whatsapp-instance` para que `instance_status`/`health_check_all` não rebaixem uma instância previamente conectada para `connecting` por respostas transitórias.
-   - Só marcar `disconnected` quando a bridge confirmar estado terminal (`disconnected`, `offline`, `closed`, `logged_out`, `logout`, `banned`) ou erro real de envio “instance not connected”.
+1. **Parar de derrubar por uma única leitura ruim**
+   - Alterar `syncInstanceHealth` e `instance_status` para não marcar `disconnected` imediatamente em uma única resposta terminal.
+   - Exigir dupla confirmação: consultar a bridge, aguardar alguns segundos e consultar novamente antes de rebaixar a instância.
+   - Se a segunda leitura vier `connected/open/connecting/vazia/erro temporário`, manter o status anterior e só atualizar `last_health_check_at`.
 
-2. **Remover reconexão automática em fluxo de envio/teste**
-   - Em `manage-whatsapp-instance`, quando `send`/`send_media` detectar erro de instância, não chamar `tryReconnectInstance` automaticamente.
-   - Registrar a falha e orientar reconexão manual, evitando loops que recriam sessão/QR e derrubam o WhatsApp.
+2. **Remover reconexões automáticas restantes**
+   - Ajustar `eleicao-send-credentials` para não chamar `reconnect` após falha de envio.
+   - Ajustar `eleicao-notify-novo-lider` para não chamar `reconnect` no preflight nem no retry.
+   - Esses fluxos devem apenas registrar a falha e orientar reconexão manual, igual ao disparo principal.
 
-3. **Corrigir o `ensure_connected`**
-   - Transformar `ensure_connected` em verificação não invasiva: consulta saúde e retorna o status, sem chamar `reconnect` automaticamente.
-   - Isso evita que algum painel ou rotina force handshake sem ação explícita do usuário.
+3. **Proteger contra recriação acidental de sessão**
+   - Revisar `create_instance` e `reconnect` para evitar `delete_instance`/recriação quando a sessão ainda tem credencial válida.
+   - Reativar uma proteção mínima contra tentativas repetidas de QR/reconnect, porque múltiplos handshakes seguidos podem derrubar ou banir o número.
 
-4. **Endurecer o webhook contra falso “disconnected”**
-   - Quando chegar evento `disconnected`, tratar `connected`, `open`, `connecting`, resposta vazia ou erro temporário como oscilação, não como queda confirmada.
-   - Marcar `disconnected` apenas em `logout`/`banned` ou confirmação terminal após rechecagem.
+4. **Corrigir o webhook de status da bridge**
+   - Incluir o token secreto na URL configurada em `set_webhook`, para garantir que eventos `connected`, `ready`, `open`, `logout` e `banned` sejam aceitos.
+   - Quando chegar evento `connected/open/ready`, limpar `last_disconnected_at` e restaurar `connected_since`.
 
-5. **Reativar sessão já pareada quando a bridge indicar estabilidade**
-   - Quando `instance_status` retornar `connected/open`, limpar `last_disconnected_at`, preencher `connected_since` e atualizar `last_health_check_at`.
-   - Se hoje a linha estiver `connecting`, ela volta para `connected` assim que a bridge confirmar.
+5. **Melhorar logs e diagnóstico no painel**
+   - Registrar em `action_logs` quando uma instância for marcada offline, com motivo: health check, webhook, envio, reconexão manual ou criação de QR.
+   - Isso permite saber exatamente quem derrubou o status caso aconteça de novo.
 
-6. **Validar após aplicar**
-   - Consultar novamente `whatsapp_instances` para confirmar que o status não fica oscilando para `connecting/disconnected` sem motivo.
-   - Verificar logs/contadores de reconexão para garantir que não há reconexões automáticas em sequência.
+6. **Validação após aplicar**
+   - Consultar a instância no banco antes/depois da verificação.
+   - Rodar `instance_status`/`health_check_all` e confirmar que uma oscilação não muda o status para `disconnected`.
+   - Implantar as Edge Functions alteradas: `manage-whatsapp-instance`, `whatsapp-inbound-webhook`, `eleicao-send-credentials` e `eleicao-notify-novo-lider`.
 
 ## Resultado esperado
 
-- A instância deixa de “cair” por checagens automáticas ou reconexões repetidas.
-- O sistema para de recriar sessão/QR sem ação manual.
-- O status no painel fica mais fiel ao estado real: conectado quando a sessão ainda está utilizável, desconectado só quando confirmado.
-- Disparos continuam pausando com segurança em queda real, mas não derrubam a conexão durante oscilações curtas.
+- O sistema não deve mais derrubar a instância por oscilação curta da ponte.
+- Nenhum fluxo deve forçar reconnect ou recriar QR sem ação explícita do usuário.
+- Quando o WhatsApp estiver realmente conectado, o painel deve voltar a mostrar conectado assim que a bridge confirmar.
+- Se cair de verdade, ficará registrado o motivo exato da queda.

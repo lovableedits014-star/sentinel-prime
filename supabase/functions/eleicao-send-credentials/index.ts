@@ -334,24 +334,9 @@ Deno.serve(async (req) => {
     const failure = sendFailure(res, sendData);
     if (failure) {
       if (selectedInstance && isInstanceDisconnectedFailure(res, sendData, String(failure))) {
-        const reconnect = await tryReconnectInstance(admin, selectedInstance);
-        if (reconnect.status === "connected") {
-          await sleep(1500);
-          const retry = await bridgeSend(bridgeUrl, bridgeKey, phone, message);
-          const retryFailure = sendFailure(retry.res, retry.data);
-          if (!retryFailure) {
-            await admin.rpc("log_whatsapp_send", {
-              p_instance_id: instanceId, p_client_id: pessoa.client_id, p_dispatch_id: null,
-              p_success: true, p_error_message: null,
-              p_preflight_status: "reconnected", p_preflight_reconnected: true,
-            });
-            return new Response(JSON.stringify({
-              success: true, sent: true, portal_url: portalUrl, email: emailNorm, password, message,
-            }), { headers: { ...cors, "Content-Type": "application/json" } });
-          }
-        } else {
-          await updateInstanceStatus(admin, selectedInstance, "disconnected");
-        }
+        // Política anti-ban: NÃO chama reconnect automaticamente. Apenas marca offline.
+        // O usuário reconecta manualmente via UI.
+        await updateInstanceStatus(admin, selectedInstance, "disconnected");
       }
       if (instanceId) {
         await admin.rpc("log_whatsapp_send", {
