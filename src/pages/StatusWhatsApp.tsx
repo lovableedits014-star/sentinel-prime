@@ -107,7 +107,11 @@ export default function StatusWhatsApp() {
     setRetryStats(Object.entries(counts).map(([status, count]) => ({ status, count })));
     setLastRefresh(new Date());
     setLoading(false);
+    // Mantém o Disparos em sincronia: sempre que o Status atualizar, o cache de
+    // readiness usado pela página Disparos é invalidado.
+    queryClient.invalidateQueries({ queryKey: ["whatsapp-dispatch-readiness", cId] });
   };
+
 
   useEffect(() => {
     loadAll();
