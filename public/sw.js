@@ -1,5 +1,5 @@
 // Service Worker para Push Notifications do Portal do Apoiador
-// v4 - sem cache de navegação; limpa caches antigos para evitar tela presa após refresh
+// v5 - sem cache de navegação; limpa caches antigos a cada activate para forçar refresh em quem instalou versões antigas (ex.: telas onde a aba Materiais não aparecia).
 const WB_MANIFEST = self.__WB_MANIFEST || [];
 
 self.addEventListener('install', (event) => {
