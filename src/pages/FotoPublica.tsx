@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import PublicMaterialsTab from "@/components/campaign-materials/PublicMaterialsTab";
+import MateriaisDestaque from "@/components/campaign-materials/MateriaisDestaque";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Download, ArrowDown, Gift } from "lucide-react";
@@ -84,6 +85,15 @@ export default function FotoPublica() {
           </p>
         </div>
         <CampaignFrameGenerator clientId={clientId} variant="showcase" />
+
+        {materialCount > 0 && (
+          <MateriaisDestaque
+            clientId={clientId}
+            clientName={candidateName}
+            limit={3}
+            onViewAll={scrollToMaterials}
+          />
+        )}
 
         {materialCount > 0 && (
           <button

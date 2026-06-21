@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import PublicMaterialsTab from "@/components/campaign-materials/PublicMaterialsTab";
+import MateriaisDestaque from "@/components/campaign-materials/MateriaisDestaque";
 
 interface Gallery {
   id: string;
