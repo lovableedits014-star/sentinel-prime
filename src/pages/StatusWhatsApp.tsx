@@ -73,11 +73,8 @@ export default function StatusWhatsApp() {
   const [autoSentFor, setAutoSentFor] = useState<Set<string>>(new Set()); // anti-loop por sessão
   const [preview, setPreview] = useState<PreviewState>(null);
 
-  const invalidateDispatchReadiness = () => {
-    if (clientId) {
-      queryClient.invalidateQueries({ queryKey: ["whatsapp-dispatch-readiness", clientId] });
-    }
-  };
+
+
 
 
   const loadAll = async (silent = false) => {
