@@ -200,15 +200,32 @@ export default function MateriaisDestaque({
       </div>
 
       {!hideViewAll && total > items.length && (
-        <Button
-          variant="default"
-          size="lg"
-          className="w-full gap-2 font-semibold"
-          onClick={handleViewAll}
-        >
-          Ver todos os {total} materiais
-          <ArrowRight className="w-4 h-4" />
-        </Button>
+        <div className="relative">
+          {/* Halo pulsante */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -inset-1 rounded-2xl bg-primary/40 blur-lg animate-pulse"
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-2xl ring-4 ring-primary/60 animate-ping"
+          />
+          <Button
+            variant="default"
+            size="lg"
+            onClick={handleViewAll}
+            className="relative w-full gap-3 font-extrabold text-base sm:text-lg py-7 rounded-2xl shadow-xl shadow-primary/40 border-2 border-primary-foreground/20 hover:scale-[1.02] transition-transform animate-pulse"
+          >
+            <Sparkles className="w-5 h-5 shrink-0" />
+            <span className="flex-1 text-center leading-tight">
+              👉 VER TODOS OS {total} MATERIAIS
+              <span className="block text-[11px] sm:text-xs font-medium opacity-90 mt-0.5">
+                Toque aqui para baixar tudo
+              </span>
+            </span>
+            <ArrowRight className="w-5 h-5 shrink-0 animate-bounce-x" />
+          </Button>
+        </div>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
