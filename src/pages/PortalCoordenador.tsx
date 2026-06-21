@@ -12,6 +12,7 @@ import { Crown, Users, UserCheck, LogOut, Plus, Trash2, Phone, MapPin, Loader2, 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
+import MateriaisDestaque from "@/components/campaign-materials/MateriaisDestaque";
 import VotosVoluntariosPanel from "@/components/eleicao/VotosVoluntariosPanel";
 
 function buildFotoLink(clientId: string) {
@@ -398,6 +399,22 @@ export default function PortalCoordenador() {
             {clientId && <CampaignFrameGenerator clientId={clientId} variant="showcase" />}
           </CardContent>
         </Card>
+
+        {clientId && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Camera className="w-4 h-4 text-primary" />Material de campanha
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-3">
+                Baixe e compartilhe nos seus grupos — mesmos materiais que aparecem para os apoiadores na página pública.
+              </p>
+              <MateriaisDestaque clientId={clientId} clientName={candidatoNome || clientName} limit={3} />
+            </CardContent>
+          </Card>
+        )}
 
         {me.escopo === "campo_grande" && (
           <Card>

@@ -1,43 +1,70 @@
-## Diagnóstico encontrado
 
-- A instância atual `Mayer` está no banco como `disconnected` desde `19/06 15:24:03`, com `last_health_check_at` no mesmo segundo.
-- Não houve falha de envio registrada hoje: os últimos envios registrados foram ontem e estavam com `preflight_status=connected` e `success=true`.
-- Isso indica que a queda mais recente provavelmente foi causada por uma verificação de status/health check, não por um disparo.
-- Ainda existem fluxos que podem marcar a instância como `disconnected` com apenas uma confirmação da ponte, e dois fluxos eleitorais ainda podem tentar `reconnect` automaticamente.
-- O webhook configurado para a bridge não inclui o token na URL; se a bridge não enviar o header secreto, o webhook rejeita eventos e o sistema perde sinais confiáveis de `connected/ready/open`.
+## Objetivo
 
-## Plano de correção definitiva
+1. Deixar os materiais de campanha **muito mais visíveis** na página pública do apoiador (`/g/:clientSlug` e `/foto/:clientId`), com prévia de destaque sem precisar clicar em aba.
+2. Corrigir o problema do **celular do usuário não exibir a aba de Materiais** (provável cache do Service Worker / aba renderizada só sob `TabsContent` que depende de JS).
+3. Adicionar a mesma seção de **materiais para download** dentro do **Portal do Coordenador** (`/portal/coordenador/...`), idêntica à pública.
 
-1. **Parar de derrubar por uma única leitura ruim**
-   - Alterar `syncInstanceHealth` e `instance_status` para não marcar `disconnected` imediatamente em uma única resposta terminal.
-   - Exigir dupla confirmação: consultar a bridge, aguardar alguns segundos e consultar novamente antes de rebaixar a instância.
-   - Se a segunda leitura vier `connected/open/connecting/vazia/erro temporário`, manter o status anterior e só atualizar `last_health_check_at`.
+---
 
-2. **Remover reconexões automáticas restantes**
-   - Ajustar `eleicao-send-credentials` para não chamar `reconnect` após falha de envio.
-   - Ajustar `eleicao-notify-novo-lider` para não chamar `reconnect` no preflight nem no retry.
-   - Esses fluxos devem apenas registrar a falha e orientar reconexão manual, igual ao disparo principal.
+## 1. Materiais em evidência na página pública
 
-3. **Proteger contra recriação acidental de sessão**
-   - Revisar `create_instance` e `reconnect` para evitar `delete_instance`/recriação quando a sessão ainda tem credencial válida.
-   - Reativar uma proteção mínima contra tentativas repetidas de QR/reconnect, porque múltiplos handshakes seguidos podem derrubar ou banir o número.
+Hoje os materiais ficam escondidos atrás da aba "Materiais" (em `GaleriaPublica`) ou no fim da página (em `FotoPublica`). Mudanças:
 
-4. **Corrigir o webhook de status da bridge**
-   - Incluir o token secreto na URL configurada em `set_webhook`, para garantir que eventos `connected`, `ready`, `open`, `logout` e `banned` sejam aceitos.
-   - Quando chegar evento `connected/open/ready`, limpar `last_disconnected_at` e restaurar `connected_since`.
+**Novo componente `MateriaisDestaque` (`src/components/campaign-materials/MateriaisDestaque.tsx`)**
+- Recebe `clientId`, `clientName`, `limit=3`.
+- Busca os 3 primeiros materiais publicados (ordenados por `order_index`).
+- Mostra cards grandes em grid (1 col mobile, 3 col desktop) com thumbnail + título + botões **Baixar** e **WhatsApp** (mesma lógica do `PublicMaterialsTab`).
+- Embaixo, um botão grande **"Ver todos os N materiais"** que:
+  - Em `GaleriaPublica`: troca para a aba `materiais` e rola até lá.
+  - Em `FotoPublica`: rola até a lista completa.
+- Renderiza nada se não houver materiais publicados.
 
-5. **Melhorar logs e diagnóstico no painel**
-   - Registrar em `action_logs` quando uma instância for marcada offline, com motivo: health check, webhook, envio, reconexão manual ou criação de QR.
-   - Isso permite saber exatamente quem derrubou o status caso aconteça de novo.
+**Em `GaleriaPublica.tsx`**
+- Inserir `<MateriaisDestaque>` logo **após o gerador de foto** e **antes do CTA atual** (que vira opcional / removido para reduzir ruído).
+- Manter a aba "Materiais" para a listagem completa com busca/filtros.
 
-6. **Validação após aplicar**
-   - Consultar a instância no banco antes/depois da verificação.
-   - Rodar `instance_status`/`health_check_all` e confirmar que uma oscilação não muda o status para `disconnected`.
-   - Implantar as Edge Functions alteradas: `manage-whatsapp-instance`, `whatsapp-inbound-webhook`, `eleicao-send-credentials` e `eleicao-notify-novo-lider`.
+**Em `FotoPublica.tsx`**
+- Inserir `<MateriaisDestaque>` logo após `CampaignFrameGenerator`, antes do botão "Baixe N materiais".
+- Manter a seção completa abaixo (`PublicMaterialsTab`).
 
-## Resultado esperado
+**Refator pequeno em `PublicMaterialsTab.tsx`**
+- Extrair o card individual em um sub-componente `MaterialCard` exportado, para `MateriaisDestaque` reaproveitar exatamente o mesmo visual e lógica de download/WhatsApp (sem duplicação).
 
-- O sistema não deve mais derrubar a instância por oscilação curta da ponte.
-- Nenhum fluxo deve forçar reconnect ou recriar QR sem ação explícita do usuário.
-- Quando o WhatsApp estiver realmente conectado, o painel deve voltar a mostrar conectado assim que a bridge confirmar.
-- Se cair de verdade, ficará registrado o motivo exato da queda.
+---
+
+## 2. Aba "Materiais" sumindo no celular do usuário
+
+Causa provável: **Service Worker em cache** (`public/sw.js`) servindo a versão antiga da página, mais o fato de o conteúdo da aba só aparecer após o JS hidratar e o usuário tocar — em telas pequenas com problema de cache, o conteúdo nunca aparece.
+
+Ações:
+
+- **Tornar os materiais visíveis sem depender da aba** (item 1 já resolve em grande parte — `MateriaisDestaque` aparece direto, sem clique).
+- **Forçar atualização do SW**: revisar `public/sw.js` para garantir versão (`CACHE_NAME = 'v…'` com bump) e que a navegação HTML use `network-first` (não `cache-first`), evitando servir HTML antigo. Se já for assim, apenas bumpar a versão para invalidar.
+- **No layout da `GaleriaPublica`**: trocar `TabsList grid-cols-2 max-w-md` para `w-full` real em mobile e garantir que a aba "Materiais" continue clicável (botão grande com badge vermelho do total) — já está, mas reforçar `min-h-11` para toque.
+- **Botão flutuante mobile**: adicionar um pequeno FAB (`fixed bottom-4 right-4 sm:hidden`) "📥 Materiais (N)" que rola até a seção, garantindo que mesmo se a aba não for percebida, exista um atalho permanente.
+
+---
+
+## 3. Materiais no Portal do Coordenador
+
+Hoje `PortalCoordenador.tsx` já tem `clientId` resolvido e usa `CampaignFrameGenerator`. Falta a seção de materiais.
+
+- Adicionar um novo bloco/cartão **"Material de campanha"** próximo do bloco de foto/moldura, contendo:
+  - `<MateriaisDestaque clientId={clientId} clientName={candidatoNome} limit={3} />`
+  - Botão "Ver todos" que abre um `Dialog` em tela cheia (mobile-friendly) com `<PublicMaterialsTab clientId={clientId} clientName={candidatoNome} />` dentro — assim o coordenador baixa exatamente igual ao apoiador público, sem sair da página.
+- Reaproveita os componentes existentes (`MateriaisDestaque` + `PublicMaterialsTab`), sem duplicar lógica nem alterar políticas RLS (a tabela `campaign_materials` com `status='published'` já é pública).
+
+---
+
+## Detalhes técnicos
+
+- **Arquivos novos**: `src/components/campaign-materials/MateriaisDestaque.tsx`.
+- **Arquivos editados**:
+  - `src/components/campaign-materials/PublicMaterialsTab.tsx` (extrair `MaterialCard` exportado).
+  - `src/pages/GaleriaPublica.tsx` (incluir destaque + FAB mobile).
+  - `src/pages/FotoPublica.tsx` (incluir destaque).
+  - `src/pages/PortalCoordenador.tsx` (novo bloco "Material de campanha" + Dialog "Ver todos").
+  - `public/sw.js` (bump de versão de cache + network-first em HTML, se ainda não estiver).
+- **Sem mudanças** em banco, RLS, edge functions ou tipos.
+- **Validação**: abrir `/g/<slug>`, `/foto/<id>` e `/portal/coordenador/...` em desktop e mobile; conferir que os 3 cards aparecem sem clique, botões de download e WhatsApp funcionam, e que o FAB mobile rola até a seção completa.
