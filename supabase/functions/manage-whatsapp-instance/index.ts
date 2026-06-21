@@ -782,6 +782,73 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, instances });
     }
 
+    // === DISPATCH READINESS ===
+    // Fonte ÚNICA de verdade usada pelo Disparos e Status WhatsApp.
+    // Faz uma checagem ao vivo (sem reconnect) em cada instância ativa do cliente,
+    // atualiza status/health no banco quando a ponte confirma, e devolve um
+    // resumo do tipo: ready | needs_reconnect | no_credentials | offline.
+    // Isso elimina o caso "Status diz OK, Disparo diz desconectado".
+    if (action === "dispatch_readiness") {
+      const { data: rows } = await adminClient
+        .from("whatsapp_instances")
+        .select("id, apelido, status, is_active, is_primary, bridge_url, bridge_api_key, phone_number, last_health_check_at, last_disconnected_at, connected_since, consecutive_failures, suspected_banned_at")
+        .eq("client_id", resolvedClientId)
+        .eq("is_active", true);
+
+      const summaries = await Promise.all((rows || []).map(async (inst: any) => {
+        const baseInfo = {
+          id: inst.id,
+          apelido: inst.apelido,
+          is_primary: inst.is_primary,
+          phone_number: inst.phone_number,
+          db_status: inst.status,
+          last_health_check_at: inst.last_health_check_at,
+          consecutive_failures: inst.consecutive_failures || 0,
+          suspected_banned_at: inst.suspected_banned_at,
+        };
+        if (!inst.bridge_api_key || !inst.bridge_url) {
+          return { ...baseInfo, ready: false, readiness: "no_credentials", live_status: null };
+        }
+        if (inst.suspected_banned_at) {
+          return { ...baseInfo, ready: false, readiness: "suspected_ban", live_status: null };
+        }
+        if ((inst.consecutive_failures || 0) >= 3) {
+          return { ...baseInfo, ready: false, readiness: "too_many_failures", live_status: inst.status };
+        }
+        try {
+          const health = await syncInstanceHealth(adminClient, inst);
+          const liveStatus = health.status;
+          const ready = liveStatus === "connected";
+          return {
+            ...baseInfo,
+            db_status: liveStatus,
+            ready,
+            readiness: ready ? "ready" : (liveStatus === "connecting" ? "connecting" : "offline"),
+            live_status: liveStatus,
+          };
+        } catch (err) {
+          return { ...baseInfo, ready: false, readiness: "check_error", live_status: null, error: (err as Error).message };
+        }
+      }));
+
+      const readyCount = summaries.filter((s) => s.ready).length;
+      const overall = readyCount > 0
+        ? "ready"
+        : summaries.length === 0
+          ? "no_instances"
+          : summaries.every((s) => s.readiness === "no_credentials") ? "no_credentials"
+          : "offline";
+
+      return jsonResponse({
+        success: true,
+        overall,
+        ready_count: readyCount,
+        total: summaries.length,
+        instances: summaries,
+        checked_at: new Date().toISOString(),
+      });
+    }
+
     if (action === "create_instance_record") {
       // Verifica se já existe alguma instância para esse cliente
       const { count: existingCount } = await adminClient
