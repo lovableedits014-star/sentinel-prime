@@ -147,8 +147,18 @@ export default function GaleriaPublica() {
           </section>
         )}
 
-        {/* CTA destacado para materiais */}
-        {materialCount > 0 && (
+        {/* Destaque de materiais — visível sem precisar clicar na aba */}
+        {client && materialCount > 0 && (
+          <MateriaisDestaque
+            clientId={client.id}
+            clientName={client.name}
+            limit={3}
+            onViewAll={goToMateriais}
+          />
+        )}
+
+        {/* (CTA antigo removido daqui; substituído pelo bloco acima) */}
+        {false && materialCount > 0 && (
           <button
             type="button"
             onClick={goToMateriais}
