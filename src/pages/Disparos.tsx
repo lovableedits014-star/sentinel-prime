@@ -410,10 +410,21 @@ export default function Disparos() {
       toast.error("Nenhum destinatário encontrado com o filtro selecionado");
       return;
     }
-    if (!bridgeConfigured) {
-      toast.error("Ponte WhatsApp não configurada. Contacte o administrador.");
+    // Re-checa readiness ao vivo antes de disparar — evita o caso "tela diz OK,
+    // mas a sessão WhatsApp caiu nos últimos segundos".
+    const fresh = await refetchReadiness();
+    const ok = (fresh.data as any)?.overall === "ready";
+    if (!ok) {
+      const r = fresh.data as any;
+      toast.error(
+        r?.overall === "no_instances" ? "Nenhuma instância WhatsApp cadastrada."
+        : r?.overall === "no_credentials" ? "Instância sem credencial — escaneie o QR antes de disparar."
+        : "Nenhuma instância WhatsApp pronta agora. Vá em Status WhatsApp para reconectar.",
+        { duration: 6000 }
+      );
       return;
     }
+
 
     setSending(true);
     try {
