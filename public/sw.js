@@ -1,17 +1,36 @@
 // Service Worker para Push Notifications do Portal do Apoiador
-// v5 - sem cache de navegação; limpa caches antigos a cada activate para forçar refresh em quem instalou versões antigas (ex.: telas onde a aba Materiais não aparecia).
-const WB_MANIFEST = self.__WB_MANIFEST || [];
+// v6 - limpa caches antigos e RECARREGA as abas controladas no activate
+// para que celulares com versão antiga já recebam o conteúdo novo
+// sem precisar fechar a aba.
+const SW_VERSION = "v6";
 
-self.addEventListener('install', (event) => {
+self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
-      .then(() => clients.claim())
+    (async () => {
+      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      } catch {}
+      try {
+        await self.clients.claim();
+      } catch {}
+      try {
+        const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        await Promise.allSettled(
+          wins.map((c) => {
+            try {
+              return c.navigate(c.url);
+            } catch {
+              return Promise.resolve();
+            }
+          }),
+        );
+      } catch {}
+    })(),
   );
 });
 
