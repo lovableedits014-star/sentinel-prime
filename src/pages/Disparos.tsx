@@ -109,17 +109,24 @@ export default function Disparos() {
 
   const clientId = client?.id;
 
-  // WhatsApp Bridge status
-  const { data: bridgeConfigured } = useQuery({
-    queryKey: ["whatsapp-bridge-status", clientId],
+  // WhatsApp readiness — fonte ÚNICA de verdade (mesma usada pelo Status WhatsApp).
+  // Checa cada instância ao vivo na ponte e diz se está realmente pronta pra disparo.
+  const { data: readiness, refetch: refetchReadiness, isFetching: checkingReadiness } = useQuery({
+    queryKey: ["whatsapp-dispatch-readiness", clientId],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
-        body: { action: "check_bridge", client_id: clientId },
+        body: { action: "dispatch_readiness", client_id: clientId },
       });
-      return !error && data?.configured;
+      if (error) return { overall: "offline", ready_count: 0, total: 0, instances: [] } as any;
+      return data as any;
     },
     enabled: !!clientId,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
+    staleTime: 15_000,
   });
+  const bridgeConfigured = !!readiness && (readiness.overall === "ready");
+
 
   // Tags for filtering
   const { data: tags = [] } = useQuery<TagOption[]>({
