@@ -574,17 +574,27 @@ export default function Disparos() {
 
       <SugestoesPanel />
 
-      {/* Connection status banner */}
+      {/* Connection status banner — usa readiness em tempo real (mesma fonte do Status WhatsApp) */}
       {!isConnected && (
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="p-4 flex items-center gap-3">
             <WifiOff className="w-5 h-5 text-amber-500 shrink-0" />
-            <div>
-              <p className="text-sm font-medium">WhatsApp não conectado</p>
+            <div className="flex-1">
+              <p className="text-sm font-medium">
+                {readiness?.overall === "no_instances" ? "Nenhuma instância WhatsApp cadastrada"
+                 : readiness?.overall === "no_credentials" ? "Instância sem credencial — conecte o QR primeiro"
+                 : "WhatsApp não está pronto para disparo"}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Vá em Configurações para criar e conectar sua instância WhatsApp antes de enviar disparos.
+                {readiness?.instances?.length
+                  ? `Instâncias verificadas: ${readiness.ready_count}/${readiness.total} prontas. Vá em Status WhatsApp para reconectar.`
+                  : "Vá em Configurações → WhatsApp para criar e conectar uma instância."}
               </p>
             </div>
+            <Button size="sm" variant="outline" onClick={() => refetchReadiness()} disabled={checkingReadiness} className="gap-1.5">
+              {checkingReadiness ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+              Verificar agora
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -593,12 +603,17 @@ export default function Disparos() {
         <Card className="border-emerald-500/20 bg-emerald-500/5">
           <CardContent className="p-4 flex items-center gap-3">
             <Wifi className="w-4 h-4 text-emerald-500 shrink-0" />
-            <p className="text-sm text-emerald-700 dark:text-emerald-400">
-              <strong>Ponte WhatsApp configurada</strong> — Pronto para envios
+            <p className="text-sm text-emerald-700 dark:text-emerald-400 flex-1">
+              <strong>WhatsApp pronto para envio</strong> — {readiness?.ready_count}/{readiness?.total} instância(s) conectada(s) e verificada(s) ao vivo
             </p>
+            <Button size="sm" variant="ghost" onClick={() => refetchReadiness()} disabled={checkingReadiness} className="gap-1.5 text-emerald-700 dark:text-emerald-400">
+              {checkingReadiness ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+              Reverificar
+            </Button>
           </CardContent>
         </Card>
       )}
+
 
       {/* Composer */}
       <Card>
