@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +63,7 @@ function downtimeLabel(inst: Instance): string | null {
 }
 
 export default function StatusWhatsApp() {
+  const queryClient = useQueryClient();
   const [clientId, setClientId] = useState<string | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
   const [retryStats, setRetryStats] = useState<RetryRow[]>([]);
@@ -69,6 +72,10 @@ export default function StatusWhatsApp() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [autoSentFor, setAutoSentFor] = useState<Set<string>>(new Set()); // anti-loop por sessão
   const [preview, setPreview] = useState<PreviewState>(null);
+
+
+
+
 
   const loadAll = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -97,7 +104,11 @@ export default function StatusWhatsApp() {
     setRetryStats(Object.entries(counts).map(([status, count]) => ({ status, count })));
     setLastRefresh(new Date());
     setLoading(false);
+    // Mantém o Disparos em sincronia: sempre que o Status atualizar, o cache de
+    // readiness usado pela página Disparos é invalidado.
+    queryClient.invalidateQueries({ queryKey: ["whatsapp-dispatch-readiness", cId] });
   };
+
 
   useEffect(() => {
     loadAll();

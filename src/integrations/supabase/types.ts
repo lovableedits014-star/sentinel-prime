@@ -7688,6 +7688,13 @@ export type Database = {
             foreignKeyName: "whatsapp_groups_instance_id_fkey"
             columns: ["instance_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_dispatch_readiness"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_groups_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
@@ -7728,6 +7735,13 @@ export type Database = {
           success?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "whatsapp_instance_send_log_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "v_whatsapp_dispatch_readiness"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "whatsapp_instance_send_log_instance_id_fkey"
             columns: ["instance_id"]
@@ -7962,6 +7976,65 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_eleicao_indicadores_cobranca"
             referencedColumns: ["indicador_id"]
+          },
+        ]
+      }
+      v_whatsapp_dispatch_readiness: {
+        Row: {
+          apelido: string | null
+          client_id: string | null
+          connected_since: string | null
+          consecutive_failures: number | null
+          has_credentials: boolean | null
+          id: string | null
+          is_active: boolean | null
+          is_primary: boolean | null
+          last_disconnected_at: string | null
+          last_health_check_at: string | null
+          phone_number: string | null
+          readiness: string | null
+          status: string | null
+          suspected_banned_at: string | null
+        }
+        Insert: {
+          apelido?: string | null
+          client_id?: string | null
+          connected_since?: string | null
+          consecutive_failures?: number | null
+          has_credentials?: never
+          id?: string | null
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_disconnected_at?: string | null
+          last_health_check_at?: string | null
+          phone_number?: string | null
+          readiness?: never
+          status?: string | null
+          suspected_banned_at?: string | null
+        }
+        Update: {
+          apelido?: string | null
+          client_id?: string | null
+          connected_since?: string | null
+          consecutive_failures?: number | null
+          has_credentials?: never
+          id?: string | null
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_disconnected_at?: string | null
+          last_health_check_at?: string | null
+          phone_number?: string | null
+          readiness?: never
+          status?: string | null
+          suspected_banned_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
         ]
       }
