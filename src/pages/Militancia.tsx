@@ -23,7 +23,7 @@ import { MilitantBadge } from "@/components/comments/MilitantBadge";
 import { AuthorHistoryDrawer } from "@/components/comments/AuthorHistoryDrawer";
 import { MilitanciaCharts } from "@/components/militancia/MilitanciaCharts";
 import { MilitanciaReport } from "@/components/militancia/MilitanciaReport";
-import { getSocialProfileUrl } from "@/lib/social-url";
+import { getSocialProfileUrl, getBestProfileLink } from "@/lib/social-url";
 import type { MilitantRow } from "@/hooks/useMilitants";
 
 function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: number | string; accent?: string }) {
@@ -453,12 +453,36 @@ function NegativeRanking({
     }
   };
 
-  const handleBlock = async (m: MilitantRow) => {
+  const handleBlock = async (m: MilitantRow, profileUrl?: string | null) => {
     if (!clientId) return;
+
+    // Instagram: API da Meta não permite bloqueio. Abrimos o perfil/comentário
+    // no Instagram (para o usuário bloquear manualmente pelo app) e registramos
+    // localmente em blocked_users para histórico.
     if (m.platform === 'instagram') {
-      toast.error("O Instagram não permite bloqueio via API. Bloqueie pelo app do Instagram.");
+      if (profileUrl) {
+        window.open(profileUrl, "_blank", "noopener,noreferrer");
+      }
+      const key = `${m.platform}:${m.platform_user_id}`;
+      const latest = commentsByAuthor.get(key)?.[0];
+      setBlocking(m.id);
+      try {
+        if (latest?.id) {
+          const { error } = await supabase.functions.invoke('manage-comment', {
+            body: { commentId: latest.id, clientId, action: 'block_user' },
+          });
+          if (error) console.warn("[block instagram local]", error.message);
+        }
+        toast.success(
+          "Abrimos o Instagram para você bloquear manualmente. Registrado aqui para histórico.",
+          { duration: 6000 },
+        );
+      } finally {
+        setBlocking(null);
+      }
       return;
     }
+
     if (!confirm(`Bloquear ${m.author_name || "este autor"} da página? Esta ação remove a capacidade de comentar.`)) return;
     setBlocking(m.id);
     try {
@@ -509,10 +533,28 @@ function NegativeRanking({
   return (
     <div className="bg-card rounded-xl border shadow-sm divide-y overflow-hidden">
       {ranking.map((m, idx) => {
-        const url = getSocialProfileUrl(m.platform, m.platform_user_id, null, m.author_name);
         const key = `${m.platform}:${m.platform_user_id}`;
         const isOpen = expanded.has(m.id);
         const authorComments = commentsByAuthor.get(key) || [];
+        const latest = authorComments[0];
+        const best = getBestProfileLink(m.platform, {
+          platformUserId: m.platform_user_id,
+          platformUsername: (m as any).platform_username ?? null,
+          authorName: m.author_name,
+          latestPermalinkUrl: latest?.post_permalink_url ?? null,
+          latestCommentId: latest?.comment_id ?? null,
+        });
+        const isInstagram = m.platform === 'instagram';
+        const openLabel = best?.kind === "profile"
+          ? "Abrir perfil"
+          : best?.kind === "comment"
+          ? "Abrir comentário"
+          : "Buscar no Facebook";
+        const openTitle = best?.kind === "comment"
+          ? "Abre o comentário desta pessoa. Clique no nome dela lá para chegar no perfil real e bloquear."
+          : best?.kind === "search"
+          ? "Não foi possível link direto: o Facebook devolve um ID interno. Abrimos a busca pelo nome."
+          : "Abrir perfil em nova aba";
         return (
           <div key={m.id}>
             <div className="px-3 py-3 flex items-center gap-3 hover:bg-muted/50">
@@ -550,25 +592,35 @@ function NegativeRanking({
                   </div>
                 </div>
               </button>
-              {url && (
-                <a href={url} target="_blank" rel="noopener noreferrer"
-                  className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                  title="Abrir perfil">
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+              {best && (
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 h-8 gap-1.5"
+                  title={openTitle}
+                >
+                  <a href={best.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{openLabel}</span>
+                  </a>
+                </Button>
               )}
               <Button
                 size="sm"
-                variant="destructive"
+                variant={isInstagram ? "secondary" : "destructive"}
                 disabled={blocking === m.id}
-                onClick={() => handleBlock(m)}
+                onClick={() => handleBlock(m, best?.url)}
                 className="shrink-0 h-8 gap-1.5"
-                title={m.platform === 'instagram' ? 'Instagram não permite bloqueio via API' : 'Bloquear autor da página'}
+                title={isInstagram
+                  ? "Instagram não permite bloqueio via API. Abre o Instagram para você bloquear manualmente e registra aqui para histórico."
+                  : "Bloquear autor da página"}
               >
                 {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">Bloquear</span>
+                <span className="hidden sm:inline">{isInstagram ? "Bloquear no app" : "Bloquear"}</span>
               </Button>
             </div>
+
 
             {isOpen && (
               <div className="bg-muted/30 px-3 py-3 space-y-2 border-t">
@@ -850,7 +902,7 @@ const Militancia = () => {
               <div className="text-sm">
                 <p className="font-semibold text-destructive mb-1">Quem mais ataca a campanha</p>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Ranking dos perfis com mais comentários negativos. Clique em <strong>Bloquear</strong> para impedir que o autor continue comentando na página (Facebook apenas — Instagram exige bloqueio manual pelo app).
+                  Ranking dos perfis com mais comentários negativos. <strong>Abrir comentário</strong> leva direto ao comentário do hater (clique no nome dele lá para abrir o perfil real). <strong>Bloquear</strong> remove a permissão de comentar no <strong>Facebook</strong>; no <strong>Instagram</strong> a Meta não permite bloqueio via API — abrimos o perfil para você bloquear pelo app e registramos aqui para histórico.
                 </p>
               </div>
             </div>

@@ -1,0 +1,1 @@
+ALTER TABLE public.social_militants ADD COLUMN IF NOT EXISTS platform_username TEXT;
