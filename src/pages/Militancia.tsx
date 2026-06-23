@@ -516,6 +516,8 @@ function NegativeRanking({
       if (error) throw error;
       if (data?.success) {
         toast.success(data.message || "Autor bloqueado!");
+        queryClient.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
+        queryClient.invalidateQueries({ queryKey: ["blocked-users", clientId] });
       } else {
         toast.error(data?.error || "Falha ao bloquear");
       }
