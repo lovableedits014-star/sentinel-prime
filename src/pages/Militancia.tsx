@@ -90,6 +90,11 @@ function MilitantList({
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium truncate">{m.author_name || "Autor desconhecido"}</span>
                 <MilitantBadge militant={m} />
+                {blockedIds?.has(`${m.platform}:${m.platform_user_id}`) && (
+                  <Badge variant="outline" className="h-5 gap-1 text-[10px] border-destructive/40 text-destructive bg-destructive/5">
+                    <Ban className="w-3 h-3" />Bloqueado
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
                 <span className="inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{m.total_comments}</span>
