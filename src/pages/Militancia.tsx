@@ -595,6 +595,11 @@ function NegativeRanking({
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium truncate">{m.author_name || "Autor desconhecido"}</span>
                     <MilitantBadge militant={m} />
+                    {isBlocked && (
+                      <Badge variant="outline" className="h-5 gap-1 text-[10px] border-destructive/40 text-destructive bg-destructive/5">
+                        <Ban className="w-3 h-3" />Bloqueado
+                      </Badge>
+                    )}
                     {m.platform === 'facebook'
                       ? <Facebook className="w-3.5 h-3.5 text-blue-600" />
                       : <Instagram className="w-3.5 h-3.5 text-pink-500" />}
