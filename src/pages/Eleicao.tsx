@@ -1048,14 +1048,14 @@ export default function Eleicao() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="coordenador">Coordenador</SelectItem>
-                    {form.escopo === "campo_grande" && <SelectItem value="lider">Líder</SelectItem>}
+                    <SelectItem value="lider">Líder</SelectItem>
                     <SelectItem value="cabo">Cabo eleitoral</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Escopo *</Label>
-                <Select value={form.escopo} onValueChange={(v) => setForm(f => ({ ...f, escopo: v as Escopo, parent_id: "", tipo: v === "interior" && f.tipo === "lider" ? "cabo" : f.tipo }))}>
+                <Select value={form.escopo} onValueChange={(v) => setForm(f => ({ ...f, escopo: v as Escopo, parent_id: "" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="campo_grande">Campo Grande</SelectItem>
