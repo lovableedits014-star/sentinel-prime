@@ -643,16 +643,18 @@ function NegativeRanking({
               )}
               <Button
                 size="sm"
-                variant={isInstagram ? "secondary" : "destructive"}
-                disabled={blocking === m.id}
+                variant={isBlocked ? "outline" : isInstagram ? "secondary" : "destructive"}
+                disabled={blocking === m.id || isBlocked}
                 onClick={() => handleBlock(m, best?.url)}
                 className="shrink-0 h-8 gap-1.5"
-                title={isInstagram
+                title={isBlocked
+                  ? "Este perfil já está bloqueado"
+                  : isInstagram
                   ? "Instagram não permite bloqueio via API. Abre o Instagram para você bloquear manualmente e registra aqui para histórico."
                   : "Bloquear autor da página"}
               >
-                {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{isInstagram ? "Bloquear no app" : "Bloquear"}</span>
+                {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isBlocked ? <ShieldOff className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{isBlocked ? "Já bloqueado" : isInstagram ? "Bloquear no app" : "Bloquear"}</span>
               </Button>
             </div>
 
