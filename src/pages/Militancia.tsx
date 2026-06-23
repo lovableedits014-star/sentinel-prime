@@ -921,7 +921,7 @@ const Militancia = () => {
             <StatCard icon={<TrendingDown className="w-4 h-4" />} label="Críticos/Haters" value={igStats.haters} accent="bg-destructive/10 text-destructive" />
             <StatCard icon={<Users className="w-4 h-4" />} label="Novos rostos" value={igStats.novos} accent="bg-cyan-500/10 text-cyan-700" />
           </div>
-          <MilitantList militants={igList} loading={isLoading} onOpen={setDrawer} />
+          <MilitantList militants={igList} loading={isLoading} onOpen={setDrawer} blockedIds={blockedIds} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4 mt-4">
