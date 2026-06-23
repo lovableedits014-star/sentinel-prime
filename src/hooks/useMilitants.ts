@@ -8,6 +8,7 @@ export interface MilitantRow {
   platform_user_id: string;
   author_name: string | null;
   avatar_url: string | null;
+  platform_username?: string | null;
   first_seen_at: string;
   last_seen_at: string;
   total_comments: number;
