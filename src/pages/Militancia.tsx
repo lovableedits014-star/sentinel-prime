@@ -24,6 +24,7 @@ import { AuthorHistoryDrawer } from "@/components/comments/AuthorHistoryDrawer";
 import { MilitanciaCharts } from "@/components/militancia/MilitanciaCharts";
 import { MilitanciaReport } from "@/components/militancia/MilitanciaReport";
 import { getDirectSocialProfileUrl, getBestProfileLink } from "@/lib/social-url";
+import { useBlockedUserIds } from "@/hooks/useBlockedUserIds";
 import type { MilitantRow } from "@/hooks/useMilitants";
 
 function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: number | string; accent?: string }) {
