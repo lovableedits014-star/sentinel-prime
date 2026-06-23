@@ -39,6 +39,9 @@ export function AuthorHistoryDrawer({
   const profileUrl = getSocialProfileUrl(platform, platformUserId);
   const [blocking, setBlocking] = useState(false);
   const isInstagram = platform === "instagram";
+  const queryClient = useQueryClient();
+  const { data: blockedIds } = useBlockedUserIds(clientId);
+  const isBlocked = blockedIds?.has(`${platform}:${platformUserId}`) ?? false;
 
   const { data, isLoading } = useQuery({
     queryKey: ["author-history", clientId, platform, platformUserId],
