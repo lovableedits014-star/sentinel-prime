@@ -161,22 +161,25 @@ function isInstanceDisconnectedError(res: Response, data: any): boolean {
 // ============================================================
 // Pré-checagem (preflight) de saúde da instância antes do envio.
 //
-// IMPORTANTE: NÃO chama mais `reconnect` automaticamente durante
-// disparo. Forçar reconnect/handshake várias vezes seguidas é um
-// dos gatilhos clássicos de queda real da sessão (e até de ban).
+// IMPORTANTE: NÃO chama `reconnect` automaticamente durante disparo.
+// Forçar reconnect/handshake várias vezes seguidas é gatilho de queda real
+// da sessão (e até de ban).
 //
-// Política:
-//  - connected/open   → "connected"
-//  - terminal offline → "disconnected" (e o caller marca no banco)
-//  - connecting/qr/vazio/erro de rede → "transient" (segue o envio;
-//    só marca offline se o envio real falhar com erro de instância)
+// Política CONSERVADORA (fail-safe):
+//  - connected/open                  → "connected" (envio liberado)
+//  - terminal offline / 401          → "disconnected" (marca offline)
+//  - connecting/qr/vazio/erro de rede → "not_ready" (NÃO envia; pausa/failover)
+//
+// Antes a categoria "transient" deixava o envio prosseguir mesmo com
+// `connecting` — exatamente o caso em que a UI dizia "conectado" mas o
+// envio falhava porque a sessão WhatsApp ainda não estava operacional.
 // ============================================================
 const TERMINAL_OFFLINE_STATUSES = new Set([
   "disconnected", "offline", "closed", "logged_out", "logout", "banned",
 ]);
 
 type PreflightResult = {
-  status: "connected" | "transient" | "disconnected" | "skipped" | "error";
+  status: "connected" | "not_ready" | "disconnected" | "skipped" | "error";
   reconnected: boolean;
   detail?: string;
 };
@@ -211,14 +214,15 @@ async function preflightInstance(params: {
       console.warn(`${tag} ❌ offline confirmado (status=${statusRaw || res.status})`);
       return { status: "disconnected", reconnected: false, detail: statusRaw || `http_${res.status}` };
     }
-    // connecting / qr / vazio / desconhecido → não mexe na sessão, segue o envio
-    console.log(`${tag} ⏳ transient (status=${statusRaw || "vazio"}) — seguindo envio sem reconnect`);
-    return { status: "transient", reconnected: false, detail: statusRaw || "no_status" };
+    // connecting / qr / vazio / desconhecido → NÃO envia. Fail-safe.
+    console.warn(`${tag} ⛔ not_ready (status=${statusRaw || "vazio"}) — sessão não comprovada, pulando esta instância`);
+    return { status: "not_ready", reconnected: false, detail: statusRaw || "no_status" };
   } catch (err) {
-    console.warn(`${tag} ⚠️ erro ao consultar status (transient):`, (err as Error).message);
-    return { status: "transient", reconnected: false, detail: (err as Error).message };
+    console.warn(`${tag} ⚠️ erro ao consultar status (not_ready):`, (err as Error).message);
+    return { status: "not_ready", reconnected: false, detail: (err as Error).message };
   }
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -1124,13 +1128,14 @@ Deno.serve(async (req) => {
             }
             lastInstanceId = instanceId;
 
-            // ===== PREFLIGHT (não-invasivo: não chama reconnect durante o envio) =====
+            // ===== PREFLIGHT (fail-safe: só envia se a ponte confirmar connected) =====
             let preflight: PreflightResult = { status: "skipped", reconnected: false };
             if (instanceId && bridgeUrl && bridgeApiKey) {
               const cached = preflightByInstance[instanceId];
               const cachedAt = (preflightCacheAt as any)[instanceId] as number | undefined;
+              // Só reaproveita cache se o último preflight foi "connected".
               const fresh = cached && cachedAt && (Date.now() - cachedAt) < 20_000;
-              if (fresh && (cached.status === "connected" || cached.status === "transient")) {
+              if (fresh && cached.status === "connected") {
                 preflight = cached;
               } else {
                 preflight = await preflightInstance({
@@ -1141,7 +1146,7 @@ Deno.serve(async (req) => {
               }
 
               if (preflight.status === "disconnected") {
-                // Só marca offline no banco quando a ponte CONFIRMOU status terminal.
+                // A ponte CONFIRMOU status terminal → marca offline no banco.
                 await adminClient.from("whatsapp_instances")
                   .update({ status: "disconnected", last_disconnected_at: new Date().toISOString() })
                   .eq("id", instanceId);
@@ -1160,8 +1165,41 @@ Deno.serve(async (req) => {
                 }
                 break;
               }
-              // status === "transient" ou "connected": segue o envio normalmente.
+
+              if (preflight.status === "not_ready") {
+                // Ponte respondeu connecting / qr / vazio / erro → NÃO envia.
+                // Marca como connecting (não confirma offline ainda) e faz failover.
+                await adminClient.from("whatsapp_instances")
+                  .update({ status: "connecting", last_health_check_at: new Date().toISOString() })
+                  .eq("id", instanceId);
+                await adminClient.rpc("log_whatsapp_send", {
+                  p_instance_id: instanceId, p_client_id: client_id,
+                  p_dispatch_id: dispatch.id, p_success: false,
+                  p_error_message: `Preflight: sessão não pronta (${preflight.detail || "sem status"})`,
+                  p_preflight_status: preflight.status,
+                  p_preflight_reconnected: preflight.reconnected,
+                });
+                delete preflightByInstance[instanceId];
+                delete (preflightCacheAt as any)[instanceId];
+                if (isGroup) {
+                  (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
+                  continue;
+                }
+                // Telefone individual: pausa o disparo — quando o chip estabilizar
+                // (próximo health_check ou intervenção manual), o cron retoma.
+                await adminClient.from("whatsapp_dispatches").update({
+                  status: "pausado_sem_instancia",
+                  pause_reason: `Sessão WhatsApp não pronta (${preflight.detail || "sem status"}). Retomado automaticamente quando reconectar.`,
+                  enviados: sent,
+                  falhas: failed,
+                  updated_at: new Date().toISOString(),
+                }).eq("id", dispatch.id);
+                return;
+
+              }
+              // status === "connected": segue o envio normalmente.
             }
+
 
             try {
               const baseMsg = (recipient as any).mensagem_personalizada

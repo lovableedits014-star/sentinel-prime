@@ -818,17 +818,28 @@ Deno.serve(async (req) => {
         try {
           const health = await syncInstanceHealth(adminClient, inst);
           const liveStatus = health.status;
-          const ready = liveStatus === "connected";
+          // Fail-safe: só considera "ready" quando a ponte respondeu connected/open
+          // AO VIVO E a instância já tem phone_number registrado (prova de sessão
+          // WhatsApp pareada). Status "connecting" / vazio / erro NÃO conta como pronto.
+          const hasPairedSession = !!(inst.phone_number && String(inst.phone_number).length > 0);
+          const ready = liveStatus === "connected" && hasPairedSession;
+          let readiness: string;
+          if (ready) readiness = "ready";
+          else if (liveStatus === "connected" && !hasPairedSession) readiness = "session_not_paired";
+          else if (liveStatus === "connecting") readiness = "connecting";
+          else if (liveStatus === "disconnected") readiness = "offline";
+          else readiness = "not_ready";
           return {
             ...baseInfo,
             db_status: liveStatus,
             ready,
-            readiness: ready ? "ready" : (liveStatus === "connecting" ? "connecting" : "offline"),
+            readiness,
             live_status: liveStatus,
           };
         } catch (err) {
           return { ...baseInfo, ready: false, readiness: "check_error", live_status: null, error: (err as Error).message };
         }
+
       }));
 
       const readyCount = summaries.filter((s) => s.ready).length;
