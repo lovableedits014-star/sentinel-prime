@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Search, Facebook, Instagram, TrendingUp, TrendingDown,
   Users, Calendar, Loader2, MessageSquare, Eye, BarChart3, FileText, ExternalLink,
-  Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus, ShieldOff, Unlock, RefreshCw,
+  Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus, ShieldOff, Unlock, RefreshCw, User,
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -555,6 +555,14 @@ function NegativeRanking({
           : best?.kind === "search"
           ? "Não foi possível link direto: o Facebook devolve um ID interno. Abrimos a busca pelo nome."
           : "Abrir perfil em nova aba";
+        const profileUrl = getSocialProfileUrl(
+          m.platform,
+          m.platform_user_id,
+          (m as any).platform_username ?? null,
+          m.author_name,
+        );
+        // Só mostra o botão de perfil separado se for diferente do botão principal
+        const showProfileButton = profileUrl && profileUrl !== best?.url;
         return (
           <div key={m.id}>
             <div className="px-3 py-3 flex items-center gap-3 hover:bg-muted/50">
@@ -603,6 +611,20 @@ function NegativeRanking({
                   <a href={best.url} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">{openLabel}</span>
+                  </a>
+                </Button>
+              )}
+              {showProfileButton && (
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 h-8 gap-1.5"
+                  title={`Abrir o perfil da pessoa no ${isInstagram ? 'Instagram' : 'Facebook'} em nova aba`}
+                >
+                  <a href={profileUrl!} target="_blank" rel="noopener noreferrer">
+                    <User className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Perfil</span>
                   </a>
                 </Button>
               )}
