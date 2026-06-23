@@ -608,14 +608,6 @@ function NegativeRanking({
                   className="shrink-0 h-8 gap-1.5"
                   title={openTitle}
                 >
-              {best && (
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0 h-8 gap-1.5"
-                  title={openTitle}
-                >
                   <a href={best.url} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">{openLabel}</span>
