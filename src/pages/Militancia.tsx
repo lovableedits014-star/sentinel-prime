@@ -811,6 +811,8 @@ const Militancia = () => {
     staleTime: 1000 * 60 * 2,
   });
 
+  const { data: blockedIds } = useBlockedUserIds(clientId);
+
   const filterByPlatform = (platform: string) => {
     return militants.filter((m) => {
       if (m.platform !== platform) return false;
