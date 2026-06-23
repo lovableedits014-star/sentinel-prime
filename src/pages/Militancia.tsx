@@ -453,12 +453,36 @@ function NegativeRanking({
     }
   };
 
-  const handleBlock = async (m: MilitantRow) => {
+  const handleBlock = async (m: MilitantRow, profileUrl?: string | null) => {
     if (!clientId) return;
+
+    // Instagram: API da Meta não permite bloqueio. Abrimos o perfil/comentário
+    // no Instagram (para o usuário bloquear manualmente pelo app) e registramos
+    // localmente em blocked_users para histórico.
     if (m.platform === 'instagram') {
-      toast.error("O Instagram não permite bloqueio via API. Bloqueie pelo app do Instagram.");
+      if (profileUrl) {
+        window.open(profileUrl, "_blank", "noopener,noreferrer");
+      }
+      const key = `${m.platform}:${m.platform_user_id}`;
+      const latest = commentsByAuthor.get(key)?.[0];
+      setBlocking(m.id);
+      try {
+        if (latest?.id) {
+          const { error } = await supabase.functions.invoke('manage-comment', {
+            body: { commentId: latest.id, clientId, action: 'block_user' },
+          });
+          if (error) console.warn("[block instagram local]", error.message);
+        }
+        toast.success(
+          "Abrimos o Instagram para você bloquear manualmente. Registrado aqui para histórico.",
+          { duration: 6000 },
+        );
+      } finally {
+        setBlocking(null);
+      }
       return;
     }
+
     if (!confirm(`Bloquear ${m.author_name || "este autor"} da página? Esta ação remove a capacidade de comentar.`)) return;
     setBlocking(m.id);
     try {
