@@ -1128,13 +1128,14 @@ Deno.serve(async (req) => {
             }
             lastInstanceId = instanceId;
 
-            // ===== PREFLIGHT (não-invasivo: não chama reconnect durante o envio) =====
+            // ===== PREFLIGHT (fail-safe: só envia se a ponte confirmar connected) =====
             let preflight: PreflightResult = { status: "skipped", reconnected: false };
             if (instanceId && bridgeUrl && bridgeApiKey) {
               const cached = preflightByInstance[instanceId];
               const cachedAt = (preflightCacheAt as any)[instanceId] as number | undefined;
+              // Só reaproveita cache se o último preflight foi "connected".
               const fresh = cached && cachedAt && (Date.now() - cachedAt) < 20_000;
-              if (fresh && (cached.status === "connected" || cached.status === "transient")) {
+              if (fresh && cached.status === "connected") {
                 preflight = cached;
               } else {
                 preflight = await preflightInstance({
@@ -1145,7 +1146,7 @@ Deno.serve(async (req) => {
               }
 
               if (preflight.status === "disconnected") {
-                // Só marca offline no banco quando a ponte CONFIRMOU status terminal.
+                // A ponte CONFIRMOU status terminal → marca offline no banco.
                 await adminClient.from("whatsapp_instances")
                   .update({ status: "disconnected", last_disconnected_at: new Date().toISOString() })
                   .eq("id", instanceId);
@@ -1164,8 +1165,32 @@ Deno.serve(async (req) => {
                 }
                 break;
               }
-              // status === "transient" ou "connected": segue o envio normalmente.
+
+              if (preflight.status === "not_ready") {
+                // Ponte respondeu connecting / qr / vazio / erro → NÃO envia.
+                // Marca como connecting (não confirma offline ainda) e faz failover.
+                await adminClient.from("whatsapp_instances")
+                  .update({ status: "connecting", last_health_check_at: new Date().toISOString() })
+                  .eq("id", instanceId);
+                await adminClient.rpc("log_whatsapp_send", {
+                  p_instance_id: instanceId, p_client_id: client_id,
+                  p_dispatch_id: dispatch.id, p_success: false,
+                  p_error_message: `Preflight: sessão não pronta (${preflight.detail || "sem status"})`,
+                  p_preflight_status: preflight.status,
+                  p_preflight_reconnected: preflight.reconnected,
+                });
+                delete preflightByInstance[instanceId];
+                delete (preflightCacheAt as any)[instanceId];
+                if (isGroup) {
+                  (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
+                  continue;
+                }
+                // Telefone individual: sai do while para cair no fluxo de "sem instância" abaixo
+                break;
+              }
+              // status === "connected": segue o envio normalmente.
             }
+
 
             try {
               const baseMsg = (recipient as any).mensagem_personalizada
