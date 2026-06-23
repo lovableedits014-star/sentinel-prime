@@ -542,6 +542,7 @@ function NegativeRanking({
     <div className="bg-card rounded-xl border shadow-sm divide-y overflow-hidden">
       {ranking.map((m, idx) => {
         const key = `${m.platform}:${m.platform_user_id}`;
+        const isBlocked = blockedIds?.has(key) ?? false;
         const isOpen = expanded.has(m.id);
         const authorComments = commentsByAuthor.get(key) || [];
         const latest = authorComments[0];
