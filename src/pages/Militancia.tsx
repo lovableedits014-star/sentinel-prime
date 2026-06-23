@@ -902,7 +902,7 @@ const Militancia = () => {
               <div className="text-sm">
                 <p className="font-semibold text-destructive mb-1">Quem mais ataca a campanha</p>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Ranking dos perfis com mais comentários negativos. Clique em <strong>Bloquear</strong> para impedir que o autor continue comentando na página (Facebook apenas — Instagram exige bloqueio manual pelo app).
+                  Ranking dos perfis com mais comentários negativos. <strong>Abrir comentário</strong> leva direto ao comentário do hater (clique no nome dele lá para abrir o perfil real). <strong>Bloquear</strong> remove a permissão de comentar no <strong>Facebook</strong>; no <strong>Instagram</strong> a Meta não permite bloqueio via API — abrimos o perfil para você bloquear pelo app e registramos aqui para histórico.
                 </p>
               </div>
             </div>
