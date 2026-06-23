@@ -23,7 +23,7 @@ import { MilitantBadge } from "@/components/comments/MilitantBadge";
 import { AuthorHistoryDrawer } from "@/components/comments/AuthorHistoryDrawer";
 import { MilitanciaCharts } from "@/components/militancia/MilitanciaCharts";
 import { MilitanciaReport } from "@/components/militancia/MilitanciaReport";
-import { getSocialProfileUrl } from "@/lib/social-url";
+import { getSocialProfileUrl, getBestProfileLink } from "@/lib/social-url";
 import type { MilitantRow } from "@/hooks/useMilitants";
 
 function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: number | string; accent?: string }) {
