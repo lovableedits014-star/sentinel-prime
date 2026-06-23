@@ -597,9 +597,27 @@ export default function Disparos() {
                  : "WhatsApp não está pronto para disparo"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {readiness?.instances?.length
-                  ? `Instâncias verificadas: ${readiness.ready_count}/${readiness.total} prontas. Vá em Status WhatsApp para reconectar.`
-                  : "Vá em Configurações → WhatsApp para criar e conectar uma instância."}
+                {readiness?.instances?.length ? (
+                  <>
+                    Instâncias verificadas: {readiness.ready_count}/{readiness.total} prontas.{" "}
+                    {(() => {
+                      const reasons = (readiness.instances as any[])
+                        .filter((i) => !i.ready)
+                        .map((i) => {
+                          const label = i.apelido || "instância";
+                          if (i.readiness === "session_not_paired") return `${label}: ponte diz conectado mas a sessão WhatsApp ainda não pareou`;
+                          if (i.readiness === "connecting") return `${label}: ainda conectando`;
+                          if (i.readiness === "offline") return `${label}: offline`;
+                          if (i.readiness === "no_credentials") return `${label}: sem credencial`;
+                          if (i.readiness === "too_many_failures") return `${label}: muitas falhas seguidas`;
+                          if (i.readiness === "suspected_ban") return `${label}: suspeita de ban`;
+                          if (i.readiness === "check_error") return `${label}: erro ao verificar`;
+                          return `${label}: ${i.readiness}`;
+                        });
+                      return reasons.length > 0 ? reasons.join(" · ") + ". Vá em Status WhatsApp para reconectar." : "Vá em Status WhatsApp para reconectar.";
+                    })()}
+                  </>
+                ) : "Vá em Configurações → WhatsApp para criar e conectar uma instância."}
               </p>
             </div>
             <Button size="sm" variant="outline" onClick={() => refetchReadiness()} disabled={checkingReadiness} className="gap-1.5">
@@ -609,6 +627,7 @@ export default function Disparos() {
           </CardContent>
         </Card>
       )}
+
 
       {isConnected && (
         <Card className="border-emerald-500/20 bg-emerald-500/5">
