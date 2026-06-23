@@ -1,10 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Minus, Calendar, Facebook, Instagram, Loader2, ExternalLink, Ban } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calendar, Facebook, Instagram, Loader2, ExternalLink, Ban, ShieldOff } from "lucide-react";
 import { MilitantBadge } from "./MilitantBadge";
 import { Button } from "@/components/ui/button";
 import { getSocialProfileUrl } from "@/lib/social-url";
@@ -13,6 +13,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useBlockedUserIds } from "@/hooks/useBlockedUserIds";
 import type { MilitantRow } from "@/hooks/useMilitants";
 
 interface Props {
@@ -38,6 +39,9 @@ export function AuthorHistoryDrawer({
   const profileUrl = getSocialProfileUrl(platform, platformUserId);
   const [blocking, setBlocking] = useState(false);
   const isInstagram = platform === "instagram";
+  const queryClient = useQueryClient();
+  const { data: blockedIds } = useBlockedUserIds(clientId);
+  const isBlocked = blockedIds?.has(`${platform}:${platformUserId}`) ?? false;
 
   const { data, isLoading } = useQuery({
     queryKey: ["author-history", clientId, platform, platformUserId],
@@ -73,6 +77,8 @@ export function AuthorHistoryDrawer({
       if (error) throw error;
       if (!res?.success) throw new Error(res?.error || "Falha ao bloquear");
       toast.success(res.message || "Usuário bloqueado!");
+      queryClient.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["blocked-users", clientId] });
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message || "Erro ao bloquear usuário");
@@ -91,8 +97,13 @@ export function AuthorHistoryDrawer({
               <AvatarFallback>{authorName?.charAt(0).toUpperCase() || "?"}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <SheetTitle className="text-base flex items-center gap-2">
+              <SheetTitle className="text-base flex items-center gap-2 flex-wrap">
                 <span className="truncate">{authorName || "Autor desconhecido"}</span>
+                {isBlocked && (
+                  <Badge variant="outline" className="h-5 gap-1 text-[10px] border-destructive/40 text-destructive bg-destructive/5">
+                    <Ban className="w-3 h-3" />Bloqueado
+                  </Badge>
+                )}
                 {isInstagram
                   ? <Instagram className="w-4 h-4 text-pink-500 shrink-0" />
                   : <Facebook className="w-4 h-4 text-blue-600 shrink-0" />}
@@ -132,9 +143,15 @@ export function AuthorHistoryDrawer({
             ) : <div />}
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button size="sm" variant="destructive" className="gap-2" disabled={blocking}>
-                  {blocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                  Bloquear
+                <Button
+                  size="sm"
+                  variant={isBlocked ? "outline" : "destructive"}
+                  className="gap-2"
+                  disabled={blocking || isBlocked}
+                  title={isBlocked ? "Este perfil já está bloqueado" : undefined}
+                >
+                  {blocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isBlocked ? <ShieldOff className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                  {isBlocked ? "Já bloqueado" : "Bloquear"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>

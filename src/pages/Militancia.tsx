@@ -24,6 +24,7 @@ import { AuthorHistoryDrawer } from "@/components/comments/AuthorHistoryDrawer";
 import { MilitanciaCharts } from "@/components/militancia/MilitanciaCharts";
 import { MilitanciaReport } from "@/components/militancia/MilitanciaReport";
 import { getDirectSocialProfileUrl, getBestProfileLink } from "@/lib/social-url";
+import { useBlockedUserIds } from "@/hooks/useBlockedUserIds";
 import type { MilitantRow } from "@/hooks/useMilitants";
 
 function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: number | string; accent?: string }) {
@@ -41,11 +42,12 @@ function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label
 }
 
 function MilitantList({
-  militants, loading, onOpen,
+  militants, loading, onOpen, blockedIds,
 }: {
   militants: MilitantRow[];
   loading: boolean;
   onOpen: (m: MilitantRow) => void;
+  blockedIds?: Set<string>;
 }) {
   if (loading) {
     return (
@@ -88,6 +90,11 @@ function MilitantList({
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium truncate">{m.author_name || "Autor desconhecido"}</span>
                 <MilitantBadge militant={m} />
+                {blockedIds?.has(`${m.platform}:${m.platform_user_id}`) && (
+                  <Badge variant="outline" className="h-5 gap-1 text-[10px] border-destructive/40 text-destructive bg-destructive/5">
+                    <Ban className="w-3 h-3" />Bloqueado
+                  </Badge>
+                )}
               </div>
               <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
                 <span className="inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" />{m.total_comments}</span>
@@ -222,6 +229,7 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
       if (!res?.success) throw new Error(res?.error || "Falha ao desbloquear");
       toast.success(res.message || "Usuário desbloqueado!");
       qc.invalidateQueries({ queryKey: ["blocked-users", clientId] });
+      qc.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
     } catch (e: any) {
       toast.error(e?.message || "Erro ao desbloquear");
     } finally {
@@ -334,11 +342,12 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
 
 
 function NegativeRanking({
-  militants, clientId, onOpen,
+  militants, clientId, onOpen, blockedIds,
 }: {
   militants: MilitantRow[];
   clientId: string | null | undefined;
   onOpen: (m: MilitantRow) => void;
+  blockedIds?: Set<string>;
 }) {
   const queryClient = useQueryClient();
   const [blocking, setBlocking] = useState<string | null>(null);
@@ -477,6 +486,8 @@ function NegativeRanking({
           "Abrimos o Instagram para você bloquear manualmente. Registrado aqui para histórico.",
           { duration: 6000 },
         );
+        queryClient.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
+        queryClient.invalidateQueries({ queryKey: ["blocked-users", clientId] });
       } finally {
         setBlocking(null);
       }
@@ -506,6 +517,8 @@ function NegativeRanking({
       if (error) throw error;
       if (data?.success) {
         toast.success(data.message || "Autor bloqueado!");
+        queryClient.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
+        queryClient.invalidateQueries({ queryKey: ["blocked-users", clientId] });
       } else {
         toast.error(data?.error || "Falha ao bloquear");
       }
@@ -534,6 +547,7 @@ function NegativeRanking({
     <div className="bg-card rounded-xl border shadow-sm divide-y overflow-hidden">
       {ranking.map((m, idx) => {
         const key = `${m.platform}:${m.platform_user_id}`;
+        const isBlocked = blockedIds?.has(key) ?? false;
         const isOpen = expanded.has(m.id);
         const authorComments = commentsByAuthor.get(key) || [];
         const latest = authorComments[0];
@@ -586,6 +600,11 @@ function NegativeRanking({
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium truncate">{m.author_name || "Autor desconhecido"}</span>
                     <MilitantBadge militant={m} />
+                    {isBlocked && (
+                      <Badge variant="outline" className="h-5 gap-1 text-[10px] border-destructive/40 text-destructive bg-destructive/5">
+                        <Ban className="w-3 h-3" />Bloqueado
+                      </Badge>
+                    )}
                     {m.platform === 'facebook'
                       ? <Facebook className="w-3.5 h-3.5 text-blue-600" />
                       : <Instagram className="w-3.5 h-3.5 text-pink-500" />}
@@ -629,16 +648,18 @@ function NegativeRanking({
               )}
               <Button
                 size="sm"
-                variant={isInstagram ? "secondary" : "destructive"}
-                disabled={blocking === m.id}
+                variant={isBlocked ? "outline" : isInstagram ? "secondary" : "destructive"}
+                disabled={blocking === m.id || isBlocked}
                 onClick={() => handleBlock(m, best?.url)}
                 className="shrink-0 h-8 gap-1.5"
-                title={isInstagram
+                title={isBlocked
+                  ? "Este perfil já está bloqueado"
+                  : isInstagram
                   ? "Instagram não permite bloqueio via API. Abre o Instagram para você bloquear manualmente e registra aqui para histórico."
                   : "Bloquear autor da página"}
               >
-                {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{isInstagram ? "Bloquear no app" : "Bloquear"}</span>
+                {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isBlocked ? <ShieldOff className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{isBlocked ? "Já bloqueado" : isInstagram ? "Bloquear no app" : "Bloquear"}</span>
               </Button>
             </div>
 
@@ -790,6 +811,8 @@ const Militancia = () => {
     staleTime: 1000 * 60 * 2,
   });
 
+  const { data: blockedIds } = useBlockedUserIds(clientId);
+
   const filterByPlatform = (platform: string) => {
     return militants.filter((m) => {
       if (m.platform !== platform) return false;
@@ -888,7 +911,7 @@ const Militancia = () => {
             <StatCard icon={<TrendingDown className="w-4 h-4" />} label="Críticos/Haters" value={fbStats.haters} accent="bg-destructive/10 text-destructive" />
             <StatCard icon={<Users className="w-4 h-4" />} label="Novos rostos" value={fbStats.novos} accent="bg-cyan-500/10 text-cyan-700" />
           </div>
-          <MilitantList militants={fbList} loading={isLoading} onOpen={setDrawer} />
+          <MilitantList militants={fbList} loading={isLoading} onOpen={setDrawer} blockedIds={blockedIds} />
         </TabsContent>
 
         <TabsContent value="instagram" className="space-y-4 mt-4">
@@ -898,7 +921,7 @@ const Militancia = () => {
             <StatCard icon={<TrendingDown className="w-4 h-4" />} label="Críticos/Haters" value={igStats.haters} accent="bg-destructive/10 text-destructive" />
             <StatCard icon={<Users className="w-4 h-4" />} label="Novos rostos" value={igStats.novos} accent="bg-cyan-500/10 text-cyan-700" />
           </div>
-          <MilitantList militants={igList} loading={isLoading} onOpen={setDrawer} />
+          <MilitantList militants={igList} loading={isLoading} onOpen={setDrawer} blockedIds={blockedIds} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4 mt-4">
@@ -928,7 +951,7 @@ const Militancia = () => {
               </div>
             </div>
           </div>
-          <NegativeRanking militants={militants} clientId={clientId} onOpen={setDrawer} />
+          <NegativeRanking militants={militants} clientId={clientId} onOpen={setDrawer} blockedIds={blockedIds} />
         </TabsContent>
 
         <TabsContent value="blocked" className="space-y-4 mt-4">
