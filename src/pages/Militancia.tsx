@@ -341,11 +341,12 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
 
 
 function NegativeRanking({
-  militants, clientId, onOpen,
+  militants, clientId, onOpen, blockedIds,
 }: {
   militants: MilitantRow[];
   clientId: string | null | undefined;
   onOpen: (m: MilitantRow) => void;
+  blockedIds?: Set<string>;
 }) {
   const queryClient = useQueryClient();
   const [blocking, setBlocking] = useState<string | null>(null);
