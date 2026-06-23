@@ -533,10 +533,28 @@ function NegativeRanking({
   return (
     <div className="bg-card rounded-xl border shadow-sm divide-y overflow-hidden">
       {ranking.map((m, idx) => {
-        const url = getSocialProfileUrl(m.platform, m.platform_user_id, null, m.author_name);
         const key = `${m.platform}:${m.platform_user_id}`;
         const isOpen = expanded.has(m.id);
         const authorComments = commentsByAuthor.get(key) || [];
+        const latest = authorComments[0];
+        const best = getBestProfileLink(m.platform, {
+          platformUserId: m.platform_user_id,
+          platformUsername: (m as any).platform_username ?? null,
+          authorName: m.author_name,
+          latestPermalinkUrl: latest?.post_permalink_url ?? null,
+          latestCommentId: latest?.comment_id ?? null,
+        });
+        const isInstagram = m.platform === 'instagram';
+        const openLabel = best?.kind === "profile"
+          ? "Abrir perfil"
+          : best?.kind === "comment"
+          ? "Abrir comentário"
+          : "Buscar no Facebook";
+        const openTitle = best?.kind === "comment"
+          ? "Abre o comentário desta pessoa. Clique no nome dela lá para chegar no perfil real e bloquear."
+          : best?.kind === "search"
+          ? "Não foi possível link direto: o Facebook devolve um ID interno. Abrimos a busca pelo nome."
+          : "Abrir perfil em nova aba";
         return (
           <div key={m.id}>
             <div className="px-3 py-3 flex items-center gap-3 hover:bg-muted/50">
@@ -574,25 +592,35 @@ function NegativeRanking({
                   </div>
                 </div>
               </button>
-              {url && (
-                <a href={url} target="_blank" rel="noopener noreferrer"
-                  className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                  title="Abrir perfil">
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+              {best && (
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 h-8 gap-1.5"
+                  title={openTitle}
+                >
+                  <a href={best.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{openLabel}</span>
+                  </a>
+                </Button>
               )}
               <Button
                 size="sm"
-                variant="destructive"
+                variant={isInstagram ? "secondary" : "destructive"}
                 disabled={blocking === m.id}
-                onClick={() => handleBlock(m)}
+                onClick={() => handleBlock(m, best?.url)}
                 className="shrink-0 h-8 gap-1.5"
-                title={m.platform === 'instagram' ? 'Instagram não permite bloqueio via API' : 'Bloquear autor da página'}
+                title={isInstagram
+                  ? "Instagram não permite bloqueio via API. Abre o Instagram para você bloquear manualmente e registra aqui para histórico."
+                  : "Bloquear autor da página"}
               >
                 {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">Bloquear</span>
+                <span className="hidden sm:inline">{isInstagram ? "Bloquear no app" : "Bloquear"}</span>
               </Button>
             </div>
+
 
             {isOpen && (
               <div className="bg-muted/30 px-3 py-3 space-y-2 border-t">
