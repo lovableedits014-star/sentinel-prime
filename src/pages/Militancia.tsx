@@ -911,7 +911,7 @@ const Militancia = () => {
             <StatCard icon={<TrendingDown className="w-4 h-4" />} label="Críticos/Haters" value={fbStats.haters} accent="bg-destructive/10 text-destructive" />
             <StatCard icon={<Users className="w-4 h-4" />} label="Novos rostos" value={fbStats.novos} accent="bg-cyan-500/10 text-cyan-700" />
           </div>
-          <MilitantList militants={fbList} loading={isLoading} onOpen={setDrawer} />
+          <MilitantList militants={fbList} loading={isLoading} onOpen={setDrawer} blockedIds={blockedIds} />
         </TabsContent>
 
         <TabsContent value="instagram" className="space-y-4 mt-4">
