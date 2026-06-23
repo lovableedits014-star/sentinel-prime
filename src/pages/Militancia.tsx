@@ -229,6 +229,7 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
       if (!res?.success) throw new Error(res?.error || "Falha ao desbloquear");
       toast.success(res.message || "Usuário desbloqueado!");
       qc.invalidateQueries({ queryKey: ["blocked-users", clientId] });
+      qc.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
     } catch (e: any) {
       toast.error(e?.message || "Erro ao desbloquear");
     } finally {
