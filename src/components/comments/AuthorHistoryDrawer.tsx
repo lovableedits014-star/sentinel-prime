@@ -143,9 +143,15 @@ export function AuthorHistoryDrawer({
             ) : <div />}
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button size="sm" variant="destructive" className="gap-2" disabled={blocking}>
-                  {blocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-                  Bloquear
+                <Button
+                  size="sm"
+                  variant={isBlocked ? "outline" : "destructive"}
+                  className="gap-2"
+                  disabled={blocking || isBlocked}
+                  title={isBlocked ? "Este perfil já está bloqueado" : undefined}
+                >
+                  {blocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isBlocked ? <ShieldOff className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                  {isBlocked ? "Já bloqueado" : "Bloquear"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
