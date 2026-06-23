@@ -1,10 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Minus, Calendar, Facebook, Instagram, Loader2, ExternalLink, Ban } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calendar, Facebook, Instagram, Loader2, ExternalLink, Ban, ShieldOff, CheckCircle2 } from "lucide-react";
 import { MilitantBadge } from "./MilitantBadge";
 import { Button } from "@/components/ui/button";
 import { getSocialProfileUrl } from "@/lib/social-url";
@@ -13,6 +13,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useBlockedUserIds } from "@/hooks/useBlockedUserIds";
 import type { MilitantRow } from "@/hooks/useMilitants";
 
 interface Props {
