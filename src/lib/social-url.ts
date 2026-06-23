@@ -8,22 +8,14 @@ export function getSocialProfileUrl(
   platformUsername?: string | null,
   authorName?: string | null
 ): string | null {
+  const directUrl = getDirectSocialProfileUrl(platform, platformUserId, platformUsername);
+  if (directUrl) return directUrl;
+
   if (platform === "instagram") {
-    // Instagram: prefer username, fall back to user ID
-    const handle = platformUsername || platformUserId;
-    if (!handle) return null;
-    const clean = handle.replace(/^@/, "");
-    return `https://www.instagram.com/${clean}`;
+    return null;
   }
 
   if (platform === "facebook") {
-    // Se temos um username/slug não-numérico, é um vanity real → link direto
-    if (platformUsername && !/^\d+$/.test(platformUsername)) {
-      return `https://www.facebook.com/${platformUsername.replace(/^@/, "")}`;
-    }
-    if (platformUserId && !/^\d+$/.test(platformUserId)) {
-      return `https://www.facebook.com/${platformUserId.replace(/^@/, "")}`;
-    }
     // IDs numéricos vindos da Graph API são PSIDs (page-scoped) e NÃO
     // resolvem em facebook.com/profile.php?id=... — sempre dá "conteúdo
     // indisponível". Como fallback, abrir uma busca pelo nome do autor.
@@ -35,6 +27,63 @@ export function getSocialProfileUrl(
   }
 
   return null;
+}
+
+/**
+ * Retorna APENAS link direto de perfil quando temos um identificador público
+ * real (username/vanity). Não cai em busca por nome para não confundir pessoas
+ * com nomes iguais no Facebook.
+ */
+export function getDirectSocialProfileUrl(
+  platform: string,
+  platformUserId?: string | null,
+  platformUsername?: string | null,
+): string | null {
+  const cleanUsername = platformUsername?.trim().replace(/^@/, "") || null;
+  const cleanUserId = platformUserId?.trim().replace(/^@/, "") || null;
+
+  if (platform === "instagram") {
+    const handle = cleanUsername || cleanUserId;
+    if (!handle || /^\d+$/.test(handle)) return null;
+    return `https://www.instagram.com/${handle}`;
+  }
+
+  if (platform === "facebook") {
+    // No Facebook, ID numérico recebido em comentário é normalmente PSID
+    // (page-scoped id), não o id público do perfil. Só vanity/username é direto.
+    const handle = cleanUsername && !/^\d+$/.test(cleanUsername)
+      ? cleanUsername
+      : cleanUserId && !/^\d+$/.test(cleanUserId)
+      ? cleanUserId
+      : null;
+    return handle ? `https://www.facebook.com/${handle}` : null;
+  }
+
+  return null;
+}
+
+function buildFacebookCommentUrl(commentId: string, postPermalinkUrl?: string | null): string {
+  const cleanCommentId = commentId.trim();
+  const commentParam = cleanCommentId.includes("_")
+    ? cleanCommentId.split("_").pop() || cleanCommentId
+    : cleanCommentId;
+
+  if (postPermalinkUrl) {
+    try {
+      const url = new URL(postPermalinkUrl);
+      url.searchParams.set("comment_id", commentParam);
+      return url.toString();
+    } catch {
+      // segue para fallback abaixo
+    }
+  }
+
+  if (cleanCommentId.includes("_")) {
+    const postId = cleanCommentId.split("_")[0];
+    return `https://www.facebook.com/${postId}?comment_id=${commentParam}`;
+  }
+
+  return `https://www.facebook.com/${cleanCommentId}`;
 }
 
 /**
@@ -121,54 +170,30 @@ export function getBestProfileLink(
   }
 ): { url: string; kind: "profile" | "comment" | "search" } | null {
   // 1) Username/vanity conhecido → perfil direto
-  if (opts.platformUsername && !/^\d+$/.test(opts.platformUsername)) {
-    const handle = opts.platformUsername.replace(/^@/, "");
-    if (platform === "instagram") {
-      return { url: `https://www.instagram.com/${handle}`, kind: "profile" };
-    }
-    if (platform === "facebook") {
-      return { url: `https://www.facebook.com/${handle}`, kind: "profile" };
-    }
+  const directProfileUrl = getDirectSocialProfileUrl(
+    platform,
+    opts.platformUserId,
+    opts.platformUsername,
+  );
+  if (directProfileUrl) {
+    return { url: directProfileUrl, kind: "profile" };
   }
 
-  // No Facebook, platform_user_id às vezes é vanity não-numérico
-  if (
-    platform === "facebook" &&
-    opts.platformUserId &&
-    !/^\d+$/.test(opts.platformUserId)
-  ) {
-    return {
-      url: `https://www.facebook.com/${opts.platformUserId.replace(/^@/, "")}`,
-      kind: "profile",
-    };
-  }
-
-  // 2) Permalink do comentário mais recente
-  if (opts.latestPermalinkUrl) {
-    return { url: opts.latestPermalinkUrl, kind: "comment" };
-  }
-
-  // 3) Facebook: tentar usar o comment_id como URL
+  // 2) Facebook: abrir o comentário exato é o caminho confiável quando a Meta
+  // só entrega PSID. Lá o nome/foto do autor apontam para o perfil correto.
   if (platform === "facebook" && opts.latestCommentId) {
     return {
-      url: `https://www.facebook.com/${opts.latestCommentId}`,
+      url: buildFacebookCommentUrl(opts.latestCommentId, opts.latestPermalinkUrl),
       kind: "comment",
     };
   }
 
-  // 4) Instagram: vanity-like a partir do user_id (algumas vezes é o username)
-  if (
-    platform === "instagram" &&
-    opts.platformUserId &&
-    !/^\d+$/.test(opts.platformUserId)
-  ) {
-    return {
-      url: `https://www.instagram.com/${opts.platformUserId.replace(/^@/, "")}`,
-      kind: "profile",
-    };
+  // 3) Permalink do post/comentário mais recente
+  if (opts.latestPermalinkUrl) {
+    return { url: opts.latestPermalinkUrl, kind: "comment" };
   }
 
-  // 5) Último recurso: busca por nome
+  // 4) Último recurso: busca por nome
   if (opts.authorName && opts.authorName.trim()) {
     if (platform === "facebook") {
       return { url: buildSearchUrl("facebook", opts.authorName), kind: "search" };

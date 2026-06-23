@@ -23,7 +23,7 @@ import { MilitantBadge } from "@/components/comments/MilitantBadge";
 import { AuthorHistoryDrawer } from "@/components/comments/AuthorHistoryDrawer";
 import { MilitanciaCharts } from "@/components/militancia/MilitanciaCharts";
 import { MilitanciaReport } from "@/components/militancia/MilitanciaReport";
-import { getSocialProfileUrl, getBestProfileLink } from "@/lib/social-url";
+import { getDirectSocialProfileUrl, getBestProfileLink } from "@/lib/social-url";
 import type { MilitantRow } from "@/hooks/useMilitants";
 
 function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: number | string; accent?: string }) {
@@ -98,7 +98,7 @@ function MilitantList({
             </div>
           </button>
           {(() => {
-            const url = getSocialProfileUrl(m.platform, m.platform_user_id, null, m.author_name);
+            const url = getDirectSocialProfileUrl(m.platform, m.platform_user_id, m.platform_username ?? null);
             return url ? (
               <a
                 href={url}
@@ -546,22 +546,21 @@ function NegativeRanking({
         });
         const isInstagram = m.platform === 'instagram';
         const openLabel = best?.kind === "profile"
-          ? "Abrir perfil"
+          ? "Perfil direto"
           : best?.kind === "comment"
-          ? "Abrir comentário"
+          ? "Comentário exato"
           : "Buscar no Facebook";
         const openTitle = best?.kind === "comment"
-          ? "Abre o comentário desta pessoa. Clique no nome dela lá para chegar no perfil real e bloquear."
+          ? "A Meta não entrega o link direto deste perfil. Abrimos o comentário exato; clique no nome/foto do autor lá para cair no perfil certo."
           : best?.kind === "search"
-          ? "Não foi possível link direto: o Facebook devolve um ID interno. Abrimos a busca pelo nome."
-          : "Abrir perfil em nova aba";
-        const profileUrl = getSocialProfileUrl(
+          ? "Sem username público salvo: busca por nome pode mostrar pessoas iguais. Prefira o comentário exato quando disponível."
+          : "Abrir perfil direto em nova aba";
+        const profileUrl = getDirectSocialProfileUrl(
           m.platform,
           m.platform_user_id,
           (m as any).platform_username ?? null,
-          m.author_name,
         );
-        // Só mostra o botão de perfil separado se for diferente do botão principal
+        // Só mostra perfil separado quando é link direto real; nunca busca por nome.
         const showProfileButton = profileUrl && profileUrl !== best?.url;
         return (
           <div key={m.id}>
@@ -624,7 +623,7 @@ function NegativeRanking({
                 >
                   <a href={profileUrl!} target="_blank" rel="noopener noreferrer">
                     <User className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Perfil</span>
+                    <span className="hidden sm:inline">Perfil direto</span>
                   </a>
                 </Button>
               )}
@@ -924,7 +923,7 @@ const Militancia = () => {
               <div className="text-sm">
                 <p className="font-semibold text-destructive mb-1">Quem mais ataca a campanha</p>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Ranking dos perfis com mais comentários negativos. <strong>Abrir comentário</strong> leva direto ao comentário do hater (clique no nome dele lá para abrir o perfil real). <strong>Bloquear</strong> remove a permissão de comentar no <strong>Facebook</strong>; no <strong>Instagram</strong> a Meta não permite bloqueio via API — abrimos o perfil para você bloquear pelo app e registramos aqui para histórico.
+                  Ranking dos perfis com mais comentários negativos. <strong>Perfil direto</strong> aparece só quando a Meta entrega username público; quando não entrega, <strong>Comentário exato</strong> abre o comentário da pessoa para você clicar no nome/foto correto. <strong>Bloquear</strong> remove a permissão de comentar no <strong>Facebook</strong>; no <strong>Instagram</strong> a Meta não permite bloqueio via API — abrimos o perfil para você bloquear pelo app e registramos aqui para histórico.
                 </p>
               </div>
             </div>
