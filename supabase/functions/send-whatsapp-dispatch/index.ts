@@ -1185,8 +1185,17 @@ Deno.serve(async (req) => {
                   (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
                   continue;
                 }
-                // Telefone individual: sai do while para cair no fluxo de "sem instância" abaixo
-                break;
+                // Telefone individual: pausa o disparo — quando o chip estabilizar
+                // (próximo health_check ou intervenção manual), o cron retoma.
+                await adminClient.from("whatsapp_dispatches").update({
+                  status: "pausado_sem_instancia",
+                  pause_reason: `Sessão WhatsApp não pronta (${preflight.detail || "sem status"}). Retomado automaticamente quando reconectar.`,
+                  enviados: sent,
+                  falhas: failed,
+                  updated_at: new Date().toISOString(),
+                }).eq("id", dispatch.id);
+                return;
+
               }
               // status === "connected": segue o envio normalmente.
             }
