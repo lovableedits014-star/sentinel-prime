@@ -555,6 +555,14 @@ function NegativeRanking({
           : best?.kind === "search"
           ? "Não foi possível link direto: o Facebook devolve um ID interno. Abrimos a busca pelo nome."
           : "Abrir perfil em nova aba";
+        const profileUrl = getSocialProfileUrl(
+          m.platform,
+          m.platform_user_id,
+          (m as any).platform_username ?? null,
+          m.author_name,
+        );
+        // Só mostra o botão de perfil separado se for diferente do botão principal
+        const showProfileButton = profileUrl && profileUrl !== best?.url;
         return (
           <div key={m.id}>
             <div className="px-3 py-3 flex items-center gap-3 hover:bg-muted/50">
