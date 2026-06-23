@@ -1,43 +1,61 @@
-Plano para corrigir a instância caindo e a divergência entre “status OK” e “disparo desconectado”:
+## Diagnóstico
 
-1. Unificar a fonte de verdade do status
-- Criar uma checagem única de “pronto para disparo” no backend, em vez de cada tela interpretar de um jeito.
-- A tela de Status WhatsApp, Central WhatsApp e Disparos passarão a usar a mesma resposta: conectado, instável, desconectado, sem credencial, ou aguardando QR.
-- O banner do Disparos deixará de dizer “Ponte configurada — pronto” quando existe apenas configuração salva, mas nenhuma instância realmente utilizável.
+**1. Botão da setinha (perfil)**
+No ranking de Militância Digital, a setinha chama `getSocialProfileUrl(platform, platform_user_id, null, author_name)` em `src/pages/Militancia.tsx:512`.
 
-2. Corrigir a seleção da instância no envio
-- Ajustar a função do banco que escolhe a instância saudável para não falhar por status antigo/inconsistente.
-- Hoje o Status pode mostrar OK depois de uma checagem, mas o envio pode rejeitar porque a função exige `last_health_check_at` recente e outros campos específicos.
-- O envio fará uma pré-checagem ao vivo antes de parar o disparo; só marcará desconectado quando a ponte confirmar estado terminal.
+O `platform_user_id` que a Graph API devolve nos comentários do Facebook é um **PSID** (Page-Scoped ID) — um número que **não** resolve em `facebook.com/profile.php?id=...`. Por isso, em `src/lib/social-url.ts:27-34`, o código cai no fallback `facebook.com/search/people/?q=<nome>` — que é exatamente a tela de "vários com nome igual" que você está vendo.
 
-3. Melhorar estabilidade sem forçar reconexão perigosa
-- Manter a regra de não reconectar automaticamente em loop, porque isso aumenta risco de bloqueio/banimento.
-- Implementar uma rotina “keepalive leve”: checar status periodicamente, atualizar o banco e limpar estados antigos quando a ponte confirmar conexão.
-- Tratar `connecting`, resposta vazia ou timeout curto como instabilidade temporária, não como queda definitiva.
+Não há como transformar PSID em link de perfil real só com o ID. O caminho confiável é abrir **o próprio comentário no Facebook** (via `permalink_url` que já temos salvo, ou via `facebook.com/<comment_id>`). Lá você clica no nome e cai no perfil verdadeiro — e pode bloquear pelo próprio Facebook se quiser.
 
-4. Sincronizar as telas após ações manuais
-- Depois de “checar status”, “reconectar” ou “gerar QR”, invalidar/refazer as consultas usadas também pelo Disparos.
-- Na Central WhatsApp, ao trocar da aba Status para Disparos, o Disparos buscará o status real novamente.
-- Mostrar no Disparos o motivo correto: “checando”, “instância instável”, “sem instância pronta”, “reconectar QR”, ou “pronto para envio”.
+**2. Botão "Bloquear"**
+Olhando `supabase/functions/manage-comment/index.ts:186-247`:
+- **Facebook**: funciona de verdade. Chama `POST /{page-id}/blocked` com o PSID, oculta o comentário e grava em `blocked_users`. Requer permissão `pages_manage_engagement` no token da página.
+- **Instagram**: **não bloqueia de verdade** — a Graph API do Instagram não expõe endpoint de bloqueio. Hoje só registra localmente em `blocked_users` e mostra a mensagem "bloqueie manualmente pelo app". A UI já desabilita parcialmente (toast em `Militancia.tsx:458`), mas o botão fica visível com o mesmo estilo, dando impressão errada.
 
-5. Corrigir inconsistências já existentes no banco
-- Aplicar uma migration para revisar as funções `pick_healthy_whatsapp_instance` e `pick_healthy_instance_for_group`.
-- Garantir que `connected_since`, `last_disconnected_at`, `last_health_check_at` e `consecutive_failures` sejam atualizados de forma coerente quando a instância volta ou cai.
-- Evitar o caso atual onde uma instância pode ter sinais misturados, como `status = disconnected` mas `connected_since` ainda preenchido.
+## Plano de melhoria
 
-6. Melhorar diagnóstico para você ver o que aconteceu
-- Registrar no log de envio se a instância foi rejeitada por status da ponte, credencial ausente, falhas consecutivas, health check antigo ou erro real de envio.
-- Exibir no Status WhatsApp a diferença entre “conectado no banco” e “confirmado agora pela ponte”.
+### A. Setinha agora abre o autor de verdade (Facebook e Instagram)
 
-Arquivos/áreas a alterar:
-- `supabase/functions/manage-whatsapp-instance/index.ts`: padronizar health check, readiness e reconexão segura.
-- `supabase/functions/send-whatsapp-dispatch/index.ts`: usar readiness/preflight consistente antes de pausar disparos.
-- Migration Supabase: ajustar funções de escolha de instância saudável e normalização de status.
-- `src/pages/Disparos.tsx`: substituir `check_bridge` por status real de envio.
-- `src/pages/StatusWhatsApp.tsx`: reaproveitar a mesma resposta e atualizar cache usado pelo Disparos.
-- `src/hooks/useWhatsAppGroups.ts`: alinhar critérios de instância conectada se necessário.
+Trocar o destino do link da setinha por uma cadeia de fallback, na ordem:
 
-Resultado esperado:
-- Se o Status disser que está pronto, o Disparos também reconhecerá como pronto.
-- Se o Disparos acusar problema, ele mostrará o motivo exato e não apenas “desconectado”.
-- A instância deixará de ser marcada como caída por oscilações rápidas da ponte, sem aumentar risco de banimento por reconexão automática excessiva.
+1. **`platform_username`** se já tivermos um handle/vanity (instagram quase sempre, facebook às vezes) → abre `instagram.com/<user>` ou `facebook.com/<user>` direto.
+2. **`comment.permalink_url`** do comentário negativo mais recente desse autor (já está salvo em `comments.post_permalink_url` ou pode ser derivado de `comment_id`). Abre o comentário exato no Facebook/Instagram — daí basta clicar no nome para chegar no perfil real.
+3. Último recurso: a busca por nome atual (mantida só como fallback final).
+
+Implementação:
+- Em `src/pages/Militancia.tsx` o ranking já tem acesso a `commentsByAuthor` — usar o comentário mais recente para pegar `permalink_url`/`comment_id`.
+- Para autores sem comentário em cache, fazer uma busca rápida no clique (lazy) buscando o último `permalink_url` em `comments`.
+- Trocar o ícone/label para "Abrir comentário" quando o link for um permalink, ou "Abrir perfil" quando for vanity — com tooltip explicando: *"O Facebook não permite link direto pelo ID interno. Abrimos o comentário; clique no nome para ver o perfil e bloquear."*
+- Substituir `<a>` por `Button` maior com `target="_blank"` para ficar óbvio (hoje é só um ícone discreto ao lado do "Bloquear").
+
+### B. Enriquecimento opcional: resolver vanity uma vez e guardar
+
+Quando abrirmos o comentário pela primeira vez, disparar em background `resolve-social-link` passando `permalink_url`. Se voltar um handle (`userVanity` do Facebook), gravar em `social_militants.platform_username` (coluna nova, nullable). Próximas vezes, a setinha vira link direto de perfil sem precisar passar pelo comentário.
+
+Migration necessária:
+- `alter table social_militants add column platform_username text;` (grants já existem).
+
+### C. Botão "Bloquear" — deixar o comportamento honesto
+
+- **Facebook**: manter como está (funciona).
+- **Instagram**: trocar o botão "Bloquear" por **"Marcar para bloquear no app"** com ícone diferente (ex.: `ExternalLink + Ban`), abrir o perfil/comentário do Instagram em nova aba e só então registrar localmente em `blocked_users`. Toast explica em uma linha que o Instagram não permite via API.
+- Adicionar legenda fixa abaixo do ranking: *"Facebook: bloqueio automático via API. Instagram: bloqueio precisa ser feito manualmente pelo app — registramos aqui para histórico."* (já existe parecida no topo, mas reforçar perto dos botões.)
+
+### D. Validação
+
+1. Clicar na setinha de um hater do Facebook → abre o comentário dele na página → clique no nome leva ao perfil real.
+2. Clicar na setinha de um hater do Instagram → abre o post/comentário no Instagram.
+3. Botão "Bloquear" no Facebook → confirma sucesso, autor entra em `blocked_users` e não comenta mais.
+4. Botão no Instagram → abre o app/web do Instagram + registra local + toast claro.
+
+## Arquivos a editar
+
+- `src/pages/Militancia.tsx` — lógica do botão setinha + texto do botão Instagram.
+- `src/lib/social-url.ts` — helper novo `getBestProfileLink(militant, latestComment)` com a cadeia de fallback.
+- `supabase/migrations/<novo>.sql` — `alter table social_militants add column platform_username text;`
+- (opcional) chamada a `resolve-social-link` em background no clique, salvando o vanity descoberto em `social_militants`.
+
+## Resposta direta às suas perguntas
+
+- **A setinha não abre o perfil?** Correto — Facebook devolve um ID interno (PSID) que não vira URL de perfil. O fallback atual é busca por nome. Vou trocar para abrir o **comentário** do hater (link direto), de onde você clica no nome e bloqueia.
+- **O botão "Bloquear" funciona?** Sim no **Facebook** (via Graph API). No **Instagram não funciona de verdade** — a Meta não expõe API de bloqueio para Instagram; hoje só registramos localmente. Vou deixar o botão do Instagram explícito ("Abrir e marcar para bloquear").
