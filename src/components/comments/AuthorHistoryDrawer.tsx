@@ -77,6 +77,8 @@ export function AuthorHistoryDrawer({
       if (error) throw error;
       if (!res?.success) throw new Error(res?.error || "Falha ao bloquear");
       toast.success(res.message || "Usuário bloqueado!");
+      queryClient.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["blocked-users", clientId] });
       onOpenChange(false);
     } catch (e: any) {
       toast.error(e?.message || "Erro ao bloquear usuário");
