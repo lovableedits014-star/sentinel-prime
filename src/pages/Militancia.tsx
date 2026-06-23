@@ -485,6 +485,8 @@ function NegativeRanking({
           "Abrimos o Instagram para você bloquear manualmente. Registrado aqui para histórico.",
           { duration: 6000 },
         );
+        queryClient.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
+        queryClient.invalidateQueries({ queryKey: ["blocked-users", clientId] });
       } finally {
         setBlocking(null);
       }
