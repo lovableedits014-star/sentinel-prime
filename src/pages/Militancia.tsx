@@ -951,7 +951,7 @@ const Militancia = () => {
               </div>
             </div>
           </div>
-          <NegativeRanking militants={militants} clientId={clientId} onOpen={setDrawer} />
+          <NegativeRanking militants={militants} clientId={clientId} onOpen={setDrawer} blockedIds={blockedIds} />
         </TabsContent>
 
         <TabsContent value="blocked" className="space-y-4 mt-4">
