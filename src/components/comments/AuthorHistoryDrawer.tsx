@@ -97,8 +97,13 @@ export function AuthorHistoryDrawer({
               <AvatarFallback>{authorName?.charAt(0).toUpperCase() || "?"}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <SheetTitle className="text-base flex items-center gap-2">
+              <SheetTitle className="text-base flex items-center gap-2 flex-wrap">
                 <span className="truncate">{authorName || "Autor desconhecido"}</span>
+                {isBlocked && (
+                  <Badge variant="outline" className="h-5 gap-1 text-[10px] border-destructive/40 text-destructive bg-destructive/5">
+                    <Ban className="w-3 h-3" />Bloqueado
+                  </Badge>
+                )}
                 {isInstagram
                   ? <Instagram className="w-4 h-4 text-pink-500 shrink-0" />
                   : <Facebook className="w-4 h-4 text-blue-600 shrink-0" />}
