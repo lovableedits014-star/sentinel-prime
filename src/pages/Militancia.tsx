@@ -42,11 +42,12 @@ function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label
 }
 
 function MilitantList({
-  militants, loading, onOpen,
+  militants, loading, onOpen, blockedIds,
 }: {
   militants: MilitantRow[];
   loading: boolean;
   onOpen: (m: MilitantRow) => void;
+  blockedIds?: Set<string>;
 }) {
   if (loading) {
     return (
