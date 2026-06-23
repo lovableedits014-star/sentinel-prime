@@ -99,3 +99,84 @@ export function buildSearchUrl(platform: "facebook" | "instagram", name: string)
   }
   return `https://www.instagram.com/explore/search/keyword/?q=${q}`;
 }
+
+/**
+ * Resolve o MELHOR link possível para chegar até o autor de um comentário.
+ * Estratégia em cascata:
+ *   1) `platform_username` (vanity já conhecido) → link direto para o perfil.
+ *   2) Permalink do comentário negativo mais recente → abre o comentário no
+ *      Facebook/Instagram. Daí o usuário clica no nome e cai no perfil real
+ *      (Facebook PSIDs não viram URL de perfil, então isso é o mais próximo).
+ *   3) Para Facebook: tenta `facebook.com/{comment_id}` como fallback.
+ *   4) Último recurso: busca por nome (comportamento antigo).
+ */
+export function getBestProfileLink(
+  platform: string,
+  opts: {
+    platformUserId?: string | null;
+    platformUsername?: string | null;
+    authorName?: string | null;
+    latestPermalinkUrl?: string | null;
+    latestCommentId?: string | null;
+  }
+): { url: string; kind: "profile" | "comment" | "search" } | null {
+  // 1) Username/vanity conhecido → perfil direto
+  if (opts.platformUsername && !/^\d+$/.test(opts.platformUsername)) {
+    const handle = opts.platformUsername.replace(/^@/, "");
+    if (platform === "instagram") {
+      return { url: `https://www.instagram.com/${handle}`, kind: "profile" };
+    }
+    if (platform === "facebook") {
+      return { url: `https://www.facebook.com/${handle}`, kind: "profile" };
+    }
+  }
+
+  // No Facebook, platform_user_id às vezes é vanity não-numérico
+  if (
+    platform === "facebook" &&
+    opts.platformUserId &&
+    !/^\d+$/.test(opts.platformUserId)
+  ) {
+    return {
+      url: `https://www.facebook.com/${opts.platformUserId.replace(/^@/, "")}`,
+      kind: "profile",
+    };
+  }
+
+  // 2) Permalink do comentário mais recente
+  if (opts.latestPermalinkUrl) {
+    return { url: opts.latestPermalinkUrl, kind: "comment" };
+  }
+
+  // 3) Facebook: tentar usar o comment_id como URL
+  if (platform === "facebook" && opts.latestCommentId) {
+    return {
+      url: `https://www.facebook.com/${opts.latestCommentId}`,
+      kind: "comment",
+    };
+  }
+
+  // 4) Instagram: vanity-like a partir do user_id (algumas vezes é o username)
+  if (
+    platform === "instagram" &&
+    opts.platformUserId &&
+    !/^\d+$/.test(opts.platformUserId)
+  ) {
+    return {
+      url: `https://www.instagram.com/${opts.platformUserId.replace(/^@/, "")}`,
+      kind: "profile",
+    };
+  }
+
+  // 5) Último recurso: busca por nome
+  if (opts.authorName && opts.authorName.trim()) {
+    if (platform === "facebook") {
+      return { url: buildSearchUrl("facebook", opts.authorName), kind: "search" };
+    }
+    if (platform === "instagram") {
+      return { url: buildSearchUrl("instagram", opts.authorName), kind: "search" };
+    }
+  }
+
+  return null;
+}

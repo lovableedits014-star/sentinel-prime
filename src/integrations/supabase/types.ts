@@ -6007,6 +6007,7 @@ export type Database = {
           notes: string | null
           platform: string
           platform_user_id: string
+          platform_username: string | null
           promoted_to_supporter_id: string | null
           total_30d_negative: number
           total_30d_positive: number
@@ -6028,6 +6029,7 @@ export type Database = {
           notes?: string | null
           platform: string
           platform_user_id: string
+          platform_username?: string | null
           promoted_to_supporter_id?: string | null
           total_30d_negative?: number
           total_30d_positive?: number
@@ -6049,6 +6051,7 @@ export type Database = {
           notes?: string | null
           platform?: string
           platform_user_id?: string
+          platform_username?: string | null
           promoted_to_supporter_id?: string | null
           total_30d_negative?: number
           total_30d_positive?: number
