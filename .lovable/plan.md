@@ -1,49 +1,94 @@
-## Contexto atual
+## Objetivo
 
-Hoje o cadastro de eleição (`src/pages/Eleicao.tsx`) trata **Interior** diferente de **Campo Grande**:
+Corrigir downloads no iPhone, especialmente quando o usuário abre pelo WhatsApp/WA Business, para que imagens, materiais de campanha e ZIPs tenham um caminho funcional de salvar/compartilhar.
 
-- Em Campo Grande os tipos são **Coordenador → Líder → Cabo eleitoral**, com a opção de **Líder avulso** (sem coordenador vinculado).
-- Em Interior o seletor de "Tipo" **esconde a opção Líder** (linha 1051) e, ao trocar o escopo para Interior, qualquer tipo "lider" é forçado para "cabo" (linha 1058). Resultado: no interior só se cadastra Coordenador e Cabo direto sob o coordenador.
+## Problema identificado
 
-A infraestrutura para líderes (vinculados e avulsos) já existe e é genérica:
-- `possibleParents` (linha 629) já filtra por `cidade` quando o escopo é interior.
-- `stats.avulsos`, filtro "⚡ Líderes avulsos" e o bloco visual "Líderes avulsos (sem coordenador)" no `RegionBlock` (linha 1534) já funcionam independentemente do escopo.
-- `CoordBlock` já renderiza `lideres` (filhos do coordenador) e mantém `cabosDir` (cabos direto no coordenador) — então dados antigos do interior continuam aparecendo.
+O app usa em vários lugares este padrão:
 
-Ou seja, é só **liberar o tipo Líder no Interior**; o resto do fluxo (relatórios, contratos, envio de credenciais, KPIs) já se encaixa.
+```ts
+const a = document.createElement("a")
+a.href = blobUrlOuDataUrl
+a.download = filename
+a.click()
+```
 
-## Mudanças propostas
+Esse padrão funciona em desktop e Android, mas é inconsistente no iPhone. No Safari iOS e nos navegadores internos do WhatsApp/Instagram/Facebook, o atributo `download` costuma ser ignorado, principalmente para `blob:` e `data:` URLs. Resultado: o usuário toca em "Baixar" e nada acontece, ou o iPhone apenas mostra uma tela de confirmação sem salvar corretamente.
 
-Tudo em `src/pages/Eleicao.tsx`, sem migração de banco (a tabela já aceita `tipo='lider'` em qualquer escopo):
+## Solução
 
-1. **Liberar "Líder" no seletor de Tipo para Interior**
-   - Remover a condição `form.escopo === "campo_grande"` na linha 1051; o item Líder fica visível em ambos os escopos.
+Criar um helper único para download compatível com iPhone e trocar os pontos críticos para usá-lo.
 
-2. **Parar de forçar Líder → Cabo ao trocar escopo**
-   - No `onValueChange` do Escopo (linha 1058), remover a coerção `tipo: v === "interior" && f.tipo === "lider" ? "cabo" : f.tipo`. Mantém o tipo escolhido.
+### 1. Criar `src/lib/mobile-download.ts`
 
-3. **Ajustar mensagens do formulário para refletir cidade no Interior**
-   - Os textos genéricos ("Indicado por (Coordenador/Líder)", "Nenhum X cadastrado nesta cidade/região…") já estão corretos — apenas conferir após a mudança.
+Funções principais:
 
-4. **CTA do estado vazio do Interior**
-   - Manter "Cadastrar primeiro coordenador" (fluxo natural continua sendo começar pelo coordenador da cidade); nenhum ajuste extra necessário.
+- `saveBlob(blob, filename, options?)`
+- `saveUrl(url, filename, options?)`
+- `saveDataUrl(dataUrl, filename, options?)`
 
-5. **Validação ao salvar**
-   - Não precisa mudar: a regra "líder precisa de coordenador OU ser marcado como avulso" já vale para os dois escopos. O ramo `escopo === "interior" && !form.cidade.trim()` (linha 332) continua exigindo a cidade.
+Comportamento:
 
-6. **Listagem por cidade**
-   - `interiorCidades` (linha 606) já cobre cidades de qualquer pessoa do escopo interior; um líder avulso de uma cidade nova fará a cidade aparecer automaticamente. O bloco "Líderes avulsos (sem coordenador)" dentro de cada `RegionBlock` passa a aparecer também no Interior sem mexer nele.
+1. Se o aparelho suportar `navigator.share({ files })`, usar Web Share API com um `File`. No iPhone isso abre a tela nativa com opções como salvar em Fotos, salvar em Arquivos, enviar pelo WhatsApp etc.
+2. Se for iPhone/iPad e não suportar compartilhamento de arquivo, abrir o arquivo em nova aba e mostrar toast com instrução curta: "No iPhone, toque em Compartilhar ou pressione a imagem para salvar."
+3. Em desktop/Android, manter o `<a download>` atual.
+4. Em caso de erro, cair para `window.open(url, "_blank")` quando houver URL pública.
 
-## Fora de escopo
+### 2. Foto de apoiador com moldura
 
-- Schema/RLS do Supabase: nada muda.
-- Telemarketing, contratos, exports: já tratam `tipo='lider'` de forma genérica.
-- Portais de coordenador/líder: já existentes, sem ajuste.
+Alterar:
 
-## Resumo técnico
+- `src/components/campaign-frame/FrameEditor.tsx`
+- `src/components/campaign-frame/useBatchRenderer.ts`
 
-Duas edições pontuais no `Dialog` de cadastro de `src/pages/Eleicao.tsx`:
-- Linha 1051: remover gate de escopo do `<SelectItem value="lider">`.
-- Linha 1058: remover a coerção de tipo no `onValueChange` do Escopo.
+Cobrir:
 
-Tudo o resto (avulsos vs vinculados, KPIs, blocos visuais, envio de credenciais, contratos) já funciona para Interior assim que o tipo Líder fica disponível.
+- Download individual da foto gerada.
+- Download de cada item do lote.
+- Download do ZIP do lote.
+
+A foto gerada hoje usa `canvas.toDataURL`; no novo fluxo vamos converter para `Blob/File` antes de chamar o helper, porque iPhone lida melhor com arquivo real do que com `data:` URL.
+
+### 3. Galeria pública de eventos/fotos
+
+Alterar:
+
+- `src/pages/GaleriaEvento.tsx`
+
+Cobrir:
+
+- Download individual de foto do evento.
+- Download de todas em ZIP.
+
+O fluxo continuará buscando a imagem/ZIP, mas a etapa final passará pelo helper compatível com iPhone.
+
+### 4. Materiais públicos de campanha
+
+Alterar:
+
+- `src/components/campaign-materials/PublicMaterialsTab.tsx`
+- `src/components/campaign-materials/MateriaisDestaque.tsx`
+
+Cobrir:
+
+- Botão "Baixar" da página pública de materiais.
+- Botão "Baixar" dos materiais em destaque na página pública.
+
+Tipos cobertos:
+
+- Imagem: usar compartilhamento nativo no iPhone ou abrir com instrução para salvar.
+- PDF: usar compartilhamento nativo/Arquivos no iPhone.
+- Vídeo: usar compartilhamento nativo quando suportado; fallback para abrir o arquivo.
+
+Manter o contador de downloads como está.
+
+### 5. Downloads administrativos/relatórios
+
+Não vou mexer em tudo que é relatório interno agora, para evitar risco em áreas não relatadas. Mas vou trocar os helpers reutilizáveis quando forem diretamente usados por fluxos relacionados ao problema, como ZIP de contratos se aparecer conectado ao mesmo helper.
+
+## Resultado esperado
+
+- No iPhone, ao tocar em "Baixar", o usuário verá a tela nativa de compartilhamento/salvamento quando possível.
+- Quando o navegador interno do WhatsApp bloquear download direto, o app abrirá o arquivo e mostrará orientação clara para salvar.
+- Desktop e Android continuam funcionando como antes.
+- A correção fica centralizada para reutilizar em qualquer novo botão de download no app.
