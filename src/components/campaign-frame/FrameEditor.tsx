@@ -155,12 +155,10 @@ export default function FrameEditor({ clientId, defaultTab = "individual" }: Fra
     });
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!resultUrl) return;
-    const link = document.createElement("a");
-    link.href = resultUrl;
-    link.download = `foto-campanha-${Date.now()}.jpg`;
-    link.click();
+    const { saveDataUrl } = await import("@/lib/mobile-download");
+    await saveDataUrl(resultUrl, `foto-campanha-${Date.now()}.jpg`, { title: "Foto de campanha" });
   };
 
   return (

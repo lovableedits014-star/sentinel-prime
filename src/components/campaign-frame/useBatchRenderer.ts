@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import JSZip from "jszip";
 import { FrameComposition, preloadComposition, renderComposition } from "./types";
+import { saveBlob } from "@/lib/mobile-download";
 
 export interface BatchItem {
   id: string;
@@ -183,21 +184,21 @@ export function useBatchRenderer(composition: FrameComposition | null) {
       zip.file(`${String(i + 1).padStart(2, "0")}-${safeName}.${OUTPUT_EXT}`, blob);
     }
     const out = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(out);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `fotos-campanha-${Date.now()}.zip`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    await saveBlob(out, `fotos-campanha-${Date.now()}.zip`, { title: "Fotos de campanha" });
   }, [items]);
 
-  const downloadOne = useCallback((id: string) => {
+  const downloadOne = useCallback(async (id: string) => {
     const it = items.find((x) => x.id === id);
     if (!it?.resultUrl) return;
-    const a = document.createElement("a");
-    a.href = it.resultUrl;
-    a.download = `${it.fileName.replace(/\.[^.]+$/, "") || "foto"}-campanha.${OUTPUT_EXT}`;
-    a.click();
+    const filename = `${it.fileName.replace(/\.[^.]+$/, "") || "foto"}-campanha.${OUTPUT_EXT}`;
+    try {
+      const resp = await fetch(it.resultUrl);
+      const blob = await resp.blob();
+      await saveBlob(blob, filename, { title: "Foto de campanha" });
+    } catch {
+      // Fallback bem básico
+      window.open(it.resultUrl, "_blank");
+    }
   }, [items]);
 
   return {
