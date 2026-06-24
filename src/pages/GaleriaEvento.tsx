@@ -86,18 +86,9 @@ export default function GaleriaEvento() {
   }, [items, query]);
 
   const downloadOne = async (it: Item) => {
-    try {
-      const resp = await fetch(it.public_url);
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = (it.original_file_name?.replace(/\.[^.]+$/, "") || "foto") + "-campanha.png";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      window.open(it.public_url, "_blank");
-    }
+    const { saveUrl } = await import("@/lib/mobile-download");
+    const filename = (it.original_file_name?.replace(/\.[^.]+$/, "") || "foto") + "-campanha.png";
+    await saveUrl(it.public_url, filename, { title: "Foto do evento" });
   };
 
   const downloadAll = async () => {
@@ -116,12 +107,8 @@ export default function GaleriaEvento() {
         zip.file(`${String(i + 1).padStart(2, "0")}-${safe}.png`, blob);
       }
       const out = await zip.generateAsync({ type: "blob" });
-      const url = URL.createObjectURL(out);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${gallery?.slug ?? "galeria"}.zip`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const { saveBlob } = await import("@/lib/mobile-download");
+      await saveBlob(out, `${gallery?.slug ?? "galeria"}.zip`, { title: "Galeria do evento" });
     } catch (e: any) {
       toast.error("Falha ao gerar ZIP");
     } finally {

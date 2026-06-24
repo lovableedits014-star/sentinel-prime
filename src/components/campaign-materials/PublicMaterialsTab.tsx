@@ -67,21 +67,9 @@ export default function PublicMaterialsTab({ clientId, clientName }: { clientId:
     setItems((arr) =>
       arr.map((x) => (x.id === item.id ? { ...x, download_count: x.download_count + 1 } : x)),
     );
-    // Trigger download
-    try {
-      const r = await fetch(item.public_url);
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = item.storage_path.split("/").pop() || item.title;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      window.open(item.public_url, "_blank");
-    }
+    const filename = item.storage_path.split("/").pop() || item.title;
+    const { saveUrl } = await import("@/lib/mobile-download");
+    await saveUrl(item.public_url, filename, { title: item.title });
   }
 
   function shareWhatsApp(item: CampaignMaterial) {
