@@ -40,7 +40,7 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
   const [colBairro, setColBairro] = useState<string>(NONE);
   const [tag, setTag] = useState<string>("");
   const [parsing, setParsing] = useState(false);
-  const [generating, setGenerating] = useState<null | "vcf" | "csv">(null);
+  const [generating, setGenerating] = useState<null | "vcf" | "csv" | "zip">(null);
 
   const reset = () => {
     setFileName(""); setHeaders([]); setRows([]);
