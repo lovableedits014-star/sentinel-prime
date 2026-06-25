@@ -63,6 +63,11 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const [busca, setBusca] = useState("");
   const [open, setOpen] = useState<RegiaoRow | null>(null);
 
+  // dialogs auxiliares
+  const [openConfigInterior, setOpenConfigInterior] = useState(false);
+  const [openConverterLista, setOpenConverterLista] = useState(false);
+  const [cidadesSemPrincipal, setCidadesSemPrincipal] = useState<number>(0);
+
   // template (apenas mensagem; a TAG agora vive em cada região)
   const [template, setTemplate] = useState<string>("");
   const [savingTpl, setSavingTpl] = useState(false);
@@ -71,12 +76,24 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const { regioes: regioesCadastradas, updateTag, isUpdatingTag } = useRegioesEleicao(clientId);
   const tagByKey = useMemo(() => {
     const m = new Map<string, RegiaoEleicao>();
-    for (const r of regioesCadastradas) m.set(r.value, r);
+    for (const r of regioesCadastradas) {
+      m.set(r.value, r);
+      m.set(slugify(r.label), r);
+      m.set(r.label.trim().toLowerCase(), r);
+    }
     return m;
   }, [regioesCadastradas]);
 
+  const lookupTag = (regiao_key: string, regiao_label: string): RegiaoEleicao | null => {
+    return tagByKey.get(regiao_key)
+      || tagByKey.get(slugify(regiao_key))
+      || tagByKey.get(slugify(regiao_label))
+      || tagByKey.get((regiao_label || "").trim().toLowerCase())
+      || null;
+  };
+
   const tagDaRegiao = (regiao_key: string, fallbackLabel: string): string => {
-    const r = tagByKey.get(regiao_key);
+    const r = lookupTag(regiao_key, fallbackLabel);
     if (r?.tag) return r.tag;
     return normalizeTag(fallbackLabel).slice(0, 6);
   };
