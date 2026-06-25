@@ -32,6 +32,7 @@ import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 import { useCandidatosParceiros } from "@/hooks/useCandidatosParceiros";
 import DobradinhasManagerPanel from "@/components/eleicao/DobradinhasManagerPanel";
 import DobradinhaPropagarDialog from "@/components/eleicao/DobradinhaPropagarDialog";
+import DistribuicaoContatosTab from "@/components/eleicao/DistribuicaoContatosTab";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -811,7 +812,7 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-7 w-full max-w-5xl">
+        <TabsList className="grid grid-cols-8 w-full max-w-6xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -823,6 +824,10 @@ export default function Eleicao() {
           </TabsTrigger>
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
           <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
+          <TabsTrigger value="distribuicao" className="gap-1.5">
+            <Send className="w-3.5 h-3.5" />
+            Distribuição
+          </TabsTrigger>
           <TabsTrigger value="dobradinhas" className="gap-1.5">
             <Handshake className="w-3.5 h-3.5" />
             Dobradinhas
@@ -840,6 +845,8 @@ export default function Eleicao() {
         clientId ? <EntradaGrupoPanel clientId={clientId} /> : null
       ) : view === "indicacoes" ? (
         clientId ? <IndicacoesPanel clientId={clientId} /> : null
+      ) : view === "distribuicao" ? (
+        clientId ? <DistribuicaoContatosTab clientId={clientId} /> : null
       ) : view === "dobradinhas" ? (
         clientId ? <DobradinhasManagerPanel clientId={clientId} pessoas={pessoas as any} onChanged={load} /> : null
       ) : view === "config" ? (
