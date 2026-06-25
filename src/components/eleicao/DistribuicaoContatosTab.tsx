@@ -310,8 +310,6 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
     </div>
   );
 }
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const __unused = tagByKey;
 
 function KpiMini({ label, value, icon: Icon, highlight }: { label: string; value: number; icon: any; highlight?: boolean }) {
   return (
