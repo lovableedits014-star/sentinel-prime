@@ -10,6 +10,7 @@ export interface RegiaoEleicao {
   ordem: number;
   ativo: boolean;
   tag: string | null;
+  escopo: string;
 }
 
 export function normalizeTag(s: string): string {
