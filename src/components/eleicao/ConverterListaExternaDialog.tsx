@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, FileSpreadsheet, Download, FileText, Loader2, AlertCircle, CheckCircle2, Tag as TagIcon, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { gerarVcardLote, gerarCsvGoogleContacts, gerarZipVcardsIphone, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
+import { gerarVcardLote, gerarCsvGoogleContacts, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
 import { saveBlob } from "@/lib/mobile-download";
 import { normalizeTag } from "@/hooks/useRegioesEleicao";
 
@@ -40,7 +40,7 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
   const [colBairro, setColBairro] = useState<string>(NONE);
   const [tag, setTag] = useState<string>("");
   const [parsing, setParsing] = useState(false);
-  const [generating, setGenerating] = useState<null | "vcf" | "csv" | "zip">(null);
+  const [generating, setGenerating] = useState<null | "vcf" | "csv">(null);
 
   const reset = () => {
     setFileName(""); setHeaders([]); setRows([]);
@@ -103,21 +103,14 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
     setGenerating("vcf");
     try {
       const vcf = gerarVcardLote({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
-      const blob = new Blob([vcf], { type: "text/vcard" });
+      // octet-stream força "Salvar em Arquivos" no Safari iOS em vez de Quick Look (que mostra só 1 contato)
+      const blob = new Blob([vcf], { type: "application/octet-stream" });
       const base = fileName.replace(/\.[^.]+$/, "") || "lista_externa";
       await saveBlob(blob, `${base}_${Date.now()}.vcf`, { title: "Lista de contatos" });
     } finally { setGenerating(null); }
   };
 
-  const baixarZipIphone = async () => {
-    setGenerating("zip");
-    try {
-      const blob = await gerarZipVcardsIphone({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
-      const base = fileName.replace(/\.[^.]+$/, "") || "lista_externa";
-      await saveBlob(blob, `${base}_iphone_${Date.now()}.zip`, { title: "Contatos para iPhone" });
-      toast.success("ZIP gerado", { description: "No iPhone: abra pelo app Arquivos → selecione todos os .vcf → Compartilhar → Contatos." });
-    } finally { setGenerating(null); }
-  };
+
 
   const baixarCsv = async () => {
     setGenerating("csv");
@@ -227,17 +220,11 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
                       • <strong>{tag ? `${tag} ` : ""}{c.nome}</strong> — {c.telefone}{c.bairro ? ` • ${c.bairro}` : ""}
                     </li>
                   ))}
-                </ul>
-              </Card>
-            )}
-          </div>
-        )}
-
         {podeGerar && (
           <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
             <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
             <div>
-              <strong>iPhone:</strong> se ao abrir o <code>.vcf</code> aparecer só 1 contato, baixe a versão <strong>ZIP iPhone</strong> — abra pelo app <em>Arquivos</em>, selecione todos os <code>.vcf</code> e use <em>Compartilhar → Contatos</em>. Alternativa: importe o CSV em <em>iCloud.com → Contatos</em>.
+              <strong>iPhone:</strong> ao clicar em <strong>Baixar .vcf</strong>, escolha <strong>"Salvar em Arquivos"</strong>. Depois abra o app <em>Arquivos</em>, toque no <code>.vcf</code> e selecione <strong>"Adicionar todos os {contatos.length} contatos"</strong>. Não abra direto no Safari (mostra só 1).
             </div>
           </div>
         )}
@@ -247,10 +234,7 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
             {generating === "csv" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
             Baixar CSV Google
           </Button>
-          <Button variant="outline" disabled={!podeGerar || !!generating} onClick={baixarZipIphone}>
-            {generating === "zip" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Smartphone className="w-4 h-4 mr-2" />}
-            ZIP iPhone
-          </Button>
+
           <Button disabled={!podeGerar || !!generating} onClick={baixarVcf}>
             {generating === "vcf" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
             Baixar .vcf
@@ -260,3 +244,4 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
     </Dialog>
   );
 }
+
