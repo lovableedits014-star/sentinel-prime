@@ -295,9 +295,23 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
           onSent={() => { setOpen(null); carregar(); }}
         />
       )}
+
+      <ConfigurarPrincipaisInteriorDialog
+        clientId={clientId}
+        open={openConfigInterior}
+        onClose={() => setOpenConfigInterior(false)}
+        onSaved={carregar}
+      />
+
+      <ConverterListaExternaDialog
+        open={openConverterLista}
+        onClose={() => setOpenConverterLista(false)}
+      />
     </div>
   );
 }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const __unused = tagByKey;
 
 function KpiMini({ label, value, icon: Icon, highlight }: { label: string; value: number; icon: any; highlight?: boolean }) {
   return (
