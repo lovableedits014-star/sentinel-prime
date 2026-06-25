@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
       regiao_label,
       regiao_key,
       escopo,
+      tag_regiao,
     } = body || {};
 
     if (!client_id || !coordenador_id || !Array.isArray(pessoa_ids) || pessoa_ids.length === 0) {
