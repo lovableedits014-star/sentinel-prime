@@ -451,6 +451,7 @@ function EnviarPacoteDialog(props: {
   const [sending, setSending] = useState<null | "instancia" | "manual_wa" | "download" | "zip">(null);
   const [tagOverride, setTagOverride] = useState(tagRegiao);
   const [tplLocal, setTplLocal] = useState(template);
+  const [iosShare, setIosShare] = useState<null | { vcfBlob: Blob; vcfName: string; csvBlob: Blob; csvName: string; publicUrl: string | null; total: number }>(null);
 
   useEffect(() => { setTagOverride(tagRegiao); }, [tagRegiao]);
 
