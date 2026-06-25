@@ -105,10 +105,23 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
     setGenerating("vcf");
     try {
       const vcf = gerarVcardLote({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
-      // text/vcard dispara o handler de Contatos no iOS quando aberto pelo app Arquivos.
+      const count = contarVcardsNoConteudo(vcf);
+      if (count !== contatos.length) {
+        toast.error("Falha na geração do VCF", { description: `Esperado ${contatos.length}, gerado ${count}.` });
+        return;
+      }
       const blob = new Blob([vcf], { type: "text/vcard;charset=utf-8" });
-      const base = fileName.replace(/\.[^.]+$/, "") || "lista_externa";
-      await saveBlob(blob, `${base}_${Date.now()}.vcf`, { title: "Lista de contatos" });
+      const base = (fileName.replace(/\.[^.]+$/, "") || "lista_externa");
+      const vcfName = `${base}_${Date.now()}.vcf`;
+
+      // iPhone: abrir diálogo de resgate com Share + CSV
+      if (isIOS()) {
+        const csv = gerarCsvGoogleContacts({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
+        const csvBlob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+        setIosDialog({ vcfBlob: blob, csvBlob, vcfName, csvName: `${base}_google_contacts.csv`, total: contatos.length });
+        return;
+      }
+      await saveBlob(blob, vcfName, { title: "Lista de contatos" });
     } finally { setGenerating(null); }
   };
 
