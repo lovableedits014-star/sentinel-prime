@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock, Tag as TagIcon, Pencil, Check, X, Users, FileSpreadsheet, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarZipVcardsIphone, gerarTextoContatosBloco, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
+import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarTextoContatosBloco, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
 import { saveBlob } from "@/lib/mobile-download";
 import { useRegioesEleicao, normalizeTag, slugify, type RegiaoEleicao } from "@/hooks/useRegioesEleicao";
 import ConfigurarPrincipaisInteriorDialog from "./ConfigurarPrincipaisInteriorDialog";
@@ -574,7 +574,8 @@ function EnviarPacoteDialog(props: {
     setSending("download");
     try {
       const vcfContent = gerarVcardLote({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
-      const blob = new Blob([vcfContent], { type: "text/vcard" });
+      // octet-stream força "Salvar em Arquivos" no Safari iOS — evita preview que mostra só 1 contato
+      const blob = new Blob([vcfContent], { type: "application/octet-stream" });
       await saveBlob(blob, `contatos_${regiao.regiao_key || "regiao"}_${Date.now()}.vcf`, { title: "Lista de contatos" });
       await registrarLoteDireto("download", null);
       onSent();
@@ -583,18 +584,7 @@ function EnviarPacoteDialog(props: {
     }
   };
 
-  const baixarZipIphone = async () => {
-    setSending("zip");
-    try {
-      const blob = await gerarZipVcardsIphone({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
-      await saveBlob(blob, `contatos_${regiao.regiao_key || "regiao"}_iphone_${Date.now()}.zip`, { title: "Contatos para iPhone" });
-      await registrarLoteDireto("download", null);
-      toast.success("ZIP gerado", { description: "No iPhone: abra pelo Arquivos → selecione todos os .vcf → Compartilhar → Contatos." });
-      onSent();
-    } finally {
-      setSending(null);
-    }
-  };
+
 
 
 
@@ -670,20 +660,19 @@ function EnviarPacoteDialog(props: {
         <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
           <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div>
-            <strong>iPhone:</strong> se ao abrir o <code>.vcf</code> aparecer só 1 contato, use o botão <strong>ZIP iPhone</strong> — abra pelo app <em>Arquivos</em>, selecione todos os <code>.vcf</code> e use <em>Compartilhar → Contatos → Adicionar todos</em>.
+            <strong>iPhone:</strong> ao clicar em <strong>.vcf</strong>, escolha <strong>"Salvar em Arquivos"</strong>. Depois abra o app <em>Arquivos</em>, toque no <code>.vcf</code> e selecione <strong>"Adicionar todos os {total} contatos"</strong>. Não abra direto no Safari (mostra só 1).
           </div>
         </div>
+
 
         <DialogFooter className="flex-col sm:flex-row gap-2 flex-wrap">
           <Button variant="outline" onClick={baixarCsv} disabled={total === 0}>
             <FileText className="w-4 h-4 mr-2" />CSV Google
           </Button>
           <Button variant="outline" onClick={baixarVcf} disabled={total === 0 || !!sending}>
-            {sending === "download" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}.vcf (Android)
+            {sending === "download" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Baixar .vcf
           </Button>
-          <Button variant="outline" onClick={baixarZipIphone} disabled={total === 0 || !!sending}>
-            {sending === "zip" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Smartphone className="w-4 h-4 mr-2" />}ZIP iPhone
-          </Button>
+
           <Button variant="outline" onClick={enviarManualWa} disabled={total === 0 || !!sending || !regiao.coordenador_telefone}>
             {sending === "manual_wa" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MessageCircle className="w-4 h-4 mr-2" />}WhatsApp manual
           </Button>
