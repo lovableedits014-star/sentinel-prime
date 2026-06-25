@@ -7,9 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, FileSpreadsheet, Download, FileText, Loader2, AlertCircle, CheckCircle2, Tag as TagIcon, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { gerarVcardLote, gerarCsvGoogleContacts, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
-import { saveBlob } from "@/lib/mobile-download";
+import { gerarVcardLote, gerarCsvGoogleContacts, contarVcardsNoConteudo, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
+import { saveBlob, isIOS } from "@/lib/mobile-download";
 import { normalizeTag } from "@/hooks/useRegioesEleicao";
+import IosContactsShareDialog from "./IosContactsShareDialog";
 
 interface Props {
   open: boolean;
@@ -41,6 +42,7 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
   const [tag, setTag] = useState<string>("");
   const [parsing, setParsing] = useState(false);
   const [generating, setGenerating] = useState<null | "vcf" | "csv">(null);
+  const [iosDialog, setIosDialog] = useState<null | { vcfBlob: Blob; csvBlob: Blob; vcfName: string; csvName: string; total: number }>(null);
 
   const reset = () => {
     setFileName(""); setHeaders([]); setRows([]);
@@ -103,10 +105,23 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
     setGenerating("vcf");
     try {
       const vcf = gerarVcardLote({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
-      // text/vcard dispara o handler de Contatos no iOS quando aberto pelo app Arquivos.
+      const count = contarVcardsNoConteudo(vcf);
+      if (count !== contatos.length) {
+        toast.error("Falha na geração do VCF", { description: `Esperado ${contatos.length}, gerado ${count}.` });
+        return;
+      }
       const blob = new Blob([vcf], { type: "text/vcard;charset=utf-8" });
-      const base = fileName.replace(/\.[^.]+$/, "") || "lista_externa";
-      await saveBlob(blob, `${base}_${Date.now()}.vcf`, { title: "Lista de contatos" });
+      const base = (fileName.replace(/\.[^.]+$/, "") || "lista_externa");
+      const vcfName = `${base}_${Date.now()}.vcf`;
+
+      // iPhone: abrir diálogo de resgate com Share + CSV
+      if (isIOS()) {
+        const csv = gerarCsvGoogleContacts({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
+        const csvBlob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+        setIosDialog({ vcfBlob: blob, csvBlob, vcfName, csvName: `${base}_google_contacts.csv`, total: contatos.length });
+        return;
+      }
+      await saveBlob(blob, vcfName, { title: "Lista de contatos" });
     } finally { setGenerating(null); }
   };
 
@@ -227,11 +242,10 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
         )}
 
         {podeGerar && (
-
           <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
             <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
             <div>
-              <strong>iPhone:</strong> baixe o <code>.vcf</code>, escolha <strong>"Salvar em Arquivos"</strong>, abra o app <em>Arquivos</em> e toque no arquivo. Vai aparecer <strong>"Adicionar todos os {contatos.length} contatos"</strong>. ⚠️ Não abra pelo Safari nem pelo Mail — eles mostram só 1.
+              <strong>iPhone:</strong> ao tocar em "Baixar .vcf" vai abrir uma tela com as melhores opções para iOS (compartilhar, abrir no Safari ou importar via iCloud/Google).
             </div>
           </div>
         )}
@@ -244,10 +258,21 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
 
           <Button disabled={!podeGerar || !!generating} onClick={baixarVcf}>
             {generating === "vcf" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-            Baixar .vcf
+            {isIOS() ? "Gerar contatos pro iPhone" : "Baixar .vcf"}
           </Button>
         </DialogFooter>
       </DialogContent>
+      {iosDialog && (
+        <IosContactsShareDialog
+          open
+          onOpenChange={(o) => { if (!o) setIosDialog(null); }}
+          vcfBlob={iosDialog.vcfBlob}
+          vcfFilename={iosDialog.vcfName}
+          totalContatos={iosDialog.total}
+          csvBlob={iosDialog.csvBlob}
+          csvFilename={iosDialog.csvName}
+        />
+      )}
     </Dialog>
   );
 }

@@ -11,11 +11,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock, Tag as TagIcon, Pencil, Check, X, Users, FileSpreadsheet, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarTextoContatosBloco, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
-import { saveBlob } from "@/lib/mobile-download";
+import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarTextoContatosBloco, contarVcardsNoConteudo, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
+import { saveBlob, isIOS } from "@/lib/mobile-download";
 import { useRegioesEleicao, normalizeTag, slugify, type RegiaoEleicao } from "@/hooks/useRegioesEleicao";
 import ConfigurarPrincipaisInteriorDialog from "./ConfigurarPrincipaisInteriorDialog";
 import ConverterListaExternaDialog from "./ConverterListaExternaDialog";
+import IosContactsShareDialog from "./IosContactsShareDialog";
 
 interface RegiaoRow {
   escopo: string;
@@ -450,6 +451,7 @@ function EnviarPacoteDialog(props: {
   const [sending, setSending] = useState<null | "instancia" | "manual_wa" | "download" | "zip">(null);
   const [tagOverride, setTagOverride] = useState(tagRegiao);
   const [tplLocal, setTplLocal] = useState(template);
+  const [iosShare, setIosShare] = useState<null | { vcfBlob: Blob; vcfName: string; csvBlob: Blob; csvName: string; publicUrl: string | null; total: number }>(null);
 
   useEffect(() => { setTagOverride(tagRegiao); }, [tagRegiao]);
 
@@ -574,9 +576,33 @@ function EnviarPacoteDialog(props: {
     setSending("download");
     try {
       const vcfContent = gerarVcardLote({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
-      // text/vcard dispara o handler nativo de Contatos no iOS quando aberto pelo app Arquivos.
+      const count = contarVcardsNoConteudo(vcfContent);
+      if (count !== contatos.length) {
+        toast.error("Falha na geração do VCF", { description: `Esperado ${contatos.length}, gerado ${count}.` });
+        return;
+      }
       const blob = new Blob([vcfContent], { type: "text/vcard;charset=utf-8" });
-      await saveBlob(blob, `contatos_${regiao.regiao_key || "regiao"}_${Date.now()}.vcf`, { title: "Lista de contatos" });
+      const vcfName = `contatos_${regiao.regiao_key || "regiao"}_${Date.now()}.vcf`;
+
+      if (isIOS()) {
+        // iPhone: gera tudo localmente + sobe pro storage pra oferecer link público
+        const csv = gerarCsvGoogleContacts({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
+        const csvBlob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+        const publicUrl = await uploadVcfPublic().catch(() => null);
+        setIosShare({
+          vcfBlob: blob,
+          vcfName,
+          csvBlob,
+          csvName: `google_contacts_${regiao.regiao_key || "regiao"}.csv`,
+          publicUrl,
+          total: contatos.length,
+        });
+        await registrarLoteDireto("download", publicUrl);
+        onSent();
+        return;
+      }
+
+      await saveBlob(blob, vcfName, { title: "Lista de contatos" });
       await registrarLoteDireto("download", null);
       onSent();
     } finally {
@@ -660,7 +686,7 @@ function EnviarPacoteDialog(props: {
         <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
           <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div>
-            <strong>iPhone:</strong> baixe o <code>.vcf</code>, escolha <strong>"Salvar em Arquivos"</strong>, abra o app <em>Arquivos</em> e toque no arquivo. Vai aparecer <strong>"Adicionar todos os {total} contatos"</strong>. ⚠️ Não abra pelo Safari nem pelo Mail — eles mostram só 1 contato. Tem que ser pelo app <em>Arquivos</em>.
+            <strong>iPhone:</strong> toque em "Baixar .vcf" e o sistema abre uma tela com as melhores opções pra iOS — compartilhar pelo iOS, abrir no Safari, copiar o link do arquivo ou importar via iCloud/Google (plano B garantido).
           </div>
         </div>
 
@@ -670,7 +696,8 @@ function EnviarPacoteDialog(props: {
             <FileText className="w-4 h-4 mr-2" />CSV Google
           </Button>
           <Button variant="outline" onClick={baixarVcf} disabled={total === 0 || !!sending}>
-            {sending === "download" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Baixar .vcf
+            {sending === "download" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            {isIOS() ? "Gerar contatos pro iPhone" : "Baixar .vcf"}
           </Button>
 
           <Button variant="outline" onClick={enviarManualWa} disabled={total === 0 || !!sending || !regiao.coordenador_telefone}>
@@ -681,6 +708,20 @@ function EnviarPacoteDialog(props: {
           </Button>
         </DialogFooter>
       </DialogContent>
+      {iosShare && (
+        <IosContactsShareDialog
+          open
+          onOpenChange={(o) => { if (!o) setIosShare(null); }}
+          vcfBlob={iosShare.vcfBlob}
+          vcfFilename={iosShare.vcfName}
+          totalContatos={iosShare.total}
+          publicUrl={iosShare.publicUrl}
+          csvBlob={iosShare.csvBlob}
+          csvFilename={iosShare.csvName}
+          whatsappTel={regiao.coordenador_telefone}
+          whatsappTexto={mensagemFinal}
+        />
+      )}
     </Dialog>
   );
 }

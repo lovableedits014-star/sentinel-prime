@@ -17,7 +17,6 @@ const onlyDigits = (s: string) => (s || "").replace(/\D/g, "");
 export function aplicarTag(nome: string, tag: string): string {
   const t = (tag || "").trim();
   if (!t) return nome;
-  // Evita prefixo duplicado caso o nome já comece com a tag
   if (nome.trim().toLowerCase().startsWith(t.toLowerCase())) return nome;
   return `${t} ${nome}`.trim();
 }
@@ -26,7 +25,6 @@ function normalizePhoneForVcard(raw: string): string {
   const d = onlyDigits(raw);
   if (!d) return "";
   const full = d.startsWith("55") ? d : `55${d}`;
-  // Formato padrão internacional E.164 (WhatsApp/Google aceitam)
   return `+${full}`;
 }
 
@@ -38,7 +36,7 @@ function escapeVcardText(s: string): string {
     .replace(/\n/g, "\\n");
 }
 
-// UID determinístico (FNV-1a 32-bit) — iOS Contacts deduplica/processa em lote por UID.
+// UID determinístico (FNV-1a 32-bit)
 function uidForContato(c: ContatoExport): string {
   const seed = `${c.pessoa_id}|${c.nome}|${c.telefone}`;
   let h = 0x811c9dc5;
@@ -46,11 +44,16 @@ function uidForContato(c: ContatoExport): string {
     h ^= seed.charCodeAt(i);
     h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
   }
-  const hex = h.toString(16).padStart(8, "0").repeat(4); // 32 chars
+  const hex = h.toString(16).padStart(8, "0").repeat(4);
   return `urn:uuid:${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-/** Gera UM vCard 3.0 individual — formato compatível com iOS 16+ em lote. */
+/**
+ * Gera UM vCard 3.0 individual — formato testado com Apple Contacts (iOS 16+).
+ * Importante:
+ *  - N: usa primeiro o sobrenome vazio + nome no segundo campo (formato preferido pelo iOS)
+ *  - Sem CATEGORIES / X-* extras que confundem o parser do iOS Quick Look
+ */
 export function gerarVcardIndividual(params: {
   contato: ContatoExport;
   tagPrefixo: string;
@@ -68,11 +71,11 @@ export function gerarVcardIndividual(params: {
   const linhas = [
     "BEGIN:VCARD",
     "VERSION:3.0",
-    "PRODID:-//Lovable//Eleicao//PT",
+    "PRODID:-//Lovable//Eleicao 1.0//PT",
     `UID:${uidForContato(c)}`,
-    `N:${fullName};;;;`,
+    `N:;${fullName};;;`,
     `FN:${fullName}`,
-    `TEL;TYPE=CELL,VOICE:${tel}`,
+    `TEL;TYPE=CELL:${tel}`,
   ];
   if (noteParts.length) linhas.push(`NOTE:${escapeVcardText(noteParts.join(" | "))}`);
   linhas.push("END:VCARD");
@@ -80,9 +83,9 @@ export function gerarVcardIndividual(params: {
 }
 
 /**
- * Gera vCard 3.0 com TODOS os contatos em um único arquivo.
- * Cards separados por linha em branco (CRLF duplo) — exigência do iOS Contacts
- * para reconhecer e oferecer "Adicionar todos os N contatos".
+ * Gera vCard 3.0 com TODOS os contatos.
+ * Sem linha em branco entre cards — Apple Contacts importa em lote quando
+ * cada cartão fecha com END:VCARD\r\n e o próximo abre direto com BEGIN:VCARD.
  */
 export function gerarVcardLote(params: {
   contatos: ContatoExport[];
@@ -90,17 +93,21 @@ export function gerarVcardLote(params: {
   regiaoLabel: string;
 }): string {
   const { contatos, tagPrefixo, regiaoLabel } = params;
-  return contatos
+  const cards = contatos
     .map((contato) => gerarVcardIndividual({ contato, tagPrefixo, regiaoLabel }))
-    .filter(Boolean)
-    .join("\r\n");
+    .filter(Boolean);
+  return cards.join("");
 }
 
-
+/** Valida o VCF gerado — retorna a contagem de cards encontrados. */
+export function contarVcardsNoConteudo(vcf: string): number {
+  const begins = (vcf.match(/BEGIN:VCARD/gi) || []).length;
+  const ends = (vcf.match(/END:VCARD/gi) || []).length;
+  return begins === ends ? begins : -1;
+}
 
 /**
  * Gera CSV no formato do Google Contacts (importação direta).
- * Colunas mínimas: Name, Given Name, Phone 1 - Type, Phone 1 - Value, Notes.
  */
 export function gerarCsvGoogleContacts(params: {
   contatos: ContatoExport[];
@@ -138,7 +145,6 @@ function csvEscape(value: string): string {
 
 /**
  * Substitui placeholders no template da mensagem.
- *  - [coordenador_nome] [regiao] [qtd_contatos] [qtd_novos]
  */
 export function aplicarTemplateMensagem(template: string, vars: Record<string, string>): string {
   let out = template || "";
@@ -148,7 +154,7 @@ export function aplicarTemplateMensagem(template: string, vars: Record<string, s
   return out;
 }
 
-/** Monta texto-bloco com TODOS os contatos no corpo (caso usuário queira mensagem só de texto). */
+/** Monta texto-bloco com TODOS os contatos no corpo. */
 export function gerarTextoContatosBloco(params: {
   contatos: ContatoExport[];
   tagPrefixo: string;
