@@ -583,6 +583,18 @@ function EnviarPacoteDialog(props: {
     }
   };
 
+  const baixarZipIphone = async () => {
+    setSending("zip");
+    try {
+      const blob = await gerarZipVcardsIphone({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
+      await saveBlob(blob, `contatos_${regiao.regiao_key || "regiao"}_iphone_${Date.now()}.zip`, { title: "Contatos para iPhone" });
+      await registrarLoteDireto("download", null);
+      toast.success("ZIP gerado", { description: "No iPhone: abra pelo Arquivos → selecione todos os .vcf → Compartilhar → Contatos." });
+      onSent();
+    } finally {
+      setSending(null);
+    }
+
   const baixarCsv = async () => {
     const csv = gerarCsvGoogleContacts({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
