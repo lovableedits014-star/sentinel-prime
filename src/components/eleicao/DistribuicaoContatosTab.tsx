@@ -574,8 +574,8 @@ function EnviarPacoteDialog(props: {
     setSending("download");
     try {
       const vcfContent = gerarVcardLote({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
-      // octet-stream força "Salvar em Arquivos" no Safari iOS — evita preview que mostra só 1 contato
-      const blob = new Blob([vcfContent], { type: "application/octet-stream" });
+      // text/vcard dispara o handler nativo de Contatos no iOS quando aberto pelo app Arquivos.
+      const blob = new Blob([vcfContent], { type: "text/vcard;charset=utf-8" });
       await saveBlob(blob, `contatos_${regiao.regiao_key || "regiao"}_${Date.now()}.vcf`, { title: "Lista de contatos" });
       await registrarLoteDireto("download", null);
       onSent();
