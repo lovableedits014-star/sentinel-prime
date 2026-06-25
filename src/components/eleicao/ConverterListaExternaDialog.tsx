@@ -7,9 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, FileSpreadsheet, Download, FileText, Loader2, AlertCircle, CheckCircle2, Tag as TagIcon, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { gerarVcardLote, gerarCsvGoogleContacts, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
-import { saveBlob } from "@/lib/mobile-download";
+import { gerarVcardLote, gerarCsvGoogleContacts, contarVcardsNoConteudo, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
+import { saveBlob, isIOS } from "@/lib/mobile-download";
 import { normalizeTag } from "@/hooks/useRegioesEleicao";
+import IosContactsShareDialog from "./IosContactsShareDialog";
 
 interface Props {
   open: boolean;
