@@ -220,7 +220,14 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
                       • <strong>{tag ? `${tag} ` : ""}{c.nome}</strong> — {c.telefone}{c.bairro ? ` • ${c.bairro}` : ""}
                     </li>
                   ))}
+                </ul>
+              </Card>
+            )}
+          </div>
+        )}
+
         {podeGerar && (
+
           <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
             <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
             <div>
