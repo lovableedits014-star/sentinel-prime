@@ -38,7 +38,19 @@ function escapeVcardText(s: string): string {
     .replace(/\n/g, "\\n");
 }
 
-/** Gera UM vCard 3.0 individual — formato mínimo recomendado para iOS. */
+// UID determinístico (FNV-1a 32-bit) — iOS Contacts deduplica/processa em lote por UID.
+function uidForContato(c: ContatoExport): string {
+  const seed = `${c.pessoa_id}|${c.nome}|${c.telefone}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  const hex = h.toString(16).padStart(8, "0").repeat(4); // 32 chars
+  return `urn:uuid:${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** Gera UM vCard 3.0 individual — formato compatível com iOS 16+ em lote. */
 export function gerarVcardIndividual(params: {
   contato: ContatoExport;
   tagPrefixo: string;
@@ -56,6 +68,8 @@ export function gerarVcardIndividual(params: {
   const linhas = [
     "BEGIN:VCARD",
     "VERSION:3.0",
+    "PRODID:-//Lovable//Eleicao//PT",
+    `UID:${uidForContato(c)}`,
     `N:${fullName};;;;`,
     `FN:${fullName}`,
     `TEL;TYPE=CELL,VOICE:${tel}`,
@@ -67,8 +81,8 @@ export function gerarVcardIndividual(params: {
 
 /**
  * Gera vCard 3.0 com TODOS os contatos em um único arquivo.
- * Funciona em Android, Google Contacts e iPhone (importando pelo app
- * Arquivos → "Adicionar todos os N contatos").
+ * Cards separados por linha em branco (CRLF duplo) — exigência do iOS Contacts
+ * para reconhecer e oferecer "Adicionar todos os N contatos".
  */
 export function gerarVcardLote(params: {
   contatos: ContatoExport[];
@@ -79,8 +93,9 @@ export function gerarVcardLote(params: {
   return contatos
     .map((contato) => gerarVcardIndividual({ contato, tagPrefixo, regiaoLabel }))
     .filter(Boolean)
-    .join("");
+    .join("\r\n");
 }
+
 
 
 /**
