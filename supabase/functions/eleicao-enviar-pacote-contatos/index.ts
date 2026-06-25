@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
       regiao_label,
       regiao_key,
       escopo,
+      tag_regiao,
     } = body || {};
 
     if (!client_id || !coordenador_id || !Array.isArray(pessoa_ids) || pessoa_ids.length === 0) {
@@ -178,6 +179,7 @@ Deno.serve(async (req) => {
       mensagem_enviada: mensagem || null,
       whatsapp_message_id: whatsappMessageId,
       vcf_url: vcf_url || null,
+      tag_regiao: tag_regiao || null,
       criado_por: user.id,
     }).select("id").single();
 

@@ -9,10 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock } from "lucide-react";
+import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock, Tag as TagIcon, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarTextoContatosBloco, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
 import { saveBlob } from "@/lib/mobile-download";
+import { useRegioesEleicao, normalizeTag, type RegiaoEleicao } from "@/hooks/useRegioesEleicao";
 
 interface RegiaoRow {
   escopo: string;
@@ -60,10 +61,23 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const [busca, setBusca] = useState("");
   const [open, setOpen] = useState<RegiaoRow | null>(null);
 
-  // template
+  // template (apenas mensagem; a TAG agora vive em cada região)
   const [template, setTemplate] = useState<string>("");
-  const [tagPrefixo, setTagPrefixo] = useState<string>("");
   const [savingTpl, setSavingTpl] = useState(false);
+
+  // tags das regiões cadastradas
+  const { regioes: regioesCadastradas, updateTag, isUpdatingTag } = useRegioesEleicao(clientId);
+  const tagByKey = useMemo(() => {
+    const m = new Map<string, RegiaoEleicao>();
+    for (const r of regioesCadastradas) m.set(r.value, r);
+    return m;
+  }, [regioesCadastradas]);
+
+  const tagDaRegiao = (regiao_key: string, fallbackLabel: string): string => {
+    const r = tagByKey.get(regiao_key);
+    if (r?.tag) return r.tag;
+    return normalizeTag(fallbackLabel).slice(0, 6);
+  };
 
   const carregar = async () => {
     setLoading(true);
@@ -72,16 +86,14 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
       supabase.from("eleicao_contato_lotes")
         .select("id, coordenador_id, regiao_label, canal, total_contatos, apenas_novos, created_at, vcf_url")
         .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
-      supabase.from("eleicao_distribuicao_template").select("mensagem_template, tag_prefixo").eq("client_id", clientId).maybeSingle(),
+      supabase.from("eleicao_distribuicao_template").select("mensagem_template").eq("client_id", clientId).maybeSingle(),
     ]);
     setRegioes((regs as any) || []);
     setHistorico((hist as any) || []);
     if (tpl) {
       setTemplate(tpl.mensagem_template || "");
-      setTagPrefixo(tpl.tag_prefixo || "");
     } else {
       setTemplate("Olá [coordenador_nome]! Segue a lista atualizada dos [qtd_contatos] contatos da região [regiao]. Importe o arquivo .vcf na sua agenda e crie uma lista de transmissão para enviar sua mensagem individual aos contatos. Qualquer dúvida me chama!");
-      setTagPrefixo("");
     }
     setLoading(false);
   };
@@ -91,7 +103,7 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const salvarTemplate = async () => {
     setSavingTpl(true);
     const { error } = await supabase.from("eleicao_distribuicao_template")
-      .upsert({ client_id: clientId, mensagem_template: template, tag_prefixo: tagPrefixo }, { onConflict: "client_id" });
+      .upsert({ client_id: clientId, mensagem_template: template }, { onConflict: "client_id" });
     setSavingTpl(false);
     if (error) toast.error("Falha ao salvar template", { description: error.message });
     else toast.success("Template salvo");
@@ -123,7 +135,7 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
         <TabsList>
           <TabsTrigger value="regioes">Regiões</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
-          <TabsTrigger value="template">Template & TAG</TabsTrigger>
+          <TabsTrigger value="template">Mensagem padrão</TabsTrigger>
         </TabsList>
 
         {/* ===================== REGIÕES ===================== */}
@@ -135,6 +147,14 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
             </Button>
           </div>
 
+          <Card className="p-3 bg-muted/30 text-xs text-muted-foreground flex items-start gap-2">
+            <TagIcon className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              Cada região tem uma <strong>TAG curta</strong> (ex: <code>MOR</code> para Moreninhas) que vai na frente do nome de cada contato exportado.
+              Isso ajuda o coordenador a identificar de onde veio cada pessoa. Edite a TAG no card da região abaixo.
+            </div>
+          </Card>
+
           {loading ? (
             <div className="text-center py-12 text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />Carregando regiões…</div>
           ) : filtradas.length === 0 ? (
@@ -143,7 +163,24 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {filtradas.map(r => <RegiaoCard key={`${r.escopo}-${r.regiao_key}-${r.coordenador_id}`} r={r} onAbrir={() => setOpen(r)} />)}
+              {filtradas.map(r => (
+                <RegiaoCard
+                  key={`${r.escopo}-${r.regiao_key}-${r.coordenador_id}`}
+                  r={r}
+                  tag={tagDaRegiao(r.regiao_key, r.regiao_label)}
+                  tagRow={tagByKey.get(r.regiao_key) || null}
+                  onSaveTag={async (newTag) => {
+                    const row = tagByKey.get(r.regiao_key);
+                    if (!row) {
+                      toast.error("Região não está cadastrada em Configurações > Regiões");
+                      return;
+                    }
+                    await updateTag({ id: row.id, tag: newTag });
+                  }}
+                  saving={isUpdatingTag}
+                  onAbrir={() => setOpen(r)}
+                />
+              ))}
             </div>
           )}
         </TabsContent>
@@ -180,15 +217,13 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
         <TabsContent value="template" className="mt-3 space-y-3">
           <Card className="p-4 space-y-3">
             <div>
-              <Label>Prefixo de TAG (vai na frente do nome de cada contato)</Label>
-              <Input value={tagPrefixo} onChange={e => setTagPrefixo(e.target.value)} placeholder="Ex: CAMPANHA — ou MOR" />
-              <p className="text-xs text-muted-foreground mt-1">Exemplo: "CAMPANHA João Silva". Útil pro coordenador identificar de onde veio o contato.</p>
-            </div>
-            <div>
-              <Label>Mensagem padrão</Label>
+              <Label>Mensagem padrão enviada junto com o pacote de contatos</Label>
               <Textarea rows={6} value={template} onChange={e => setTemplate(e.target.value)} />
               <p className="text-xs text-muted-foreground mt-1">
                 Use os marcadores: <code>[coordenador_nome]</code> <code>[regiao]</code> <code>[qtd_contatos]</code> <code>[qtd_novos]</code>
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                <strong>A TAG é por região</strong> — configure no card de cada região na aba "Regiões".
               </p>
             </div>
             <div className="flex justify-end">
@@ -205,7 +240,7 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
           clientId={clientId}
           regiao={open}
           template={template}
-          tagPrefixo={tagPrefixo}
+          tagRegiao={tagDaRegiao(open.regiao_key, open.regiao_label)}
           onClose={() => setOpen(null)}
           onSent={() => { setOpen(null); carregar(); }}
         />
@@ -228,16 +263,68 @@ function KpiMini({ label, value, icon: Icon, highlight }: { label: string; value
   );
 }
 
-function RegiaoCard({ r, onAbrir }: { r: RegiaoRow; onAbrir: () => void }) {
+function RegiaoCard({ r, tag, tagRow, onSaveTag, saving, onAbrir }: {
+  r: RegiaoRow;
+  tag: string;
+  tagRow: RegiaoEleicao | null;
+  onSaveTag: (tag: string) => Promise<void>;
+  saving: boolean;
+  onAbrir: () => void;
+}) {
   const novos = Number(r.total_novos || 0);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(tag);
+
+  useEffect(() => { setDraft(tag); }, [tag]);
+
+  const salvar = async () => {
+    const norm = normalizeTag(draft);
+    if (!norm) { toast.error("Informe uma TAG válida"); return; }
+    await onSaveTag(norm);
+    setEditing(false);
+  };
+
   return (
     <Card className={`p-4 ${novos > 0 ? "border-emerald-400" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <MapPin className="w-4 h-4 text-muted-foreground" />
             <span className="font-semibold truncate">{r.regiao_label}</span>
             <Badge variant="outline" className="text-[10px]">{r.escopo === "campo_grande" ? "Campo Grande" : "Interior"}</Badge>
+
+            {/* TAG da região */}
+            {editing ? (
+              <span className="inline-flex items-center gap-1">
+                <Input
+                  value={draft}
+                  onChange={e => setDraft(normalizeTag(e.target.value))}
+                  className="h-6 w-20 text-xs font-mono uppercase px-2"
+                  maxLength={8}
+                  autoFocus
+                />
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={salvar} disabled={saving}>
+                  {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                </Button>
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setDraft(tag); setEditing(false); }}>
+                  <X className="w-3 h-3" />
+                </Button>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1">
+                <Badge className="bg-primary/15 text-primary border border-primary/30 font-mono">
+                  <TagIcon className="w-3 h-3 mr-1" />{tag || "—"}
+                </Badge>
+                <Button
+                  size="icon" variant="ghost" className="h-6 w-6"
+                  onClick={() => setEditing(true)}
+                  title={tagRow ? "Editar TAG da região" : "Cadastre a região em Configurações para editar a TAG"}
+                  disabled={!tagRow}
+                >
+                  <Pencil className="w-3 h-3" />
+                </Button>
+              </span>
+            )}
           </div>
           <div className="text-sm text-muted-foreground mt-1 truncate">
             Coord. principal: <strong>{r.coordenador_nome}</strong>
@@ -290,17 +377,19 @@ function EnviarPacoteDialog(props: {
   clientId: string;
   regiao: RegiaoRow;
   template: string;
-  tagPrefixo: string;
+  tagRegiao: string;
   onClose: () => void;
   onSent: () => void;
 }) {
-  const { clientId, regiao, template, tagPrefixo, onClose, onSent } = props;
+  const { clientId, regiao, template, tagRegiao, onClose, onSent } = props;
   const [apenasNovos, setApenasNovos] = useState(true);
   const [contatos, setContatos] = useState<ContatoExport[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState<null | "instancia" | "manual_wa" | "download">(null);
-  const [tagOverride, setTagOverride] = useState(tagPrefixo);
+  const [tagOverride, setTagOverride] = useState(tagRegiao);
   const [tplLocal, setTplLocal] = useState(template);
+
+  useEffect(() => { setTagOverride(tagRegiao); }, [tagRegiao]);
 
   const carregar = async () => {
     setLoading(true);
@@ -336,7 +425,6 @@ function EnviarPacoteDialog(props: {
   };
 
   const registrarLoteDireto = async (canal: "manual_wa" | "download", vcfUrl: string | null) => {
-    // Para canais que não passam pela edge function: insere direto via RLS (authenticated)
     const { data: lote, error } = await supabase.from("eleicao_contato_lotes").insert({
       client_id: clientId,
       coordenador_id: regiao.coordenador_id,
@@ -348,7 +436,8 @@ function EnviarPacoteDialog(props: {
       apenas_novos: apenasNovos,
       mensagem_enviada: mensagemFinal,
       vcf_url: vcfUrl,
-    }).select("id").single();
+      tag_regiao: tagOverride || null,
+    } as any).select("id").single();
     if (error || !lote) { toast.error("Falha ao registrar lote", { description: error?.message }); return false; }
     const rows = contatos.map(c => ({
       client_id: clientId, lote_id: lote.id, coordenador_id: regiao.coordenador_id, pessoa_id: c.pessoa_id,
@@ -387,6 +476,7 @@ function EnviarPacoteDialog(props: {
           regiao_label: regiao.regiao_label,
           regiao_key: regiao.regiao_key,
           escopo: regiao.escopo,
+          tag_regiao: tagOverride || null,
         }),
       });
       const data = await resp.json().catch(() => ({}));
@@ -475,8 +565,19 @@ function EnviarPacoteDialog(props: {
 
           <Card className="p-3 space-y-3">
             <div>
-              <Label>TAG (prefixo do nome)</Label>
-              <Input value={tagOverride} onChange={e => setTagOverride(e.target.value)} placeholder="Opcional" />
+              <Label className="flex items-center gap-1">
+                <TagIcon className="w-3 h-3" />TAG da região (prefixo do nome de cada contato)
+              </Label>
+              <Input
+                value={tagOverride}
+                onChange={e => setTagOverride(normalizeTag(e.target.value))}
+                placeholder="Ex: MOR"
+                maxLength={8}
+                className="font-mono uppercase"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Vem da região <strong>{regiao.regiao_label}</strong>. Mudar aqui afeta só este envio — para mudar de forma permanente, edite no card da região.
+              </p>
             </div>
             <div>
               <Label>Mensagem que será enviada</Label>
