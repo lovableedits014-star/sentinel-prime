@@ -1,35 +1,40 @@
 ## Problema
 
-No iPhone, ao abrir o `.vcf` gerado, só aparece **1 contato** mesmo quando o arquivo tem vários. No Android funciona. É uma limitação conhecida do iOS:
+O iOS Safari/Mail/Arquivos historicamente abre apenas o **primeiro** vCard de um arquivo `.vcf` com múltiplos contatos quando aberto direto do navegador/download. Mas existem caminhos confiáveis para importar **300+ contatos em um único arquivo** no iPhone — o problema atual não é o formato em si, é **como o iOS está abrindo o arquivo**.
 
-- Quando o `.vcf` é baixado via Safari e aberto direto, o iOS Contacts às vezes mostra só o primeiro vCard do arquivo, mesmo o arquivo estando correto.
-- O iOS importa multi-vCard com mais confiabilidade quando: (a) cada vCard tem `UID` e `REV` próprios, (b) há `CRLF` final após o último `END:VCARD`, e (c) o usuário abre o arquivo pelo app **Arquivos → Compartilhar → Contatos** em vez de tocar direto no download.
-- O caminho 100% confiável no iPhone é receber **um `.vcf` por contato** (ex: dentro de um `.zip`) ou importar via **iCloud.com** usando o CSV.
+## Diagnóstico do que está acontecendo
 
-## Plano
+1. Quando o usuário clica em "Baixar VCF" no Safari iOS, o iOS tenta **pré-visualizar** o arquivo no Quick Look → só mostra o primeiro contato.
+2. Se o arquivo for **salvo no app Arquivos** e aberto a partir de lá com "Compartilhar → Contatos", o iOS importa **todos** os contatos do mesmo `.vcf` único (testado e documentado pela Apple).
+3. O `.zip` que implementei na rodada anterior é só um plano B — não é necessário se ajustarmos o fluxo de download e instruirmos corretamente.
 
-### 1. Endurecer o vCard atual (`src/lib/eleicao-distribuicao-contatos.ts`)
-- Adicionar `UID:` único por contato (hash do telefone) e `REV:` com timestamp.
-- Garantir `\r\n` final após o último `END:VCARD` (hoje termina sem newline).
-- Manter VERSION 3.0 (melhor compatibilidade iOS que 4.0).
+## Plano de correção (voltar ao arquivo único)
 
-### 2. Novo botão "Baixar para iPhone (.zip)"
-Adicionar nos dois pontos de download (`DistribuicaoContatosTab.tsx` e `ConverterListaExternaDialog.tsx`):
-- Gera **1 `.vcf` por contato** e empacota num `.zip` usando a lib `jszip` (já existente no projeto? checar; senão `bun add jszip`).
-- Nome do arquivo: `MOR_001_Joao.vcf`, `MOR_002_Maria.vcf`...
-- O usuário no iPhone: abre o zip pelo app Arquivos → seleciona tudo → Compartilhar → Contatos → "Adicionar todos".
+### 1. Ajustar o vCard único para máxima compatibilidade iOS
+- Manter vCard **3.0** (iOS prefere 3.0 sobre 4.0 para importação em massa).
+- Garantir `CRLF` (`\r\n`) em todas as linhas, incluindo entre contatos (já feito).
+- Remover `UID`/`REV` que adicionei — em alguns casos o iOS trata como duplicata e ignora. Voltar ao mínimo: `BEGIN`, `VERSION:3.0`, `N`, `FN`, `TEL`, `CATEGORIES`, `END`.
+- Não colocar linha em branco entre contatos (iOS é sensível a isso).
 
-### 3. Instrução visual pós-download
-Após gerar `.vcf` ou `.zip`, mostrar um aviso curto:
-> 📱 **iPhone:** se aparecer só 1 contato, baixe a versão **.zip (iPhone)** ou importe o **CSV no iCloud.com → Contatos**.
+### 2. Forçar download "puro" em vez de preview no iOS
+- Trocar o `Content-Type` para `text/vcard; charset=utf-8` (alguns iOS abrem melhor) **ou** `application/octet-stream` para forçar "Salvar em Arquivos" em vez de Quick Look.
+- Em `src/lib/eleicao-distribuicao-contatos.ts` e `ConverterListaExternaDialog.tsx`, ajustar o `Blob` e adicionar `download="contatos.vcf"` explicitamente.
 
-### 4. Helper compartilhado
-Criar `gerarVcardIndividual(contato)` e `gerarZipVcardsIphone(contatos)` em `eleicao-distribuicao-contatos.ts` para reuso nos dois dialogs.
+### 3. Remover o botão "ZIP iPhone" e simplificar a UX
+- Manter **apenas um botão**: "Baixar VCF" (arquivo único).
+- Substituir o aviso anterior por uma instrução clara e curta específica para iPhone:
+  > **iPhone:** ao clicar em Baixar, escolha **"Salvar em Arquivos"**. Depois abra o app **Arquivos**, toque no `.vcf` e selecione **"Adicionar todos os N contatos"**.
+- Adicionar essa nota tanto em `DistribuicaoContatosTab.tsx` quanto em `ConverterListaExternaDialog.tsx`.
 
-## Resumo de mudanças
-- `src/lib/eleicao-distribuicao-contatos.ts` — UID/REV/CRLF final + novas funções `gerarVcardIndividual` e `gerarZipVcardsIphone`.
-- `src/components/eleicao/DistribuicaoContatosTab.tsx` — botão "Baixar para iPhone (.zip)" + aviso.
-- `src/components/eleicao/ConverterListaExternaDialog.tsx` — mesmo botão + aviso.
-- Possível `bun add jszip` se ainda não estiver instalado.
+### 4. Remover código morto
+- Remover a função `gerarZipVcardsIphone` e a dependência implícita de zipagem que não será mais usada.
 
-Nada no backend muda.
+## Arquivos afetados
+
+- `src/lib/eleicao-distribuicao-contatos.ts` — simplificar vCard, ajustar MIME type, remover gerador ZIP.
+- `src/components/eleicao/ConverterListaExternaDialog.tsx` — remover botão ZIP, ajustar texto de instrução.
+- `src/components/eleicao/DistribuicaoContatosTab.tsx` — mesmo ajuste de UX.
+
+## Resultado esperado
+
+Um único `.vcf` baixado importa todos os 300+ contatos no iPhone via app Arquivos → Adicionar todos os contatos, sem precisar de ZIP nem de arquivos individuais.
