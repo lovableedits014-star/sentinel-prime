@@ -42,6 +42,7 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
   const [tag, setTag] = useState<string>("");
   const [parsing, setParsing] = useState(false);
   const [generating, setGenerating] = useState<null | "vcf" | "csv">(null);
+  const [iosDialog, setIosDialog] = useState<null | { vcfBlob: Blob; csvBlob: Blob; vcfName: string; csvName: string; total: number }>(null);
 
   const reset = () => {
     setFileName(""); setHeaders([]); setRows([]);
