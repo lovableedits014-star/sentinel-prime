@@ -97,6 +97,24 @@ export function useRegioesEleicao(clientId: string | undefined) {
     onError: (e: any) => toast.error(e?.message || "Falha ao remover região"),
   });
 
+  const updateTag = useMutation({
+    mutationFn: async ({ id, tag }: { id: string; tag: string }) => {
+      const cleanTag = normalizeTag(tag);
+      if (!cleanTag) throw new Error("Tag inválida (use 1–8 letras/números)");
+      const { error } = await supabase
+        .from("eleicao_regioes" as any)
+        .update({ tag: cleanTag })
+        .eq("id", id);
+      if (error) throw error;
+      return cleanTag;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key });
+      toast.success("TAG da região atualizada");
+    },
+    onError: (e: any) => toast.error(e?.message || "Falha ao atualizar TAG"),
+  });
+
   return {
     regioes: query.data || [],
     isLoading: query.isLoading,
@@ -104,5 +122,7 @@ export function useRegioesEleicao(clientId: string | undefined) {
     isAdding: add.isPending,
     remove: remove.mutateAsync,
     isRemoving: remove.isPending,
+    updateTag: updateTag.mutateAsync,
+    isUpdatingTag: updateTag.isPending,
   };
 }
