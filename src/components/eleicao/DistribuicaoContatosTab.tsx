@@ -9,11 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock, Tag as TagIcon, Pencil, Check, X } from "lucide-react";
+import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock, Tag as TagIcon, Pencil, Check, X, Users, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarTextoContatosBloco, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
 import { saveBlob } from "@/lib/mobile-download";
-import { useRegioesEleicao, normalizeTag, type RegiaoEleicao } from "@/hooks/useRegioesEleicao";
+import { useRegioesEleicao, normalizeTag, slugify, type RegiaoEleicao } from "@/hooks/useRegioesEleicao";
+import ConfigurarPrincipaisInteriorDialog from "./ConfigurarPrincipaisInteriorDialog";
+import ConverterListaExternaDialog from "./ConverterListaExternaDialog";
 
 interface RegiaoRow {
   escopo: string;
