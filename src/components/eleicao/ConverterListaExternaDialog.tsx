@@ -103,8 +103,8 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
     setGenerating("vcf");
     try {
       const vcf = gerarVcardLote({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
-      // octet-stream força "Salvar em Arquivos" no Safari iOS em vez de Quick Look (que mostra só 1 contato)
-      const blob = new Blob([vcf], { type: "application/octet-stream" });
+      // text/vcard dispara o handler de Contatos no iOS quando aberto pelo app Arquivos.
+      const blob = new Blob([vcf], { type: "text/vcard;charset=utf-8" });
       const base = fileName.replace(/\.[^.]+$/, "") || "lista_externa";
       await saveBlob(blob, `${base}_${Date.now()}.vcf`, { title: "Lista de contatos" });
     } finally { setGenerating(null); }
