@@ -2822,6 +2822,7 @@ export type Database = {
           ativo: boolean
           client_id: string
           created_at: string
+          escopo: string
           id: string
           label: string
           ordem: number
@@ -2833,6 +2834,7 @@ export type Database = {
           ativo?: boolean
           client_id: string
           created_at?: string
+          escopo?: string
           id?: string
           label: string
           ordem?: number
@@ -2844,6 +2846,7 @@ export type Database = {
           ativo?: boolean
           client_id?: string
           created_at?: string
+          escopo?: string
           id?: string
           label?: string
           ordem?: number
@@ -8299,6 +8302,10 @@ export type Database = {
         }
         Returns: number
       }
+      eleicao_definir_principal_regiao: {
+        Args: { _client_id: string; _coordenador_id: string }
+        Returns: undefined
+      }
       eleicao_garantir_token_indicador: {
         Args: { _indicador_id: string }
         Returns: string
@@ -8318,6 +8325,13 @@ export type Database = {
           _token: string
         }
         Returns: Json
+      }
+      eleicao_listar_cidades_interior_sem_principal: {
+        Args: { _client_id: string }
+        Returns: {
+          candidatos: Json
+          cidade: string
+        }[]
       }
       eleicao_listar_contatos_pacote: {
         Args: {

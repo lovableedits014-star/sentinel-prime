@@ -9,11 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock, Tag as TagIcon, Pencil, Check, X } from "lucide-react";
+import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock, Tag as TagIcon, Pencil, Check, X, Users, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarTextoContatosBloco, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
 import { saveBlob } from "@/lib/mobile-download";
-import { useRegioesEleicao, normalizeTag, type RegiaoEleicao } from "@/hooks/useRegioesEleicao";
+import { useRegioesEleicao, normalizeTag, slugify, type RegiaoEleicao } from "@/hooks/useRegioesEleicao";
+import ConfigurarPrincipaisInteriorDialog from "./ConfigurarPrincipaisInteriorDialog";
+import ConverterListaExternaDialog from "./ConverterListaExternaDialog";
 
 interface RegiaoRow {
   escopo: string;
@@ -61,6 +63,11 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const [busca, setBusca] = useState("");
   const [open, setOpen] = useState<RegiaoRow | null>(null);
 
+  // dialogs auxiliares
+  const [openConfigInterior, setOpenConfigInterior] = useState(false);
+  const [openConverterLista, setOpenConverterLista] = useState(false);
+  const [cidadesSemPrincipal, setCidadesSemPrincipal] = useState<number>(0);
+
   // template (apenas mensagem; a TAG agora vive em cada região)
   const [template, setTemplate] = useState<string>("");
   const [savingTpl, setSavingTpl] = useState(false);
@@ -69,27 +76,41 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const { regioes: regioesCadastradas, updateTag, isUpdatingTag } = useRegioesEleicao(clientId);
   const tagByKey = useMemo(() => {
     const m = new Map<string, RegiaoEleicao>();
-    for (const r of regioesCadastradas) m.set(r.value, r);
+    for (const r of regioesCadastradas) {
+      m.set(r.value, r);
+      m.set(slugify(r.label), r);
+      m.set(r.label.trim().toLowerCase(), r);
+    }
     return m;
   }, [regioesCadastradas]);
 
+  const lookupTag = (regiao_key: string, regiao_label: string): RegiaoEleicao | null => {
+    return tagByKey.get(regiao_key)
+      || tagByKey.get(slugify(regiao_key))
+      || tagByKey.get(slugify(regiao_label))
+      || tagByKey.get((regiao_label || "").trim().toLowerCase())
+      || null;
+  };
+
   const tagDaRegiao = (regiao_key: string, fallbackLabel: string): string => {
-    const r = tagByKey.get(regiao_key);
+    const r = lookupTag(regiao_key, fallbackLabel);
     if (r?.tag) return r.tag;
     return normalizeTag(fallbackLabel).slice(0, 6);
   };
 
   const carregar = async () => {
     setLoading(true);
-    const [{ data: regs }, { data: hist }, { data: tpl }] = await Promise.all([
+    const [{ data: regs }, { data: hist }, { data: tpl }, { data: cidadesSem }] = await Promise.all([
       supabase.rpc("eleicao_listar_regioes_distribuicao", { _client_id: clientId }),
       supabase.from("eleicao_contato_lotes")
         .select("id, coordenador_id, regiao_label, canal, total_contatos, apenas_novos, created_at, vcf_url")
         .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
       supabase.from("eleicao_distribuicao_template").select("mensagem_template").eq("client_id", clientId).maybeSingle(),
+      supabase.rpc("eleicao_listar_cidades_interior_sem_principal", { _client_id: clientId }),
     ]);
     setRegioes((regs as any) || []);
     setHistorico((hist as any) || []);
+    setCidadesSemPrincipal(((cidadesSem as any) || []).length);
     if (tpl) {
       setTemplate(tpl.mensagem_template || "");
     } else {
@@ -140,12 +161,41 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
 
         {/* ===================== REGIÕES ===================== */}
         <TabsContent value="regioes" className="space-y-3 mt-3">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Input placeholder="Buscar região ou coordenador..." value={busca} onChange={e => setBusca(e.target.value)} className="max-w-md" />
             <Button variant="outline" size="sm" onClick={carregar} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />Atualizar
             </Button>
+            <div className="ml-auto flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setOpenConverterLista(true)}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />Converter lista externa
+              </Button>
+              <Button
+                variant={cidadesSemPrincipal > 0 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOpenConfigInterior(true)}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Principais do interior
+                {cidadesSemPrincipal > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-white/20 text-current">{cidadesSemPrincipal}</Badge>
+                )}
+              </Button>
+            </div>
           </div>
+
+          {cidadesSemPrincipal > 0 && (
+            <Card className="p-3 border-amber-400 bg-amber-50/40 dark:bg-amber-900/10 flex items-center gap-3 flex-wrap">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="flex-1 min-w-0 text-sm">
+                <strong>{cidadesSemPrincipal} cidade(s) do interior</strong> com coordenadores cadastrados ainda <strong>sem principal definido</strong>.
+                Defina um principal por cidade para liberar a distribuição automática dos contatos.
+              </div>
+              <Button size="sm" onClick={() => setOpenConfigInterior(true)}>
+                Definir agora
+              </Button>
+            </Card>
+          )}
 
           <Card className="p-3 bg-muted/30 text-xs text-muted-foreground flex items-start gap-2">
             <TagIcon className="w-4 h-4 mt-0.5 shrink-0" />
@@ -168,11 +218,11 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
                   key={`${r.escopo}-${r.regiao_key}-${r.coordenador_id}`}
                   r={r}
                   tag={tagDaRegiao(r.regiao_key, r.regiao_label)}
-                  tagRow={tagByKey.get(r.regiao_key) || null}
+                  tagRow={lookupTag(r.regiao_key, r.regiao_label)}
                   onSaveTag={async (newTag) => {
-                    const row = tagByKey.get(r.regiao_key);
+                    const row = lookupTag(r.regiao_key, r.regiao_label);
                     if (!row) {
-                      toast.error("Região não está cadastrada em Configurações > Regiões");
+                      toast.error("Região não está cadastrada", { description: "Cadastre em Configurações > Regiões primeiro." });
                       return;
                     }
                     await updateTag({ id: row.id, tag: newTag });
@@ -245,6 +295,18 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
           onSent={() => { setOpen(null); carregar(); }}
         />
       )}
+
+      <ConfigurarPrincipaisInteriorDialog
+        clientId={clientId}
+        open={openConfigInterior}
+        onClose={() => setOpenConfigInterior(false)}
+        onSaved={carregar}
+      />
+
+      <ConverterListaExternaDialog
+        open={openConverterLista}
+        onClose={() => setOpenConverterLista(false)}
+      />
     </div>
   );
 }
