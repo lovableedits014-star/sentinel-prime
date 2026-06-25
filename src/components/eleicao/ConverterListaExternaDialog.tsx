@@ -109,6 +109,16 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
     } finally { setGenerating(null); }
   };
 
+  const baixarZipIphone = async () => {
+    setGenerating("zip");
+    try {
+      const blob = await gerarZipVcardsIphone({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
+      const base = fileName.replace(/\.[^.]+$/, "") || "lista_externa";
+      await saveBlob(blob, `${base}_iphone_${Date.now()}.zip`, { title: "Contatos para iPhone" });
+      toast.success("ZIP gerado", { description: "No iPhone: abra pelo app Arquivos → selecione todos os .vcf → Compartilhar → Contatos." });
+    } finally { setGenerating(null); }
+  };
+
   const baixarCsv = async () => {
     setGenerating("csv");
     try {
