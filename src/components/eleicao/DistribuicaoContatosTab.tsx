@@ -100,15 +100,17 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
 
   const carregar = async () => {
     setLoading(true);
-    const [{ data: regs }, { data: hist }, { data: tpl }] = await Promise.all([
+    const [{ data: regs }, { data: hist }, { data: tpl }, { data: cidadesSem }] = await Promise.all([
       supabase.rpc("eleicao_listar_regioes_distribuicao", { _client_id: clientId }),
       supabase.from("eleicao_contato_lotes")
         .select("id, coordenador_id, regiao_label, canal, total_contatos, apenas_novos, created_at, vcf_url")
         .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
       supabase.from("eleicao_distribuicao_template").select("mensagem_template").eq("client_id", clientId).maybeSingle(),
+      supabase.rpc("eleicao_listar_cidades_interior_sem_principal", { _client_id: clientId }),
     ]);
     setRegioes((regs as any) || []);
     setHistorico((hist as any) || []);
+    setCidadesSemPrincipal(((cidadesSem as any) || []).length);
     if (tpl) {
       setTemplate(tpl.mensagem_template || "");
     } else {
