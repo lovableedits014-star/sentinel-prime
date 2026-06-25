@@ -22,7 +22,7 @@ export function normalizeTag(s: string): string {
     .slice(0, 8);
 }
 
-function slugify(s: string): string {
+export function slugify(s: string): string {
   return s
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
