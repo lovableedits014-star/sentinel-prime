@@ -38,9 +38,53 @@ function escapeVcardText(s: string): string {
     .replace(/\n/g, "\\n");
 }
 
+function nowRevStamp(): string {
+  // RFC 2425 timestamp: 20260625T120000Z
+  return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+function uidFor(c: ContatoExport, tel: string): string {
+  const seed = (c.pessoa_id || "") + "|" + tel;
+  // hash simples e estável (djb2)
+  let h = 5381;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) + h + seed.charCodeAt(i)) | 0;
+  return `lov-${Math.abs(h).toString(36)}-${tel.replace(/\D/g, "").slice(-6)}`;
+}
+
+/** Gera UM vCard 3.0 individual (usado tanto no lote quanto no zip por contato). */
+export function gerarVcardIndividual(params: {
+  contato: ContatoExport;
+  tagPrefixo: string;
+  regiaoLabel: string;
+}): string {
+  const { contato: c, tagPrefixo, regiaoLabel } = params;
+  const tel = normalizePhoneForVcard(c.telefone);
+  if (!tel) return "";
+  const fullName = escapeVcardText(aplicarTag(c.nome || "", tagPrefixo));
+  const noteParts = [
+    regiaoLabel ? `Região: ${regiaoLabel}` : "",
+    c.tipo ? `Tipo: ${c.tipo}` : "",
+    c.bairro ? `Bairro: ${c.bairro}` : "",
+  ].filter(Boolean);
+  const linhas = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    `N:${fullName};;;;`,
+    `FN:${fullName}`,
+    `TEL;TYPE=CELL,VOICE:${tel}`,
+  ];
+  if (noteParts.length) linhas.push(`NOTE:${escapeVcardText(noteParts.join(" | "))}`);
+  linhas.push(`UID:${uidFor(c, tel)}`);
+  linhas.push(`REV:${nowRevStamp()}`);
+  linhas.push("END:VCARD");
+  return linhas.join("\r\n") + "\r\n";
+}
+
 /**
  * Gera vCard 3.0 com TODOS os contatos em um único arquivo.
- * Compatível com importação no Google Contacts, iPhone, Android.
+ * Compatível com Google Contacts, Android. iOS importa, mas em alguns
+ * casos o Safari mostra só 1 contato no preview — para iPhone use
+ * gerarZipVcardsIphone.
  */
 export function gerarVcardLote(params: {
   contatos: ContatoExport[];
@@ -48,25 +92,38 @@ export function gerarVcardLote(params: {
   regiaoLabel: string;
 }): string {
   const { contatos, tagPrefixo, regiaoLabel } = params;
-  const linhas: string[] = [];
-  for (const c of contatos) {
-    const tel = normalizePhoneForVcard(c.telefone);
-    if (!tel) continue;
-    const fullName = escapeVcardText(aplicarTag(c.nome || "", tagPrefixo));
-    const noteParts = [
-      regiaoLabel ? `Região: ${regiaoLabel}` : "",
-      c.tipo ? `Tipo: ${c.tipo}` : "",
-      c.bairro ? `Bairro: ${c.bairro}` : "",
-    ].filter(Boolean);
-    linhas.push("BEGIN:VCARD");
-    linhas.push("VERSION:3.0");
-    linhas.push(`FN:${fullName}`);
-    linhas.push(`N:${fullName};;;;`);
-    linhas.push(`TEL;TYPE=CELL,VOICE:${tel}`);
-    if (noteParts.length) linhas.push(`NOTE:${escapeVcardText(noteParts.join(" | "))}`);
-    linhas.push("END:VCARD");
+  return contatos
+    .map((contato) => gerarVcardIndividual({ contato, tagPrefixo, regiaoLabel }))
+    .filter(Boolean)
+    .join("");
+}
+
+/**
+ * Gera um ZIP com 1 arquivo .vcf por contato (mais confiável no iPhone:
+ * usuário abre o zip pelo Arquivos → seleciona todos → Compartilhar →
+ * Contatos → "Adicionar todos").
+ */
+export async function gerarZipVcardsIphone(params: {
+  contatos: ContatoExport[];
+  tagPrefixo: string;
+  regiaoLabel: string;
+}): Promise<Blob> {
+  const { contatos, tagPrefixo, regiaoLabel } = params;
+  const JSZipMod = await import("jszip");
+  const JSZip = JSZipMod.default || (JSZipMod as any);
+  const zip = new JSZip();
+  let idx = 0;
+  for (const contato of contatos) {
+    const vcf = gerarVcardIndividual({ contato, tagPrefixo, regiaoLabel });
+    if (!vcf) continue;
+    idx++;
+    const safeNome = (aplicarTag(contato.nome || "contato", tagPrefixo) || "contato")
+      .replace(/[^\p{L}\p{N}_-]+/gu, "_")
+      .slice(0, 40);
+    const seq = String(idx).padStart(3, "0");
+    zip.file(`${seq}_${safeNome}.vcf`, vcf);
   }
-  return linhas.join("\r\n");
+  return zip.generateAsync({ type: "blob", mimeType: "application/zip" });
 }
 
 /**
