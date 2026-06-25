@@ -233,11 +233,23 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
           </div>
         )}
 
+        {podeGerar && (
+          <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
+            <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
+            <div>
+              <strong>iPhone:</strong> se ao abrir o <code>.vcf</code> aparecer só 1 contato, baixe a versão <strong>ZIP iPhone</strong> — abra pelo app <em>Arquivos</em>, selecione todos os <code>.vcf</code> e use <em>Compartilhar → Contatos</em>. Alternativa: importe o CSV em <em>iCloud.com → Contatos</em>.
+            </div>
+          </div>
+        )}
         <DialogFooter className="gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => { reset(); onClose(); }}>Cancelar</Button>
           <Button variant="outline" disabled={!podeGerar || !!generating} onClick={baixarCsv}>
             {generating === "csv" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
             Baixar CSV Google
+          </Button>
+          <Button variant="outline" disabled={!podeGerar || !!generating} onClick={baixarZipIphone}>
+            {generating === "zip" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Smartphone className="w-4 h-4 mr-2" />}
+            ZIP iPhone
           </Button>
           <Button disabled={!podeGerar || !!generating} onClick={baixarVcf}>
             {generating === "vcf" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
