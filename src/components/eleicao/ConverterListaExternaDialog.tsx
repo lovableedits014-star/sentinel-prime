@@ -242,11 +242,10 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
         )}
 
         {podeGerar && (
-
           <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
             <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
             <div>
-              <strong>iPhone:</strong> baixe o <code>.vcf</code>, escolha <strong>"Salvar em Arquivos"</strong>, abra o app <em>Arquivos</em> e toque no arquivo. Vai aparecer <strong>"Adicionar todos os {contatos.length} contatos"</strong>. ⚠️ Não abra pelo Safari nem pelo Mail — eles mostram só 1.
+              <strong>iPhone:</strong> ao tocar em "Baixar .vcf" vai abrir uma tela com as melhores opções para iOS (compartilhar, abrir no Safari ou importar via iCloud/Google).
             </div>
           </div>
         )}
@@ -259,10 +258,21 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
 
           <Button disabled={!podeGerar || !!generating} onClick={baixarVcf}>
             {generating === "vcf" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-            Baixar .vcf
+            {isIOS() ? "Gerar contatos pro iPhone" : "Baixar .vcf"}
           </Button>
         </DialogFooter>
       </DialogContent>
+      {iosDialog && (
+        <IosContactsShareDialog
+          open
+          onOpenChange={(o) => { if (!o) setIosDialog(null); }}
+          vcfBlob={iosDialog.vcfBlob}
+          vcfFilename={iosDialog.vcfName}
+          totalContatos={iosDialog.total}
+          csvBlob={iosDialog.csvBlob}
+          csvFilename={iosDialog.csvName}
+        />
+      )}
     </Dialog>
   );
 }
