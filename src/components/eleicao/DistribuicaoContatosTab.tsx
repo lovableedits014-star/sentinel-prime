@@ -594,6 +594,9 @@ function EnviarPacoteDialog(props: {
     } finally {
       setSending(null);
     }
+  };
+
+
 
   const baixarCsv = async () => {
     const csv = gerarCsvGoogleContacts({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
