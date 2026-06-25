@@ -179,6 +179,7 @@ Deno.serve(async (req) => {
       mensagem_enviada: mensagem || null,
       whatsapp_message_id: whatsappMessageId,
       vcf_url: vcf_url || null,
+      tag_regiao: tag_regiao || null,
       criado_por: user.id,
     }).select("id").single();
 
