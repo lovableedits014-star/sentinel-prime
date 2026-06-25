@@ -686,7 +686,7 @@ function EnviarPacoteDialog(props: {
         <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
           <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
           <div>
-            <strong>iPhone:</strong> baixe o <code>.vcf</code>, escolha <strong>"Salvar em Arquivos"</strong>, abra o app <em>Arquivos</em> e toque no arquivo. Vai aparecer <strong>"Adicionar todos os {total} contatos"</strong>. ⚠️ Não abra pelo Safari nem pelo Mail — eles mostram só 1 contato. Tem que ser pelo app <em>Arquivos</em>.
+            <strong>iPhone:</strong> toque em "Baixar .vcf" e o sistema abre uma tela com as melhores opções pra iOS — compartilhar pelo iOS, abrir no Safari, copiar o link do arquivo ou importar via iCloud/Google (plano B garantido).
           </div>
         </div>
 
@@ -696,7 +696,8 @@ function EnviarPacoteDialog(props: {
             <FileText className="w-4 h-4 mr-2" />CSV Google
           </Button>
           <Button variant="outline" onClick={baixarVcf} disabled={total === 0 || !!sending}>
-            {sending === "download" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Baixar .vcf
+            {sending === "download" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            {isIOS() ? "Gerar contatos pro iPhone" : "Baixar .vcf"}
           </Button>
 
           <Button variant="outline" onClick={enviarManualWa} disabled={total === 0 || !!sending || !regiao.coordenador_telefone}>
@@ -707,6 +708,20 @@ function EnviarPacoteDialog(props: {
           </Button>
         </DialogFooter>
       </DialogContent>
+      {iosShare && (
+        <IosContactsShareDialog
+          open
+          onOpenChange={(o) => { if (!o) setIosShare(null); }}
+          vcfBlob={iosShare.vcfBlob}
+          vcfFilename={iosShare.vcfName}
+          totalContatos={iosShare.total}
+          publicUrl={iosShare.publicUrl}
+          csvBlob={iosShare.csvBlob}
+          csvFilename={iosShare.csvName}
+          whatsappTel={regiao.coordenador_telefone}
+          whatsappTexto={mensagemFinal}
+        />
+      )}
     </Dialog>
   );
 }
