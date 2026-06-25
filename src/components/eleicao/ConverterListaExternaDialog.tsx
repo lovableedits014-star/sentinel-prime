@@ -103,8 +103,8 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
     setGenerating("vcf");
     try {
       const vcf = gerarVcardLote({ contatos, tagPrefixo: tag, regiaoLabel: tag || "Lista externa" });
-      // octet-stream força "Salvar em Arquivos" no Safari iOS em vez de Quick Look (que mostra só 1 contato)
-      const blob = new Blob([vcf], { type: "application/octet-stream" });
+      // text/vcard dispara o handler de Contatos no iOS quando aberto pelo app Arquivos.
+      const blob = new Blob([vcf], { type: "text/vcard;charset=utf-8" });
       const base = fileName.replace(/\.[^.]+$/, "") || "lista_externa";
       await saveBlob(blob, `${base}_${Date.now()}.vcf`, { title: "Lista de contatos" });
     } finally { setGenerating(null); }
@@ -231,7 +231,7 @@ export default function ConverterListaExternaDialog({ open, onClose }: Props) {
           <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
             <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
             <div>
-              <strong>iPhone:</strong> ao clicar em <strong>Baixar .vcf</strong>, escolha <strong>"Salvar em Arquivos"</strong>. Depois abra o app <em>Arquivos</em>, toque no <code>.vcf</code> e selecione <strong>"Adicionar todos os {contatos.length} contatos"</strong>. Não abra direto no Safari (mostra só 1).
+              <strong>iPhone:</strong> baixe o <code>.vcf</code>, escolha <strong>"Salvar em Arquivos"</strong>, abra o app <em>Arquivos</em> e toque no arquivo. Vai aparecer <strong>"Adicionar todos os {contatos.length} contatos"</strong>. ⚠️ Não abra pelo Safari nem pelo Mail — eles mostram só 1.
             </div>
           </div>
         )}
