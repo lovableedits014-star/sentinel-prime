@@ -9,6 +9,16 @@ export interface RegiaoEleicao {
   label: string;
   ordem: number;
   ativo: boolean;
+  tag: string | null;
+}
+
+export function normalizeTag(s: string): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 8);
 }
 
 function slugify(s: string): string {
