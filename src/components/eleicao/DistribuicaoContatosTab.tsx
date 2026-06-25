@@ -11,11 +11,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Send, Download, MessageCircle, RefreshCw, Save, Sparkles, FileText, AlertCircle, MapPin, Phone, CheckCircle2, Clock, Tag as TagIcon, Pencil, Check, X, Users, FileSpreadsheet, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarTextoContatosBloco, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
-import { saveBlob } from "@/lib/mobile-download";
+import { aplicarTag, aplicarTemplateMensagem, gerarCsvGoogleContacts, gerarVcardLote, gerarTextoContatosBloco, contarVcardsNoConteudo, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
+import { saveBlob, isIOS } from "@/lib/mobile-download";
 import { useRegioesEleicao, normalizeTag, slugify, type RegiaoEleicao } from "@/hooks/useRegioesEleicao";
 import ConfigurarPrincipaisInteriorDialog from "./ConfigurarPrincipaisInteriorDialog";
 import ConverterListaExternaDialog from "./ConverterListaExternaDialog";
+import IosContactsShareDialog from "./IosContactsShareDialog";
 
 interface RegiaoRow {
   escopo: string;
