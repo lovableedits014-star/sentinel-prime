@@ -576,9 +576,33 @@ function EnviarPacoteDialog(props: {
     setSending("download");
     try {
       const vcfContent = gerarVcardLote({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
-      // text/vcard dispara o handler nativo de Contatos no iOS quando aberto pelo app Arquivos.
+      const count = contarVcardsNoConteudo(vcfContent);
+      if (count !== contatos.length) {
+        toast.error("Falha na geração do VCF", { description: `Esperado ${contatos.length}, gerado ${count}.` });
+        return;
+      }
       const blob = new Blob([vcfContent], { type: "text/vcard;charset=utf-8" });
-      await saveBlob(blob, `contatos_${regiao.regiao_key || "regiao"}_${Date.now()}.vcf`, { title: "Lista de contatos" });
+      const vcfName = `contatos_${regiao.regiao_key || "regiao"}_${Date.now()}.vcf`;
+
+      if (isIOS()) {
+        // iPhone: gera tudo localmente + sobe pro storage pra oferecer link público
+        const csv = gerarCsvGoogleContacts({ contatos, tagPrefixo: tagOverride, regiaoLabel: regiao.regiao_label });
+        const csvBlob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+        const publicUrl = await uploadVcfPublic().catch(() => null);
+        setIosShare({
+          vcfBlob: blob,
+          vcfName,
+          csvBlob,
+          csvName: `google_contacts_${regiao.regiao_key || "regiao"}.csv`,
+          publicUrl,
+          total: contatos.length,
+        });
+        await registrarLoteDireto("download", publicUrl);
+        onSent();
+        return;
+      }
+
+      await saveBlob(blob, vcfName, { title: "Lista de contatos" });
       await registrarLoteDireto("download", null);
       onSent();
     } finally {
