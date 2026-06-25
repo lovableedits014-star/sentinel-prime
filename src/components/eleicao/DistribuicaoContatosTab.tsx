@@ -161,12 +161,41 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
 
         {/* ===================== REGIÕES ===================== */}
         <TabsContent value="regioes" className="space-y-3 mt-3">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Input placeholder="Buscar região ou coordenador..." value={busca} onChange={e => setBusca(e.target.value)} className="max-w-md" />
             <Button variant="outline" size="sm" onClick={carregar} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />Atualizar
             </Button>
+            <div className="ml-auto flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setOpenConverterLista(true)}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />Converter lista externa
+              </Button>
+              <Button
+                variant={cidadesSemPrincipal > 0 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOpenConfigInterior(true)}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Principais do interior
+                {cidadesSemPrincipal > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-white/20 text-current">{cidadesSemPrincipal}</Badge>
+                )}
+              </Button>
+            </div>
           </div>
+
+          {cidadesSemPrincipal > 0 && (
+            <Card className="p-3 border-amber-400 bg-amber-50/40 dark:bg-amber-900/10 flex items-center gap-3 flex-wrap">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="flex-1 min-w-0 text-sm">
+                <strong>{cidadesSemPrincipal} cidade(s) do interior</strong> com coordenadores cadastrados ainda <strong>sem principal definido</strong>.
+                Defina um principal por cidade para liberar a distribuição automática dos contatos.
+              </div>
+              <Button size="sm" onClick={() => setOpenConfigInterior(true)}>
+                Definir agora
+              </Button>
+            </Card>
+          )}
 
           <Card className="p-3 bg-muted/30 text-xs text-muted-foreground flex items-start gap-2">
             <TagIcon className="w-4 h-4 mt-0.5 shrink-0" />
@@ -189,11 +218,11 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
                   key={`${r.escopo}-${r.regiao_key}-${r.coordenador_id}`}
                   r={r}
                   tag={tagDaRegiao(r.regiao_key, r.regiao_label)}
-                  tagRow={tagByKey.get(r.regiao_key) || null}
+                  tagRow={lookupTag(r.regiao_key, r.regiao_label)}
                   onSaveTag={async (newTag) => {
-                    const row = tagByKey.get(r.regiao_key);
+                    const row = lookupTag(r.regiao_key, r.regiao_label);
                     if (!row) {
-                      toast.error("Região não está cadastrada em Configurações > Regiões");
+                      toast.error("Região não está cadastrada", { description: "Cadastre em Configurações > Regiões primeiro." });
                       return;
                     }
                     await updateTag({ id: row.id, tag: newTag });
