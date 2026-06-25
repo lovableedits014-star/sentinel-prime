@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileSpreadsheet, Download, FileText, Loader2, AlertCircle, CheckCircle2, Tag as TagIcon } from "lucide-react";
+import { Upload, FileSpreadsheet, Download, FileText, Loader2, AlertCircle, CheckCircle2, Tag as TagIcon, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { gerarVcardLote, gerarCsvGoogleContacts, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
+import { gerarVcardLote, gerarCsvGoogleContacts, gerarZipVcardsIphone, type ContatoExport } from "@/lib/eleicao-distribuicao-contatos";
 import { saveBlob } from "@/lib/mobile-download";
 import { normalizeTag } from "@/hooks/useRegioesEleicao";
 
