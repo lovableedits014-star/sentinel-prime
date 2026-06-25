@@ -447,7 +447,7 @@ function EnviarPacoteDialog(props: {
   const [apenasNovos, setApenasNovos] = useState(true);
   const [contatos, setContatos] = useState<ContatoExport[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState<null | "instancia" | "manual_wa" | "download">(null);
+  const [sending, setSending] = useState<null | "instancia" | "manual_wa" | "download" | "zip">(null);
   const [tagOverride, setTagOverride] = useState(tagRegiao);
   const [tplLocal, setTplLocal] = useState(template);
 
