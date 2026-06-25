@@ -2098,6 +2098,7 @@ export type Database = {
           regiao_key: string
           regiao_label: string
           status_leitura: string | null
+          tag_regiao: string | null
           total_contatos: number
           updated_at: string
           vcf_url: string | null
@@ -2117,6 +2118,7 @@ export type Database = {
           regiao_key: string
           regiao_label: string
           status_leitura?: string | null
+          tag_regiao?: string | null
           total_contatos?: number
           updated_at?: string
           vcf_url?: string | null
@@ -2136,6 +2138,7 @@ export type Database = {
           regiao_key?: string
           regiao_label?: string
           status_leitura?: string | null
+          tag_regiao?: string | null
           total_contatos?: number
           updated_at?: string
           vcf_url?: string | null
@@ -2822,6 +2825,7 @@ export type Database = {
           id: string
           label: string
           ordem: number
+          tag: string | null
           updated_at: string
           value: string
         }
@@ -2832,6 +2836,7 @@ export type Database = {
           id?: string
           label: string
           ordem?: number
+          tag?: string | null
           updated_at?: string
           value: string
         }
@@ -2842,6 +2847,7 @@ export type Database = {
           id?: string
           label?: string
           ordem?: number
+          tag?: string | null
           updated_at?: string
           value?: string
         }
