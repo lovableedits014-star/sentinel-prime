@@ -667,12 +667,22 @@ function EnviarPacoteDialog(props: {
           </Card>
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md p-2 flex gap-2">
+          <Smartphone className="w-4 h-4 mt-0.5 shrink-0 text-amber-700 dark:text-amber-400" />
+          <div>
+            <strong>iPhone:</strong> se ao abrir o <code>.vcf</code> aparecer só 1 contato, use o botão <strong>ZIP iPhone</strong> — abra pelo app <em>Arquivos</em>, selecione todos os <code>.vcf</code> e use <em>Compartilhar → Contatos → Adicionar todos</em>.
+          </div>
+        </div>
+
+        <DialogFooter className="flex-col sm:flex-row gap-2 flex-wrap">
           <Button variant="outline" onClick={baixarCsv} disabled={total === 0}>
             <FileText className="w-4 h-4 mr-2" />CSV Google
           </Button>
           <Button variant="outline" onClick={baixarVcf} disabled={total === 0 || !!sending}>
-            {sending === "download" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}.vcf (celular)
+            {sending === "download" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}.vcf (Android)
+          </Button>
+          <Button variant="outline" onClick={baixarZipIphone} disabled={total === 0 || !!sending}>
+            {sending === "zip" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Smartphone className="w-4 h-4 mr-2" />}ZIP iPhone
           </Button>
           <Button variant="outline" onClick={enviarManualWa} disabled={total === 0 || !!sending || !regiao.coordenador_telefone}>
             {sending === "manual_wa" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MessageCircle className="w-4 h-4 mr-2" />}WhatsApp manual
