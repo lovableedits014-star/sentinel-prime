@@ -2007,6 +2007,199 @@ export type Database = {
         }
         Relationships: []
       }
+      eleicao_contato_distribuicoes: {
+        Row: {
+          client_id: string
+          coordenador_id: string
+          enviado_em: string
+          escopo: string
+          id: string
+          lote_id: string
+          pessoa_id: string
+          regiao_key: string
+        }
+        Insert: {
+          client_id: string
+          coordenador_id: string
+          enviado_em?: string
+          escopo: string
+          id?: string
+          lote_id: string
+          pessoa_id: string
+          regiao_key: string
+        }
+        Update: {
+          client_id?: string
+          coordenador_id?: string
+          enviado_em?: string
+          escopo?: string
+          id?: string
+          lote_id?: string
+          pessoa_id?: string
+          regiao_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_contato_distribuicoes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_contato_distribuicoes_coordenador_id_fkey"
+            columns: ["coordenador_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_contato_distribuicoes_coordenador_id_fkey"
+            columns: ["coordenador_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
+          },
+          {
+            foreignKeyName: "eleicao_contato_distribuicoes_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_contato_lotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_contato_distribuicoes_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_contato_distribuicoes_pessoa_id_fkey"
+            columns: ["pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
+          },
+        ]
+      }
+      eleicao_contato_lotes: {
+        Row: {
+          apenas_novos: boolean
+          canal: string
+          client_id: string
+          coordenador_id: string
+          created_at: string
+          criado_por: string | null
+          escopo: string
+          id: string
+          mensagem_enviada: string | null
+          observacao: string | null
+          regiao_key: string
+          regiao_label: string
+          status_leitura: string | null
+          total_contatos: number
+          updated_at: string
+          vcf_url: string | null
+          whatsapp_message_id: string | null
+        }
+        Insert: {
+          apenas_novos?: boolean
+          canal: string
+          client_id: string
+          coordenador_id: string
+          created_at?: string
+          criado_por?: string | null
+          escopo: string
+          id?: string
+          mensagem_enviada?: string | null
+          observacao?: string | null
+          regiao_key: string
+          regiao_label: string
+          status_leitura?: string | null
+          total_contatos?: number
+          updated_at?: string
+          vcf_url?: string | null
+          whatsapp_message_id?: string | null
+        }
+        Update: {
+          apenas_novos?: boolean
+          canal?: string
+          client_id?: string
+          coordenador_id?: string
+          created_at?: string
+          criado_por?: string | null
+          escopo?: string
+          id?: string
+          mensagem_enviada?: string | null
+          observacao?: string | null
+          regiao_key?: string
+          regiao_label?: string
+          status_leitura?: string | null
+          total_contatos?: number
+          updated_at?: string
+          vcf_url?: string | null
+          whatsapp_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_contato_lotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_contato_lotes_coordenador_id_fkey"
+            columns: ["coordenador_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eleicao_contato_lotes_coordenador_id_fkey"
+            columns: ["coordenador_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
+          },
+        ]
+      }
+      eleicao_distribuicao_template: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          mensagem_template: string
+          tag_prefixo: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          mensagem_template?: string
+          tag_prefixo?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          mensagem_template?: string
+          tag_prefixo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eleicao_distribuicao_template_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eleicao_indicacao_config: {
         Row: {
           ativo: boolean
@@ -8120,6 +8313,21 @@ export type Database = {
         }
         Returns: Json
       }
+      eleicao_listar_contatos_pacote: {
+        Args: {
+          _apenas_novos?: boolean
+          _client_id: string
+          _coordenador_id: string
+        }
+        Returns: {
+          bairro: string
+          ja_enviado: boolean
+          nome: string
+          pessoa_id: string
+          telefone: string
+          tipo: string
+        }[]
+      }
       eleicao_listar_indicacoes_token: {
         Args: { _limit?: number; _token: string }
         Returns: {
@@ -8157,6 +8365,22 @@ export type Database = {
           id: string
           nome: string
           telefone: string
+        }[]
+      }
+      eleicao_listar_regioes_distribuicao: {
+        Args: { _client_id: string }
+        Returns: {
+          coordenador_id: string
+          coordenador_nome: string
+          coordenador_telefone: string
+          escopo: string
+          regiao_key: string
+          regiao_label: string
+          total_elegivel: number
+          total_ja_enviado: number
+          total_novos: number
+          ultima_distribuicao_em: string
+          ultimo_canal: string
         }[]
       }
       eleicao_pessoa_in_user_tree: {

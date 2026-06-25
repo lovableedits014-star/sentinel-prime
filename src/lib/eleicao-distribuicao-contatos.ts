@@ -1,0 +1,135 @@
+// ============================================================
+// Helpers para a aba "Distribuição de Contatos" (Eleição)
+// Geração de vCard (.vcf), CSV (Google Contacts) e link wa.me.
+// ============================================================
+
+export interface ContatoExport {
+  pessoa_id: string;
+  nome: string;
+  telefone: string;
+  tipo?: string | null;
+  bairro?: string | null;
+}
+
+const onlyDigits = (s: string) => (s || "").replace(/\D/g, "");
+
+/** Aplica prefixo de TAG ao nome do contato (ex: "MOR - João"). */
+export function aplicarTag(nome: string, tag: string): string {
+  const t = (tag || "").trim();
+  if (!t) return nome;
+  // Evita prefixo duplicado caso o nome já comece com a tag
+  if (nome.trim().toLowerCase().startsWith(t.toLowerCase())) return nome;
+  return `${t} ${nome}`.trim();
+}
+
+function normalizePhoneForVcard(raw: string): string {
+  const d = onlyDigits(raw);
+  if (!d) return "";
+  const full = d.startsWith("55") ? d : `55${d}`;
+  // Formato padrão internacional E.164 (WhatsApp/Google aceitam)
+  return `+${full}`;
+}
+
+function escapeVcardText(s: string): string {
+  return (s || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
+}
+
+/**
+ * Gera vCard 3.0 com TODOS os contatos em um único arquivo.
+ * Compatível com importação no Google Contacts, iPhone, Android.
+ */
+export function gerarVcardLote(params: {
+  contatos: ContatoExport[];
+  tagPrefixo: string;
+  regiaoLabel: string;
+}): string {
+  const { contatos, tagPrefixo, regiaoLabel } = params;
+  const linhas: string[] = [];
+  for (const c of contatos) {
+    const tel = normalizePhoneForVcard(c.telefone);
+    if (!tel) continue;
+    const fullName = escapeVcardText(aplicarTag(c.nome || "", tagPrefixo));
+    const noteParts = [
+      regiaoLabel ? `Região: ${regiaoLabel}` : "",
+      c.tipo ? `Tipo: ${c.tipo}` : "",
+      c.bairro ? `Bairro: ${c.bairro}` : "",
+    ].filter(Boolean);
+    linhas.push("BEGIN:VCARD");
+    linhas.push("VERSION:3.0");
+    linhas.push(`FN:${fullName}`);
+    linhas.push(`N:${fullName};;;;`);
+    linhas.push(`TEL;TYPE=CELL,VOICE:${tel}`);
+    if (noteParts.length) linhas.push(`NOTE:${escapeVcardText(noteParts.join(" | "))}`);
+    linhas.push("END:VCARD");
+  }
+  return linhas.join("\r\n");
+}
+
+/**
+ * Gera CSV no formato do Google Contacts (importação direta).
+ * Colunas mínimas: Name, Given Name, Phone 1 - Type, Phone 1 - Value, Notes.
+ */
+export function gerarCsvGoogleContacts(params: {
+  contatos: ContatoExport[];
+  tagPrefixo: string;
+  regiaoLabel: string;
+}): string {
+  const { contatos, tagPrefixo, regiaoLabel } = params;
+  const header = [
+    "Name",
+    "Given Name",
+    "Phone 1 - Type",
+    "Phone 1 - Value",
+    "Notes",
+  ];
+  const rows: string[][] = [header];
+  for (const c of contatos) {
+    const tel = normalizePhoneForVcard(c.telefone);
+    if (!tel) continue;
+    const fullName = aplicarTag(c.nome || "", tagPrefixo);
+    const note = [
+      regiaoLabel ? `Região: ${regiaoLabel}` : "",
+      c.tipo ? `Tipo: ${c.tipo}` : "",
+      c.bairro ? `Bairro: ${c.bairro}` : "",
+    ].filter(Boolean).join(" | ");
+    rows.push([fullName, fullName, "Mobile", tel, note]);
+  }
+  return rows.map((r) => r.map(csvEscape).join(",")).join("\r\n");
+}
+
+function csvEscape(value: string): string {
+  const v = String(value ?? "");
+  if (/[",\n\r]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  return v;
+}
+
+/**
+ * Substitui placeholders no template da mensagem.
+ *  - [coordenador_nome] [regiao] [qtd_contatos] [qtd_novos]
+ */
+export function aplicarTemplateMensagem(template: string, vars: Record<string, string>): string {
+  let out = template || "";
+  for (const [k, v] of Object.entries(vars)) {
+    out = out.replace(new RegExp(`\\[${k}\\]`, "g"), v);
+  }
+  return out;
+}
+
+/** Monta texto-bloco com TODOS os contatos no corpo (caso usuário queira mensagem só de texto). */
+export function gerarTextoContatosBloco(params: {
+  contatos: ContatoExport[];
+  tagPrefixo: string;
+}): string {
+  const { contatos, tagPrefixo } = params;
+  return contatos
+    .map((c, i) => {
+      const tel = normalizePhoneForVcard(c.telefone);
+      const nome = aplicarTag(c.nome || "", tagPrefixo);
+      return `${i + 1}. ${nome} — ${tel}`;
+    })
+    .join("\n");
+}
