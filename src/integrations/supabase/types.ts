@@ -297,6 +297,84 @@ export type Database = {
           },
         ]
       }
+      ads_ai_suggestions: {
+        Row: {
+          acao_proposta: Json
+          ads_campaign_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          client_id: string
+          created_at: string
+          descricao: string
+          executed_at: string | null
+          execution_result: Json | null
+          expires_at: string
+          id: string
+          impacto_estimado: string | null
+          motivo: string | null
+          prioridade: string
+          status: string
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          acao_proposta?: Json
+          ads_campaign_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id: string
+          created_at?: string
+          descricao: string
+          executed_at?: string | null
+          execution_result?: Json | null
+          expires_at?: string
+          id?: string
+          impacto_estimado?: string | null
+          motivo?: string | null
+          prioridade?: string
+          status?: string
+          tipo: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          acao_proposta?: Json
+          ads_campaign_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          client_id?: string
+          created_at?: string
+          descricao?: string
+          executed_at?: string | null
+          execution_result?: Json | null
+          expires_at?: string
+          id?: string
+          impacto_estimado?: string | null
+          motivo?: string | null
+          prioridade?: string
+          status?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_ai_suggestions_ads_campaign_id_fkey"
+            columns: ["ads_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ads_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_ai_suggestions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ads_audit_log: {
         Row: {
           action: string
