@@ -158,7 +158,7 @@ export default function FrameEditor({ clientId, defaultTab = "individual" }: Fra
   const handleDownload = async () => {
     if (!resultUrl) return;
     const { saveDataUrl } = await import("@/lib/mobile-download");
-    await saveDataUrl(resultUrl, `foto-campanha-${Date.now()}.jpg`, { title: "Foto de campanha" });
+    await saveDataUrl(resultUrl, `foto-campanha-${Date.now()}.jpg`, { title: "Foto de campanha", preferDownload: true });
   };
 
   return (

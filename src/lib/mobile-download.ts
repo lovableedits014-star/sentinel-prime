@@ -82,6 +82,11 @@ export interface SaveOptions {
   text?: string;
   /** Não mostrar toast no fallback iOS (caso o componente queira tratar). */
   silent?: boolean;
+  /**
+   * Força download direto (sem abrir folha de compartilhamento).
+   * Use quando o usuário clicou em "Baixar" e espera o arquivo salvar direto.
+   */
+  preferDownload?: boolean;
 }
 
 /**
@@ -90,6 +95,24 @@ export interface SaveOptions {
 export async function saveBlob(blob: Blob, filename: string, opts: SaveOptions = {}): Promise<void> {
   const type = blob.type || inferMime(filename);
   const file = new File([blob], filename, { type });
+
+  // 0) Download direto solicitado — pula Web Share API completamente
+  if (opts.preferDownload) {
+    const url = URL.createObjectURL(blob);
+    try {
+      legacyAnchorDownload(url, filename);
+      // Em WebViews (Instagram/WhatsApp/Facebook) o <a download> costuma ser ignorado.
+      // Avisa o usuário pra abrir no navegador padrão.
+      if (isInAppBrowser() && !opts.silent) {
+        toast.info("Para baixar, abra esta página no Safari ou Chrome (toque nos 3 pontinhos → Abrir no navegador).", {
+          duration: 7000,
+        });
+      }
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    }
+    return;
+  }
 
   // 1) Web Share API com arquivo (iOS 15+, Android moderno)
   if (canShareFile(file)) {

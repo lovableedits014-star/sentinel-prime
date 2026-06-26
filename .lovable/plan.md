@@ -1,105 +1,44 @@
-## Objetivo
+## Problema
 
-Fazer a exportação/importação de contatos funcionar de forma confiável no iPhone, mesmo quando o Safari/iOS não oferece “Salvar em Arquivos” nem “Abrir em outro app”, mantendo Android funcionando.
+Hoje, ao clicar em **"Baixar"** na foto montada do perfil (frame de campanha), o sistema chama `saveDataUrl` / `saveBlob` do helper `src/lib/mobile-download.ts`. Esse helper foi feito priorizando a **Web Share API** — então no iPhone (e em alguns Androids modernos) abre a folha de compartilhamento em vez de baixar direto. Para usuários leigos isso confunde: eles esperam que "Baixar" baixe.
 
-## Problema provável
+O mesmo helper é usado em outros lugares (galeria de eventos, materiais, exportar VCF do iOS, etc.) onde **compartilhar faz sentido**. Então não dá pra simplesmente desligar Web Share globalmente — precisa ser uma opção por chamada.
 
-Hoje o app gera um `.vcf` e tenta baixar/compartilhar pelo navegador. No Android isso é tolerante. No iOS, dependendo de onde o link foi aberto, ele cai em preview/Quick Look ou WebView, e o sistema mostra só o primeiro contato. Se o usuário está dentro de Safari/WhatsApp/Instagram/Facebook WebView, muitas vezes nem aparece a opção correta de salvar/abrir.
+## Correção
 
-Então o problema não é só o conteúdo do vCard: é também o fluxo de entrega do arquivo no iOS.
+### 1. Adicionar modo "download direto" no helper `src/lib/mobile-download.ts`
 
-## Correção proposta
+Incluir uma flag `preferDownload?: boolean` em `SaveOptions`. Quando `true`:
 
-### 1. Reformular o VCF para o formato mais compatível com Apple Contacts
+- **Android / Desktop**: usa `<a download>` clássico (já é o comportamento atual no fallback).
+- **iPhone (Safari iOS 13+)**: usa `<a download>` apontando para um `blob:` URL. O Safari moderno respeita o atributo `download` para blobs same-origin e salva direto em **Arquivos → Downloads** sem abrir folha de compartilhamento. Funciona pra imagem JPG/PNG.
+- **WebView de in-app browser (Instagram/WhatsApp)**: aí sim mostra um toast curto avisando "Abra no Safari/Chrome para baixar", porque WebViews bloqueiam download de blob. Sem cair em Web Share.
+- Não chamar `navigator.share` em nenhum caminho quando `preferDownload` estiver ligado.
 
-Atualizar `src/lib/eleicao-distribuicao-contatos.ts` para gerar vCard 3.0 no padrão mais aceito pelo iOS:
+O comportamento atual (Share-first) continua sendo o **default** para os outros usos que dependem dele.
 
-- Remover separador extra estranho entre cards e garantir cada contato como bloco independente bem fechado.
-- Gerar o arquivo com `CRLF` real em todas as linhas.
-- Adicionar `X-ADDRESSBOOKSERVER-KIND:individual`, compatível com Apple Contacts.
-- Usar `N:;Nome;;;` em vez de repetir tudo no primeiro campo de sobrenome.
-- Manter `FN`, `TEL;TYPE=CELL`, `NOTE`, `UID` único e `PRODID`.
-- Remover qualquer caractere antes do primeiro `BEGIN:VCARD`.
-- Validar contagem de `BEGIN:VCARD` e `END:VCARD` antes de baixar/enviar.
+### 2. Ligar o modo nos pontos do frame de campanha
 
-### 2. Criar um fluxo especial para iPhone: “Enviar para o iPhone”
+Passar `{ preferDownload: true }` nas chamadas:
 
-Não depender mais apenas do download direto no iOS.
+- `src/components/campaign-frame/FrameEditor.tsx` linha 161 — `saveDataUrl(resultUrl, ..., { preferDownload: true })`
+- `src/components/campaign-frame/useBatchRenderer.ts` linhas 187 e 197 — `saveBlob(..., { preferDownload: true })` no ZIP e em cada foto individual baixada do lote.
 
-Criar uma função nova no helper `mobile-download.ts` para arquivos de contato:
+Esses são os fluxos do "monte sua foto de perfil" e "baixar todas".
 
-- Se for iOS e suportar Web Share com arquivo: abrir a folha nativa de compartilhamento com o `.vcf` como arquivo real.
-- Se o Web Share falhar/cancelar/não suportar: mostrar uma tela/modal própria com alternativas claras.
-- Em Android/desktop: manter download tradicional.
+### 3. Pequeno ajuste de UX
 
-### 3. Adicionar tela/modal de resgate para iPhone
+- Manter o texto do botão como **"Baixar PNG (1080x1080)"** no `FrameEditor.tsx` (sem mudança).
+- Remover a frase "Clique em Baixar e depois compartilhe…" de `src/pages/FotoPublica.tsx` linha 125 e trocar por algo mais direto tipo: *"Toque em Baixar para salvar a foto no seu celular. No iPhone, ela vai pra Arquivos → Downloads."* Isso reduz a confusão pra usuário leigo.
 
-Quando o iOS não permitir download direto, mostrar uma tela com botões grandes:
+### 4. Não mexer (importante)
 
-1. **Compartilhar arquivo**
-   - tenta novamente `navigator.share({ files })`.
-2. **Enviar pelo WhatsApp**
-   - usa o arquivo público gerado no storage e envia o link ao usuário/coordenador.
-3. **Copiar link do arquivo**
-   - para abrir no Safari fora do WebView.
-4. **Baixar CSV Google**
-   - alternativa de segurança para importar via Google Contacts/iCloud quando o iOS local continuar limitando.
+- `GaleriaEvento.tsx`, materiais da campanha, e o fluxo de **VCF iOS** continuam usando o comportamento atual (Web Share habilitado) — ali compartilhar é desejado (salvar em Contatos, mandar pro WhatsApp etc.).
 
-A mensagem deixa claro: no iPhone, abrir o `.vcf` direto no preview pode mostrar 1 contato; o caminho seguro é usar a folha de compartilhamento ou importar via Google/iCloud.
+## Testes manuais sugeridos
 
-### 4. Gerar sempre uma URL pública do VCF para iPhone
-
-Na aba de distribuição, já existe upload para o storage em alguns fluxos. Vamos padronizar:
-
-- Antes de abrir o fluxo iPhone, gerar/subir o `.vcf` no bucket.
-- Usar essa URL no botão de copiar link e no WhatsApp manual.
-- Registrar o lote apenas depois de confirmar que o arquivo foi gerado.
-
-Na conversão de lista externa, como hoje é 100% local, há duas opções:
-
-- Implementação imediata: usar Web Share/download local e fallback para CSV.
-- Implementação completa: permitir upload temporário do VCF gerado para obter link público também no conversor externo.
-
-### 5. Oferecer alternativa realmente confiável para massa grande no iPhone
-
-Adicionar botão destacado: **CSV Google / iCloud**.
-
-Porque, na prática, quando o iOS insiste em mostrar só 1 contato e não oferece salvar/abrir, a importação mais estável para 300+ contatos é:
-
-- Exportar CSV Google Contacts; ou
-- Abrir no computador/iCloud.com e importar; ou
-- Enviar o arquivo para o app Arquivos via compartilhamento nativo quando disponível.
-
-O sistema deve apresentar isso como alternativa oficial, não como detalhe escondido.
-
-### 6. Ajustar os botões existentes
-
-Em `DistribuicaoContatosTab.tsx`:
-
-- Trocar “Baixar .vcf” por dois caminhos mais claros:
-  - **iPhone / Compartilhar contatos**
-  - **Baixar .vcf Android/PC**
-- Manter “CSV Google” visível.
-- No envio ao coordenador, incluir instrução curta junto com o link do `.vcf`.
-
-Em `ConverterListaExternaDialog.tsx`:
-
-- Trocar “Baixar .vcf” por **Gerar contatos para celular**.
-- Mostrar aviso específico quando detectar iPhone/WebView.
-- Destacar CSV como plano B oficial.
-
-### 7. Validação técnica
-
-Adicionar validação simples antes de entregar o arquivo:
-
-- Contar quantos contatos válidos existem.
-- Contar quantos `BEGIN:VCARD` foram gerados.
-- Se a contagem divergir, bloquear download e mostrar erro.
-- Baixar um arquivo de teste pequeno com 3 contatos para validar visualmente em iPhone.
-
-## Resultado esperado
-
-- Android continua abrindo/importando normalmente.
-- iPhone passa a ter um fluxo próprio, com compartilhamento nativo quando possível.
-- Quando o iOS/WebView bloquear o caminho ideal, o usuário não fica sem saída: recebe link, WhatsApp e CSV Google/iCloud como alternativas claras.
-- O coordenador não recebe só uma instrução genérica; recebe o arquivo/link no caminho mais provável de funcionar no iPhone.
+1. iPhone Safari → abrir página pública, montar foto, tocar **Baixar** → arquivo cai direto em Arquivos/Downloads, sem folha de compartilhamento.
+2. Android Chrome → mesmo fluxo, baixa direto para Downloads.
+3. iPhone dentro do Instagram (WebView) → toast pedindo abrir no Safari (não tenta share).
+4. Desktop → baixa direto, sem mudança.
+5. Galeria de evento e materiais → continuam abrindo a folha de compartilhar normalmente (sem regressão).

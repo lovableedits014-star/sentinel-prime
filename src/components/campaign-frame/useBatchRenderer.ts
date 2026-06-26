@@ -184,7 +184,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
       zip.file(`${String(i + 1).padStart(2, "0")}-${safeName}.${OUTPUT_EXT}`, blob);
     }
     const out = await zip.generateAsync({ type: "blob" });
-    await saveBlob(out, `fotos-campanha-${Date.now()}.zip`, { title: "Fotos de campanha" });
+    await saveBlob(out, `fotos-campanha-${Date.now()}.zip`, { title: "Fotos de campanha", preferDownload: true });
   }, [items]);
 
   const downloadOne = useCallback(async (id: string) => {
@@ -194,7 +194,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
     try {
       const resp = await fetch(it.resultUrl);
       const blob = await resp.blob();
-      await saveBlob(blob, filename, { title: "Foto de campanha" });
+      await saveBlob(blob, filename, { title: "Foto de campanha", preferDownload: true });
     } catch {
       // Fallback bem básico
       window.open(it.resultUrl, "_blank");
