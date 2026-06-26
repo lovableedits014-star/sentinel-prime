@@ -82,6 +82,11 @@ export interface SaveOptions {
   text?: string;
   /** Não mostrar toast no fallback iOS (caso o componente queira tratar). */
   silent?: boolean;
+  /**
+   * Força download direto (sem abrir folha de compartilhamento).
+   * Use quando o usuário clicou em "Baixar" e espera o arquivo salvar direto.
+   */
+  preferDownload?: boolean;
 }
 
 /**
