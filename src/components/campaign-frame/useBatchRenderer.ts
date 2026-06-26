@@ -194,7 +194,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
     try {
       const resp = await fetch(it.resultUrl);
       const blob = await resp.blob();
-      await saveBlob(blob, filename, { title: "Foto de campanha" });
+      await saveBlob(blob, filename, { title: "Foto de campanha", preferDownload: true });
     } catch {
       // Fallback bem básico
       window.open(it.resultUrl, "_blank");
