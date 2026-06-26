@@ -69,7 +69,7 @@ export default function PublicMaterialsTab({ clientId, clientName }: { clientId:
     );
     const filename = item.storage_path.split("/").pop() || item.title;
     const { saveUrl } = await import("@/lib/mobile-download");
-    await saveUrl(item.public_url, filename, { title: item.title });
+    await saveUrl(item.public_url, filename, { title: item.title, preferDownload: true });
   }
 
   function shareWhatsApp(item: CampaignMaterial) {
