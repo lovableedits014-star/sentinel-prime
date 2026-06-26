@@ -84,6 +84,7 @@ export default function TrafegoPago() {
   const [showAccountDialog, setShowAccountDialog] = useState(false);
   const [insights, setInsights] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const periodoLiberado = useMemo(() => new Date() >= PERIODO_PERMITIDO_INICIO, []);
   const diasParaLiberacao = useMemo(() => {
