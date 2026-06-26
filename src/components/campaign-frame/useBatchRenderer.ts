@@ -184,7 +184,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
       zip.file(`${String(i + 1).padStart(2, "0")}-${safeName}.${OUTPUT_EXT}`, blob);
     }
     const out = await zip.generateAsync({ type: "blob" });
-    await saveBlob(out, `fotos-campanha-${Date.now()}.zip`, { title: "Fotos de campanha" });
+    await saveBlob(out, `fotos-campanha-${Date.now()}.zip`, { title: "Fotos de campanha", preferDownload: true });
   }, [items]);
 
   const downloadOne = useCallback(async (id: string) => {
