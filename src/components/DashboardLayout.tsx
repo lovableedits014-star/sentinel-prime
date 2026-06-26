@@ -95,6 +95,7 @@ const MENU_SECTIONS: MenuSection[] = [
       { icon: MapPin, label: "Territorial", path: "/territorial" },
       { icon: Vote, label: "Inteligência Eleitoral", path: "/inteligencia-eleitoral" },
       { icon: Newspaper, label: "Mídia", path: "/midia" },
+      { icon: Megaphone, label: "Tráfego Pago", path: "/trafego-pago" },
     ],
   },
   {
