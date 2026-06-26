@@ -72,7 +72,8 @@ const CARGOS = [
 const PERIODO_PERMITIDO_INICIO = new Date("2026-08-16T00:00:00-03:00");
 
 export default function TrafegoPago() {
-  const { data: clientId } = useActiveClientId();
+  const { data: activeClient } = useActiveClientId();
+  const clientId = activeClient?.clientId ?? null;
   const [account, setAccount] = useState<AdsAccount | null>(null);
   const [status, setStatus] = useState<IdentityStatus | null>(null);
   const [loadingDiag, setLoadingDiag] = useState(false);
