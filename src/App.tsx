@@ -69,6 +69,7 @@ const TelemarketingAdminFilas = lazy(() => import("./pages/TelemarketingAdminFil
 const FotosCampanha = lazy(() => import("./pages/FotosCampanha"));
 const GaleriaPublica = lazy(() => import("./pages/GaleriaPublica"));
 const GaleriaEvento = lazy(() => import("./pages/GaleriaEvento"));
+const TrafegoPago = lazy(() => import("./pages/TrafegoPago"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
