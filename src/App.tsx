@@ -159,6 +159,7 @@ const RoutesWithBoundary = () => {
               <Route path="/inteligencia-eleitoral" element={<InteligenciaEleitoral />} />
               <Route path="/calendario-politico" element={<CalendarioPolitico />} />
               <Route path="/midia" element={<Midia />} />
+              <Route path="/trafego-pago" element={<TrafegoPago />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/telemarketing-admin" element={<TelemarketingAdmin />} />
               <Route path="/telemarketing-admin/fila" element={<TelemarketingAdminFila />} />
