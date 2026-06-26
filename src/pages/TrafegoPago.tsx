@@ -14,11 +14,14 @@ import { Progress } from "@/components/ui/progress";
 import {
   Megaphone, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, ExternalLink,
   AlertTriangle, CheckCircle2, XCircle, Info, Plus, Calendar, DollarSign,
-  Eye, MousePointer, Users as UsersIcon, Lock, Settings as SettingsIcon
+  Eye, MousePointer, Users as UsersIcon, Lock, Settings as SettingsIcon, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { CriarCampanhaWizard } from "@/components/trafego/CriarCampanhaWizard";
+import { CampanhaCard } from "@/components/trafego/CampanhaCard";
+import { IAEstrategistaPanel } from "@/components/trafego/IAEstrategistaPanel";
 
 type AdsAccount = {
   id: string;
@@ -81,6 +84,7 @@ export default function TrafegoPago() {
   const [showAccountDialog, setShowAccountDialog] = useState(false);
   const [insights, setInsights] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const periodoLiberado = useMemo(() => new Date() >= PERIODO_PERMITIDO_INICIO, []);
   const diasParaLiberacao = useMemo(() => {
@@ -203,6 +207,7 @@ export default function TrafegoPago() {
           </TabsTrigger>
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="campanhas">Campanhas ({campaigns.length})</TabsTrigger>
+          <TabsTrigger value="ia"><Sparkles className="h-4 w-4 mr-1" />IA Estrategista</TabsTrigger>
           <TabsTrigger value="conta">Conta & Configurações</TabsTrigger>
         </TabsList>
 
@@ -247,41 +252,35 @@ export default function TrafegoPago() {
         </TabsContent>
 
         <TabsContent value="campanhas" className="space-y-4">
-          {campaigns.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">Sincronize para ver suas campanhas existentes na Meta.</CardContent></Card>
-          ) : (
-            <div className="space-y-2">
-              {campaigns.map(c => (
-                <Card key={c.id}>
-                  <CardContent className="p-4 flex justify-between items-center">
-                    <div>
-                      <div className="font-medium">{c.nome}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {c.objetivo} · {c.status}
-                        {c.is_political && <Badge variant="outline" className="ml-2">Político</Badge>}
-                      </div>
-                    </div>
-                    <div className="text-right text-sm">
-                      {c.daily_budget_cents && <div>R$ {(c.daily_budget_cents / 100).toFixed(2)}/dia</div>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              <Alert>
-                <Lock className="h-4 w-4" />
-                <AlertTitle>Criação e edição vêm na Fase 2</AlertTitle>
-                <AlertDescription>
-                  Fase 1 é read-only: sincroniza o que já existe. Na próxima fase você poderá criar campanhas direto daqui, com o Guard Eleitoral validando antes de publicar.
-                </AlertDescription>
-              </Alert>
+          {account && periodoLiberado && (
+            <div className="flex justify-end">
+              <Button onClick={() => setWizardOpen(true)}><Plus className="h-4 w-4 mr-2" />Nova campanha</Button>
             </div>
           )}
+          {!periodoLiberado && (
+            <Alert><Lock className="h-4 w-4" /><AlertTitle>Criação liberada em 16/ago/2026</AlertTitle>
+              <AlertDescription>Faltam {diasParaLiberacao} dias. Use este tempo para configurar conta, identidade e CNPJ.</AlertDescription>
+            </Alert>
+          )}
+          {campaigns.length === 0 ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhuma campanha ainda. Crie a primeira ou sincronize existentes da Meta.</CardContent></Card>
+          ) : (
+            <div className="space-y-2">
+              {campaigns.map(c => <CampanhaCard key={c.id} campaign={c} clientId={clientId} onChanged={loadAll} />)}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="ia" className="space-y-4">
+          <IAEstrategistaPanel clientId={clientId} />
         </TabsContent>
 
         <TabsContent value="conta" className="space-y-4">
           <AccountForm account={account} clientId={clientId} onSaved={loadAll} />
         </TabsContent>
       </Tabs>
+
+      <CriarCampanhaWizard open={wizardOpen} onOpenChange={setWizardOpen} clientId={clientId} onCreated={loadAll} />
 
       <Dialog open={showAccountDialog} onOpenChange={setShowAccountDialog}>
         <DialogContent>
