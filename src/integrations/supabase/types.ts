@@ -157,6 +157,625 @@ export type Database = {
           },
         ]
       }
+      ads_accounts: {
+        Row: {
+          ativa: boolean | null
+          business_manager_id: string | null
+          candidato_cargo: string | null
+          candidato_nome: string | null
+          candidato_numero: string | null
+          client_id: string
+          cnpj_eleitoral: string | null
+          created_at: string
+          disclaimer_pago_por: string | null
+          id: string
+          identidade_expira_em: string | null
+          identidade_meta_confirmada: boolean | null
+          instagram_id: string | null
+          meta_ad_account_id: string
+          page_id: string | null
+          pixel_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean | null
+          business_manager_id?: string | null
+          candidato_cargo?: string | null
+          candidato_nome?: string | null
+          candidato_numero?: string | null
+          client_id: string
+          cnpj_eleitoral?: string | null
+          created_at?: string
+          disclaimer_pago_por?: string | null
+          id?: string
+          identidade_expira_em?: string | null
+          identidade_meta_confirmada?: boolean | null
+          instagram_id?: string | null
+          meta_ad_account_id: string
+          page_id?: string | null
+          pixel_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean | null
+          business_manager_id?: string | null
+          candidato_cargo?: string | null
+          candidato_nome?: string | null
+          candidato_numero?: string | null
+          client_id?: string
+          cnpj_eleitoral?: string | null
+          created_at?: string
+          disclaimer_pago_por?: string | null
+          id?: string
+          identidade_expira_em?: string | null
+          identidade_meta_confirmada?: boolean | null
+          instagram_id?: string | null
+          meta_ad_account_id?: string
+          page_id?: string | null
+          pixel_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_accounts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads_adsets: {
+        Row: {
+          billing_event: string | null
+          campaign_id: string | null
+          client_id: string
+          created_at: string
+          daily_budget_cents: number | null
+          end_time: string | null
+          id: string
+          last_synced_at: string | null
+          meta_adset_id: string
+          nome: string
+          optimization_goal: string | null
+          raw_data: Json | null
+          start_time: string | null
+          status: string | null
+          targeting: Json | null
+          updated_at: string
+        }
+        Insert: {
+          billing_event?: string | null
+          campaign_id?: string | null
+          client_id: string
+          created_at?: string
+          daily_budget_cents?: number | null
+          end_time?: string | null
+          id?: string
+          last_synced_at?: string | null
+          meta_adset_id: string
+          nome: string
+          optimization_goal?: string | null
+          raw_data?: Json | null
+          start_time?: string | null
+          status?: string | null
+          targeting?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          billing_event?: string | null
+          campaign_id?: string | null
+          client_id?: string
+          created_at?: string
+          daily_budget_cents?: number | null
+          end_time?: string | null
+          id?: string
+          last_synced_at?: string | null
+          meta_adset_id?: string
+          nome?: string
+          optimization_goal?: string | null
+          raw_data?: Json | null
+          start_time?: string | null
+          status?: string | null
+          targeting?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_adsets_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ads_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_adsets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads_audit_log: {
+        Row: {
+          action: string
+          client_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: string | null
+          target_id: string | null
+          target_type: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          client_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          target_id?: string | null
+          target_type?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          client_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          target_id?: string | null
+          target_type?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_audit_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads_campaigns: {
+        Row: {
+          ads_account_id: string | null
+          client_id: string
+          created_at: string
+          created_by_user_id: string | null
+          daily_budget_cents: number | null
+          guard_status: string | null
+          id: string
+          is_political: boolean | null
+          last_synced_at: string | null
+          lifetime_budget_cents: number | null
+          meta_campaign_id: string
+          nome: string
+          objetivo: string | null
+          raw_data: Json | null
+          special_ad_categories: string[] | null
+          start_time: string | null
+          status: string | null
+          stop_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          ads_account_id?: string | null
+          client_id: string
+          created_at?: string
+          created_by_user_id?: string | null
+          daily_budget_cents?: number | null
+          guard_status?: string | null
+          id?: string
+          is_political?: boolean | null
+          last_synced_at?: string | null
+          lifetime_budget_cents?: number | null
+          meta_campaign_id: string
+          nome: string
+          objetivo?: string | null
+          raw_data?: Json | null
+          special_ad_categories?: string[] | null
+          start_time?: string | null
+          status?: string | null
+          stop_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ads_account_id?: string | null
+          client_id?: string
+          created_at?: string
+          created_by_user_id?: string | null
+          daily_budget_cents?: number | null
+          guard_status?: string | null
+          id?: string
+          is_political?: boolean | null
+          last_synced_at?: string | null
+          lifetime_budget_cents?: number | null
+          meta_campaign_id?: string
+          nome?: string
+          objetivo?: string | null
+          raw_data?: Json | null
+          special_ad_categories?: string[] | null
+          start_time?: string | null
+          status?: string | null
+          stop_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_campaigns_ads_account_id_fkey"
+            columns: ["ads_account_id"]
+            isOneToOne: false
+            referencedRelation: "ads_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads_creatives: {
+        Row: {
+          adset_id: string | null
+          call_to_action: string | null
+          client_id: string
+          copy_description: string | null
+          copy_headline: string | null
+          copy_text: string | null
+          created_at: string
+          gerado_por_ia: boolean | null
+          id: string
+          image_url: string | null
+          meta_ad_id: string | null
+          meta_creative_id: string | null
+          nome: string | null
+          raw_data: Json | null
+          rotulo_ia_aplicado: boolean | null
+          status: string | null
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          adset_id?: string | null
+          call_to_action?: string | null
+          client_id: string
+          copy_description?: string | null
+          copy_headline?: string | null
+          copy_text?: string | null
+          created_at?: string
+          gerado_por_ia?: boolean | null
+          id?: string
+          image_url?: string | null
+          meta_ad_id?: string | null
+          meta_creative_id?: string | null
+          nome?: string | null
+          raw_data?: Json | null
+          rotulo_ia_aplicado?: boolean | null
+          status?: string | null
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          adset_id?: string | null
+          call_to_action?: string | null
+          client_id?: string
+          copy_description?: string | null
+          copy_headline?: string | null
+          copy_text?: string | null
+          created_at?: string
+          gerado_por_ia?: boolean | null
+          id?: string
+          image_url?: string | null
+          meta_ad_id?: string | null
+          meta_creative_id?: string | null
+          nome?: string | null
+          raw_data?: Json | null
+          rotulo_ia_aplicado?: boolean | null
+          status?: string | null
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_creatives_adset_id_fkey"
+            columns: ["adset_id"]
+            isOneToOne: false
+            referencedRelation: "ads_adsets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_creatives_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads_guard_checks: {
+        Row: {
+          campaign_id: string | null
+          check_categoria_politica: boolean | null
+          check_disclaimer: boolean | null
+          check_identidade_valida: boolean | null
+          check_limite_tse: boolean | null
+          check_numero_cargo: boolean | null
+          check_periodo: boolean | null
+          check_rotulo_ia: boolean | null
+          check_sem_adversario: boolean | null
+          check_sem_termos_proibidos: boolean | null
+          client_id: string
+          created_at: string
+          creative_id: string | null
+          failures: Json | null
+          id: string
+          passed: boolean
+          triggered_by: string | null
+          warnings: Json | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          check_categoria_politica?: boolean | null
+          check_disclaimer?: boolean | null
+          check_identidade_valida?: boolean | null
+          check_limite_tse?: boolean | null
+          check_numero_cargo?: boolean | null
+          check_periodo?: boolean | null
+          check_rotulo_ia?: boolean | null
+          check_sem_adversario?: boolean | null
+          check_sem_termos_proibidos?: boolean | null
+          client_id: string
+          created_at?: string
+          creative_id?: string | null
+          failures?: Json | null
+          id?: string
+          passed?: boolean
+          triggered_by?: string | null
+          warnings?: Json | null
+        }
+        Update: {
+          campaign_id?: string | null
+          check_categoria_politica?: boolean | null
+          check_disclaimer?: boolean | null
+          check_identidade_valida?: boolean | null
+          check_limite_tse?: boolean | null
+          check_numero_cargo?: boolean | null
+          check_periodo?: boolean | null
+          check_rotulo_ia?: boolean | null
+          check_sem_adversario?: boolean | null
+          check_sem_termos_proibidos?: boolean | null
+          client_id?: string
+          created_at?: string
+          creative_id?: string | null
+          failures?: Json | null
+          id?: string
+          passed?: boolean
+          triggered_by?: string | null
+          warnings?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_guard_checks_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "ads_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_guard_checks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_guard_checks_creative_id_fkey"
+            columns: ["creative_id"]
+            isOneToOne: false
+            referencedRelation: "ads_creatives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads_identity_status: {
+        Row: {
+          ad_account_active: boolean | null
+          ads_account_id: string | null
+          authorized_advertiser_linked: boolean | null
+          business_manager_linked: boolean | null
+          checked_at: string
+          client_id: string
+          cnpj_eleitoral_set: boolean | null
+          created_at: string
+          disclaimer_configured: boolean | null
+          has_ads_management: boolean | null
+          has_ads_read: boolean | null
+          has_business_management: boolean | null
+          has_leads_retrieval: boolean | null
+          has_pages_manage_ads: boolean | null
+          id: string
+          issues: Json | null
+          overall_status: string | null
+          pixel_configured: boolean | null
+          political_identity_confirmed: boolean | null
+          political_identity_expires_at: string | null
+          raw_response: Json | null
+        }
+        Insert: {
+          ad_account_active?: boolean | null
+          ads_account_id?: string | null
+          authorized_advertiser_linked?: boolean | null
+          business_manager_linked?: boolean | null
+          checked_at?: string
+          client_id: string
+          cnpj_eleitoral_set?: boolean | null
+          created_at?: string
+          disclaimer_configured?: boolean | null
+          has_ads_management?: boolean | null
+          has_ads_read?: boolean | null
+          has_business_management?: boolean | null
+          has_leads_retrieval?: boolean | null
+          has_pages_manage_ads?: boolean | null
+          id?: string
+          issues?: Json | null
+          overall_status?: string | null
+          pixel_configured?: boolean | null
+          political_identity_confirmed?: boolean | null
+          political_identity_expires_at?: string | null
+          raw_response?: Json | null
+        }
+        Update: {
+          ad_account_active?: boolean | null
+          ads_account_id?: string | null
+          authorized_advertiser_linked?: boolean | null
+          business_manager_linked?: boolean | null
+          checked_at?: string
+          client_id?: string
+          cnpj_eleitoral_set?: boolean | null
+          created_at?: string
+          disclaimer_configured?: boolean | null
+          has_ads_management?: boolean | null
+          has_ads_read?: boolean | null
+          has_business_management?: boolean | null
+          has_leads_retrieval?: boolean | null
+          has_pages_manage_ads?: boolean | null
+          id?: string
+          issues?: Json | null
+          overall_status?: string | null
+          pixel_configured?: boolean | null
+          political_identity_confirmed?: boolean | null
+          political_identity_expires_at?: string | null
+          raw_response?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_identity_status_ads_account_id_fkey"
+            columns: ["ads_account_id"]
+            isOneToOne: false
+            referencedRelation: "ads_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ads_identity_status_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads_insights_daily: {
+        Row: {
+          clicks: number | null
+          client_id: string
+          conversions: number | null
+          cpc_cents: number | null
+          cpm_cents: number | null
+          cpr_cents: number | null
+          ctr: number | null
+          date: string
+          id: string
+          impressions: number | null
+          leads: number | null
+          level: string
+          level_id: string
+          raw_data: Json | null
+          reach: number | null
+          spend_cents: number | null
+          synced_at: string
+        }
+        Insert: {
+          clicks?: number | null
+          client_id: string
+          conversions?: number | null
+          cpc_cents?: number | null
+          cpm_cents?: number | null
+          cpr_cents?: number | null
+          ctr?: number | null
+          date: string
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          level: string
+          level_id: string
+          raw_data?: Json | null
+          reach?: number | null
+          spend_cents?: number | null
+          synced_at?: string
+        }
+        Update: {
+          clicks?: number | null
+          client_id?: string
+          conversions?: number | null
+          cpc_cents?: number | null
+          cpm_cents?: number | null
+          cpr_cents?: number | null
+          ctr?: number | null
+          date?: string
+          id?: string
+          impressions?: number | null
+          leads?: number | null
+          level?: string
+          level_id?: string
+          raw_data?: Json | null
+          reach?: number | null
+          spend_cents?: number | null
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_insights_daily_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ads_tse_limits: {
+        Row: {
+          ano_eleicao: number
+          cargo: string
+          created_at: string
+          id: string
+          limite_pre_campanha_cents: number | null
+          limite_total_cents: number
+          observacoes: string | null
+          uf: string | null
+        }
+        Insert: {
+          ano_eleicao: number
+          cargo: string
+          created_at?: string
+          id?: string
+          limite_pre_campanha_cents?: number | null
+          limite_total_cents: number
+          observacoes?: string | null
+          uf?: string | null
+        }
+        Update: {
+          ano_eleicao?: number
+          cargo?: string
+          created_at?: string
+          id?: string
+          limite_pre_campanha_cents?: number | null
+          limite_total_cents?: number
+          observacoes?: string | null
+          uf?: string | null
+        }
+        Relationships: []
+      }
       adversarios_politicos: {
         Row: {
           ativo: boolean
