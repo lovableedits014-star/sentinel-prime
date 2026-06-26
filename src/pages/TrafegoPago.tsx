@@ -14,11 +14,14 @@ import { Progress } from "@/components/ui/progress";
 import {
   Megaphone, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, ExternalLink,
   AlertTriangle, CheckCircle2, XCircle, Info, Plus, Calendar, DollarSign,
-  Eye, MousePointer, Users as UsersIcon, Lock, Settings as SettingsIcon
+  Eye, MousePointer, Users as UsersIcon, Lock, Settings as SettingsIcon, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { CriarCampanhaWizard } from "@/components/trafego/CriarCampanhaWizard";
+import { CampanhaCard } from "@/components/trafego/CampanhaCard";
+import { IAEstrategistaPanel } from "@/components/trafego/IAEstrategistaPanel";
 
 type AdsAccount = {
   id: string;
