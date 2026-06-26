@@ -207,6 +207,7 @@ export default function TrafegoPago() {
           </TabsTrigger>
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="campanhas">Campanhas ({campaigns.length})</TabsTrigger>
+          <TabsTrigger value="ia"><Sparkles className="h-4 w-4 mr-1" />IA Estrategista</TabsTrigger>
           <TabsTrigger value="conta">Conta & Configurações</TabsTrigger>
         </TabsList>
 
