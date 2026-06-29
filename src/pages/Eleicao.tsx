@@ -1940,11 +1940,21 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
             <span className="truncate hidden md:inline">· <MapPin className="w-2.5 h-2.5 inline mr-0.5" />{p.endereco}</span>
           )}
         </div>
+        {parentName && (p.tipo === "lider" || p.tipo === "cabo") && (
+          <div className="text-[10.5px] text-muted-foreground/90 mt-0.5 italic truncate">
+            ↳ Vinculado a {parentTipo === "coordenador" ? "coordenador" : "líder"} <span className="font-medium text-foreground/80 not-italic">{parentName}</span>
+          </div>
+        )}
       </div>
 
       {teamCount !== undefined && (
         <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0 gap-0.5">
           <Users className="w-2.5 h-2.5" />{teamCount}
+        </Badge>
+      )}
+      {matchInTeam !== undefined && matchInTeam > 0 && (
+        <Badge className="text-[10px] h-5 px-1.5 shrink-0 gap-0.5 bg-yellow-400 text-yellow-950 hover:bg-yellow-400">
+          <Search className="w-2.5 h-2.5" />{matchInTeam} na equipe
         </Badge>
       )}
       {bulkAction && (
