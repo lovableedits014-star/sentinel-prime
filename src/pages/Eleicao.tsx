@@ -1820,7 +1820,7 @@ function FavoritoToggle({ pessoa }: { pessoa: Pessoa }) {
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction }: {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction, matchInTeam }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
@@ -1832,10 +1832,16 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   expanded?: boolean;
   onToggle?: () => void;
   bulkAction?: { label: string; onClick: () => void };
+  matchInTeam?: number;
 }) {
   const actions = React.useContext(EleicaoActionsContext);
   const onTogglePermissao = actions?.onTogglePermissao;
   const onResendLiderFlow = actions?.onResendLiderFlow;
+  const { searchActive, matchedIds, nameById, tipoById } = React.useContext(EleicaoSearchContext);
+  const isMatch = searchActive && matchedIds.has(p.id);
+  const parentName = p.parent_id ? nameById.get(p.parent_id) : null;
+  const parentTipo = p.parent_id ? tipoById.get(p.parent_id) : null;
+
 
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
