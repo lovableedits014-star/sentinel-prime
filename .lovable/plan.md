@@ -1,62 +1,44 @@
-# Fase 2 — Criação de Campanhas + Guard Eleitoral
+## Problema confirmado
 
-Já temos a Fase 1 (diagnóstico, dashboard read-only, configuração da conta). Agora vamos permitir **criar e gerenciar campanhas direto pela plataforma**, com as travas eleitorais aplicadas automaticamente antes de qualquer publicação.
+Quando você pesquisa "luciana", o sistema **conta corretamente** as 2 pessoas na Moreninha (badge mostra "Moreninha 2"), mas só exibe 1 — a Luciana Dantas, que é **avulsa**. A outra Luciana (a do telefone 67 9211-3443) está **vinculada ao coordenador Humberto Cantuario** e fica escondida dentro do bloco do coordenador, que está colapsado.
 
-## O que será entregue
+A busca filtra a pessoa corretamente no banco, mas o componente do coordenador não se abre automaticamente para mostrar o resultado, então quem pesquisa acha que ela não existe.
 
-### 1. Wizard de criação de campanha (4 passos)
-- **Passo 1 — Objetivo**: Reconhecimento, Tráfego, Engajamento, Mensagens (WhatsApp), Leads. Cada um com explicação em linguagem leiga ("para quê serve").
-- **Passo 2 — Público**: localização (cidade/região/raio), idade 18+, interesses sugeridos por cargo. Bloqueios automáticos do TSE aplicados (sem lookalike de eleitores, sem dados sensíveis).
-- **Passo 3 — Criativo**: upload de imagem/vídeo + texto. IA analisa e mostra alertas (número do candidato presente? cargo claro? menção a adversário?).
-- **Passo 4 — Orçamento + revisão**: diário ou total, datas, e tela final com o "Guard Eleitoral" rodando 9 checks visíveis antes de liberar o botão "Publicar".
+## Correção
 
-### 2. Guard Eleitoral (executado antes do publish)
-Cada check vira um cartão verde/amarelo/vermelho. Vermelho **bloqueia** a publicação:
-1. Período eleitoral liberado (>= 16/ago/2026)
-2. Categoria `ISSUES_ELECTIONS_POLITICS` marcada
-3. Disclaimer "Pago por..." injetado no criativo
-4. Identidade Meta confirmada e não expirada
-5. CNPJ eleitoral cadastrado
-6. Sem menção a adversários (IA analisa texto)
-7. Número e cargo do candidato presentes (IA analisa imagem/texto)
-8. Dentro do teto de gasto TSE para o cargo
-9. Rótulo "Conteúdo IA" quando criativo foi gerado por IA
+### 1. Coordenadores se abrem sozinhos quando há resultado dentro deles
+Quando você está pesquisando e algum líder ou cabo da equipe do coordenador bate com a busca:
 
-### 3. Gestão da campanha publicada
-- Botões **Pausar / Reativar / Duplicar / Encerrar** com confirmação.
-- Edição de orçamento (slider com novo valor; chama API Meta e registra em `ads_audit_log`).
-- Histórico de alterações (auditoria visível por campanha).
+- O bloco do coordenador abre automaticamente.
+- Os líderes que não batem com a busca ficam ocultos (só aparece a pessoa procurada).
+- O bloco mostra um aviso amarelo do tipo "1 resultado encontrado na equipe".
 
-### 4. IA Estrategista (modo "sempre pedir aprovação")
-- Card na campanha: "A IA sugere: aumentar orçamento de R$50→R$80 (CPR caiu 30%)".
-- Botões **Aprovar / Recusar / Ver detalhes**. Nada é executado sem aprovação.
-- Sugestões geradas por job diário lendo `ads_insights_daily`.
+Sem busca ativa, comportamento atual continua igual (coordenadores colapsados).
 
-## Arquivos a criar/editar
+### 2. Cada linha mostra a quem está vinculada
+Em toda linha de líder ou cabo, abaixo do nome aparece de forma discreta:
 
-### Edge Functions (novas)
-- `ads-create-campaign` — recebe payload validado, roda Guard, cria Campaign+AdSet+Ad+Creative na Marketing API, persiste local.
-- `ads-update-campaign` — pausar/reativar/editar orçamento, com auditoria.
-- `ads-guard-check` — roda os 9 checks isoladamente (chamada do wizard antes de publicar).
-- `ads-ai-suggestions` — lê insights, gera sugestões via Lovable AI, grava em nova tabela `ads_ai_suggestions`.
+- Para líder vinculado: "Vinculado ao coordenador Humberto Cantuario"
+- Para cabo vinculado a líder: "Vinculado ao líder X / coordenador Y"
+- Para avulso: "Líder avulso (sem coordenador)" — já existe hoje.
 
-### Frontend
-- `src/components/trafego/CriarCampanhaWizard.tsx` — wizard 4 passos.
-- `src/components/trafego/GuardChecklist.tsx` — UI dos 9 checks.
-- `src/components/trafego/CampanhaCard.tsx` — card com pause/play/edit + sugestões IA.
-- `src/components/trafego/IAEstrategistaPanel.tsx` — lista de sugestões pendentes.
-- Atualizar `src/pages/TrafegoPago.tsx` para integrar wizard e ações nas campanhas.
+Assim, quando você achar a pessoa, já sabe imediatamente de quem ela depende.
 
-### Banco
-- Nova tabela `ads_ai_suggestions` (campanha, tipo, descrição, ação proposta, status: pendente/aprovada/recusada).
-- Migração das limits TSE 2026 (seed em `ads_tse_limits` por cargo).
+### 3. Contador da região reflete só o que está visível
+Quando há busca ativa e a região mostra "2 resultados", os 2 devem realmente aparecer na lista. O auto-expandir do item 1 já garante isso.
 
-## Ordem de implementação
-1. Migração: `ads_ai_suggestions` + seed TSE 2026.
-2. Edge `ads-guard-check` (isolada, usada pelo wizard).
-3. Edge `ads-create-campaign` (usa o guard internamente).
-4. Wizard frontend + integração na página.
-5. Edge `ads-update-campaign` + botões pause/play.
-6. Edge `ads-ai-suggestions` + painel IA + cron diário.
+### 4. Ao tentar cadastrar telefone duplicado, mostrar onde está
+Quando o sistema bloquear "telefone já cadastrado", a mensagem passa a incluir:
 
-Posso ir direto na ordem acima ou prefere fatiar (ex: só itens 1-4 agora, IA depois)?
+- Nome cadastrado, tipo (coordenador/líder/cabo), região.
+- Se vinculada, o nome do coordenador/líder responsável.
+
+Exemplo: "Telefone já cadastrado: **Luciana** — Líder na Moreninha, vinculada ao coordenador Humberto Cantuario."
+
+## Arquivo afetado
+
+- `src/pages/Eleicao.tsx` (componentes `CoordBlock`, `LiderBlock`, `PessoaRow` e validação de duplicidade no formulário de cadastro).
+
+## Resultado esperado
+
+Ao pesquisar **luciana** ou **9211-3443**, as duas Lucianas da Moreninha aparecem visíveis na hora, com o nome do coordenador ao lado das que estão vinculadas. Nenhum cadastro fica mais "invisível" por estar dentro de um coordenador fechado.
