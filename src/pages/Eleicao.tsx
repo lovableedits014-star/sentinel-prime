@@ -1862,6 +1862,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         indent === 0 && "py-2.5 hover:border-l-primary/50",
         indent === 1 && "hover:border-l-blue-500/50",
         indent === 2 && "hover:border-l-green-500/50",
+        isMatch && "bg-yellow-100/60 dark:bg-yellow-500/10 border-l-yellow-400",
       )}
       style={{ paddingLeft: `${10 + indent * 22}px` }}
       onClick={onToggle}
