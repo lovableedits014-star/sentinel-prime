@@ -198,6 +198,22 @@ type EleicaoActions = {
 };
 const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
 
+// Contexto da busca atual — usado para auto-expandir blocos e mostrar vínculos
+type EleicaoSearchCtx = {
+  searchActive: boolean;
+  matchedIds: Set<string>;
+  nameById: Map<string, string>;
+  tipoById: Map<string, Tipo>;
+  parentById: Map<string, string | null>;
+};
+const EleicaoSearchContext = React.createContext<EleicaoSearchCtx>({
+  searchActive: false,
+  matchedIds: new Set(),
+  nameById: new Map(),
+  tipoById: new Map(),
+  parentById: new Map(),
+});
+
 
 export default function Eleicao() {
   const { data: clientId } = useCurrentClientId();
