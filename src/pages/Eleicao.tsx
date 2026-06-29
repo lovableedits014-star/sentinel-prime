@@ -1727,9 +1727,16 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
   onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null;
 }) {
   const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === lider.id);
-  const [open, setOpen] = useState(true);
   const hasCabos = cabos.length > 0;
-  
+  const { searchActive, matchedIds } = React.useContext(EleicaoSearchContext);
+  const matchesNaEquipe = useMemo(
+    () => (searchActive ? cabos.filter(c => matchedIds.has(c.id)).length : 0),
+    [searchActive, matchedIds, cabos],
+  );
+  const [open, setOpen] = useState(true);
+  React.useEffect(() => {
+    if (searchActive && matchesNaEquipe > 0) setOpen(true);
+  }, [searchActive, matchesNaEquipe]);
 
   return (
     <div className="border-t border-border/40">
@@ -1742,6 +1749,7 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
         sendingId={sendingId}
         indent={1}
         teamCount={hasCabos ? cabos.length : undefined}
+        matchInTeam={matchesNaEquipe}
         expanded={open}
         onToggle={hasCabos ? () => setOpen(o => !o) : undefined}
       />
