@@ -1531,6 +1531,7 @@ export default function Eleicao() {
         onExport={handleExport}
       />
     </div>
+    </EleicaoSearchContext.Provider>
     </EleicaoActionsContext.Provider>
   );
 }
