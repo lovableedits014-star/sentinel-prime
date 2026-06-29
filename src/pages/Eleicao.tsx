@@ -198,6 +198,22 @@ type EleicaoActions = {
 };
 const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
 
+// Contexto da busca atual — usado para auto-expandir blocos e mostrar vínculos
+type EleicaoSearchCtx = {
+  searchActive: boolean;
+  matchedIds: Set<string>;
+  nameById: Map<string, string>;
+  tipoById: Map<string, Tipo>;
+  parentById: Map<string, string | null>;
+};
+const EleicaoSearchContext = React.createContext<EleicaoSearchCtx>({
+  searchActive: false,
+  matchedIds: new Set(),
+  nameById: new Map(),
+  tipoById: new Map(),
+  parentById: new Map(),
+});
+
 
 export default function Eleicao() {
   const { data: clientId } = useCurrentClientId();
@@ -596,9 +612,65 @@ export default function Eleicao() {
     return p.nome.toLowerCase().includes(q) || p.telefone.includes(search) || (p.endereco || "").toLowerCase().includes(q);
   };
 
-  const escopoList = pessoas.filter(p =>
-    p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p)
+  // Índice global de pessoas para resolver ancestrais (mesmo escopo) e nomes de pais
+  const pessoaById = useMemo(() => {
+    const m = new Map<string, Pessoa>();
+    pessoas.forEach(p => m.set(p.id, p));
+    return m;
+  }, [pessoas]);
+
+  // Ids efetivamente visíveis no escopo: matches + ancestrais (coordenador/líder).
+  // Sem busca ativa, mantém comportamento antigo (todas as pessoas do escopo que passam nos filtros).
+  const visibleIds = useMemo(() => {
+    const visible = new Set<string>();
+    const baseFiltered = pessoas.filter(
+      p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p),
+    );
+    baseFiltered.forEach(p => visible.add(p.id));
+    if (search) {
+      // Para cada match, adiciona ancestrais (líder pai e coordenador avô) para tornar o caminho visível.
+      baseFiltered.forEach(p => {
+        let cur: string | null = p.parent_id || null;
+        let safety = 5;
+        while (cur && safety-- > 0) {
+          const parent = pessoaById.get(cur);
+          if (!parent) break;
+          visible.add(parent.id);
+          cur = parent.parent_id || null;
+        }
+      });
+    }
+    return visible;
+  }, [pessoas, escopo, search, statusFilter, tipoFilter, pessoaById]);
+
+  // Lista visível no escopo. Mantém o nome original para minimizar mudanças no resto da árvore.
+  const escopoList = useMemo(
+    () => pessoas.filter(p => p.escopo === escopo && visibleIds.has(p.id)),
+    [pessoas, escopo, visibleIds],
   );
+
+  // Ids que realmente correspondem à busca (sem contar ancestrais visíveis por contexto).
+  const matchedIds = useMemo(() => {
+    if (!search) return new Set<string>();
+    return new Set(
+      pessoas
+        .filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p))
+        .map(p => p.id),
+    );
+  }, [pessoas, escopo, search, statusFilter, tipoFilter]);
+
+  const searchCtxValue = useMemo<EleicaoSearchCtx>(() => {
+    const nameById = new Map<string, string>();
+    const tipoById = new Map<string, Tipo>();
+    const parentById = new Map<string, string | null>();
+    pessoas.forEach(p => {
+      nameById.set(p.id, p.nome);
+      tipoById.set(p.id, p.tipo);
+      parentById.set(p.id, p.parent_id || null);
+    });
+    return { searchActive: !!search, matchedIds, nameById, tipoById, parentById };
+  }, [pessoas, search, matchedIds]);
+
   const cgRegioes = useMemo(() => {
     if (escopo !== "campo_grande") return [];
     return REGIOES.filter(r => regiaoFilter === "all" || r.value === regiaoFilter);
@@ -790,6 +862,7 @@ export default function Eleicao() {
 
   return (
     <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow }}>
+    <EleicaoSearchContext.Provider value={searchCtxValue}>
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
@@ -925,7 +998,7 @@ export default function Eleicao() {
 
         {(statusFilter !== "todos" || tipoFilter !== "todos" || search) && (
           <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
-            <span>Mostrando <strong className="text-foreground">{escopoList.length}</strong> resultados</span>
+            <span>Mostrando <strong className="text-foreground">{search ? matchedIds.size : escopoList.length}</strong> resultados</span>
             <button onClick={() => { setStatusFilter("todos"); setTipoFilter("todos"); setSearch(""); }} className="text-primary hover:underline">limpar filtros</button>
           </div>
         )}
@@ -940,10 +1013,12 @@ export default function Eleicao() {
                 regiaoFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border"
               )}
             >
-              Todas <span className="opacity-70 ml-1">{escopoList.length}</span>
+              Todas <span className="opacity-70 ml-1">{search ? matchedIds.size : escopoList.length}</span>
             </button>
             {REGIOES.map(r => {
-              const count = escopoList.filter(p => p.regiao === r.value).length;
+              const count = search
+                ? escopoList.filter(p => p.regiao === r.value && matchedIds.has(p.id)).length
+                : escopoList.filter(p => p.regiao === r.value).length;
               const active = regiaoFilter === r.value;
               return (
                 <button
@@ -1456,6 +1531,7 @@ export default function Eleicao() {
         onExport={handleExport}
       />
     </div>
+    </EleicaoSearchContext.Provider>
     </EleicaoActionsContext.Provider>
   );
 }
@@ -1579,9 +1655,27 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
   const cabosLid = lideres.flatMap(l => all.filter(p => p.tipo === "cabo" && p.parent_id === l.id));
   const totalEquipe = lideres.length + cabosDir.length + cabosLid.length;
-  const [expanded, setExpanded] = useState(false);
   const hasTeam = totalEquipe > 0;
   const allDoTime = [coord, ...lideres, ...cabosDir, ...cabosLid];
+
+  const { searchActive, matchedIds } = React.useContext(EleicaoSearchContext);
+  // Conta matches dentro da equipe (excluindo o próprio coord para destacar "achou alguém aqui dentro").
+  const matchesNaEquipe = useMemo(() => {
+    if (!searchActive) return 0;
+    return [...lideres, ...cabosDir, ...cabosLid].filter(p => matchedIds.has(p.id)).length;
+  }, [searchActive, matchedIds, lideres, cabosDir, cabosLid]);
+  const autoExpand = searchActive && matchesNaEquipe > 0;
+  const [userToggled, setUserToggled] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  // Quando a busca muda e há matches dentro, abre. Quando a busca some, volta a fechar (a não ser que o usuário tenha aberto manualmente).
+  React.useEffect(() => {
+    if (autoExpand) {
+      setExpanded(true);
+      setUserToggled(false);
+    } else if (!userToggled) {
+      setExpanded(false);
+    }
+  }, [autoExpand, userToggled]);
 
   return (
     <div className="border-b last:border-b-0">
@@ -1593,8 +1687,9 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
         onSend={onSend}
         sendingId={sendingId}
         teamCount={hasTeam ? totalEquipe : undefined}
+        matchInTeam={matchesNaEquipe}
         expanded={expanded}
-        onToggle={hasTeam ? () => setExpanded(e => !e) : undefined}
+        onToggle={hasTeam ? () => { setUserToggled(true); setExpanded(e => !e); } : undefined}
         bulkAction={hasTeam ? {
           label: "Contratos da equipe",
           onClick: () => {
@@ -1632,9 +1727,16 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
   onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null;
 }) {
   const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === lider.id);
-  const [open, setOpen] = useState(true);
   const hasCabos = cabos.length > 0;
-  
+  const { searchActive, matchedIds } = React.useContext(EleicaoSearchContext);
+  const matchesNaEquipe = useMemo(
+    () => (searchActive ? cabos.filter(c => matchedIds.has(c.id)).length : 0),
+    [searchActive, matchedIds, cabos],
+  );
+  const [open, setOpen] = useState(true);
+  React.useEffect(() => {
+    if (searchActive && matchesNaEquipe > 0) setOpen(true);
+  }, [searchActive, matchesNaEquipe]);
 
   return (
     <div className="border-t border-border/40">
@@ -1647,6 +1749,7 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
         sendingId={sendingId}
         indent={1}
         teamCount={hasCabos ? cabos.length : undefined}
+        matchInTeam={matchesNaEquipe}
         expanded={open}
         onToggle={hasCabos ? () => setOpen(o => !o) : undefined}
       />
@@ -1725,7 +1828,7 @@ function FavoritoToggle({ pessoa }: { pessoa: Pessoa }) {
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction }: {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction, matchInTeam }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
@@ -1737,10 +1840,16 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   expanded?: boolean;
   onToggle?: () => void;
   bulkAction?: { label: string; onClick: () => void };
+  matchInTeam?: number;
 }) {
   const actions = React.useContext(EleicaoActionsContext);
   const onTogglePermissao = actions?.onTogglePermissao;
   const onResendLiderFlow = actions?.onResendLiderFlow;
+  const { searchActive, matchedIds, nameById, tipoById } = React.useContext(EleicaoSearchContext);
+  const isMatch = searchActive && matchedIds.has(p.id);
+  const parentName = p.parent_id ? nameById.get(p.parent_id) : null;
+  const parentTipo = p.parent_id ? tipoById.get(p.parent_id) : null;
+
 
   const isSending = sendingId === p.id;
   const meta = TIPO_META[p.tipo];
@@ -1761,6 +1870,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
         indent === 0 && "py-2.5 hover:border-l-primary/50",
         indent === 1 && "hover:border-l-blue-500/50",
         indent === 2 && "hover:border-l-green-500/50",
+        isMatch && "bg-yellow-100/60 dark:bg-yellow-500/10 border-l-yellow-400",
       )}
       style={{ paddingLeft: `${10 + indent * 22}px` }}
       onClick={onToggle}
@@ -1838,11 +1948,21 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
             <span className="truncate hidden md:inline">· <MapPin className="w-2.5 h-2.5 inline mr-0.5" />{p.endereco}</span>
           )}
         </div>
+        {parentName && (p.tipo === "lider" || p.tipo === "cabo") && (
+          <div className="text-[10.5px] text-muted-foreground/90 mt-0.5 italic truncate">
+            ↳ Vinculado a {parentTipo === "coordenador" ? "coordenador" : "líder"} <span className="font-medium text-foreground/80 not-italic">{parentName}</span>
+          </div>
+        )}
       </div>
 
       {teamCount !== undefined && (
         <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0 gap-0.5">
           <Users className="w-2.5 h-2.5" />{teamCount}
+        </Badge>
+      )}
+      {matchInTeam !== undefined && matchInTeam > 0 && (
+        <Badge className="text-[10px] h-5 px-1.5 shrink-0 gap-0.5 bg-yellow-400 text-yellow-950 hover:bg-yellow-400">
+          <Search className="w-2.5 h-2.5" />{matchInTeam} na equipe
         </Badge>
       )}
       {bulkAction && (
