@@ -862,6 +862,7 @@ export default function Eleicao() {
 
   return (
     <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow }}>
+    <EleicaoSearchContext.Provider value={searchCtxValue}>
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
