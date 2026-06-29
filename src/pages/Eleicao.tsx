@@ -1655,9 +1655,27 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
   const cabosLid = lideres.flatMap(l => all.filter(p => p.tipo === "cabo" && p.parent_id === l.id));
   const totalEquipe = lideres.length + cabosDir.length + cabosLid.length;
-  const [expanded, setExpanded] = useState(false);
   const hasTeam = totalEquipe > 0;
   const allDoTime = [coord, ...lideres, ...cabosDir, ...cabosLid];
+
+  const { searchActive, matchedIds } = React.useContext(EleicaoSearchContext);
+  // Conta matches dentro da equipe (excluindo o próprio coord para destacar "achou alguém aqui dentro").
+  const matchesNaEquipe = useMemo(() => {
+    if (!searchActive) return 0;
+    return [...lideres, ...cabosDir, ...cabosLid].filter(p => matchedIds.has(p.id)).length;
+  }, [searchActive, matchedIds, lideres, cabosDir, cabosLid]);
+  const autoExpand = searchActive && matchesNaEquipe > 0;
+  const [userToggled, setUserToggled] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  // Quando a busca muda e há matches dentro, abre. Quando a busca some, volta a fechar (a não ser que o usuário tenha aberto manualmente).
+  React.useEffect(() => {
+    if (autoExpand) {
+      setExpanded(true);
+      setUserToggled(false);
+    } else if (!userToggled) {
+      setExpanded(false);
+    }
+  }, [autoExpand, userToggled]);
 
   return (
     <div className="border-b last:border-b-0">
@@ -1669,8 +1687,9 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
         onSend={onSend}
         sendingId={sendingId}
         teamCount={hasTeam ? totalEquipe : undefined}
+        matchInTeam={matchesNaEquipe}
         expanded={expanded}
-        onToggle={hasTeam ? () => setExpanded(e => !e) : undefined}
+        onToggle={hasTeam ? () => { setUserToggled(true); setExpanded(e => !e); } : undefined}
         bulkAction={hasTeam ? {
           label: "Contratos da equipe",
           onClick: () => {
