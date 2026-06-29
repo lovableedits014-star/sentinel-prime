@@ -997,7 +997,7 @@ export default function Eleicao() {
 
         {(statusFilter !== "todos" || tipoFilter !== "todos" || search) && (
           <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
-            <span>Mostrando <strong className="text-foreground">{escopoList.length}</strong> resultados</span>
+            <span>Mostrando <strong className="text-foreground">{search ? matchedIds.size : escopoList.length}</strong> resultados</span>
             <button onClick={() => { setStatusFilter("todos"); setTipoFilter("todos"); setSearch(""); }} className="text-primary hover:underline">limpar filtros</button>
           </div>
         )}
@@ -1012,10 +1012,12 @@ export default function Eleicao() {
                 regiaoFilter === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted border-border"
               )}
             >
-              Todas <span className="opacity-70 ml-1">{escopoList.length}</span>
+              Todas <span className="opacity-70 ml-1">{search ? matchedIds.size : escopoList.length}</span>
             </button>
             {REGIOES.map(r => {
-              const count = escopoList.filter(p => p.regiao === r.value).length;
+              const count = search
+                ? escopoList.filter(p => p.regiao === r.value && matchedIds.has(p.id)).length
+                : escopoList.filter(p => p.regiao === r.value).length;
               const active = regiaoFilter === r.value;
               return (
                 <button
