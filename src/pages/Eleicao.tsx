@@ -612,9 +612,65 @@ export default function Eleicao() {
     return p.nome.toLowerCase().includes(q) || p.telefone.includes(search) || (p.endereco || "").toLowerCase().includes(q);
   };
 
-  const escopoList = pessoas.filter(p =>
-    p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p)
+  // Índice global de pessoas para resolver ancestrais (mesmo escopo) e nomes de pais
+  const pessoaById = useMemo(() => {
+    const m = new Map<string, Pessoa>();
+    pessoas.forEach(p => m.set(p.id, p));
+    return m;
+  }, [pessoas]);
+
+  // Ids efetivamente visíveis no escopo: matches + ancestrais (coordenador/líder).
+  // Sem busca ativa, mantém comportamento antigo (todas as pessoas do escopo que passam nos filtros).
+  const visibleIds = useMemo(() => {
+    const visible = new Set<string>();
+    const baseFiltered = pessoas.filter(
+      p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p),
+    );
+    baseFiltered.forEach(p => visible.add(p.id));
+    if (search) {
+      // Para cada match, adiciona ancestrais (líder pai e coordenador avô) para tornar o caminho visível.
+      baseFiltered.forEach(p => {
+        let cur: string | null = p.parent_id || null;
+        let safety = 5;
+        while (cur && safety-- > 0) {
+          const parent = pessoaById.get(cur);
+          if (!parent) break;
+          visible.add(parent.id);
+          cur = parent.parent_id || null;
+        }
+      });
+    }
+    return visible;
+  }, [pessoas, escopo, search, statusFilter, tipoFilter, pessoaById]);
+
+  // Lista visível no escopo. Mantém o nome original para minimizar mudanças no resto da árvore.
+  const escopoList = useMemo(
+    () => pessoas.filter(p => p.escopo === escopo && visibleIds.has(p.id)),
+    [pessoas, escopo, visibleIds],
   );
+
+  // Ids que realmente correspondem à busca (sem contar ancestrais visíveis por contexto).
+  const matchedIds = useMemo(() => {
+    if (!search) return new Set<string>();
+    return new Set(
+      pessoas
+        .filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p))
+        .map(p => p.id),
+    );
+  }, [pessoas, escopo, search, statusFilter, tipoFilter]);
+
+  const searchCtxValue = useMemo<EleicaoSearchCtx>(() => {
+    const nameById = new Map<string, string>();
+    const tipoById = new Map<string, Tipo>();
+    const parentById = new Map<string, string | null>();
+    pessoas.forEach(p => {
+      nameById.set(p.id, p.nome);
+      tipoById.set(p.id, p.tipo);
+      parentById.set(p.id, p.parent_id || null);
+    });
+    return { searchActive: !!search, matchedIds, nameById, tipoById, parentById };
+  }, [pessoas, search, matchedIds]);
+
   const cgRegioes = useMemo(() => {
     if (escopo !== "campo_grande") return [];
     return REGIOES.filter(r => regiaoFilter === "all" || r.value === regiaoFilter);
