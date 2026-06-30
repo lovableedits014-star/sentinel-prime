@@ -389,15 +389,16 @@ function AccountForm({ account, clientId, onSaved, compact }: { account: AdsAcco
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    const id = adAccountId.trim();
+    let id = adAccountId.trim();
     if (!id) {
       toast.error("Informe o ID da conta de anúncio (act_XXXX)");
       return;
     }
-    if (!/^act_\d+$/.test(id)) {
+    if (!/^(act_)?\d+$/.test(id)) {
       toast.error("Formato inválido. Use act_ seguido de números (ex: act_123456789).");
       return;
     }
+    if (!id.startsWith("act_")) id = `act_${id}`;
     setSaving(true);
     try {
       const payload = { meta_ad_account_id: id, client_id: clientId, ativa: true };

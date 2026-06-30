@@ -64,7 +64,8 @@ Deno.serve(async (req) => {
       .eq('ativa', true)
       .maybeSingle();
 
-    const adAccountId = adAccountIdOverride || adsAccount?.meta_ad_account_id;
+    const rawId = (adAccountIdOverride || adsAccount?.meta_ad_account_id || '').trim();
+    const adAccountId = rawId ? (rawId.startsWith('act_') ? rawId : `act_${rawId.replace(/^act_?/, '')}`) : '';
     const token = integration?.meta_access_token;
     const issues: Issue[] = [];
 
