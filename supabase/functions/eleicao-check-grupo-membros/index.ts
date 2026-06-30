@@ -206,7 +206,7 @@ Deno.serve(async (req: Request) => {
 
     // 3. Recalcula status por pessoa
     const { data: pessoas } = await admin.from("eleicao_pessoas")
-      .select("id, regiao, parent_id, telefone, tipo")
+      .select("id, regiao, parent_id, telefone, tipo, escopo")
       .eq("client_id", clientId)
       .in("tipo", ["cabo", "lider", "coordenador"]);
 
@@ -228,8 +228,11 @@ Deno.serve(async (req: Request) => {
     let entrou = 0, pendente = 0, semGrupo = 0, semTelefone = 0;
 
     for (const pessoa of pessoas || []) {
-      const regiao = await resolveRegiao(admin, pessoa, cache);
-      const groupJid = regiao ? gruposJids[regiao] : null;
+      const { regiao, escopo } = await resolveRegiao(admin, pessoa, cache);
+      // Interior usa o grupo único __interior__; demais regiões usam o JID por nome da região.
+      const groupJid = escopo === "interior"
+        ? (gruposJids["__interior__"] || null)
+        : (regiao ? gruposJids[regiao] : null);
       let status: string;
       let entrouVisto: string | null = null;
 
