@@ -21,7 +21,7 @@ import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTempla
 import EnviarFluxoMenu from "@/components/eleicao/EnviarFluxoMenu";
 import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog";
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
-import EntradaGrupoPanel from "@/components/eleicao/EntradaGrupoPanel";
+
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
 import { FileDown, Package, FileText, Printer } from "lucide-react";
 import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
@@ -592,7 +592,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "pendentes" | "grupo" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
+  const [view, setView] = useState<"cadastros" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
@@ -885,7 +885,7 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-8 w-full max-w-6xl">
+        <TabsList className="grid grid-cols-7 w-full max-w-6xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -896,7 +896,6 @@ export default function Eleicao() {
             )}
           </TabsTrigger>
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
-          <TabsTrigger value="grupo">Entrada no grupo</TabsTrigger>
           <TabsTrigger value="distribuicao" className="gap-1.5">
             <Send className="w-3.5 h-3.5" />
             Distribuição
@@ -914,8 +913,6 @@ export default function Eleicao() {
         <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
       ) : view === "pendentes" ? (
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
-      ) : view === "grupo" ? (
-        clientId ? <EntradaGrupoPanel clientId={clientId} /> : null
       ) : view === "indicacoes" ? (
         clientId ? <IndicacoesPanel clientId={clientId} /> : null
       ) : view === "distribuicao" ? (
