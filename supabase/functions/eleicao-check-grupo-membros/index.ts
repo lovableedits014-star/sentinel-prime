@@ -98,23 +98,29 @@ async function getBridge(admin: any, clientId: string) {
   return anyActive || null;
 }
 
-// Resolve a região da pessoa subindo pela cadeia parent_id se preciso.
-async function resolveRegiao(admin: any, pessoa: any, cache: Map<string, any>): Promise<string | null> {
-  if (pessoa.regiao) return pessoa.regiao;
+// Resolve a região + escopo da pessoa subindo pela cadeia parent_id se preciso.
+async function resolveRegiao(
+  admin: any,
+  pessoa: any,
+  cache: Map<string, any>,
+): Promise<{ regiao: string | null; escopo: string | null }> {
+  let escopo: string | null = (pessoa as any)?.escopo ?? null;
+  if (pessoa.regiao) return { regiao: pessoa.regiao, escopo };
   let current = pessoa;
   for (let i = 0; i < 5 && current?.parent_id; i++) {
     let parent = cache.get(current.parent_id);
     if (!parent) {
       const { data } = await admin.from("eleicao_pessoas")
-        .select("id, regiao, parent_id").eq("id", current.parent_id).maybeSingle();
+        .select("id, regiao, parent_id, escopo").eq("id", current.parent_id).maybeSingle();
       parent = data;
       if (parent) cache.set(parent.id, parent);
     }
-    if (!parent) return null;
-    if (parent.regiao) return parent.regiao;
+    if (!parent) return { regiao: null, escopo };
+    if (!escopo && (parent as any).escopo) escopo = (parent as any).escopo;
+    if (parent.regiao) return { regiao: parent.regiao, escopo };
     current = parent;
   }
-  return null;
+  return { regiao: null, escopo };
 }
 
 Deno.serve(async (req: Request) => {
