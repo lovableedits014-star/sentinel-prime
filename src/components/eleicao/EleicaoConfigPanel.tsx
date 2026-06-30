@@ -328,6 +328,9 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
               </Select>
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground border-t pt-2 mt-1">
+            💡 O <strong>grupo selecionado acima</strong> é o que define quem do interior aparece como "entrou no grupo" na ficha — mesma regra das regiões de Campo Grande, só que apontando para este grupo único.
+          </p>
         </div>
 
 

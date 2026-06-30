@@ -1,30 +1,32 @@
 ## Objetivo
-Criar um único **Grupo Interior** para todos os coordenadores e líderes cadastrados como `escopo = "interior"`, independente da cidade. Hoje o link do grupo (`grupos_links`) e o JID de rastreamento (`grupos_jids`) são por região — funciona pras regiões de Campo Grande, mas no interior cada município viraria um grupo, e a ideia é o contrário: um grupo só pra tudo do interior.
+
+Garantir que coordenadores, líderes e cabos cadastrados como **Interior** tenham exatamente o mesmo comportamento das regiões de Campo Grande — só que apontando para o **Grupo Interior único** (`__interior__`) em vez de um grupo por região.
+
+Hoje só a **mensagem de boas-vindas** está adaptada. O **rastreamento de entrada no grupo** (badges "entrou/pendente" na ficha, base da cobrança automática) ainda procura o JID por nome da cidade, então todo mundo do interior fica como `sem_grupo` mesmo com o grupo único configurado.
 
 ## Mudanças
 
-### 1. Configurações de Eleição — UI (`src/components/eleicao/EleicaoConfigPanel.tsx`)
-Adicionar um **card dedicado "Grupo Interior"** logo acima da lista de regiões, com os mesmos dois campos que cada região tem hoje:
-- **Link de convite** (`https://chat.whatsapp.com/...`)
-- **Grupo no WhatsApp (rastreamento)** — select dos grupos sincronizados
+### 1. Rastreamento de entrada — `supabase/functions/eleicao-check-grupo-membros`
+- Incluir `escopo` no `select` de `eleicao_pessoas` e na subida via `parent_id` (resolveRegiao passa a devolver `{ regiao, escopo }`).
+- Na hora de escolher o `groupJid` da pessoa: se `escopo === 'interior'`, usar `gruposJids['__interior__']`; senão, manter `gruposJids[regiao]` como hoje.
+- O loop de sincronização de participantes não muda (já varre todas as entradas de `gruposJids`, inclusive `__interior__`).
+- Resultado: pessoas do interior passam a aparecer como `entrou` / `pendente` corretamente, alimentando os mesmos painéis e a cobrança automática.
 
-Esses valores são salvos no mesmo `grupos_links` / `grupos_jids` da `eleicao_notif_config`, usando uma chave reservada `__interior__`. Zero migração — é só uma chave nova dentro do JSONB existente.
+### 2. Boas-vindas — `supabase/functions/eleicao-notify-novo-lider` e `src/lib/eleicao-fluxo-cadastro.ts`
+- Hoje o fallback `escopo === 'interior'` já existe para coordenador/líder. Garantir que **cabo eleitoral** do interior também receba o link do grupo único (mesma regra para os 3 tipos).
+- Sem mudança de template — só assegurar que o `{link_grupo}` resolvido seja o do `__interior__` quando aplicável.
 
-### 2. Fluxo de cadastro client-side (`src/lib/eleicao-fluxo-cadastro.ts`)
-Na resolução do `link_grupo` (passo 4), antes de cair na lookup por região:
-- Se `p.escopo === "interior"`, usar `gruposLinks["__interior__"]` direto.
-- Senão (Campo Grande), manter o comportamento atual de buscar por `regiaoValue`.
+### 3. UI — `EleicaoConfigPanel.tsx`
+- Acrescentar um aviso curto abaixo do card "🌾 Grupo Interior" explicando que o JID configurado ali é o que define quem do interior aparece como "entrou no grupo" (paridade com os cards das regiões).
+- Nenhuma mudança estrutural; campos já existem.
 
-### 3. Edge function de notificação (`supabase/functions/eleicao-notify-novo-lider/index.ts`)
-Mesma regra do item 2 na linha onde calcula `linkGrupo`. Garante que o template de boas-vindas enviado automaticamente ao novo coordenador/líder do interior já vem com o link do grupo único.
+## Detalhes técnicos
 
-### 4. Rastreamento (grupos_jids)
-Quando o sistema for rastrear participação em grupo de pessoas do interior, usar `grupos_jids["__interior__"]` em vez do JID por município. (Aplicar onde o código hoje resolve JID por região para escopo interior — pontos a verificar: `PortalCoordenador.tsx` e dashboards que cruzam `whatsapp_group_participants`.)
+- A tabela `eleicao_pessoa_grupo_status` continua sendo a fonte de verdade; só muda como o `groupJid` esperado é resolvido por pessoa.
+- `escopo` é lido da própria pessoa; se nulo, herda do ancestral (mesma lógica atual da região).
+- Sem migração nem mudança de schema.
+- Deploy das duas edge functions após a alteração.
 
-## O que NÃO muda
-- A coluna `regiao` segue guardando o município no interior (pra continuar exportando vCard com a TAG da região e pra IA territorial).
-- Regiões de Campo Grande continuam com link/JID próprio por região.
-- Nenhuma migração de banco — só uso de chave reservada `__interior__` no JSONB que já existe.
+## Fora de escopo
 
-## Resultado final
-Você abre **Configurações → Eleição**, preenche uma vez o link do "Grupo Interior" e o JID de rastreamento, e todo coordenador/líder novo cadastrado como interior recebe automaticamente esse mesmo link no WhatsApp de boas-vindas — igual já acontece pras regiões de Campo Grande.
+- Criar lembretes/cobranças novos — vamos reusar o fluxo de cobrança existente, que passa a funcionar para o interior automaticamente assim que o rastreamento começar a marcar `entrou/pendente` corretamente.

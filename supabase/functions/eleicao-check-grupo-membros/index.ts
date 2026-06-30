@@ -98,23 +98,29 @@ async function getBridge(admin: any, clientId: string) {
   return anyActive || null;
 }
 
-// Resolve a região da pessoa subindo pela cadeia parent_id se preciso.
-async function resolveRegiao(admin: any, pessoa: any, cache: Map<string, any>): Promise<string | null> {
-  if (pessoa.regiao) return pessoa.regiao;
+// Resolve a região + escopo da pessoa subindo pela cadeia parent_id se preciso.
+async function resolveRegiao(
+  admin: any,
+  pessoa: any,
+  cache: Map<string, any>,
+): Promise<{ regiao: string | null; escopo: string | null }> {
+  let escopo: string | null = (pessoa as any)?.escopo ?? null;
+  if (pessoa.regiao) return { regiao: pessoa.regiao, escopo };
   let current = pessoa;
   for (let i = 0; i < 5 && current?.parent_id; i++) {
     let parent = cache.get(current.parent_id);
     if (!parent) {
       const { data } = await admin.from("eleicao_pessoas")
-        .select("id, regiao, parent_id").eq("id", current.parent_id).maybeSingle();
+        .select("id, regiao, parent_id, escopo").eq("id", current.parent_id).maybeSingle();
       parent = data;
       if (parent) cache.set(parent.id, parent);
     }
-    if (!parent) return null;
-    if (parent.regiao) return parent.regiao;
+    if (!parent) return { regiao: null, escopo };
+    if (!escopo && (parent as any).escopo) escopo = (parent as any).escopo;
+    if (parent.regiao) return { regiao: parent.regiao, escopo };
     current = parent;
   }
-  return null;
+  return { regiao: null, escopo };
 }
 
 Deno.serve(async (req: Request) => {
@@ -200,7 +206,7 @@ Deno.serve(async (req: Request) => {
 
     // 3. Recalcula status por pessoa
     const { data: pessoas } = await admin.from("eleicao_pessoas")
-      .select("id, regiao, parent_id, telefone, tipo")
+      .select("id, regiao, parent_id, telefone, tipo, escopo")
       .eq("client_id", clientId)
       .in("tipo", ["cabo", "lider", "coordenador"]);
 
@@ -222,8 +228,11 @@ Deno.serve(async (req: Request) => {
     let entrou = 0, pendente = 0, semGrupo = 0, semTelefone = 0;
 
     for (const pessoa of pessoas || []) {
-      const regiao = await resolveRegiao(admin, pessoa, cache);
-      const groupJid = regiao ? gruposJids[regiao] : null;
+      const { regiao, escopo } = await resolveRegiao(admin, pessoa, cache);
+      // Interior usa o grupo único __interior__; demais regiões usam o JID por nome da região.
+      const groupJid = escopo === "interior"
+        ? (gruposJids["__interior__"] || null)
+        : (regiao ? gruposJids[regiao] : null);
       let status: string;
       let entrouVisto: string | null = null;
 
