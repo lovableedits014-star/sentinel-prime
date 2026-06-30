@@ -1,60 +1,52 @@
 ## Objetivo
+Tornar a página **Tráfego Pago** plug-and-play: nada de digitar `act_XXX`, nada de configurar token aqui. O sistema lê o **token Meta já conectado** em `integrations.meta_access_token` (mesmo token usado pelo módulo de Comentários), descobre sozinho as contas de anúncio disponíveis, conecta automaticamente e puxa as campanhas.
 
-Deixar a aba **Tráfego Pago** enxuta — só o que o **sistema** precisa para funcionar (conectar na Meta, ler conta, sincronizar campanhas e métricas). Tudo que é responsabilidade do anunciante na Meta (CNPJ eleitoral, disclaimer "Pago por…", identidade política, dados do candidato, banners do TSE) sai da tela e do checklist. Além disso, corrigir o diagnóstico de permissões, que hoje dá "faltando" mesmo quando o token funciona.
+## O que muda
 
-## O que muda na tela (`src/pages/TrafegoPago.tsx`)
+### 1. Edge Function `ads-meta-diagnostic` (reformulada — autoconnect)
+Hoje ela só valida uma conta já cadastrada. Vai passar a:
+- Ler `integrations.meta_access_token` do cliente ativo.
+- Chamar `GET /me/adaccounts?fields=id,name,account_status,business,currency,disable_reason` para **descobrir** todas as contas que o token enxerga.
+- Se não houver registro em `ads_accounts`, **gravar automaticamente** todas as contas ativas encontradas (a primeira ativa vira `ativa=true`).
+- Se já houver `ads_accounts`, atualizar nome/status/moeda e marcar contas perdidas como `ativa=false`.
+- Validar funcionalmente: token vivo (`/me`), `business_management` (`/me/businesses`), `ads_read` (lê uma campanha), pixel (`/adspixels`).
+- Persistir em `ads_identity_status` com `available_accounts` no `raw_response` para a UI listar.
+- Remover qualquer issue do tipo "no_token" pedindo configuração manual — em vez disso, instruir o usuário a conectar Meta no módulo de Comentários (link direto).
 
-1. **Remover da UI**:
-   - Banner "Período pré-eleitoral / faltam X dias".
-   - Trava `periodoLiberado` no botão "Nova campanha" (deixa sempre disponível, o Guard da Meta cuida do resto).
-   - Aba/seção de "CNPJ eleitoral", "Disclaimer Pago por…", "Confirmação de identidade política", "Nome/Número/Cargo do candidato" no `AccountForm`.
-   - Itens do checklist: `disclaimer_configured`, `cnpj_eleitoral_set`, `political_identity_confirmed`.
+### 2. Nova Edge Function `ads-switch-account`
+Recebe `{ clientId, metaAdAccountId }`, marca a conta escolhida como `ativa=true` e as demais do mesmo cliente como `ativa=false`. Usada quando o usuário tem várias contas e quer trocar.
 
-2. **AccountForm fica com apenas**:
-   - **ID da conta de anúncio Meta** (`act_XXXXXXXX`) — único campo obrigatório.
-   - Botão **Salvar**.
-   - Texto curto explicando onde achar o ID.
+### 3. `ads-sync-campaigns` (pequeno ajuste)
+- Se não houver `ads_accounts` ativa, dispara o diagnóstico antes (auto-descoberta) e tenta de novo.
+- Mantém o resto igual.
 
-3. **Checklist reduzido ao essencial p/ a integração funcionar**:
-   - Token Meta presente e válido.
-   - Permissão `ads_management` **ou** `ads_read` (qualquer uma já permite leitura/sincronização).
-   - Permissão `business_management` (necessária para listar contas via BM).
-   - `pages_manage_ads` + `leads_retrieval` viram **opcionais/avisos** (só travam se o cliente for usar campanha de Leads).
-   - Conta de anúncio acessível pelo token (chamada real ao endpoint `/{act_id}`).
-   - Conta de anúncio com `account_status = 1` (ativa).
-   - Pixel: vira **info**, não bloqueia.
+### 4. Página `src/pages/TrafegoPago.tsx` (reformulada)
+- **Autoconnect on mount**: ao montar com `clientId` válido, se não há `ads_identity_status` recente (ou não há `ads_accounts`), dispara `ads-meta-diagnostic` automaticamente e, em seguida, `ads-sync-campaigns` quando uma conta ficar ativa. Toast discreto "Conectando à Meta…".
+- **Remove** o formulário `AccountForm` (digitar `act_XXX`), o dialog "Cadastrar conta" e a aba "Conta".
+- **Nova aba "Conta Meta"** mostra:
+  - Quais contas o token enxerga (cards com nome, ID, moeda, status).
+  - Botão "Usar esta conta" em cada uma (chama `ads-switch-account` e re-sincroniza).
+  - Aviso curto com link para `/configuracoes` caso `meta_access_token` esteja ausente — em vez de um formulário.
+- **Header**: o `StatusOverview` deixa de oferecer "Cadastrar conta" e passa a refletir o auto-status (Conectando / Conectado / Sem token Meta).
+- **Aba Conexão**: o checklist vira leitura pura do diagnóstico. Remove instruções de cadastrar `act_`.
+- Mantém Dashboard, Campanhas, IA Estrategista intactos.
 
-4. **Status geral**: `ok` se token + 1 permissão de ads + conta acessível e ativa. Removidos blocos eleitorais do cálculo.
+### 5. Testes (via `supabase--curl_edge_functions`)
+Depois do deploy, com o usuário logado:
+1. `POST /ads-meta-diagnostic { clientId }` → confere `success:true`, `status.overall_status` e que `ads_accounts` recebeu as contas descobertas.
+2. `POST /ads-switch-account` em uma segunda conta (se houver) → confere flip de `ativa`.
+3. `POST /ads-sync-campaigns { clientId, daysBack:30 }` → confere `counts.campaigns >= 0` e `counts.insights >= 0` sem erro 400.
+4. Validar no preview: abrir `/trafego-pago` zerado, ver auto-conexão concluir e dashboard popular sem nenhuma ação manual.
 
-## O que muda no diagnóstico (`supabase/functions/ads-meta-diagnostic/index.ts`)
+## Tabelas / migrações
+Nenhuma migração nova — `ads_accounts` e `ads_identity_status` já têm os campos necessários (uso `raw_response` jsonb para guardar a lista de contas descobertas).
 
-Problema atual: o checklist marca permissões como ausentes mesmo quando funcionam. Causas comuns:
-- **System User Tokens** não retornam dados em `/me/permissions` (esse endpoint é para tokens de usuário). O código atual marca tudo como `false` nesse caso.
-- O endpoint pode responder OK mas só listar um subset; a verdade prática é se as chamadas funcionam.
+## Detalhes técnicos
+- Toda a leitura de `meta_access_token` continua server-side (edge function com service role) — o front nunca vê o token.
+- Normalização do ID continua: API exige prefixo `act_`.
+- Autoconnect roda no máximo uma vez por carga; após sucesso, salva timestamp em `ads_identity_status` e a página decide pelo `checked_at` (>10min revalida).
+- Erros do tipo "token sem permissão de ads" geram issue informativa apontando para o Business Manager, não para configuração local.
 
-**Correções**:
-1. Tentar `/me/permissions` como hoje. Se vier vazio **ou** der erro de tipo de token, cair para **verificação funcional**:
-   - `GET /me?fields=id,name` → token vivo.
-   - `GET /me/businesses` → confirma `business_management`.
-   - `GET /{adAccountId}?fields=account_status,name,business` → confirma `ads_read`/acesso.
-   - `GET /{adAccountId}/campaigns?limit=1` → confirma leitura.
-   - `GET /{adAccountId}/adspixels?limit=1` → pixel (info).
-   Cada chamada bem-sucedida marca a flag correspondente como `true`, mesmo sem aparecer em `/me/permissions`.
-2. Reduzir `REQUIRED_ADS_PERMS` para `['ads_read','business_management']` como bloqueantes; resto vira warn/info.
-3. Parar de gerar issues `block` para `cnpj_eleitoral`, `disclaimer`, `candidato_*`, `identidade_meta`. Esses campos ainda podem existir no DB mas o diagnóstico ignora.
-4. `overall_status`:
-   - `ok` = sem `block` na lista reduzida.
-   - `warning` = só `warn`/`info`.
-   - `blocked` = qualquer `block` (token inválido, conta inacessível, conta inativa).
-
-## O que NÃO muda
-
-- Esquema do banco (`ads_accounts`, `ads_identity_status`) fica como está — só deixamos de exibir/cobrar os campos eleitorais. Sem migração.
-- `ads-sync-campaigns`, `ads-create-campaign`, `ads-guard-check`, wizard de criação e IA Estrategista permanecem.
-- Botão **Sincronizar campanhas** continua igual.
-
-## Resultado esperado
-
-- Tela limpa: cadastra `act_XXXX`, roda diagnóstico, vê os 4-5 itens que importam, sincroniza, vê métricas.
-- Quem já tem permissão na Meta passa a aparecer como ✓ porque o diagnóstico valida via chamada real à API, não só via `/me/permissions`.
-- Toda burocracia eleitoral (CNPJ, disclaimer, identidade política, datas do TSE) sai da plataforma — o usuário trata 100% disso dentro do Gerenciador da Meta.
+## Fora de escopo
+- Nenhuma mudança em CNPJ eleitoral / disclaimer / identidade política (segue tratado direto na Meta, como já está).
+- Sem mudanças no Wizard de criação nem na IA Estrategista.
