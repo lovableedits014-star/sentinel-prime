@@ -318,7 +318,7 @@ function StatusOverview({
         <AlertDescription className="space-y-2">
           <p>Tráfego Pago reaproveita o token Meta do módulo de Comentários/Instagram. Conecte a Meta em Configurações para ativar.</p>
           <Button size="sm" variant="outline" asChild>
-            <a href="/configuracoes"><Settings className="h-4 w-4 mr-2" />Ir para Configurações</a>
+            <a href="/settings"><Settings className="h-4 w-4 mr-2" />Ir para Configurações</a>
           </Button>
         </AlertDescription>
       </Alert>
@@ -475,7 +475,7 @@ function AccountsManager({
         <Info className="h-4 w-4" />
         <AlertTitle>Conecte a Meta primeiro</AlertTitle>
         <AlertDescription>
-          <a href="/configuracoes" className="underline">Ir para Configurações → Integrações Meta</a>
+          <a href="/settings" className="underline">Ir para Configurações → Integrações Meta</a>
         </AlertDescription>
       </Alert>
     );
