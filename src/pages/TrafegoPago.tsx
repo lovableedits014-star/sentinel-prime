@@ -6,15 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
 import {
   Megaphone, RefreshCw, ShieldCheck, ShieldAlert, ShieldX, ExternalLink,
-  AlertTriangle, CheckCircle2, XCircle, Info, Plus, Calendar, DollarSign,
-  Eye, MousePointer, Users as UsersIcon, Lock, Settings as SettingsIcon, Sparkles
+  AlertTriangle, CheckCircle2, XCircle, Info, Plus,
+  DollarSign, Eye, Users as UsersIcon, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -27,13 +25,6 @@ type AdsAccount = {
   id: string;
   client_id: string;
   meta_ad_account_id: string;
-  cnpj_eleitoral: string | null;
-  disclaimer_pago_por: string | null;
-  candidato_nome: string | null;
-  candidato_numero: string | null;
-  candidato_cargo: string | null;
-  identidade_meta_confirmada: boolean;
-  identidade_expira_em: string | null;
   ativa: boolean;
 };
 
@@ -58,21 +49,8 @@ type IdentityStatus = {
   business_manager_linked: boolean;
   ad_account_active: boolean;
   pixel_configured: boolean;
-  disclaimer_configured: boolean;
-  cnpj_eleitoral_set: boolean;
-  political_identity_confirmed: boolean;
-  political_identity_expires_at: string | null;
   issues: Issue[];
 };
-
-const CARGOS = [
-  { value: "governador", label: "Governador" },
-  { value: "senador", label: "Senador" },
-  { value: "dep_federal", label: "Deputado Federal" },
-  { value: "dep_estadual", label: "Deputado Estadual" },
-];
-
-const PERIODO_PERMITIDO_INICIO = new Date("2026-08-16T00:00:00-03:00");
 
 export default function TrafegoPago() {
   const { data: activeClient } = useActiveClientId();
@@ -85,12 +63,6 @@ export default function TrafegoPago() {
   const [insights, setInsights] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
-
-  const periodoLiberado = useMemo(() => new Date() >= PERIODO_PERMITIDO_INICIO, []);
-  const diasParaLiberacao = useMemo(() => {
-    const diff = PERIODO_PERMITIDO_INICIO.getTime() - Date.now();
-    return Math.ceil(diff / 86400000);
-  }, []);
 
   useEffect(() => {
     if (!clientId) return;
@@ -151,11 +123,9 @@ export default function TrafegoPago() {
     return <div className="p-6">Selecione um cliente.</div>;
   }
 
-  // Métricas agregadas
   const totalSpend = insights.reduce((s, i) => s + (i.spend_cents || 0), 0);
   const totalLeads = insights.reduce((s, i) => s + (i.leads || 0), 0);
   const totalImpr = insights.reduce((s, i) => s + (i.impressions || 0), 0);
-  const totalClicks = insights.reduce((s, i) => s + (i.clicks || 0), 0);
   const avgCpr = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
 
   const blockingIssues = status?.issues.filter(i => i.severity === "block").length || 0;
@@ -169,12 +139,12 @@ export default function TrafegoPago() {
             <Megaphone className="h-7 w-7" />
             Tráfego Pago — Meta Ads
           </h1>
-          <p className="text-muted-foreground">Gerencie anúncios eleitorais com Guard TSE integrado</p>
+          <p className="text-muted-foreground">Conecte sua conta Meta e gerencie campanhas por aqui</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={runDiagnostic} disabled={loadingDiag}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loadingDiag ? "animate-spin" : ""}`} />
-            Rodar diagnóstico
+            Verificar conexão
           </Button>
           <Button onClick={syncCampaigns} disabled={loadingSync || !account}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loadingSync ? "animate-spin" : ""}`} />
@@ -183,32 +153,20 @@ export default function TrafegoPago() {
         </div>
       </div>
 
-      {/* Banner período eleitoral */}
-      {!periodoLiberado && (
-        <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/30">
-          <Calendar className="h-4 w-4" />
-          <AlertTitle>Período pré-eleitoral — faltam {diasParaLiberacao} dias para liberação</AlertTitle>
-          <AlertDescription>
-            Anúncios eleitorais (com nº/cargo do candidato) só podem ir ao ar a partir de <strong>16/ago/2026</strong>. O Guard Eleitoral bloqueará publicações antes dessa data. Você pode usar este tempo para configurar tudo (CNPJ, identidade Meta, criativos).
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Semáforo de status */}
       <StatusOverview status={status} account={account} onOpenAccountDialog={() => setShowAccountDialog(true)} />
 
       <Tabs defaultValue="diagnostico" className="space-y-4">
         <TabsList>
           <TabsTrigger value="diagnostico">
             <ShieldCheck className="h-4 w-4 mr-2" />
-            Diagnóstico
+            Conexão
             {blockingIssues > 0 && <Badge variant="destructive" className="ml-2">{blockingIssues}</Badge>}
             {blockingIssues === 0 && warnIssues > 0 && <Badge variant="secondary" className="ml-2">{warnIssues}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="campanhas">Campanhas ({campaigns.length})</TabsTrigger>
           <TabsTrigger value="ia"><Sparkles className="h-4 w-4 mr-1" />IA Estrategista</TabsTrigger>
-          <TabsTrigger value="conta">Conta & Configurações</TabsTrigger>
+          <TabsTrigger value="conta">Conta</TabsTrigger>
         </TabsList>
 
         <TabsContent value="diagnostico" className="space-y-4">
@@ -252,15 +210,10 @@ export default function TrafegoPago() {
         </TabsContent>
 
         <TabsContent value="campanhas" className="space-y-4">
-          {account && periodoLiberado && (
+          {account && (
             <div className="flex justify-end">
               <Button onClick={() => setWizardOpen(true)}><Plus className="h-4 w-4 mr-2" />Nova campanha</Button>
             </div>
-          )}
-          {!periodoLiberado && (
-            <Alert><Lock className="h-4 w-4" /><AlertTitle>Criação liberada em 16/ago/2026</AlertTitle>
-              <AlertDescription>Faltam {diasParaLiberacao} dias. Use este tempo para configurar conta, identidade e CNPJ.</AlertDescription>
-            </Alert>
           )}
           {campaigns.length === 0 ? (
             <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhuma campanha ainda. Crie a primeira ou sincronize existentes da Meta.</CardContent></Card>
@@ -286,7 +239,7 @@ export default function TrafegoPago() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cadastrar conta de anúncio Meta</DialogTitle>
-            <DialogDescription>Preencha os dados eleitorais. Você pode editar depois.</DialogDescription>
+            <DialogDescription>Informe o ID da conta. Você pode editar depois.</DialogDescription>
           </DialogHeader>
           <AccountForm account={null} clientId={clientId} onSaved={() => { setShowAccountDialog(false); loadAll(); }} compact />
         </DialogContent>
@@ -302,7 +255,7 @@ function StatusOverview({ status, account, onOpenAccountDialog }: { status: Iden
         <Info className="h-4 w-4" />
         <AlertTitle>Comece cadastrando sua conta de anúncio</AlertTitle>
         <AlertDescription className="space-y-2">
-          <p>Vincule o ID da conta de anúncios Meta (formato <code>act_XXXXXXXX</code>) e os dados eleitorais do candidato.</p>
+          <p>Vincule o ID da conta de anúncios Meta (formato <code>act_XXXXXXXX</code>). É só isso que o sistema precisa para funcionar.</p>
           <Button size="sm" onClick={onOpenAccountDialog}><Plus className="h-4 w-4 mr-2" />Cadastrar conta</Button>
         </AlertDescription>
       </Alert>
@@ -313,8 +266,8 @@ function StatusOverview({ status, account, onOpenAccountDialog }: { status: Iden
     return (
       <Alert>
         <ShieldAlert className="h-4 w-4" />
-        <AlertTitle>Diagnóstico ainda não rodado</AlertTitle>
-        <AlertDescription>Clique em "Rodar diagnóstico" para verificar permissões, identidade Meta e configuração eleitoral.</AlertDescription>
+        <AlertTitle>Conexão ainda não verificada</AlertTitle>
+        <AlertDescription>Clique em "Verificar conexão" para conferir o token, as permissões e o acesso à conta de anúncio.</AlertDescription>
       </Alert>
     );
   }
@@ -323,9 +276,9 @@ function StatusOverview({ status, account, onOpenAccountDialog }: { status: Iden
     : status.overall_status === "warning" ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30"
     : "border-red-500 bg-red-50 dark:bg-red-950/30";
   const Icon = status.overall_status === "ok" ? ShieldCheck : status.overall_status === "warning" ? ShieldAlert : ShieldX;
-  const title = status.overall_status === "ok" ? "Tudo certo para anunciar"
-    : status.overall_status === "warning" ? "Pronto com ressalvas"
-    : "Bloqueios — corrija antes de anunciar";
+  const title = status.overall_status === "ok" ? "Conexão funcionando"
+    : status.overall_status === "warning" ? "Conectado com avisos"
+    : "Bloqueios — corrija para o sistema funcionar";
 
   return (
     <Alert className={color}>
@@ -343,42 +296,41 @@ function DiagnosticChecklist({ status, onRun, loading }: { status: IdentityStatu
     return (
       <Card>
         <CardContent className="py-12 text-center space-y-4">
-          <p className="text-muted-foreground">Rode o diagnóstico para conferir tudo que a Meta exige para anúncios eleitorais.</p>
+          <p className="text-muted-foreground">Verifique se o sistema está conseguindo conversar com a sua conta Meta Ads.</p>
           <Button onClick={onRun} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Rodar diagnóstico agora
+            Verificar agora
           </Button>
         </CardContent>
       </Card>
     );
   }
 
+  // Apenas o que o SISTEMA precisa para funcionar
   const items = [
-    { label: "Permissão ads_management", ok: status.has_ads_management },
-    { label: "Permissão ads_read", ok: status.has_ads_read },
-    { label: "Permissão business_management", ok: status.has_business_management },
-    { label: "Permissão leads_retrieval", ok: status.has_leads_retrieval },
-    { label: "Permissão pages_manage_ads", ok: status.has_pages_manage_ads },
-    { label: "Business Manager vinculado", ok: status.business_manager_linked },
-    { label: "Conta de anúncio ativa", ok: status.ad_account_active },
-    { label: "Pixel Meta configurado", ok: status.pixel_configured },
-    { label: "Disclaimer 'Pago por...' configurado", ok: status.disclaimer_configured },
-    { label: "CNPJ eleitoral cadastrado", ok: status.cnpj_eleitoral_set },
-    { label: "Confirmação de identidade política (verificação manual)", ok: status.political_identity_confirmed },
+    { label: "Permissão ads_read (leitura)", ok: status.has_ads_read, required: true },
+    { label: "Permissão business_management", ok: status.has_business_management, required: false },
+    { label: "Business Manager vinculado", ok: status.business_manager_linked, required: false },
+    { label: "Conta de anúncio acessível e ativa", ok: status.ad_account_active, required: true },
+    { label: "Pixel Meta (opcional, p/ conversões)", ok: status.pixel_configured, required: false },
   ];
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Checklist Meta Ads</CardTitle>
-          <CardDescription>11 verificações automáticas + 1 manual</CardDescription>
+          <CardTitle>O que o sistema precisa</CardTitle>
+          <CardDescription>
+            Checagens feitas chamando a API real da Meta. CNPJ eleitoral, disclaimer "Pago por...", identidade política
+            e demais exigências do TSE são tratadas <strong>direto no Gerenciador da Meta</strong> — não precisam ser configuradas aqui.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-1">
           {items.map((it, i) => (
             <div key={i} className="flex items-center gap-2 py-2 border-b last:border-b-0">
-              {it.ok ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
+              {it.ok ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : <XCircle className={`h-5 w-5 ${it.required ? "text-red-600" : "text-amber-500"}`} />}
               <span className={it.ok ? "" : "text-muted-foreground"}>{it.label}</span>
+              {!it.required && !it.ok && <Badge variant="outline" className="ml-auto text-xs">opcional</Badge>}
             </div>
           ))}
         </CardContent>
@@ -433,37 +385,28 @@ function MetricCard({ icon: Icon, label, value }: { icon: any; label: string; va
 }
 
 function AccountForm({ account, clientId, onSaved, compact }: { account: AdsAccount | null; clientId: string; onSaved: () => void; compact?: boolean }) {
-  const [form, setForm] = useState({
-    meta_ad_account_id: account?.meta_ad_account_id || "",
-    cnpj_eleitoral: account?.cnpj_eleitoral || "",
-    candidato_nome: account?.candidato_nome || "",
-    candidato_numero: account?.candidato_numero || "",
-    candidato_cargo: account?.candidato_cargo || "",
-    disclaimer_pago_por: account?.disclaimer_pago_por || "",
-    identidade_meta_confirmada: account?.identidade_meta_confirmada || false,
-    identidade_expira_em: account?.identidade_expira_em || "",
-  });
+  const [adAccountId, setAdAccountId] = useState(account?.meta_ad_account_id || "");
   const [saving, setSaving] = useState(false);
 
-  // Auto-gerar disclaimer
-  useEffect(() => {
-    if (form.candidato_nome && form.cnpj_eleitoral && !form.disclaimer_pago_por) {
-      setForm(f => ({ ...f, disclaimer_pago_por: `Pago por ${form.candidato_nome} — CNPJ ${form.cnpj_eleitoral}` }));
-    }
-  }, [form.candidato_nome, form.cnpj_eleitoral]);
-
   async function save() {
-    if (!form.meta_ad_account_id.trim()) {
+    const id = adAccountId.trim();
+    if (!id) {
       toast.error("Informe o ID da conta de anúncio (act_XXXX)");
+      return;
+    }
+    if (!/^act_\d+$/.test(id)) {
+      toast.error("Formato inválido. Use act_ seguido de números (ex: act_123456789).");
       return;
     }
     setSaving(true);
     try {
-      const payload = { ...form, client_id: clientId, ativa: true, identidade_expira_em: form.identidade_expira_em || null };
+      const payload = { meta_ad_account_id: id, client_id: clientId, ativa: true };
       if (account) {
-        await supabase.from("ads_accounts").update(payload).eq("id", account.id);
+        const { error } = await supabase.from("ads_accounts").update(payload).eq("id", account.id);
+        if (error) throw error;
       } else {
-        await supabase.from("ads_accounts").insert(payload);
+        const { error } = await supabase.from("ads_accounts").insert(payload);
+        if (error) throw error;
       }
       toast.success("Conta salva");
       onSaved();
@@ -478,73 +421,27 @@ function AccountForm({ account, clientId, onSaved, compact }: { account: AdsAcco
     <Card className={compact ? "border-0 shadow-none" : ""}>
       {!compact && (
         <CardHeader>
-          <CardTitle>Dados da conta de anúncio</CardTitle>
-          <CardDescription>Configurações eleitorais usadas pelo Guard antes de publicar</CardDescription>
+          <CardTitle>Conta de anúncio Meta</CardTitle>
+          <CardDescription>Único dado obrigatório para o sistema funcionar</CardDescription>
         </CardHeader>
       )}
       <CardContent className="space-y-4">
         <div>
           <Label>ID da conta de anúncio Meta *</Label>
-          <Input value={form.meta_ad_account_id} onChange={e => setForm(f => ({ ...f, meta_ad_account_id: e.target.value }))} placeholder="act_123456789" />
-          <p className="text-xs text-muted-foreground mt-1">Encontre no Gerenciador de Anúncios → Configurações da conta</p>
+          <Input value={adAccountId} onChange={e => setAdAccountId(e.target.value)} placeholder="act_123456789" />
+          <p className="text-xs text-muted-foreground mt-1">
+            Encontre em <a href="https://business.facebook.com/settings/ad-accounts" target="_blank" rel="noreferrer" className="underline">Business Manager → Contas de anúncio</a>. Sempre começa com <code>act_</code>.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label>Nome do candidato</Label>
-            <Input value={form.candidato_nome} onChange={e => setForm(f => ({ ...f, candidato_nome: e.target.value }))} placeholder="João da Silva" />
-          </div>
-          <div>
-            <Label>Número (urna)</Label>
-            <Input value={form.candidato_numero} onChange={e => setForm(f => ({ ...f, candidato_numero: e.target.value }))} placeholder="12345" />
-          </div>
-          <div>
-            <Label>Cargo</Label>
-            <Select value={form.candidato_cargo} onValueChange={v => setForm(f => ({ ...f, candidato_cargo: v }))}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {CARGOS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>CNPJ eleitoral</Label>
-            <Input value={form.cnpj_eleitoral} onChange={e => setForm(f => ({ ...f, cnpj_eleitoral: e.target.value }))} placeholder="XX.XXX.XXX/XXXX-XX" />
-          </div>
-        </div>
-
-        <div>
-          <Label>Disclaimer "Pago por..."</Label>
-          <Input value={form.disclaimer_pago_por} onChange={e => setForm(f => ({ ...f, disclaimer_pago_por: e.target.value }))} />
-          <p className="text-xs text-muted-foreground mt-1">Será injetado automaticamente em todos os anúncios eleitorais</p>
-        </div>
-
-        <Card className="bg-muted/30">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                id="identidade"
-                checked={form.identidade_meta_confirmada}
-                onChange={e => setForm(f => ({ ...f, identidade_meta_confirmada: e.target.checked }))}
-                className="mt-1"
-              />
-              <div className="flex-1">
-                <Label htmlFor="identidade" className="cursor-pointer">Confirmação de identidade política Meta está ATIVA</Label>
-                <p className="text-xs text-muted-foreground">
-                  Confira em <a href="https://www.facebook.com/ID" target="_blank" rel="noreferrer" className="underline">facebook.com/ID</a>. Marque só se estiver ativa.
-                </p>
-              </div>
-            </div>
-            {form.identidade_meta_confirmada && (
-              <div>
-                <Label>Expira em</Label>
-                <Input type="date" value={form.identidade_expira_em || ""} onChange={e => setForm(f => ({ ...f, identidade_expira_em: e.target.value }))} />
-                <p className="text-xs text-muted-foreground mt-1">Avisaremos 30 dias antes</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-xs">
+            Tudo que envolve regras eleitorais (CNPJ, disclaimer "Pago por...", confirmação de identidade política, dados do candidato)
+            é configurado <strong>diretamente no Gerenciador da Meta</strong>. O sistema não precisa desses dados — quem aprova o
+            anúncio é a própria Meta.
+          </AlertDescription>
+        </Alert>
 
         <Button onClick={save} disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
       </CardContent>
