@@ -152,12 +152,14 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
       regiaoValue.charAt(0).toUpperCase() + regiaoValue.slice(1);
   }
 
-  // 4. Link do grupo da região (vem de cfg.grupos_links: { [regiao]: url })
+  // 4. Link do grupo: interior usa grupo único (__interior__), CG usa por região
   const gruposLinks = (cfg.grupos_links ?? {}) as Record<string, string>;
-  const linkGrupo =
-    regiaoValue && typeof gruposLinks === "object" && gruposLinks
-      ? gruposLinks[regiaoValue] || ""
-      : "";
+  let linkGrupo = "";
+  if (p.escopo === "interior") {
+    linkGrupo = gruposLinks["__interior__"] || "";
+  } else if (regiaoValue && typeof gruposLinks === "object" && gruposLinks) {
+    linkGrupo = gruposLinks[regiaoValue] || "";
+  }
 
   // 5. Vars de template (mesmas chaves usadas pela edge)
   const vars: Record<string, string> = {
