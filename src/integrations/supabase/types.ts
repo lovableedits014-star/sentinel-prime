@@ -159,8 +159,11 @@ export type Database = {
       }
       ads_accounts: {
         Row: {
+          account_status: number | null
           ativa: boolean | null
+          business_id: string | null
           business_manager_id: string | null
+          business_name: string | null
           candidato_cargo: string | null
           candidato_nome: string | null
           candidato_numero: string | null
@@ -173,13 +176,18 @@ export type Database = {
           identidade_meta_confirmada: boolean | null
           instagram_id: string | null
           meta_ad_account_id: string
+          moeda: string | null
+          nome: string | null
           page_id: string | null
           pixel_id: string | null
           updated_at: string
         }
         Insert: {
+          account_status?: number | null
           ativa?: boolean | null
+          business_id?: string | null
           business_manager_id?: string | null
+          business_name?: string | null
           candidato_cargo?: string | null
           candidato_nome?: string | null
           candidato_numero?: string | null
@@ -192,13 +200,18 @@ export type Database = {
           identidade_meta_confirmada?: boolean | null
           instagram_id?: string | null
           meta_ad_account_id: string
+          moeda?: string | null
+          nome?: string | null
           page_id?: string | null
           pixel_id?: string | null
           updated_at?: string
         }
         Update: {
+          account_status?: number | null
           ativa?: boolean | null
+          business_id?: string | null
           business_manager_id?: string | null
+          business_name?: string | null
           candidato_cargo?: string | null
           candidato_nome?: string | null
           candidato_numero?: string | null
@@ -211,6 +224,8 @@ export type Database = {
           identidade_meta_confirmada?: boolean | null
           instagram_id?: string | null
           meta_ad_account_id?: string
+          moeda?: string | null
+          nome?: string | null
           page_id?: string | null
           pixel_id?: string | null
           updated_at?: string
