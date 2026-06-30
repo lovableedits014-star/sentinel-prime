@@ -46,7 +46,11 @@ Deno.serve(async (req) => {
     const token = integration?.meta_access_token;
     if (!token) return resp({ success: false, error: 'Token Meta ausente' }, 400);
 
-    const adAccountId = account.meta_ad_account_id;
+    const rawId = (account.meta_ad_account_id || '').trim();
+    if (!/^(act_)?\d+$/.test(rawId)) {
+      return resp({ success: false, error: `ID da conta inválido: "${rawId}". Use o formato act_123456789 (só números após act_).` }, 400);
+    }
+    const adAccountId = rawId.startsWith('act_') ? rawId : `act_${rawId}`;
     const counts = { campaigns: 0, adsets: 0, ads: 0, insights: 0 };
 
     // Campanhas
