@@ -1,44 +1,60 @@
-## Problema confirmado
+## Objetivo
 
-Quando você pesquisa "luciana", o sistema **conta corretamente** as 2 pessoas na Moreninha (badge mostra "Moreninha 2"), mas só exibe 1 — a Luciana Dantas, que é **avulsa**. A outra Luciana (a do telefone 67 9211-3443) está **vinculada ao coordenador Humberto Cantuario** e fica escondida dentro do bloco do coordenador, que está colapsado.
+Deixar a aba **Tráfego Pago** enxuta — só o que o **sistema** precisa para funcionar (conectar na Meta, ler conta, sincronizar campanhas e métricas). Tudo que é responsabilidade do anunciante na Meta (CNPJ eleitoral, disclaimer "Pago por…", identidade política, dados do candidato, banners do TSE) sai da tela e do checklist. Além disso, corrigir o diagnóstico de permissões, que hoje dá "faltando" mesmo quando o token funciona.
 
-A busca filtra a pessoa corretamente no banco, mas o componente do coordenador não se abre automaticamente para mostrar o resultado, então quem pesquisa acha que ela não existe.
+## O que muda na tela (`src/pages/TrafegoPago.tsx`)
 
-## Correção
+1. **Remover da UI**:
+   - Banner "Período pré-eleitoral / faltam X dias".
+   - Trava `periodoLiberado` no botão "Nova campanha" (deixa sempre disponível, o Guard da Meta cuida do resto).
+   - Aba/seção de "CNPJ eleitoral", "Disclaimer Pago por…", "Confirmação de identidade política", "Nome/Número/Cargo do candidato" no `AccountForm`.
+   - Itens do checklist: `disclaimer_configured`, `cnpj_eleitoral_set`, `political_identity_confirmed`.
 
-### 1. Coordenadores se abrem sozinhos quando há resultado dentro deles
-Quando você está pesquisando e algum líder ou cabo da equipe do coordenador bate com a busca:
+2. **AccountForm fica com apenas**:
+   - **ID da conta de anúncio Meta** (`act_XXXXXXXX`) — único campo obrigatório.
+   - Botão **Salvar**.
+   - Texto curto explicando onde achar o ID.
 
-- O bloco do coordenador abre automaticamente.
-- Os líderes que não batem com a busca ficam ocultos (só aparece a pessoa procurada).
-- O bloco mostra um aviso amarelo do tipo "1 resultado encontrado na equipe".
+3. **Checklist reduzido ao essencial p/ a integração funcionar**:
+   - Token Meta presente e válido.
+   - Permissão `ads_management` **ou** `ads_read` (qualquer uma já permite leitura/sincronização).
+   - Permissão `business_management` (necessária para listar contas via BM).
+   - `pages_manage_ads` + `leads_retrieval` viram **opcionais/avisos** (só travam se o cliente for usar campanha de Leads).
+   - Conta de anúncio acessível pelo token (chamada real ao endpoint `/{act_id}`).
+   - Conta de anúncio com `account_status = 1` (ativa).
+   - Pixel: vira **info**, não bloqueia.
 
-Sem busca ativa, comportamento atual continua igual (coordenadores colapsados).
+4. **Status geral**: `ok` se token + 1 permissão de ads + conta acessível e ativa. Removidos blocos eleitorais do cálculo.
 
-### 2. Cada linha mostra a quem está vinculada
-Em toda linha de líder ou cabo, abaixo do nome aparece de forma discreta:
+## O que muda no diagnóstico (`supabase/functions/ads-meta-diagnostic/index.ts`)
 
-- Para líder vinculado: "Vinculado ao coordenador Humberto Cantuario"
-- Para cabo vinculado a líder: "Vinculado ao líder X / coordenador Y"
-- Para avulso: "Líder avulso (sem coordenador)" — já existe hoje.
+Problema atual: o checklist marca permissões como ausentes mesmo quando funcionam. Causas comuns:
+- **System User Tokens** não retornam dados em `/me/permissions` (esse endpoint é para tokens de usuário). O código atual marca tudo como `false` nesse caso.
+- O endpoint pode responder OK mas só listar um subset; a verdade prática é se as chamadas funcionam.
 
-Assim, quando você achar a pessoa, já sabe imediatamente de quem ela depende.
+**Correções**:
+1. Tentar `/me/permissions` como hoje. Se vier vazio **ou** der erro de tipo de token, cair para **verificação funcional**:
+   - `GET /me?fields=id,name` → token vivo.
+   - `GET /me/businesses` → confirma `business_management`.
+   - `GET /{adAccountId}?fields=account_status,name,business` → confirma `ads_read`/acesso.
+   - `GET /{adAccountId}/campaigns?limit=1` → confirma leitura.
+   - `GET /{adAccountId}/adspixels?limit=1` → pixel (info).
+   Cada chamada bem-sucedida marca a flag correspondente como `true`, mesmo sem aparecer em `/me/permissions`.
+2. Reduzir `REQUIRED_ADS_PERMS` para `['ads_read','business_management']` como bloqueantes; resto vira warn/info.
+3. Parar de gerar issues `block` para `cnpj_eleitoral`, `disclaimer`, `candidato_*`, `identidade_meta`. Esses campos ainda podem existir no DB mas o diagnóstico ignora.
+4. `overall_status`:
+   - `ok` = sem `block` na lista reduzida.
+   - `warning` = só `warn`/`info`.
+   - `blocked` = qualquer `block` (token inválido, conta inacessível, conta inativa).
 
-### 3. Contador da região reflete só o que está visível
-Quando há busca ativa e a região mostra "2 resultados", os 2 devem realmente aparecer na lista. O auto-expandir do item 1 já garante isso.
+## O que NÃO muda
 
-### 4. Ao tentar cadastrar telefone duplicado, mostrar onde está
-Quando o sistema bloquear "telefone já cadastrado", a mensagem passa a incluir:
-
-- Nome cadastrado, tipo (coordenador/líder/cabo), região.
-- Se vinculada, o nome do coordenador/líder responsável.
-
-Exemplo: "Telefone já cadastrado: **Luciana** — Líder na Moreninha, vinculada ao coordenador Humberto Cantuario."
-
-## Arquivo afetado
-
-- `src/pages/Eleicao.tsx` (componentes `CoordBlock`, `LiderBlock`, `PessoaRow` e validação de duplicidade no formulário de cadastro).
+- Esquema do banco (`ads_accounts`, `ads_identity_status`) fica como está — só deixamos de exibir/cobrar os campos eleitorais. Sem migração.
+- `ads-sync-campaigns`, `ads-create-campaign`, `ads-guard-check`, wizard de criação e IA Estrategista permanecem.
+- Botão **Sincronizar campanhas** continua igual.
 
 ## Resultado esperado
 
-Ao pesquisar **luciana** ou **9211-3443**, as duas Lucianas da Moreninha aparecem visíveis na hora, com o nome do coordenador ao lado das que estão vinculadas. Nenhum cadastro fica mais "invisível" por estar dentro de um coordenador fechado.
+- Tela limpa: cadastra `act_XXXX`, roda diagnóstico, vê os 4-5 itens que importam, sincroniza, vê métricas.
+- Quem já tem permissão na Meta passa a aparecer como ✓ porque o diagnóstico valida via chamada real à API, não só via `/me/permissions`.
+- Toda burocracia eleitoral (CNPJ, disclaimer, identidade política, datas do TSE) sai da plataforma — o usuário trata 100% disso dentro do Gerenciador da Meta.
