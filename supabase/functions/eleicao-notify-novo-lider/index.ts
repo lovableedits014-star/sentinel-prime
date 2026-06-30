@@ -406,7 +406,9 @@ Deno.serve(async (req) => {
         || REGIAO_LABELS[regiaoValue]
         || regiaoValue.charAt(0).toUpperCase() + regiaoValue.slice(1);
     }
-    const linkGrupo = (cfg.grupos_links && regiaoValue) ? (cfg.grupos_links[regiaoValue] || "") : "";
+    const linkGrupo = pessoa.escopo === "interior"
+      ? ((cfg.grupos_links && cfg.grupos_links["__interior__"]) || "")
+      : ((cfg.grupos_links && regiaoValue) ? (cfg.grupos_links[regiaoValue] || "") : "");
     const vars = {
       nome: pessoa.nome,
       regiao: regiaoLabel,
