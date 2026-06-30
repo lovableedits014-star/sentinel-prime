@@ -292,6 +292,45 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
           Adicione regiões personalizadas. O link configurado é enviado ao líder cadastrado naquela região.
         </p>
 
+        {/* Grupo único do Interior — vale pra todos os coordenadores/líderes com escopo "interior" */}
+        <div className="flex flex-col gap-2 p-3 rounded-md border-2 border-primary/30 bg-primary/5">
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-xs sm:text-sm font-semibold">🌾 Grupo Interior (único para todo o interior)</Label>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Todos os coordenadores e líderes cadastrados como <strong>interior</strong> recebem este mesmo link — independente do município.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-[10px] uppercase text-muted-foreground">Link de convite</Label>
+              <Input
+                placeholder="https://chat.whatsapp.com/..."
+                value={cfg.grupos_links["__interior__"] || ""}
+                onChange={e => setCfg(c => ({ ...c, grupos_links: { ...c.grupos_links, __interior__: e.target.value } }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] uppercase text-muted-foreground">Grupo no WhatsApp (rastreamento)</Label>
+              <Select
+                value={cfg.grupos_jids["__interior__"] || ""}
+                onValueChange={(v) => setCfg(c => ({ ...c, grupos_jids: { ...c.grupos_jids, __interior__: v } }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={grupos.length ? "Selecione um grupo" : "Sincronize grupos em Configurações"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {grupos.map(g => (
+                    <SelectItem key={g.group_jid} value={g.group_jid}>
+                      {g.name || g.group_jid}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+
         {showAdd && (
           <div className="flex flex-col sm:flex-row gap-2 p-3 rounded-md bg-muted/40 border">
             <Input
