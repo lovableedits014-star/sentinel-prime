@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
         title: 'Meta ainda não conectado neste cliente',
         why: 'Tráfego Pago reaproveita o mesmo token Meta usado pelo módulo de Comentários/Instagram. Sem ele não há como conectar nas contas de anúncio.',
         howToFix: 'Vá em Configurações → Integrações Meta e conecte a conta. O Tráfego Pago vai se autoconfigurar em seguida.',
-        link: '/configuracoes',
+        link: '/settings',
       });
     } else {
       // 1) Token vivo?
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
             title: 'Token Meta inválido ou expirado',
             why: err?.error?.message || 'Não conseguimos validar o token.',
             howToFix: 'Reconecte a Meta em Configurações → Integrações (gere de preferência um System User Token, que não expira).',
-            link: '/configuracoes',
+            link: '/settings',
           });
         }
       } catch (e) {
@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
               title: 'Não foi possível listar contas de anúncio',
               why: err?.error?.message || 'A Meta recusou a chamada /me/adaccounts.',
               howToFix: 'O token precisa ter pelo menos ads_read. Reconecte a Meta com as permissões corretas em Configurações.',
-              link: '/configuracoes',
+              link: '/settings',
             });
           }
         } catch (e) { console.error('adaccounts discovery failed', e); }
