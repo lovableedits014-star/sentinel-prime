@@ -512,7 +512,7 @@ export default function StatusWhatsApp() {
                                 Reconectar
                               </Button>
                             )}
-                            <Button size="sm" variant="outline" onClick={() => handleRescan(inst.id)} disabled={busy === `rescan-${inst.id}`}>
+                            <Button size="sm" variant="outline" onClick={() => handleRescan(inst.id, inst.apelido)} disabled={busy === `rescan-${inst.id}`}>
                               {busy === `rescan-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <QrCode className="w-3 h-3 mr-1" />}
                               Re-scan
                             </Button>
