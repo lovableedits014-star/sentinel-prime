@@ -9982,6 +9982,10 @@ export type Database = {
           nome: string
         }[]
       }
+      whatsapp_effective_daily_limit: {
+        Args: { p_daily_limit: number; p_stage: string }
+        Returns: number
+      }
       whatsapp_phone_variants: { Args: { p_phone: string }; Returns: string[] }
     }
     Enums: {
