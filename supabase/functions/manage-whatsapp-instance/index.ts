@@ -1610,6 +1610,7 @@ Deno.serve(async (req) => {
         total_groups: rawGroups.length,
         inactive_marked: inactiveMarked,
         restored_favorites: restoredFavorites,
+        list_action: usedListAction,
         phone_number: phoneDigits || null,
         synced_at: now,
       });
