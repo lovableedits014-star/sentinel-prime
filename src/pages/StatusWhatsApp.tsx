@@ -604,6 +604,42 @@ export default function StatusWhatsApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!qrModal} onOpenChange={(o) => !o && setQrModal(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Escanear QR — {qrModal?.apelido}</DialogTitle>
+            <DialogDescription>
+              Abra o WhatsApp no celular → Aparelhos conectados → Conectar um aparelho e escaneie o código abaixo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-3 py-2">
+            {qrModal?.loading && (
+              <div className="w-64 h-64 flex items-center justify-center border rounded-md">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {!qrModal?.loading && qrModal?.qr && (
+              <img src={qrModal.qr} alt="QR Code WhatsApp" className="w-64 h-64" />
+            )}
+            {!qrModal?.loading && qrModal?.error && (
+              <div className="text-sm text-destructive text-center px-4">
+                {qrModal.error}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground text-center">
+              Verificando conexão automaticamente a cada 3s. O modal fecha sozinho quando conectar.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQrModal(null)}>Fechar</Button>
+            <Button onClick={handleRefreshQr} disabled={qrModal?.loading}>
+              {qrModal?.loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+              Gerar novo QR
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
