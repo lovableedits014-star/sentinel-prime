@@ -638,14 +638,15 @@ async function createClientInstance(params: {
   clientName?: string | null;
   providedName?: string | null;
   currentApiKey?: string | null;
+  forceRecreate?: boolean;
 }) {
-  const { adminClient, bridgeToken, supabaseUrl, clientId, clientName, providedName, currentApiKey } = params;
+  const { adminClient, bridgeToken, supabaseUrl, clientId, clientName, providedName, currentApiKey, forceRecreate = false } = params;
 
   if (!bridgeToken) {
     return jsonResponse({ error: "Bridge token não configurado no servidor" }, 500);
   }
 
-  if (currentApiKey) {
+  if (currentApiKey && !forceRecreate) {
     try {
       const repaired = await fetchFreshQr(currentApiKey, 2);
       if (isConnectedStatus(repaired.status) || repaired.qrcode) {
@@ -661,6 +662,15 @@ async function createClientInstance(params: {
     } catch (err) {
       console.warn("Legacy repair before create failed:", (err as Error).message);
     }
+    return jsonResponse({
+      success: false,
+      requires_force_recreate: true,
+      error: "Não consegui recuperar a sessão sem recriar a instância. Confirme a recriação de QR apenas se aceitar derrubar a sessão atual.",
+    }, 200);
+  }
+
+  if (currentApiKey && forceRecreate) {
+    await deleteExistingInstance({ adminClient, clientId, clientApiKey: currentApiKey });
   }
 
   const instanceName = providedName || clientName || "WhatsApp Bot";
@@ -1250,6 +1260,7 @@ Deno.serve(async (req) => {
         clientName: clientConfig?.name,
         providedName: name,
         currentApiKey: clientApiKey ?? undefined,
+        forceRecreate,
       });
     }
 
@@ -1522,6 +1533,7 @@ Deno.serve(async (req) => {
           clientId: resolvedClientId,
           clientName: clientConfig?.name,
           currentApiKey: null, // No old key since we already checked !clientApiKey
+          forceRecreate,
         });
       }
 
@@ -1715,6 +1727,7 @@ Deno.serve(async (req) => {
         clientId: resolvedClientId,
         clientName: clientConfig?.name,
         currentApiKey: clientApiKey,
+        forceRecreate,
       });
     }
 
