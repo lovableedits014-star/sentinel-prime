@@ -1024,6 +1024,7 @@ Deno.serve(async (req) => {
             let bridgeUrl: string | null = null;
             let bridgeApiKey: string | null = null;
             let instanceId: string | null = null;
+            let currentStage: string = "maduro";
 
             if (isGroup) {
               // Para grupos, escolhe SÓ entre instâncias que são membros
