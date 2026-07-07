@@ -197,9 +197,9 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
     }, 3000);
   };
 
-  const createNewInstance = async (successMessage: string) => {
+  const createNewInstance = async (successMessage: string, forceRecreate = false) => {
     const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
-      body: { action: "create_instance", client_id: clientId },
+      body: { action: "create_instance", client_id: clientId, force_recreate: forceRecreate },
     });
 
     if (error) {
@@ -249,6 +249,21 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
     setCreating(true);
     try {
       await createNewInstance("Instância criada! Escaneie o QR Code com seu WhatsApp.");
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleForceRecreate = async () => {
+    const ok = window.confirm(
+      "Gerar novo QR pode derrubar a sessão atual e conta como tentativa anti-ban. Use só se o reparo normal falhou. Deseja continuar?",
+    );
+    if (!ok) return;
+    setCreating(true);
+    try {
+      await createNewInstance("Novo QR gerado. Escaneie apenas uma vez e aguarde a confirmação.", true);
     } catch (err: any) {
       toast.error("Erro: " + err.message);
     } finally {
@@ -467,7 +482,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
                 {qrAge >= 30 ? (
                   <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-xs p-2.5">
                     ⚠️ Este QR Code está aberto há {qrAge}s e provavelmente expirou.
-                    Se o celular continua girando, clique em <b>Gerar novo QR</b> abaixo.
+                  Se o celular continua girando, use <b>Gerar novo QR</b> apenas uma vez para evitar bloqueio.
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -478,7 +493,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCreateInstance}
+                  onClick={handleForceRecreate}
                   disabled={creating}
                   className="gap-1.5"
                 >
@@ -500,7 +515,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCreateInstance}
+                  onClick={handleForceRecreate}
                   disabled={creating}
                   className="gap-1.5"
                 >
