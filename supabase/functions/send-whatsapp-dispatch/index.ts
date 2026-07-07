@@ -317,6 +317,43 @@ Deno.serve(async (req) => {
       }
     };
 
+    // Anti-loop de auto-resume: se o disparo já foi retomado 250+ vezes,
+    // pausa com status manual para intervenção — evita cadeia infinita de
+    // invocações da própria função no worker.
+    const MAX_RESUMES = 250;
+    const guardResumeLimit = async (
+      client: any,
+      dispatchId: string,
+      sentSoFar: number,
+      failedSoFar: number,
+    ): Promise<boolean> => {
+      try {
+        const { data: row } = await client
+          .from("whatsapp_dispatches")
+          .select("resume_count")
+          .eq("id", dispatchId)
+          .maybeSingle();
+        const nextCount = Number(row?.resume_count || 0) + 1;
+        if (nextCount > MAX_RESUMES) {
+          await client.from("whatsapp_dispatches").update({
+            enviados: sentSoFar,
+            falhas: failedSoFar,
+            status: "pausado_limite_resumos",
+            pause_reason: `Limite de ${MAX_RESUMES} retomadas automáticas atingido. Retome manualmente após revisar.`,
+            updated_at: new Date().toISOString(),
+          }).eq("id", dispatchId);
+          console.warn(`[resume] dispatch=${dispatchId} atingiu MAX_RESUMES=${MAX_RESUMES}`);
+          return true;
+        }
+        await client.from("whatsapp_dispatches")
+          .update({ resume_count: nextCount })
+          .eq("id", dispatchId);
+      } catch (e) {
+        console.warn(`[resume] guardResumeLimit erro dispatch=${dispatchId}:`, (e as Error).message);
+      }
+      return false;
+    };
+
     // Helper: promove o próximo disparo enfileirado do cliente, se houver, e
     // dispara o processamento internamente (auto-invoke via fetch da própria função).
     const promoteNextQueued = async (cid: string) => {
