@@ -1556,32 +1556,13 @@ Deno.serve(async (req) => {
     }
 
     if ((action === "send" || action === "send_media") && instance_id && activeInstanceRow) {
-      const health = await syncInstanceHealth(adminClient, activeInstanceRow);
-      const currentStatus = health.status;
-
-      // Se a ponte ACABOU de confirmar "connected" ao vivo, confiamos nela.
-      // Não recusamos por dbDisconnected/recentlyDropped — esses dados são
-      // anteriores ao syncInstanceHealth que acabou de revalidar a sessão.
-      // Antes, um evento transitório de "disconnected" no webhook bloqueava
-      // envios por até 90s mesmo com a sessão WhatsApp comprovadamente viva.
-      if (currentStatus !== "connected") {
-        // Releitura do banco: o webhook pode ter marcado disconnected entre
-        // o syncInstanceHealth (sem confirmação) e este ponto.
-        const { data: freshRow } = await adminClient
-          .from("whatsapp_instances")
-          .select("status, last_disconnected_at, connected_since")
-          .eq("id", instance_id)
-          .maybeSingle();
-        const lastDisc = freshRow?.last_disconnected_at ? new Date(freshRow.last_disconnected_at).getTime() : 0;
-        const recentlyDropped = lastDisc > 0 && (Date.now() - lastDisc) < 90_000;
-        const dbDisconnected = freshRow?.status === "disconnected";
-
-        if (currentStatus !== "connected" || dbDisconnected || recentlyDropped) {
-          // Política anti-ban: NÃO chamamos /reconnect proativamente antes de enviar.
-          const error = "Instância WhatsApp desconectada. Reconecte o chip manualmente (botão na UI) antes de enviar.";
-          await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
-          return jsonResponse({ success: false, status: health.status, error, health });
-        }
+      const operational = await verifyWhatsAppOperationalSession(adminClient, activeInstanceRow);
+      if (!operational.ready) {
+        const error = operational.reason === "session_probe_failed" || operational.reason === "session_probe_error"
+          ? "A ponte diz conectado, mas a sessão WhatsApp não responde operacionalmente. Repare a conexão uma vez e evite gerar QR repetidamente."
+          : "Instância WhatsApp não está pronta para envio. Repare/conecte o chip manualmente antes de enviar.";
+        await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
+        return jsonResponse({ success: false, status: operational.status, error, health: operational });
       }
     }
 
