@@ -1288,29 +1288,21 @@ Deno.serve(async (req) => {
       if (!activeInstanceRow.bridge_api_key) {
         return jsonResponse({ success: false, error: "Instância sem API key — conecte primeiro" }, 400);
       }
-      const tokenParam = bridgeToken ? `&token=${encodeURIComponent(bridgeToken)}` : "";
-      const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${resolvedClientId}${tokenParam}`;
-      const bridgeRes = await fetch(BRIDGE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": activeInstanceRow.bridge_api_key,
-        },
-        body: JSON.stringify({
-          action: "set_webhook",
-          instance_id: instance_id,
-          webhook_url: webhookUrl,
-        }),
+      const rebound = await bindInstanceWebhook({
+        supabaseUrl,
+        bridgeToken,
+        apiKey: activeInstanceRow.bridge_api_key,
+        clientId: resolvedClientId,
+        instanceId: instance_id,
       });
-      const bridgeData = await bridgeRes.json().catch(() => ({}));
-      if (!bridgeRes.ok) {
+      if (!rebound.ok) {
         return jsonResponse({
           success: false,
-          error: bridgeData?.error || `Bridge respondeu ${bridgeRes.status}`,
-          details: sanitizeBridgeData(bridgeData),
+          error: rebound.error || "Falha ao registrar webhook na ponte",
+          details: rebound.details,
         });
       }
-      return jsonResponse({ success: true, webhook_url: webhookUrl, bridge: bridgeData });
+      return jsonResponse({ success: true, webhook_url: rebound.webhook_url, bridge: rebound.details });
     }
 
     // === SYNC GROUPS (lista grupos do WhatsApp em que essa instância participa) ===
@@ -1528,6 +1520,41 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Instância WhatsApp não configurada. Crie uma instância primeiro." }, 400);
     }
 
+    if (action === "reconnect" && instance_id && activeInstanceRow) {
+      const cd = checkReconnectCooldown(activeInstanceRow, "reconnect");
+      if (!cd.allowed) return cooldownBlockedResponse(cd);
+      await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow, "reconnect");
+      const { bridgeRes, bridgeData } = await fetchBridgeAction({
+        action: "reconnect",
+        apiKey: clientApiKey,
+        body: { action: "reconnect" },
+      });
+      const rawStatus = getBridgeRawStatus(bridgeData);
+      const qrcode = getBridgeQrCode(bridgeData);
+      const normalizedStatus = isConnectedStatus(rawStatus) ? "connected"
+        : isExplicitOfflineStatus(rawStatus) || isInvalidApiKeyResponse(bridgeRes.status, bridgeData) ? "disconnected"
+        : "connecting";
+      const updates: any = { status: normalizedStatus, last_health_check_at: new Date().toISOString() };
+      if (normalizedStatus === "connected") {
+        updates.connected_since = activeInstanceRow.connected_since || new Date().toISOString();
+        updates.last_disconnected_at = null;
+      }
+      if (normalizedStatus === "disconnected") {
+        updates.connected_since = null;
+        updates.last_disconnected_at = new Date().toISOString();
+      }
+      await adminClient.from("whatsapp_instances").update(updates).eq("id", instance_id);
+      await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: clientApiKey, clientId: resolvedClientId, instanceId: instance_id });
+      return jsonResponse({
+        success: bridgeRes.ok && bridgeData?.success !== false,
+        qrcode,
+        status: rawStatus || normalizedStatus,
+        instance: bridgeData.instance,
+        error: !bridgeRes.ok || bridgeData?.success === false ? (bridgeData.error || `Erro na ponte (status ${bridgeRes.status})`) : undefined,
+        details: sanitizeBridgeData(bridgeData),
+      });
+    }
+
     if ((action === "send" || action === "send_media") && instance_id && activeInstanceRow) {
       const health = await syncInstanceHealth(adminClient, activeInstanceRow);
       const currentStatus = health.status;
@@ -1695,6 +1722,7 @@ Deno.serve(async (req) => {
       return await createClientInstance({
         adminClient,
         bridgeToken,
+        supabaseUrl,
         clientId: resolvedClientId,
         clientName: clientConfig?.name,
         currentApiKey: clientApiKey,
