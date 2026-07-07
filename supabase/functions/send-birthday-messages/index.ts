@@ -28,12 +28,49 @@ function cleanPhoneForBridge(raw: string): string {
   return digits.startsWith("55") ? digits : `55${digits}`;
 }
 
+// Janela horária segura para envios automáticos (evita disparar 2h da manhã).
+const WINDOW_START_HOUR = 8;
+const WINDOW_END_HOUR = 20;
+
+function isWithinBirthdayWindow(now = new Date()): boolean {
+  const h = now.getHours();
+  return h >= WINDOW_START_HOUR && h < WINDOW_END_HOUR;
+}
+
+// Preflight: só confirma envio se a ponte retornar status connected/open ao vivo.
+async function preflightBridge(bridgeUrl: string, bridgeApiKey: string): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(bridgeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": bridgeApiKey },
+      body: JSON.stringify({ action: "instance_status" }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(tid);
+    const data = await res.json().catch(() => ({}));
+    const status = String((data as any)?.status || (data as any)?.instance?.status || "").toLowerCase();
+    return status === "connected" || status === "open";
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Guarda global de janela horária: se estiver fora, nem carrega configs.
+    if (!isWithinBirthdayWindow()) {
+      return new Response(
+        JSON.stringify({ success: true, skipped: "fora_da_janela", window: `${WINDOW_START_HOUR}h-${WINDOW_END_HOUR}h` }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(supabaseUrl, serviceKey);
@@ -50,8 +87,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Bridge config is now per-client, loaded inside the loop
-
     let totalSent = 0;
     let totalFailed = 0;
 
@@ -59,7 +94,6 @@ Deno.serve(async (req) => {
       const clientId = config.client_id;
 
       // Prefer the PRIMARY WhatsApp instance from the pool.
-      // Fallback to legacy single-bridge config on the client record if no primary is set.
       let bridgeUrl: string | null = null;
       let bridgeApiKey: string | null = null;
 
@@ -90,7 +124,13 @@ Deno.serve(async (req) => {
 
       if (!bridgeUrl || !bridgeApiKey) continue; // Skip clients without any usable bridge
 
-      // Find people with birthday today (month + day match)
+      // Preflight ao vivo — evita disparar contra bridge marcada connected mas caída.
+      const bridgeAlive = await preflightBridge(bridgeUrl, bridgeApiKey);
+      if (!bridgeAlive) {
+        console.warn(`[birthday] bridge não confirmou connected para client=${clientId} — pulando`);
+        continue;
+      }
+
       const today = new Date();
       const month = String(today.getMonth() + 1).padStart(2, "0");
       const day = String(today.getDate()).padStart(2, "0");
@@ -106,7 +146,6 @@ Deno.serve(async (req) => {
 
       if (!aniversariantes || aniversariantes.length === 0) continue;
 
-      // Check which ones already received today
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
@@ -123,11 +162,15 @@ Deno.serve(async (req) => {
       if (toSend.length === 0) continue;
 
       for (const pessoa of toSend) {
+        // Reverifica janela dentro do loop (batches longos podem ultrapassar 20h)
+        if (!isWithinBirthdayWindow()) {
+          console.log(`[birthday] saiu da janela horária durante o loop — parando client=${clientId}`);
+          break;
+        }
         try {
           const personalizedMsg = config.mensagem_template.replace(/{nome}/g, pessoa.nome);
           const phoneClean = cleanPhoneForBridge(pessoa.telefone);
 
-          // Send via Bridge API (text only — images handled externally)
           const sendRes = await fetch(bridgeUrl, {
             method: "POST",
             headers: {
@@ -141,7 +184,13 @@ Deno.serve(async (req) => {
             }),
           });
 
-          if (sendRes.ok) {
+          const sendData: any = await sendRes.json().catch(() => ({}));
+          // Mesma regra flexível do dispatch: 2xx + sem sinal explícito de falha = enviado.
+          const failed = !sendRes.ok
+            || sendData?.success === false
+            || sendData?.delivered === false;
+
+          if (!failed) {
             await admin.from("whatsapp_birthday_log").insert({
               client_id: clientId,
               pessoa_id: pessoa.id,
@@ -151,14 +200,14 @@ Deno.serve(async (req) => {
             });
             totalSent++;
           } else {
-            const errText = await sendRes.text();
+            const errText = String(sendData?.error || sendRes.statusText || "sem detalhe").slice(0, 200);
             await admin.from("whatsapp_birthday_log").insert({
               client_id: clientId,
               pessoa_id: pessoa.id,
               pessoa_nome: pessoa.nome,
               telefone: pessoa.telefone,
               status: "falha",
-              erro: errText.slice(0, 200),
+              erro: errText,
             });
             totalFailed++;
           }
