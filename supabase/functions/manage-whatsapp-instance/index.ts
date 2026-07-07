@@ -1495,6 +1495,12 @@ Deno.serve(async (req) => {
               details: sanitizeBridgeData(failure.data),
             });
           }
+          return jsonResponse({
+            success: false,
+            error: "A instância está conectada, mas a ponte não liberou a listagem de grupos agora. Tente sincronizar novamente em alguns segundos.",
+            details: sanitizeBridgeData(failure.data),
+            attempted_actions: groupListActions,
+          });
         }
         return jsonResponse({
           success: false,
