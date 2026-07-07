@@ -150,13 +150,28 @@ Deno.serve(async (req: Request) => {
     // 1) Carrega a instância ALVO (a que precisa entrar nos grupos)
     const { data: inst, error: instErr } = await admin
       .from("whatsapp_instances")
-      .select("id, apelido, phone_number, is_primary, status, client_id")
+      .select("id, apelido, phone_number, is_primary, status, client_id, onboarding_sent_at")
       .eq("id", instanceId)
       .eq("client_id", clientId)
       .maybeSingle();
 
     if (instErr || !inst) return jsonResp({ success: false, error: "Instância não encontrada" }, 404);
     if (!inst.phone_number) return jsonResp({ success: false, error: "Instância ainda sem número associado" }, 400);
+
+    // Cooldown de reenvio: onboarding é uma mensagem longa com links; não deve
+    // ser reenviada com frequência (protege o remetente contra padrão de spam).
+    if (action === "send" && inst.onboarding_sent_at) {
+      const minutesAgo = (Date.now() - new Date(inst.onboarding_sent_at as string).getTime()) / 60000;
+      if (minutesAgo < 10) {
+        const remainingMin = Math.max(1, Math.ceil(10 - minutesAgo));
+        return jsonResp({
+          success: false,
+          error: `Onboarding enviado há ${Math.floor(minutesAgo)} min. Aguarde ${remainingMin} min para reenviar.`,
+          cooldown: true,
+          remaining_minutes: remainingMin,
+        }, 429);
+      }
+    }
 
     // 1b) Escolhe a instância REMETENTE (qualquer outra conectada e saudável,
     //     preferindo a principal). WhatsApp não entrega mensagem da linha pra

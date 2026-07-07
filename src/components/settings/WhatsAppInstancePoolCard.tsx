@@ -162,7 +162,7 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
         toast.error(`Tempo esgotado: ${instance.apelido} não confirmou a conexão. Gere um QR novo e tente novamente.`);
         onChange();
       }
-    }, 3000);
+    }, 8000);
   };
 
   const handleConnect = async () => {

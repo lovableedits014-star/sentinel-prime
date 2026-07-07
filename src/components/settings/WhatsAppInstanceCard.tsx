@@ -194,7 +194,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
     pollAttemptsRef.current = 0;
     pollingRef.current = setInterval(async () => {
       await pollInstanceStatus();
-    }, 3000);
+    }, 8000);
   };
 
   const createNewInstance = async (successMessage: string, forceRecreate = false) => {
