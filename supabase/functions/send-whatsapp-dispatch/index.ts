@@ -20,6 +20,16 @@ function randomDelay(minMs: number, maxMs: number) {
   return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
+/**
+ * Delay mínimo por estágio de ramp-up (protege chip novo de queima).
+ * novo: 25s min entre msgs · aquecendo: 8s · maduro: 0 (respeita config).
+ */
+function stageMinDelayMs(stage: string): number {
+  if (stage === "novo") return 25_000;
+  if (stage === "aquecendo") return 8_000;
+  return 0;
+}
+
 function isWithinWindow(start: string, end: string): boolean {
   // start/end no formato "HH:MM:SS"
   const now = new Date();
