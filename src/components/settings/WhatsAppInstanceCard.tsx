@@ -23,6 +23,9 @@ type BridgeResponse = {
   status?: string | null;
   success?: boolean;
   requires_reconnect?: boolean;
+  requires_force_recreate?: boolean;
+  cooldown?: boolean;
+  remaining_seconds?: number;
   instance?: {
     status?: string | null;
     qrcode?: string | null;
@@ -204,6 +207,13 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
     }
 
     const response = (data ?? {}) as BridgeResponse;
+    if (response.cooldown) {
+      const mins = Math.ceil(Number(response.remaining_seconds || 0) / 60);
+      throw new Error(`Proteção anti-ban ativa. Aguarde ~${mins} min antes de gerar/reparar QR novamente.`);
+    }
+    if (response.requires_force_recreate) {
+      throw new Error(response.error || "A sessão não pôde ser recuperada sem recriar QR. Use a recriação só com confirmação manual.");
+    }
     if (response.error && !response.requires_reconnect) {
       throw new Error(response.error);
     }
@@ -277,17 +287,18 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
         body: { action: "reconnect", client_id: clientId },
       });
 
-      if (error || (data as BridgeResponse)?.error) {
-        console.log("Reconnect failed, trying clean disconnect and recreate...");
-        // If reconnect fails (e.g. 401), try explicit disconnect and recreate
-        await supabase.functions.invoke("manage-whatsapp-instance", {
-          body: { action: "disconnect", client_id: clientId },
-        });
-        await handleCreateInstance();
+      const firstResponse = (data ?? {}) as BridgeResponse;
+      if (firstResponse.cooldown) {
+        const mins = Math.ceil(Number(firstResponse.remaining_seconds || 0) / 60);
+        toast.error(`🛡️ Proteção anti-ban ativa. Aguarde ~${mins} min antes de reconectar novamente.`, { duration: 8000 });
+        return;
+      }
+      if (error || firstResponse.error) {
+        toast.error("Falha ao reparar conexão: " + (error?.message || firstResponse.error));
         return;
       }
 
-      const response = (data ?? {}) as BridgeResponse;
+      const response = firstResponse;
       const nextQrCode = getQrCodeFromResponse(response);
       const status = getBridgeStatus(response);
 
@@ -334,8 +345,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
         }
       }
 
-      toast.info("A reconexão não retornou QR Code. Gerando uma nova instância...");
-      await handleCreateInstance();
+      toast.info("A reconexão não retornou QR Code. Aguarde alguns segundos e verifique novamente; não vamos recriar a sessão automaticamente para evitar banimento.");
     } catch (err: any) {
       stopPolling();
       setStoredQrCode(null);
