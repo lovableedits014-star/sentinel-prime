@@ -151,11 +151,45 @@ type CooldownCheck =
   | { allowed: false; remainingMs: number; reason: string; remainingAttempts?: number };
 
 function checkReconnectCooldown(
-  _row: any,
-  _kind: "create" | "reconnect",
+  row: any,
+  kind: "create" | "reconnect",
 ): CooldownCheck {
-  // Cooldown desativado a pedido do usuário — reconexão/re-scan liberados a qualquer momento.
-  // Tentativas continuam sendo registradas via recordReconnectAttempt para rastreabilidade.
+  // Exceção segura: se a sessão está claramente morta ou nunca conectou,
+  // liberamos SEM cooldown para o usuário conseguir reagir. Isso cobre:
+  //  - status disconnected/offline/logged_out/banned (sessão real caiu)
+  //  - status connecting sem phone_number (nunca pareou de fato)
+  const status = String(row?.status || "").toLowerCase();
+  const hasPhone = Boolean(row?.phone_number);
+  const isDeadSession = isExplicitOfflineStatus(status);
+  const neverPaired = (status === "connecting" || status === "awaiting_qr" || status === "qr") && !hasPhone;
+  if (isDeadSession || neverPaired) return { allowed: true };
+
+  const now = Date.now();
+  const cooldownMs = kind === "create" ? CREATE_COOLDOWN_MS : RECONNECT_COOLDOWN_MS;
+  const lastAttempt = row?.last_reconnect_attempt_at
+    ? new Date(row.last_reconnect_attempt_at).getTime() : 0;
+  const sinceLastMs = now - lastAttempt;
+  if (lastAttempt > 0 && sinceLastMs < cooldownMs) {
+    const remainingMs = cooldownMs - sinceLastMs;
+    const remainingMin = Math.ceil(remainingMs / 60000);
+    return {
+      allowed: false,
+      remainingMs,
+      reason: `Aguarde ${remainingMin} min antes de ${kind === "create" ? "recriar" : "reconectar"} para não queimar o número.`,
+    };
+  }
+
+  const today = todayDateStr();
+  const sameDay = row?.reconnect_attempts_date === today;
+  const used = sameDay ? Number(row?.reconnect_attempts_today || 0) : 0;
+  if (used >= MAX_RECONNECTS_PER_DAY) {
+    return {
+      allowed: false,
+      remainingMs: 0,
+      reason: `Limite de ${MAX_RECONNECTS_PER_DAY} reconexões manuais por dia atingido. Aguarde 24h para não banir o número.`,
+      remainingAttempts: 0,
+    };
+  }
   return { allowed: true };
 }
 

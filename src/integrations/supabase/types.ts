@@ -8402,6 +8402,7 @@ export type Database = {
           mensagem_template: string
           pause_reason: string | null
           paused_until: string | null
+          resume_count: number
           started_at: string | null
           status: string
           tag_filtro: string | null
@@ -8427,6 +8428,7 @@ export type Database = {
           mensagem_template: string
           pause_reason?: string | null
           paused_until?: string | null
+          resume_count?: number
           started_at?: string | null
           status?: string
           tag_filtro?: string | null
@@ -8452,6 +8454,7 @@ export type Database = {
           mensagem_template?: string
           pause_reason?: string | null
           paused_until?: string | null
+          resume_count?: number
           started_at?: string | null
           status?: string
           tag_filtro?: string | null

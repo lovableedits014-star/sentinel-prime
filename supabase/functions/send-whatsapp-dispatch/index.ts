@@ -153,10 +153,9 @@ function getSendFailure(res: Response, data: any) {
   if (!res.ok) return data?.error || `Erro na ponte WhatsApp (status ${res.status})`;
   if (data?.success === false) return data?.error || "Ponte recusou o envio";
   if (data?.delivered === false) return data?.error || "Mensagem não entregue pelo WhatsApp";
-
-  const hasDeliverySignal = data?.delivered === true || Boolean(data?.messageId || data?.message_id || data?.id || data?.key?.id);
-  if (!hasDeliverySignal) return data?.error || "Ponte não confirmou entrega da mensagem";
-
+  // Aceita como enviado quando a ponte responde 2xx e não há sinal explícito de falha.
+  // Alguns builds da bridge não retornam messageId — punir a instância nesse caso gera
+  // falsos "consecutive_failures" e derruba o chip do pool sem motivo real.
   return null;
 }
 
@@ -953,17 +952,18 @@ Deno.serve(async (req) => {
           return;
         }
         if (Date.now() - startTime > MAX_RUNTIME_MS) {
+          if (await guardResumeLimit(adminClient, dispatch.id, sent, failed)) return;
           await adminClient.from("whatsapp_dispatches").update({
             enviados: sent,
             falhas: failed,
             status: "pausado_timeout",
-            pause_reason: `Pausado por tempo limite. Retomando em segundos…`,
-            paused_until: new Date(Date.now() + 5000).toISOString(),
+            pause_reason: `Pausado por tempo limite. Retomando em 30s…`,
+            paused_until: new Date(Date.now() + 30_000).toISOString(),
             updated_at: new Date().toISOString(),
           }).eq("id", dispatch.id);
           const edgeRuntime = (globalThis as any).EdgeRuntime;
-          if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 5000));
-          else void invokeResumeDispatch(dispatch.id, 5000);
+          if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 30_000));
+          else void invokeResumeDispatch(dispatch.id, 30_000);
           return;
         }
 
@@ -981,17 +981,18 @@ Deno.serve(async (req) => {
             }
           }
           if (Date.now() - startTime > MAX_RUNTIME_MS) {
+            if (await guardResumeLimit(adminClient, dispatch.id, sent, failed)) return;
             await adminClient.from("whatsapp_dispatches").update({
               enviados: sent,
               falhas: failed,
               status: "pausado_timeout",
-              pause_reason: "Pausado por tempo limite. Retomando em segundos…",
-              paused_until: new Date(Date.now() + 5000).toISOString(),
+              pause_reason: "Pausado por tempo limite. Retomando em 30s…",
+              paused_until: new Date(Date.now() + 30_000).toISOString(),
               updated_at: new Date().toISOString(),
             }).eq("id", dispatch.id);
             const edgeRuntime = (globalThis as any).EdgeRuntime;
-            if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 5000));
-            else void invokeResumeDispatch(dispatch.id, 5000);
+            if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 30_000));
+            else void invokeResumeDispatch(dispatch.id, 30_000);
             return;
           }
 
@@ -1080,13 +1081,18 @@ Deno.serve(async (req) => {
                 }
               }
               if (!bridgeUrl) {
+                // Fallback: só usa instância explicitamente CONNECTED. Nunca cair para
+                // 'disconnected'/'connecting' aqui — isso gera falhas em cascata e
+                // aciona o auto-suspect (>=10 falhas em 15min derrubam o chip).
                 const { data: anyActive } = await adminClient
                   .from("whatsapp_instances")
                   .select("id, bridge_url, bridge_api_key, status, ramp_up_stage")
                   .eq("client_id", client_id)
                   .eq("is_active", true)
+                  .eq("status", "connected")
+                  .is("suspected_banned_at", null)
                   .not("bridge_api_key", "is", null)
-                  .order("status", { ascending: true })
+                  .order("consecutive_failures", { ascending: true })
                   .limit(1)
                   .maybeSingle();
                 if (anyActive?.bridge_url && anyActive?.bridge_api_key) {
@@ -1148,7 +1154,8 @@ Deno.serve(async (req) => {
               const cached = preflightByInstance[instanceId];
               const cachedAt = (preflightCacheAt as any)[instanceId] as number | undefined;
               // Só reaproveita cache se o último preflight foi "connected".
-              const fresh = cached && cachedAt && (Date.now() - cachedAt) < 20_000;
+              // Cache curto (5s) — se o chip cair entre um envio e outro, reconfirmamos rápido.
+              const fresh = cached && cachedAt && (Date.now() - cachedAt) < 5_000;
               if (fresh && cached.status === "connected") {
                 preflight = cached;
               } else {
