@@ -1111,6 +1111,58 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    if (action === "pause_instance") {
+      if (!instance_id) return jsonResponse({ success: false, error: "instance_id required" }, 400);
+      const minutes = Math.max(1, Math.min(24 * 60 * 7, Number((body as any)?.minutes || 60)));
+      const pausedUntil = new Date(Date.now() + minutes * 60_000).toISOString();
+      const { error } = await adminClient
+        .from("whatsapp_instances")
+        .update({ paused_until: pausedUntil })
+        .eq("id", instance_id).eq("client_id", resolvedClientId);
+      if (error) return jsonResponse({ success: false, error: error.message }, 500);
+      return jsonResponse({ success: true, paused_until: pausedUntil });
+    }
+
+    if (action === "resume_instance") {
+      if (!instance_id) return jsonResponse({ success: false, error: "instance_id required" }, 400);
+      const { error } = await adminClient
+        .from("whatsapp_instances")
+        .update({ paused_until: null })
+        .eq("id", instance_id).eq("client_id", resolvedClientId);
+      if (error) return jsonResponse({ success: false, error: error.message }, 500);
+      return jsonResponse({ success: true });
+    }
+
+    if (action === "clear_suspicion") {
+      if (!instance_id) return jsonResponse({ success: false, error: "instance_id required" }, 400);
+      const { error } = await adminClient
+        .from("whatsapp_instances")
+        .update({
+          suspected_banned_at: null,
+          auto_suspected_reason: null,
+          consecutive_failures: 0,
+        })
+        .eq("id", instance_id).eq("client_id", resolvedClientId);
+      if (error) return jsonResponse({ success: false, error: error.message }, 500);
+      return jsonResponse({ success: true });
+    }
+
+    if (action === "set_daily_limit") {
+      if (!instance_id) return jsonResponse({ success: false, error: "instance_id required" }, 400);
+      const limit = Math.max(10, Math.min(5000, Number((body as any)?.daily_send_limit || 800)));
+      const { error } = await adminClient
+        .from("whatsapp_instances")
+        .update({ daily_send_limit: limit })
+        .eq("id", instance_id).eq("client_id", resolvedClientId);
+      if (error) return jsonResponse({ success: false, error: error.message }, 500);
+      return jsonResponse({ success: true, daily_send_limit: limit });
+    }
+
+    if (action === "promote_ramp_stages") {
+      await adminClient.rpc("promote_whatsapp_ramp_stages");
+      return jsonResponse({ success: true });
+    }
+
     if (action === "delete_instance_record") {
       if (!instance_id) return jsonResponse({ success: false, error: "instance_id required" }, 400);
       const { data: inst } = await adminClient
