@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
     // Refletimos no banco IMEDIATAMENTE para evitar envios "fantasma" (status
     // OK no banco enquanto a sessão real está caída).
     const eventName = String(payload?.event || payload?.type || "").toLowerCase();
-    const instanceId = payload?.instance_id || payload?.instanceId || payload?.data?.instance_id;
+    const instanceId = payload?.instance_id || payload?.instanceId || payload?.data?.instance_id || url.searchParams.get("instance_id");
 
     // Verify instance belongs to the client_id in the URL before any status mutation
     let instanceOwnedByClient = false;
@@ -145,7 +145,20 @@ Deno.serve(async (req) => {
       instanceOwnedByClient = !!inst && (inst as any).client_id === clientId;
       if (!instanceOwnedByClient) {
         console.warn("[whatsapp-inbound-webhook] instance/client mismatch", { instanceId, clientId, found: inst });
+        await admin.from("action_logs").insert({
+          client_id: clientId,
+          action: "whatsapp_webhook_instance_mismatch",
+          status: "warn",
+          details: { instance_id: instanceId, event: eventName, found: inst },
+        });
       }
+    } else if (eventName) {
+      await admin.from("action_logs").insert({
+        client_id: clientId,
+        action: "whatsapp_webhook_without_instance_id",
+        status: "warn",
+        details: { event: eventName, payload_keys: Object.keys(payload || {}) },
+      });
     }
 
     if (instanceId && instanceOwnedByClient && (eventName === "disconnected" || eventName.includes("logout") || eventName.includes("banned"))) {
@@ -206,7 +219,15 @@ Deno.serve(async (req) => {
           last_disconnected_at: new Date().toISOString(),
         }).eq("id", instanceId).eq("client_id", clientId);
         if (upErr) console.error("[whatsapp-inbound-webhook] failed to mark disconnected:", upErr);
-        else console.log("[whatsapp-inbound-webhook] instance marked disconnected:", instanceId, "reason=", payload?.data?.reason);
+        else {
+          console.log("[whatsapp-inbound-webhook] instance marked disconnected:", instanceId, "reason=", payload?.data?.reason);
+          await admin.from("action_logs").insert({
+            client_id: clientId,
+            action: "whatsapp_webhook_disconnected",
+            status: "ok",
+            details: { instance_id: instanceId, event: eventName, reason: payload?.data?.reason || null },
+          });
+        }
         return json({ ok: true, handled: "disconnected", instance_id: instanceId });
       }
     }
@@ -218,6 +239,12 @@ Deno.serve(async (req) => {
         last_disconnected_at: null,
         last_health_check_at: new Date().toISOString(),
       }).eq("id", instanceId).eq("client_id", clientId);
+      await admin.from("action_logs").insert({
+        client_id: clientId,
+        action: "whatsapp_webhook_connected",
+        status: "ok",
+        details: { instance_id: instanceId, event: eventName },
+      });
       return json({ ok: true, handled: "connected", instance_id: instanceId });
     }
 

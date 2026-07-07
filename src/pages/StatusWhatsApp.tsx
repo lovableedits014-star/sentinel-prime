@@ -140,12 +140,21 @@ export default function StatusWhatsApp() {
 
   const handleHealthCheck = async (instanceId: string) => {
     setBusy(`check-${instanceId}`);
-    const { data, error } = await callBridge("instance_status", instanceId);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "dispatch_readiness", client_id: clientId },
+    });
     setBusy(null);
     if (error || data?.error) {
       toast.error("Falha na verificação: " + (error?.message || data?.error));
     } else {
-      toast.success("Status atualizado.");
+      const checked = (data?.instances || []).find((i: any) => i.id === instanceId);
+      if (checked?.ready) toast.success("Sessão operacional confirmada.");
+      else toast.error(
+        checked?.readiness === "session_probe_failed" || checked?.readiness === "session_probe_error"
+          ? "A ponte diz conectado, mas a sessão WhatsApp não respondeu ao teste operacional. Repare a conexão uma vez."
+          : "Instância não está operacional para envio agora.",
+        { duration: 7000 },
+      );
       loadAll(true);
     }
   };
@@ -188,11 +197,14 @@ export default function StatusWhatsApp() {
     if (!clientId) return;
     setBusy("check-all");
     const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
-      body: { action: "health_check_all", client_id: clientId },
+      body: { action: "dispatch_readiness", client_id: clientId },
     });
     setBusy(null);
     if (error || data?.error || data?.success === false) toast.error("Falha: " + (error?.message || data?.error || "verificação não concluída"));
-    else { toast.success("Verificação completa solicitada."); loadAll(true); }
+    else {
+      toast.success(data?.ready_count > 0 ? "Sessão operacional confirmada." : "Nenhuma instância operacional para envio agora.");
+      loadAll(true);
+    }
   };
 
   // ---------- Onboarding (Frente 7) ----------

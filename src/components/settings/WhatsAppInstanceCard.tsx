@@ -23,6 +23,9 @@ type BridgeResponse = {
   status?: string | null;
   success?: boolean;
   requires_reconnect?: boolean;
+  requires_force_recreate?: boolean;
+  cooldown?: boolean;
+  remaining_seconds?: number;
   instance?: {
     status?: string | null;
     qrcode?: string | null;
@@ -194,9 +197,9 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
     }, 3000);
   };
 
-  const createNewInstance = async (successMessage: string) => {
+  const createNewInstance = async (successMessage: string, forceRecreate = false) => {
     const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
-      body: { action: "create_instance", client_id: clientId },
+      body: { action: "create_instance", client_id: clientId, force_recreate: forceRecreate },
     });
 
     if (error) {
@@ -204,6 +207,13 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
     }
 
     const response = (data ?? {}) as BridgeResponse;
+    if (response.cooldown) {
+      const mins = Math.ceil(Number(response.remaining_seconds || 0) / 60);
+      throw new Error(`Proteção anti-ban ativa. Aguarde ~${mins} min antes de gerar/reparar QR novamente.`);
+    }
+    if (response.requires_force_recreate) {
+      throw new Error(response.error || "A sessão não pôde ser recuperada sem recriar QR. Use a recriação só com confirmação manual.");
+    }
     if (response.error && !response.requires_reconnect) {
       throw new Error(response.error);
     }
@@ -246,6 +256,21 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
     }
   };
 
+  const handleForceRecreate = async () => {
+    const ok = window.confirm(
+      "Gerar novo QR pode derrubar a sessão atual e conta como tentativa anti-ban. Use só se o reparo normal falhou. Deseja continuar?",
+    );
+    if (!ok) return;
+    setCreating(true);
+    try {
+      await createNewInstance("Novo QR gerado. Escaneie apenas uma vez e aguarde a confirmação.", true);
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const handleDisconnect = async () => {
     if (!confirm("Tem certeza que deseja desconectar e remover esta instância do WhatsApp?")) {
       return;
@@ -277,17 +302,18 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
         body: { action: "reconnect", client_id: clientId },
       });
 
-      if (error || (data as BridgeResponse)?.error) {
-        console.log("Reconnect failed, trying clean disconnect and recreate...");
-        // If reconnect fails (e.g. 401), try explicit disconnect and recreate
-        await supabase.functions.invoke("manage-whatsapp-instance", {
-          body: { action: "disconnect", client_id: clientId },
-        });
-        await handleCreateInstance();
+      const firstResponse = (data ?? {}) as BridgeResponse;
+      if (firstResponse.cooldown) {
+        const mins = Math.ceil(Number(firstResponse.remaining_seconds || 0) / 60);
+        toast.error(`🛡️ Proteção anti-ban ativa. Aguarde ~${mins} min antes de reconectar novamente.`, { duration: 8000 });
+        return;
+      }
+      if (error || firstResponse.error) {
+        toast.error("Falha ao reparar conexão: " + (error?.message || firstResponse.error));
         return;
       }
 
-      const response = (data ?? {}) as BridgeResponse;
+      const response = firstResponse;
       const nextQrCode = getQrCodeFromResponse(response);
       const status = getBridgeStatus(response);
 
@@ -334,8 +360,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
         }
       }
 
-      toast.info("A reconexão não retornou QR Code. Gerando uma nova instância...");
-      await handleCreateInstance();
+      toast.info("A reconexão não retornou QR Code. Aguarde alguns segundos e verifique novamente; não vamos recriar a sessão automaticamente para evitar banimento.");
     } catch (err: any) {
       stopPolling();
       setStoredQrCode(null);
@@ -457,7 +482,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
                 {qrAge >= 30 ? (
                   <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-xs p-2.5">
                     ⚠️ Este QR Code está aberto há {qrAge}s e provavelmente expirou.
-                    Se o celular continua girando, clique em <b>Gerar novo QR</b> abaixo.
+                  Se o celular continua girando, use <b>Gerar novo QR</b> apenas uma vez para evitar bloqueio.
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -468,7 +493,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCreateInstance}
+                  onClick={handleForceRecreate}
                   disabled={creating}
                   className="gap-1.5"
                 >
@@ -490,7 +515,7 @@ export default function WhatsAppInstanceCard({ clientId }: WhatsAppInstanceCardP
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCreateInstance}
+                  onClick={handleForceRecreate}
                   disabled={creating}
                   className="gap-1.5"
                 >

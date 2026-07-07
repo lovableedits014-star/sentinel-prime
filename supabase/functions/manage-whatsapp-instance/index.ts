@@ -140,9 +140,9 @@ const getBridgeRawStatus = (data: any) =>
 // para o mesmo número. Repetir login/handshake várias vezes em sequência
 // é um dos principais gatilhos de ban definitivo do WhatsApp.
 // =====================================================================
-const CREATE_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutos
-const RECONNECT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos
-const MAX_RECONNECTS_PER_DAY = 3;
+const CREATE_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutos entre QR/recriação
+const RECONNECT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutos entre reparos/reconnect
+const MAX_RECONNECTS_PER_DAY = 2;
 
 const todayDateStr = () => new Date().toISOString().slice(0, 10);
 
@@ -151,26 +151,52 @@ type CooldownCheck =
   | { allowed: false; remainingMs: number; reason: string; remainingAttempts?: number };
 
 function checkReconnectCooldown(
-  _row: any,
-  _kind: "create" | "reconnect",
+  row: any,
+  kind: "create" | "reconnect",
 ): CooldownCheck {
-  // Cooldown anti-ban desativado a pedido do usuário — sempre permite.
+  const now = Date.now();
+  const today = todayDateStr();
+  const sameDay = row?.reconnect_attempts_date === today;
+  const attemptsToday = sameDay ? Number(row?.reconnect_attempts_today || 0) : 0;
+  if (attemptsToday >= MAX_RECONNECTS_PER_DAY) {
+    return {
+      allowed: false,
+      remainingMs: Math.max(0, new Date(`${today}T23:59:59.999Z`).getTime() - now),
+      reason: `Proteção anti-ban: limite diário de ${MAX_RECONNECTS_PER_DAY} tentativas de QR/reconexão atingido para esta instância. Tente novamente amanhã para evitar novo bloqueio do WhatsApp.`,
+      remainingAttempts: 0,
+    };
+  }
+
+  const lastIso = kind === "create" ? row?.last_create_instance_at : row?.last_reconnect_attempt_at;
+  const cooldownMs = kind === "create" ? CREATE_COOLDOWN_MS : RECONNECT_COOLDOWN_MS;
+  const lastMs = lastIso ? new Date(lastIso).getTime() : 0;
+  if (lastMs > 0 && now - lastMs < cooldownMs) {
+    const remainingMs = cooldownMs - (now - lastMs);
+    return {
+      allowed: false,
+      remainingMs,
+      reason: `Proteção anti-ban: aguarde aproximadamente ${Math.ceil(remainingMs / 60000)} min antes de ${kind === "create" ? "gerar outro QR" : "reparar/reconectar"} esta instância. Tentativas repetidas derrubam a sessão e aumentam risco de banimento.`,
+      remainingAttempts: MAX_RECONNECTS_PER_DAY - attemptsToday,
+    };
+  }
+
   return { allowed: true };
 }
 
-async function recordReconnectAttempt(adminClient: any, instanceId: string, row: any) {
+async function recordReconnectAttempt(adminClient: any, instanceId: string, row: any, kind: "create" | "reconnect") {
   const today = todayDateStr();
   const sameDay = row?.reconnect_attempts_date === today;
   const next = (sameDay ? Number(row?.reconnect_attempts_today || 0) : 0) + 1;
+  const updates: any = {
+    last_reconnect_attempt_at: new Date().toISOString(),
+    reconnect_attempts_today: next,
+    reconnect_attempts_date: today,
+  };
+  if (kind === "create") updates.last_create_instance_at = new Date().toISOString();
   try {
     await adminClient
       .from("whatsapp_instances")
-      .update({
-        last_create_instance_at: new Date().toISOString(),
-        last_reconnect_attempt_at: new Date().toISOString(),
-        reconnect_attempts_today: next,
-        reconnect_attempts_date: today,
-      })
+      .update(updates)
       .eq("id", instanceId);
   } catch (err) {
     console.error("recordReconnectAttempt error", err);
@@ -285,6 +311,86 @@ async function fetchFreshQr(apiKey: string, attempts = 2) {
     qrcode: getBridgeQrCode(bridgeData),
     status: getBridgeRawStatus(bridgeData),
   };
+}
+
+async function bindInstanceWebhook(params: {
+  supabaseUrl: string;
+  bridgeToken: string | undefined;
+  apiKey: string;
+  clientId: string;
+  instanceId?: string | null;
+}) {
+  const { supabaseUrl, bridgeToken, apiKey, clientId, instanceId } = params;
+  if (!bridgeToken) return { ok: false, skipped: true, reason: "missing_token" };
+  const instanceParam = instanceId ? `&instance_id=${encodeURIComponent(instanceId)}` : "";
+  const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${encodeURIComponent(clientId)}${instanceParam}&token=${encodeURIComponent(bridgeToken)}`;
+  try {
+    const bridgeRes = await fetch(BRIDGE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+      body: JSON.stringify({ action: "set_webhook", instance_id: instanceId, webhook_url: webhookUrl }),
+    });
+    const bridgeData = await bridgeRes.json().catch(() => ({}));
+    return { ok: bridgeRes.ok, webhook_url: webhookUrl, details: sanitizeBridgeData(bridgeData) };
+  } catch (err) {
+    return { ok: false, webhook_url: webhookUrl, error: (err as Error).message };
+  }
+}
+
+async function verifyWhatsAppOperationalSession(adminClient: any, inst: any) {
+  if (!inst?.bridge_api_key || !inst?.bridge_url) {
+    return { ready: false, status: "no_credentials", reason: "no_credentials" };
+  }
+  if (inst.suspected_banned_at) {
+    return { ready: false, status: "suspected_ban", reason: "suspected_ban" };
+  }
+  if ((inst.consecutive_failures || 0) >= 3) {
+    return { ready: false, status: "too_many_failures", reason: "too_many_failures" };
+  }
+
+  const health = await syncInstanceHealth(adminClient, inst);
+  if (health.status !== "connected") {
+    return { ready: false, status: health.status, reason: health.status, health };
+  }
+
+  const hasPairedSession = Boolean(inst.phone_number || health.details?.phone_number || health.details?.phone || health.details?.instance?.phone_number || health.details?.instance?.phone);
+  if (!hasPairedSession) {
+    return { ready: false, status: "session_not_paired", reason: "session_not_paired", health };
+  }
+
+  try {
+    const { bridgeRes, bridgeData } = await fetchBridgeAction({
+      action: "chats",
+      apiKey: inst.bridge_api_key,
+      body: { action: "chats" },
+    });
+    const errorText = String(bridgeData?.error || bridgeData?.message || "").toLowerCase();
+    if (!bridgeRes.ok || bridgeData?.success === false || isInstanceDisconnectedError(bridgeRes.status, bridgeData)) {
+      const terminal = bridgeRes.status === 401 || errorText.includes("disconnect") || errorText.includes("not connected") || errorText.includes("offline") || errorText.includes("logged") || errorText.includes("banned");
+      if (terminal) {
+        await markInstanceDisconnected(adminClient, inst.id);
+        return { ready: false, status: "disconnected", reason: "session_probe_failed", health, probe: sanitizeBridgeData(bridgeData) };
+      }
+      await adminClient.from("whatsapp_instances").update({
+        status: "connecting",
+        last_health_check_at: new Date().toISOString(),
+      }).eq("id", inst.id);
+      return { ready: false, status: "not_ready", reason: "session_probe_failed", health, probe: sanitizeBridgeData(bridgeData) };
+    }
+    await adminClient.from("whatsapp_instances").update({
+      status: "connected",
+      last_health_check_at: new Date().toISOString(),
+      last_disconnected_at: null,
+      connected_since: inst.connected_since || new Date().toISOString(),
+    }).eq("id", inst.id);
+    return { ready: true, status: "connected", reason: "ready", health, probe: { ok: true } };
+  } catch (err) {
+    await adminClient.from("whatsapp_instances").update({
+      status: "connecting",
+      last_health_check_at: new Date().toISOString(),
+    }).eq("id", inst.id);
+    return { ready: false, status: "not_ready", reason: "session_probe_error", health, error: (err as Error).message };
+  }
 }
 
 async function syncInstanceHealth(adminClient: any, inst: any) {
@@ -527,24 +633,44 @@ async function deleteExistingInstance(params: {
 async function createClientInstance(params: {
   adminClient: any;
   bridgeToken: string | undefined;
+  supabaseUrl: string;
   clientId: string;
   clientName?: string | null;
   providedName?: string | null;
   currentApiKey?: string | null;
+  forceRecreate?: boolean;
 }) {
-  const { adminClient, bridgeToken, clientId, clientName, providedName, currentApiKey } = params;
+  const { adminClient, bridgeToken, supabaseUrl, clientId, clientName, providedName, currentApiKey, forceRecreate = false } = params;
 
   if (!bridgeToken) {
     return jsonResponse({ error: "Bridge token não configurado no servidor" }, 500);
   }
 
-  // Ensure old instance is gone before creating a new one. Even if the bridge
-  // rejects the old key, clear our stored credentials before issuing a fresh QR
-  // so the user never scans a QR linked to a stale/corrupted session.
-  if (currentApiKey) {
+  if (currentApiKey && !forceRecreate) {
+    try {
+      const repaired = await fetchFreshQr(currentApiKey, 2);
+      if (isConnectedStatus(repaired.status) || repaired.qrcode) {
+        await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: currentApiKey, clientId });
+        return jsonResponse({
+          success: true,
+          qrcode: repaired.qrcode,
+          status: repaired.status || "connecting",
+          instance: repaired.bridgeData.instance,
+          repaired: true,
+        });
+      }
+    } catch (err) {
+      console.warn("Legacy repair before create failed:", (err as Error).message);
+    }
+    return jsonResponse({
+      success: false,
+      requires_force_recreate: true,
+      error: "Não consegui recuperar a sessão sem recriar a instância. Confirme a recriação de QR apenas se aceitar derrubar a sessão atual.",
+    }, 200);
+  }
+
+  if (currentApiKey && forceRecreate) {
     await deleteExistingInstance({ adminClient, clientId, clientApiKey: currentApiKey });
-  } else {
-    await deleteExistingInstance({ adminClient, clientId, clientApiKey: undefined });
   }
 
   const instanceName = providedName || clientName || "WhatsApp Bot";
@@ -565,6 +691,7 @@ async function createClientInstance(params: {
   // call would create another instance from scratch and loop forever.
   const apiKey = getBridgeApiKey(bridgeData);
   if (apiKey) {
+    await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId });
     const { error: updateError } = await adminClient
       .from("clients")
       .update({
@@ -649,6 +776,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     validateInput(ManageWhatsappSchema, body, { fn: "manage-whatsapp-instance" });
     const { action, phone, message, client_id, target_client_id, name, instance_id, apelido, bridge_url, bridge_api_key, is_active, status: newStatus, media, mimetype, filename, caption } = body;
+    const forceRecreate = Boolean((body as any).force_recreate);
     const cronRequested = action === "health_check_all";
     if (!authHeader && !cronRequested) {
       return jsonResponse({ error: "Unauthorized" }, 401);
@@ -816,25 +944,25 @@ Deno.serve(async (req) => {
           return { ...baseInfo, ready: false, readiness: "too_many_failures", live_status: inst.status };
         }
         try {
-          const health = await syncInstanceHealth(adminClient, inst);
-          const liveStatus = health.status;
-          // Fail-safe: só considera "ready" quando a ponte respondeu connected/open
-          // AO VIVO E a instância já tem phone_number registrado (prova de sessão
-          // WhatsApp pareada). Status "connecting" / vazio / erro NÃO conta como pronto.
-          const hasPairedSession = !!(inst.phone_number && String(inst.phone_number).length > 0);
-          const ready = liveStatus === "connected" && hasPairedSession;
+          const operational = await verifyWhatsAppOperationalSession(adminClient, inst);
+          const liveStatus = operational.status;
+          const ready = operational.ready;
           let readiness: string;
           if (ready) readiness = "ready";
-          else if (liveStatus === "connected" && !hasPairedSession) readiness = "session_not_paired";
+          else if (operational.reason === "session_probe_failed") readiness = "session_probe_failed";
+          else if (operational.reason === "session_probe_error") readiness = "session_probe_error";
+          else if (liveStatus === "session_not_paired") readiness = "session_not_paired";
           else if (liveStatus === "connecting") readiness = "connecting";
           else if (liveStatus === "disconnected") readiness = "offline";
-          else readiness = "not_ready";
+          else readiness = String(operational.reason || "not_ready");
           return {
             ...baseInfo,
             db_status: liveStatus,
             ready,
             readiness,
             live_status: liveStatus,
+            reason: operational.reason,
+            error: operational.error,
           };
         } catch (err) {
           return { ...baseInfo, ready: false, readiness: "check_error", live_status: null, error: (err as Error).message };
@@ -935,13 +1063,14 @@ Deno.serve(async (req) => {
       let webhookRebound = false;
       if (inst.bridge_api_key) {
         try {
-          const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${target_client_id}`;
-          const bridgeRes = await fetch(BRIDGE_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Api-Key": inst.bridge_api_key },
-            body: JSON.stringify({ action: "set_webhook", instance_id, webhook_url: webhookUrl }),
+          const rebound = await bindInstanceWebhook({
+            supabaseUrl,
+            bridgeToken,
+            apiKey: inst.bridge_api_key,
+            clientId: target_client_id,
+            instanceId: instance_id,
           });
-          webhookRebound = bridgeRes.ok;
+          webhookRebound = Boolean(rebound.ok);
         } catch (err) {
           console.warn("[whatsapp] reassign webhook error", err);
         }
@@ -1054,7 +1183,36 @@ Deno.serve(async (req) => {
         if (!cd.allowed) return cooldownBlockedResponse(cd);
         if (!bridgeToken) return jsonResponse({ error: "Bridge token não configurado" }, 500);
 
-        if (activeInstanceRow.bridge_api_key) {
+        if (activeInstanceRow.bridge_api_key && !forceRecreate) {
+          await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow, "create");
+          const fresh = await fetchFreshQr(activeInstanceRow.bridge_api_key, 2);
+          if (isConnectedStatus(fresh.status)) {
+            await adminClient.from("whatsapp_instances").update({
+              status: "connected",
+              last_health_check_at: new Date().toISOString(),
+              last_disconnected_at: null,
+              connected_since: activeInstanceRow.connected_since || new Date().toISOString(),
+            }).eq("id", instance_id);
+            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
+            return jsonResponse({ success: true, status: fresh.status, instance: fresh.bridgeData.instance, repaired: true });
+          }
+          if (fresh.qrcode) {
+            await adminClient.from("whatsapp_instances").update({
+              status: "connecting",
+              last_health_check_at: new Date().toISOString(),
+            }).eq("id", instance_id);
+            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
+            return jsonResponse({ success: true, qrcode: fresh.qrcode, status: fresh.status || "connecting", instance: fresh.bridgeData.instance, repaired: true });
+          }
+          return jsonResponse({
+            success: false,
+            requires_force_recreate: true,
+            error: "Não consegui recuperar um QR válido sem recriar a sessão. Use a opção de recriar QR apenas se aceitar derrubar a sessão atual.",
+            details: sanitizeBridgeData(fresh.bridgeData),
+          }, 200);
+        }
+
+        if (activeInstanceRow.bridge_api_key && forceRecreate) {
           try {
             await fetch(BRIDGE_URL, {
               method: "POST",
@@ -1070,7 +1228,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ action: "create_instance", name: instName }),
         });
         // Conta a tentativa SEMPRE que a chamada ao bridge é feita, sucesso ou não.
-        await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
+        await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow, "create");
         const bridgeData = await bridgeRes.json().catch(() => ({}));
         const apiKey = getBridgeApiKey(bridgeData);
         if (apiKey) {
@@ -1078,6 +1236,7 @@ Deno.serve(async (req) => {
             .from("whatsapp_instances")
             .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
             .eq("id", instance_id);
+          await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
           try {
             const fresh = await fetchFreshQr(apiKey, 2);
             if (fresh.qrcode) {
@@ -1096,10 +1255,12 @@ Deno.serve(async (req) => {
       return await createClientInstance({
         adminClient,
         bridgeToken,
+        supabaseUrl,
         clientId: resolvedClientId,
         clientName: clientConfig?.name,
         providedName: name,
         currentApiKey: clientApiKey ?? undefined,
+        forceRecreate,
       });
     }
 
@@ -1146,29 +1307,21 @@ Deno.serve(async (req) => {
       if (!activeInstanceRow.bridge_api_key) {
         return jsonResponse({ success: false, error: "Instância sem API key — conecte primeiro" }, 400);
       }
-      const tokenParam = bridgeToken ? `&token=${encodeURIComponent(bridgeToken)}` : "";
-      const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${resolvedClientId}${tokenParam}`;
-      const bridgeRes = await fetch(BRIDGE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": activeInstanceRow.bridge_api_key,
-        },
-        body: JSON.stringify({
-          action: "set_webhook",
-          instance_id: instance_id,
-          webhook_url: webhookUrl,
-        }),
+      const rebound = await bindInstanceWebhook({
+        supabaseUrl,
+        bridgeToken,
+        apiKey: activeInstanceRow.bridge_api_key,
+        clientId: resolvedClientId,
+        instanceId: instance_id,
       });
-      const bridgeData = await bridgeRes.json().catch(() => ({}));
-      if (!bridgeRes.ok) {
+      if (!rebound.ok) {
         return jsonResponse({
           success: false,
-          error: bridgeData?.error || `Bridge respondeu ${bridgeRes.status}`,
-          details: sanitizeBridgeData(bridgeData),
+          error: rebound.error || "Falha ao registrar webhook na ponte",
+          details: rebound.details,
         });
       }
-      return jsonResponse({ success: true, webhook_url: webhookUrl, bridge: bridgeData });
+      return jsonResponse({ success: true, webhook_url: rebound.webhook_url, bridge: rebound.details });
     }
 
     // === SYNC GROUPS (lista grupos do WhatsApp em que essa instância participa) ===
@@ -1348,7 +1501,7 @@ Deno.serve(async (req) => {
             headers: { "Content-Type": "application/json", "X-Bridge-Token": bridgeToken },
             body: JSON.stringify({ action: "create_instance", name: instName }),
           });
-          await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
+          await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow, "reconnect");
           const bridgeData = await bridgeRes.json().catch(() => ({}));
           const apiKey = getBridgeApiKey(bridgeData);
           if (apiKey) {
@@ -1356,6 +1509,7 @@ Deno.serve(async (req) => {
               .from("whatsapp_instances")
               .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
               .eq("id", instance_id);
+            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
             try {
               const fresh = await fetchFreshQr(apiKey, 2);
               if (fresh.qrcode) {
@@ -1375,42 +1529,60 @@ Deno.serve(async (req) => {
         return await createClientInstance({
           adminClient,
           bridgeToken,
+          supabaseUrl,
           clientId: resolvedClientId,
           clientName: clientConfig?.name,
           currentApiKey: null, // No old key since we already checked !clientApiKey
+          forceRecreate,
         });
       }
 
       return jsonResponse({ error: "Instância WhatsApp não configurada. Crie uma instância primeiro." }, 400);
     }
 
+    if (action === "reconnect" && instance_id && activeInstanceRow) {
+      const cd = checkReconnectCooldown(activeInstanceRow, "reconnect");
+      if (!cd.allowed) return cooldownBlockedResponse(cd);
+      await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow, "reconnect");
+      const { bridgeRes, bridgeData } = await fetchBridgeAction({
+        action: "reconnect",
+        apiKey: clientApiKey,
+        body: { action: "reconnect" },
+      });
+      const rawStatus = getBridgeRawStatus(bridgeData);
+      const qrcode = getBridgeQrCode(bridgeData);
+      const normalizedStatus = isConnectedStatus(rawStatus) ? "connected"
+        : isExplicitOfflineStatus(rawStatus) || isInvalidApiKeyResponse(bridgeRes.status, bridgeData) ? "disconnected"
+        : "connecting";
+      const updates: any = { status: normalizedStatus, last_health_check_at: new Date().toISOString() };
+      if (normalizedStatus === "connected") {
+        updates.connected_since = activeInstanceRow.connected_since || new Date().toISOString();
+        updates.last_disconnected_at = null;
+      }
+      if (normalizedStatus === "disconnected") {
+        updates.connected_since = null;
+        updates.last_disconnected_at = new Date().toISOString();
+      }
+      await adminClient.from("whatsapp_instances").update(updates).eq("id", instance_id);
+      await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: clientApiKey, clientId: resolvedClientId, instanceId: instance_id });
+      return jsonResponse({
+        success: bridgeRes.ok && bridgeData?.success !== false,
+        qrcode,
+        status: rawStatus || normalizedStatus,
+        instance: bridgeData.instance,
+        error: !bridgeRes.ok || bridgeData?.success === false ? (bridgeData.error || `Erro na ponte (status ${bridgeRes.status})`) : undefined,
+        details: sanitizeBridgeData(bridgeData),
+      });
+    }
+
     if ((action === "send" || action === "send_media") && instance_id && activeInstanceRow) {
-      const health = await syncInstanceHealth(adminClient, activeInstanceRow);
-      const currentStatus = health.status;
-
-      // Se a ponte ACABOU de confirmar "connected" ao vivo, confiamos nela.
-      // Não recusamos por dbDisconnected/recentlyDropped — esses dados são
-      // anteriores ao syncInstanceHealth que acabou de revalidar a sessão.
-      // Antes, um evento transitório de "disconnected" no webhook bloqueava
-      // envios por até 90s mesmo com a sessão WhatsApp comprovadamente viva.
-      if (currentStatus !== "connected") {
-        // Releitura do banco: o webhook pode ter marcado disconnected entre
-        // o syncInstanceHealth (sem confirmação) e este ponto.
-        const { data: freshRow } = await adminClient
-          .from("whatsapp_instances")
-          .select("status, last_disconnected_at, connected_since")
-          .eq("id", instance_id)
-          .maybeSingle();
-        const lastDisc = freshRow?.last_disconnected_at ? new Date(freshRow.last_disconnected_at).getTime() : 0;
-        const recentlyDropped = lastDisc > 0 && (Date.now() - lastDisc) < 90_000;
-        const dbDisconnected = freshRow?.status === "disconnected";
-
-        if (currentStatus !== "connected" || dbDisconnected || recentlyDropped) {
-          // Política anti-ban: NÃO chamamos /reconnect proativamente antes de enviar.
-          const error = "Instância WhatsApp desconectada. Reconecte o chip manualmente (botão na UI) antes de enviar.";
-          await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
-          return jsonResponse({ success: false, status: health.status, error, health });
-        }
+      const operational = await verifyWhatsAppOperationalSession(adminClient, activeInstanceRow);
+      if (!operational.ready) {
+        const error = operational.reason === "session_probe_failed" || operational.reason === "session_probe_error"
+          ? "A ponte diz conectado, mas a sessão WhatsApp não responde operacionalmente. Repare a conexão uma vez e evite gerar QR repetidamente."
+          : "Instância WhatsApp não está pronta para envio. Repare/conecte o chip manualmente antes de enviar.";
+        await logDirectSend(adminClient, { instanceId: instance_id, clientId: resolvedClientId, success: false, error });
+        return jsonResponse({ success: false, status: operational.status, error, health: operational });
       }
     }
 
@@ -1551,9 +1723,11 @@ Deno.serve(async (req) => {
       return await createClientInstance({
         adminClient,
         bridgeToken,
+        supabaseUrl,
         clientId: resolvedClientId,
         clientName: clientConfig?.name,
         currentApiKey: clientApiKey,
+        forceRecreate,
       });
     }
 

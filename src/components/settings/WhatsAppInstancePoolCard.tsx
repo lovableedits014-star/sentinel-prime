@@ -192,8 +192,70 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
         );
         return;
       }
+      if (data?.requires_force_recreate) {
+        toast.error(data.error || "Não foi possível recuperar a sessão sem recriar QR. Use 'Gerar novo QR' apenas se aceitar derrubar a sessão atual.", { duration: 9000 });
+        return;
+      }
       if (error || data?.error) {
         toast.error("Erro: " + (error?.message || data?.error));
+        return;
+      }
+      const qr = normalizeQrCode(data?.qrcode || data?.instance?.qrcode);
+      if (qr) setStoredQrCode(qr);
+      startPolling();
+      onChange();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleRepairConnection = async () => {
+    setBusy("reconnect");
+    try {
+      const { data, error } = await invoke("reconnect");
+      if (data?.cooldown) {
+        const mins = Math.ceil(Number(data?.remaining_seconds || 0) / 60);
+        toast.error(`🛡️ Proteção anti-ban ativa. Aguarde ~${mins} min antes de reparar/reconectar novamente.`, { duration: 8000 });
+        return;
+      }
+      if (error || data?.error) {
+        toast.error("Falha ao reparar conexão: " + (error?.message || data?.error));
+        return;
+      }
+      const qr = normalizeQrCode(data?.qrcode || data?.instance?.qrcode);
+      if (qr) {
+        setStoredQrCode(qr);
+        startPolling();
+        toast.info("QR recebido. Escaneie apenas uma vez e aguarde a confirmação.");
+      } else if (CONNECTED.has(String(data?.status || data?.instance?.status || "").toLowerCase())) {
+        setStoredQrCode(null);
+        toast.success("Conexão reparada e confirmada.");
+      } else {
+        toast.info("Reparo solicitado. Aguarde alguns segundos e verifique o status.");
+      }
+      onChange();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleForceNewQr = async () => {
+    const ok = window.confirm(
+      "Gerar novo QR pode derrubar a sessão atual e conta como tentativa anti-ban. Use só se o QR/reparo normal falhou. Deseja continuar?",
+    );
+    if (!ok) return;
+    setBusy("force-qr");
+    try {
+      setStoredQrCode(null);
+      setScanTimedOut(false);
+      const { data, error } = await invoke("create_instance", { force_recreate: true });
+      if (data?.cooldown) {
+        const mins = Math.ceil(Number(data?.remaining_seconds || 0) / 60);
+        toast.error(`🛡️ Proteção anti-ban ativa. Aguarde ~${mins} min antes de gerar outro QR.`, { duration: 8000 });
+        return;
+      }
+      if (error || data?.error) {
+        toast.error("Erro ao gerar QR: " + (error?.message || data?.error));
         return;
       }
       const qr = normalizeQrCode(data?.qrcode || data?.instance?.qrcode);
@@ -395,11 +457,11 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
             type="button"
             size="sm"
             variant="outline"
-            onClick={handleConnect}
-            disabled={busy === "connect"}
+            onClick={handleForceNewQr}
+            disabled={busy === "force-qr"}
             className="h-8 gap-1.5 text-xs text-slate-800 border-slate-300 hover:bg-slate-100"
           >
-            {busy === "connect" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            {busy === "force-qr" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             Gerar novo QR
           </Button>
         </div>
@@ -457,8 +519,8 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
             <Button size="sm" variant="outline" onClick={() => setShowTest((v) => !v)}>
               <Send className="w-3.5 h-3.5 mr-1" /> Testar
             </Button>
-            <Button size="sm" variant="outline" onClick={handleConnect} disabled={busy === "connect"}>
-              <RefreshCw className={`w-3.5 h-3.5 mr-1 ${busy === "connect" ? "animate-spin" : ""}`} /> Reconectar
+            <Button size="sm" variant="outline" onClick={handleRepairConnection} disabled={busy === "reconnect"}>
+              <RefreshCw className={`w-3.5 h-3.5 mr-1 ${busy === "reconnect" ? "animate-spin" : ""}`} /> Reparar conexão
             </Button>
             <Button size="sm" variant="outline" onClick={handleDisconnect} disabled={busy === "disconnect"}>
               <Power className="w-3.5 h-3.5 mr-1" /> Desconectar

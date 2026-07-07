@@ -237,7 +237,7 @@ export default function Disparos() {
   const [eleicaoEscopo, setEleicaoEscopo] = useState<"all" | "campo_grande" | "interior">("all");
   const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
   const [sending, setSending] = useState(false);
-  const [politica, setPolitica] = useState<PolicyKey>("conservador");
+  const [politica, setPolitica] = useState<PolicyKey>("furtivo");
   const [customPol, setCustomPol] = useState({ batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120 });
   const { regioes: regioesCadastradas } = useRegioesEleicao(clientId);
   const [groupSearch, setGroupSearch] = useState("");
@@ -419,6 +419,8 @@ export default function Disparos() {
       toast.error(
         r?.overall === "no_instances" ? "Nenhuma instância WhatsApp cadastrada."
         : r?.overall === "no_credentials" ? "Instância sem credencial — escaneie o QR antes de disparar."
+        : (r?.instances || []).some((i: any) => i.readiness === "session_probe_failed" || i.readiness === "session_probe_error")
+          ? "A ponte diz conectado, mas a sessão WhatsApp não respondeu ao teste operacional. Repare a conexão uma vez antes de enviar."
         : "Nenhuma instância WhatsApp pronta agora. Vá em Status WhatsApp para reconectar.",
         { duration: 6000 }
       );
@@ -430,6 +432,11 @@ export default function Disparos() {
     try {
       const basePol = POLICIES[politica];
       const pol = politica === "personalizado" ? { ...basePol, ...customPol } : basePol;
+      if (politica === "agressivo") {
+        toast.error("Modo agressivo bloqueado para proteger a instância WhatsApp contra queda e banimento.");
+        setSending(false);
+        return;
+      }
       if (politica === "personalizado") {
         if (customPol.delay_max < customPol.delay_min || customPol.delay_min < 1 || customPol.batch_size < 1 || customPol.batch_pause < 0) {
           toast.error("Valores inválidos na política personalizada (delay máx ≥ delay mín, valores ≥ 1).");
@@ -606,6 +613,8 @@ export default function Disparos() {
                         .map((i) => {
                           const label = i.apelido || "instância";
                           if (i.readiness === "session_not_paired") return `${label}: ponte diz conectado mas a sessão WhatsApp ainda não pareou`;
+                          if (i.readiness === "session_probe_failed") return `${label}: conectado na ponte, mas a sessão não respondeu ao teste operacional`;
+                          if (i.readiness === "session_probe_error") return `${label}: erro no teste operacional da sessão`;
                           if (i.readiness === "connecting") return `${label}: ainda conectando`;
                           if (i.readiness === "offline") return `${label}: offline`;
                           if (i.readiness === "no_credentials") return `${label}: sem credencial`;
@@ -670,7 +679,7 @@ export default function Disparos() {
                 <SelectContent>
                   <SelectItem value="conservador">🛡️ Conservador</SelectItem>
                   <SelectItem value="moderado">⚡ Moderado</SelectItem>
-                  <SelectItem value="agressivo">🔥 Agressivo</SelectItem>
+                  <SelectItem value="agressivo" disabled>🔥 Agressivo (bloqueado)</SelectItem>
                   <SelectItem value="furtivo">🥷 Furtivo (anti-ban)</SelectItem>
                   <SelectItem value="personalizado">⚙️ Personalizado</SelectItem>
                 </SelectContent>
