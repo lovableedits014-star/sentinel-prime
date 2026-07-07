@@ -914,25 +914,25 @@ Deno.serve(async (req) => {
           return { ...baseInfo, ready: false, readiness: "too_many_failures", live_status: inst.status };
         }
         try {
-          const health = await syncInstanceHealth(adminClient, inst);
-          const liveStatus = health.status;
-          // Fail-safe: só considera "ready" quando a ponte respondeu connected/open
-          // AO VIVO E a instância já tem phone_number registrado (prova de sessão
-          // WhatsApp pareada). Status "connecting" / vazio / erro NÃO conta como pronto.
-          const hasPairedSession = !!(inst.phone_number && String(inst.phone_number).length > 0);
-          const ready = liveStatus === "connected" && hasPairedSession;
+          const operational = await verifyWhatsAppOperationalSession(adminClient, inst);
+          const liveStatus = operational.status;
+          const ready = operational.ready;
           let readiness: string;
           if (ready) readiness = "ready";
-          else if (liveStatus === "connected" && !hasPairedSession) readiness = "session_not_paired";
+          else if (operational.reason === "session_probe_failed") readiness = "session_probe_failed";
+          else if (operational.reason === "session_probe_error") readiness = "session_probe_error";
+          else if (liveStatus === "session_not_paired") readiness = "session_not_paired";
           else if (liveStatus === "connecting") readiness = "connecting";
           else if (liveStatus === "disconnected") readiness = "offline";
-          else readiness = "not_ready";
+          else readiness = String(operational.reason || "not_ready");
           return {
             ...baseInfo,
             db_status: liveStatus,
             ready,
             readiness,
             live_status: liveStatus,
+            reason: operational.reason,
+            error: operational.error,
           };
         } catch (err) {
           return { ...baseInfo, ready: false, readiness: "check_error", live_status: null, error: (err as Error).message };
