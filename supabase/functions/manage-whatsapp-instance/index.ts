@@ -747,6 +747,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     validateInput(ManageWhatsappSchema, body, { fn: "manage-whatsapp-instance" });
     const { action, phone, message, client_id, target_client_id, name, instance_id, apelido, bridge_url, bridge_api_key, is_active, status: newStatus, media, mimetype, filename, caption } = body;
+    const forceRecreate = Boolean((body as any).force_recreate);
     const cronRequested = action === "health_check_all";
     if (!authHeader && !cronRequested) {
       return jsonResponse({ error: "Unauthorized" }, 401);
@@ -1033,13 +1034,14 @@ Deno.serve(async (req) => {
       let webhookRebound = false;
       if (inst.bridge_api_key) {
         try {
-          const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${target_client_id}`;
-          const bridgeRes = await fetch(BRIDGE_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Api-Key": inst.bridge_api_key },
-            body: JSON.stringify({ action: "set_webhook", instance_id, webhook_url: webhookUrl }),
+          const rebound = await bindInstanceWebhook({
+            supabaseUrl,
+            bridgeToken,
+            apiKey: inst.bridge_api_key,
+            clientId: target_client_id,
+            instanceId: instance_id,
           });
-          webhookRebound = bridgeRes.ok;
+          webhookRebound = Boolean(rebound.ok);
         } catch (err) {
           console.warn("[whatsapp] reassign webhook error", err);
         }
@@ -1152,7 +1154,36 @@ Deno.serve(async (req) => {
         if (!cd.allowed) return cooldownBlockedResponse(cd);
         if (!bridgeToken) return jsonResponse({ error: "Bridge token não configurado" }, 500);
 
-        if (activeInstanceRow.bridge_api_key) {
+        if (activeInstanceRow.bridge_api_key && !forceRecreate) {
+          await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow, "create");
+          const fresh = await fetchFreshQr(activeInstanceRow.bridge_api_key, 2);
+          if (isConnectedStatus(fresh.status)) {
+            await adminClient.from("whatsapp_instances").update({
+              status: "connected",
+              last_health_check_at: new Date().toISOString(),
+              last_disconnected_at: null,
+              connected_since: activeInstanceRow.connected_since || new Date().toISOString(),
+            }).eq("id", instance_id);
+            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
+            return jsonResponse({ success: true, status: fresh.status, instance: fresh.bridgeData.instance, repaired: true });
+          }
+          if (fresh.qrcode) {
+            await adminClient.from("whatsapp_instances").update({
+              status: "connecting",
+              last_health_check_at: new Date().toISOString(),
+            }).eq("id", instance_id);
+            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
+            return jsonResponse({ success: true, qrcode: fresh.qrcode, status: fresh.status || "connecting", instance: fresh.bridgeData.instance, repaired: true });
+          }
+          return jsonResponse({
+            success: false,
+            requires_force_recreate: true,
+            error: "Não consegui recuperar um QR válido sem recriar a sessão. Use a opção de recriar QR apenas se aceitar derrubar a sessão atual.",
+            details: sanitizeBridgeData(fresh.bridgeData),
+          }, 200);
+        }
+
+        if (activeInstanceRow.bridge_api_key && forceRecreate) {
           try {
             await fetch(BRIDGE_URL, {
               method: "POST",
@@ -1168,7 +1199,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ action: "create_instance", name: instName }),
         });
         // Conta a tentativa SEMPRE que a chamada ao bridge é feita, sucesso ou não.
-        await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
+        await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow, "create");
         const bridgeData = await bridgeRes.json().catch(() => ({}));
         const apiKey = getBridgeApiKey(bridgeData);
         if (apiKey) {
@@ -1176,6 +1207,7 @@ Deno.serve(async (req) => {
             .from("whatsapp_instances")
             .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
             .eq("id", instance_id);
+          await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
           try {
             const fresh = await fetchFreshQr(apiKey, 2);
             if (fresh.qrcode) {
@@ -1446,7 +1478,7 @@ Deno.serve(async (req) => {
             headers: { "Content-Type": "application/json", "X-Bridge-Token": bridgeToken },
             body: JSON.stringify({ action: "create_instance", name: instName }),
           });
-          await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow);
+          await recordReconnectAttempt(adminClient, instance_id, activeInstanceRow, "reconnect");
           const bridgeData = await bridgeRes.json().catch(() => ({}));
           const apiKey = getBridgeApiKey(bridgeData);
           if (apiKey) {
@@ -1454,6 +1486,7 @@ Deno.serve(async (req) => {
               .from("whatsapp_instances")
               .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
               .eq("id", instance_id);
+            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
             try {
               const fresh = await fetchFreshQr(apiKey, 2);
               if (fresh.qrcode) {
