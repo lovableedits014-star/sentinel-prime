@@ -1,30 +1,14 @@
-# WhatsApp multi-instância — estabilização anti-queda (P1+P2)
+## Bug
+`send-whatsapp-dispatch/index.ts` linha 1075 declara `let currentStage = "maduro"` **dentro** do `while (attempt < MAX_ATTEMPTS)`. A linha 1381 (`stageMinDelayMs(currentStage)`), que roda **fora** desse loop após o envio, quebra com `ReferenceError: currentStage is not defined`. Resultado: apenas 1 destinatário é processado e o disparo inteiro vai para "Falhou".
 
-## Aplicado nesta rodada
+Foi regressão introduzida na rodada P1+P2 quando adicionei o retry de failover para grupos.
 
-### P1 (imediato — evita queima do número)
-- **Cooldown de reconexão reativado** em `manage-whatsapp-instance` com exceção segura: sessão morta/nunca pareada libera 1ª tentativa sem esperar. Limite: 10min entre reconnects, 30min entre creates, máx 2 reconnects manuais/dia.
-- **Polling de QR: 3s → 8s** em `WhatsAppInstanceCard` e `WhatsAppInstancePoolCard`.
-- **Pausa entre re-invocações do dispatch: 5s → 30s** + contador `resume_count` (nova coluna); ao atingir 250 resumes, o disparo entra em `pausado_limite_resumos` para revisão manual.
-- **`getSendFailure` mais tolerante**: 2xx sem sinal explícito de falha = enviado. Ausência de `messageId` não pune o chip.
+## Correção (1 arquivo, cirúrgica)
+`supabase/functions/send-whatsapp-dispatch/index.ts`:
+1. Declarar `let currentStage = "maduro"` **antes** do `while` (junto de `attempt`), removendo a redeclaração `let` dentro do loop.
+2. Nas 3 atribuições internas (linhas 1098, 1117, 1139) usar apenas `currentStage = ...` (sem `let`), o que já é o caso — só remover o `let` da declaração interna.
 
-### P2 (curto prazo — estabilidade do pool)
-- **Fallback `anyActive`** em `send-whatsapp-dispatch` só usa instância `status='connected'`, sem suspeita de ban, ordenada por menor `consecutive_failures`. Nunca escolhe chip desconectado/connecting.
-- **Cache de preflight: 20s → 5s** — reconfirma rápido se o chip cair.
-- **`send-birthday-messages`** ganhou janela 8h–20h, preflight ao vivo antes de disparar e validação de sucesso alinhada com o dispatch.
-- **`onboard-whatsapp-instance`** com cooldown de 10min entre reenvios (429 quando dentro do cooldown).
+Nenhuma outra lógica muda. Redeploy da função.
 
-## Preservado (não tocado)
-- Modal de QR inline no StatusWhatsApp
-- Modos de disparo (Furtivo/Moderado/Agressivo) e delays entre mensagens
-- Ramp-up, limites diários e auto-suspeita já implantados
-- RPCs `pick_healthy_*`
-- UI "Cota hoje" e botões de pausar/reativar
-
-## Migration adicionada
-- `whatsapp_dispatches.resume_count INTEGER NOT NULL DEFAULT 0`
-
-## Como validar
-1. Reconectar 2× seguidas no mesmo chip: segunda deve mostrar cooldown (exceto se a sessão estiver realmente morta).
-2. Disparo pequeno (10-20 destinos): logs não devem marcar falha por resposta sem `messageId`.
-3. Chip conectado deve permanecer estável sem oscilar status.
+## Validação
+Refazer o disparo aos grupos: deve processar todos os destinatários e respeitar o delay do stage sem erro.

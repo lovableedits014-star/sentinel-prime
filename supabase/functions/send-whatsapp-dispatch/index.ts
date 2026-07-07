@@ -1064,6 +1064,7 @@ Deno.serve(async (req) => {
           const MAX_ATTEMPTS = isGroup ? 5 : 1;
           let recipientResolved = false;
           let attempt = 0;
+          let currentStage: string = "maduro";
 
           while (!recipientResolved && attempt < MAX_ATTEMPTS) {
             attempt++;
@@ -1072,7 +1073,7 @@ Deno.serve(async (req) => {
             let bridgeUrl: string | null = null;
             let bridgeApiKey: string | null = null;
             let instanceId: string | null = null;
-            let currentStage: string = "maduro";
+
 
             if (isGroup) {
               // Para grupos, escolhe SÓ entre instâncias que são membros
