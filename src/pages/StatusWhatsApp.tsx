@@ -176,22 +176,55 @@ export default function StatusWhatsApp() {
     }
   };
 
-  const handleRescan = async (instanceId: string) => {
-    setBusy(`rescan-${instanceId}`);
-    const { data, error } = await callBridge("create_instance", instanceId);
-    setBusy(null);
-    if (data?.cooldown) {
-      const mins = Math.ceil(Number(data?.remaining_seconds || 0) / 60);
-      toast.error(`🛡️ Proteção anti-ban: aguarde ~${mins} min antes de gerar um novo QR para este número.`, { duration: 8000 });
-      return;
-    }
-    if (error || data?.error) {
-      toast.error("Falha ao gerar novo QR: " + (error?.message || data?.error));
-    } else {
-      toast.success("Novo QR Code gerado. Abra Configurações para escanear.");
-      loadAll(true);
-    }
+  const [qrModal, setQrModal] = useState<{ instanceId: string; apelido: string; qr: string | null; loading: boolean; error?: string | null } | null>(null);
+
+  const fetchQrForInstance = async (instanceId: string) => {
+    if (!clientId) return { qr: null as string | null, error: "client missing" };
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "create_instance", client_id: clientId, instance_id: instanceId, force_recreate: true },
+    });
+    if (error || data?.error) return { qr: null, error: (error?.message || data?.error || "Falha ao gerar QR") };
+    const raw = data?.qrcode ?? data?.instance?.qrcode ?? null;
+    if (!raw || typeof raw !== "string") return { qr: null, error: "Bridge não retornou QR Code" };
+    const trimmed = raw.trim();
+    const qr = trimmed.startsWith("data:image")
+      ? trimmed
+      : (/^[A-Za-z0-9+/=]+$/.test(trimmed) && trimmed.length > 100
+        ? `data:image/png;base64,${trimmed}`
+        : trimmed);
+    return { qr, error: null as string | null };
   };
+
+  const handleRescan = async (instanceId: string, apelido: string) => {
+    setQrModal({ instanceId, apelido, qr: null, loading: true });
+    const { qr, error } = await fetchQrForInstance(instanceId);
+    setQrModal({ instanceId, apelido, qr, loading: false, error });
+    if (!error) loadAll(true);
+  };
+
+  const handleRefreshQr = async () => {
+    if (!qrModal) return;
+    setQrModal({ ...qrModal, loading: true, error: null });
+    const { qr, error } = await fetchQrForInstance(qrModal.instanceId);
+    setQrModal((prev) => prev ? { ...prev, qr, loading: false, error } : prev);
+  };
+
+  // Polling: enquanto o modal QR estiver aberto, verificar se a instância conectou.
+  useEffect(() => {
+    if (!qrModal || !clientId) return;
+    const id = qrModal.instanceId;
+    const interval = setInterval(async () => {
+      const { data } = await supabase.from("whatsapp_instances")
+        .select("status,phone_number").eq("id", id).maybeSingle();
+      if (data && CONNECTED.has(String(data.status))) {
+        toast.success("✅ WhatsApp conectado!");
+        setQrModal(null);
+        loadAll(true);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrModal?.instanceId, clientId]);
 
   const handleHealthCheckAll = async () => {
     if (!clientId) return;
