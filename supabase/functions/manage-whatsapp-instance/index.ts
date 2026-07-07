@@ -151,35 +151,11 @@ type CooldownCheck =
   | { allowed: false; remainingMs: number; reason: string; remainingAttempts?: number };
 
 function checkReconnectCooldown(
-  row: any,
-  kind: "create" | "reconnect",
+  _row: any,
+  _kind: "create" | "reconnect",
 ): CooldownCheck {
-  const now = Date.now();
-  const today = todayDateStr();
-  const sameDay = row?.reconnect_attempts_date === today;
-  const attemptsToday = sameDay ? Number(row?.reconnect_attempts_today || 0) : 0;
-  if (attemptsToday >= MAX_RECONNECTS_PER_DAY) {
-    return {
-      allowed: false,
-      remainingMs: Math.max(0, new Date(`${today}T23:59:59.999Z`).getTime() - now),
-      reason: `Proteção anti-ban: limite diário de ${MAX_RECONNECTS_PER_DAY} tentativas de QR/reconexão atingido para esta instância. Tente novamente amanhã para evitar novo bloqueio do WhatsApp.`,
-      remainingAttempts: 0,
-    };
-  }
-
-  const lastIso = kind === "create" ? row?.last_create_instance_at : row?.last_reconnect_attempt_at;
-  const cooldownMs = kind === "create" ? CREATE_COOLDOWN_MS : RECONNECT_COOLDOWN_MS;
-  const lastMs = lastIso ? new Date(lastIso).getTime() : 0;
-  if (lastMs > 0 && now - lastMs < cooldownMs) {
-    const remainingMs = cooldownMs - (now - lastMs);
-    return {
-      allowed: false,
-      remainingMs,
-      reason: `Proteção anti-ban: aguarde aproximadamente ${Math.ceil(remainingMs / 60000)} min antes de ${kind === "create" ? "gerar outro QR" : "reparar/reconectar"} esta instância. Tentativas repetidas derrubam a sessão e aumentam risco de banimento.`,
-      remainingAttempts: MAX_RECONNECTS_PER_DAY - attemptsToday,
-    };
-  }
-
+  // Cooldown desativado a pedido do usuário — reconexão/re-scan liberados a qualquer momento.
+  // Tentativas continuam sendo registradas via recordReconnectAttempt para rastreabilidade.
   return { allowed: true };
 }
 
