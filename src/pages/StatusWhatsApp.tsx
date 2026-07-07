@@ -250,6 +250,54 @@ export default function StatusWhatsApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrModal?.instanceId, clientId]);
 
+  const handlePause = async (instanceId: string) => {
+    const raw = window.prompt("Pausar chip por quantos minutos?", "60");
+    if (!raw) return;
+    const minutes = Math.max(1, parseInt(raw, 10) || 60);
+    setBusy(`pause-${instanceId}`);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "pause_instance", client_id: clientId, instance_id: instanceId, minutes },
+    });
+    setBusy(null);
+    if (error || data?.error) toast.error("Falha ao pausar: " + (error?.message || data?.error));
+    else { toast.success(`Chip pausado por ${minutes} min.`); loadAll(true); }
+  };
+
+  const handleResume = async (instanceId: string) => {
+    setBusy(`resume-${instanceId}`);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "resume_instance", client_id: clientId, instance_id: instanceId },
+    });
+    setBusy(null);
+    if (error || data?.error) toast.error("Falha: " + (error?.message || data?.error));
+    else { toast.success("Chip retomado."); loadAll(true); }
+  };
+
+  const handleClearSuspicion = async (instanceId: string) => {
+    if (!confirm("Reativar este chip? Isso limpa a marcação de ban e zera falhas consecutivas.")) return;
+    setBusy(`clear-${instanceId}`);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "clear_suspicion", client_id: clientId, instance_id: instanceId },
+    });
+    setBusy(null);
+    if (error || data?.error) toast.error("Falha: " + (error?.message || data?.error));
+    else { toast.success("Chip reativado."); loadAll(true); }
+  };
+
+  const handleSetLimit = async (instanceId: string, current: number) => {
+    const raw = window.prompt("Novo limite diário de envios (10–5000):", String(current || 800));
+    if (!raw) return;
+    const limit = Math.max(10, Math.min(5000, parseInt(raw, 10) || 800));
+    setBusy(`limit-${instanceId}`);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "set_daily_limit", client_id: clientId, instance_id: instanceId, daily_send_limit: limit },
+    });
+    setBusy(null);
+    if (error || data?.error) toast.error("Falha: " + (error?.message || data?.error));
+    else { toast.success(`Limite atualizado para ${limit}/dia.`); loadAll(true); }
+  };
+
+
   const handleHealthCheckAll = async () => {
     if (!clientId) return;
     setBusy("check-all");
