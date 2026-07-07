@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
           action: "whatsapp_webhook_instance_mismatch",
           status: "warn",
           details: { instance_id: instanceId, event: eventName, found: inst },
-        }).catch(() => null);
+        });
       }
     } else if (eventName) {
       await admin.from("action_logs").insert({
@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
         action: "whatsapp_webhook_without_instance_id",
         status: "warn",
         details: { event: eventName, payload_keys: Object.keys(payload || {}) },
-      }).catch(() => null);
+      });
     }
 
     if (instanceId && instanceOwnedByClient && (eventName === "disconnected" || eventName.includes("logout") || eventName.includes("banned"))) {
@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
             action: "whatsapp_webhook_disconnected",
             status: "ok",
             details: { instance_id: instanceId, event: eventName, reason: payload?.data?.reason || null },
-          }).catch(() => null);
+          });
         }
         return json({ ok: true, handled: "disconnected", instance_id: instanceId });
       }
@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
         action: "whatsapp_webhook_connected",
         status: "ok",
         details: { instance_id: instanceId, event: eventName },
-      }).catch(() => null);
+      });
       return json({ ok: true, handled: "connected", instance_id: instanceId });
     }
 
