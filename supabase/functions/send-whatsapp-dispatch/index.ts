@@ -20,6 +20,16 @@ function randomDelay(minMs: number, maxMs: number) {
   return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
+/**
+ * Delay mínimo por estágio de ramp-up (protege chip novo de queima).
+ * novo: 25s min entre msgs · aquecendo: 8s · maduro: 0 (respeita config).
+ */
+function stageMinDelayMs(stage: string): number {
+  if (stage === "novo") return 25_000;
+  if (stage === "aquecendo") return 8_000;
+  return 0;
+}
+
 function isWithinWindow(start: string, end: string): boolean {
   // start/end no formato "HH:MM:SS"
   const now = new Date();
@@ -1024,6 +1034,7 @@ Deno.serve(async (req) => {
             let bridgeUrl: string | null = null;
             let bridgeApiKey: string | null = null;
             let instanceId: string | null = null;
+            let currentStage: string = "maduro";
 
             if (isGroup) {
               // Para grupos, escolhe SÓ entre instâncias que são membros
@@ -1039,13 +1050,14 @@ Deno.serve(async (req) => {
               if (pickedId) {
                 const { data: inst } = await adminClient
                   .from("whatsapp_instances")
-                  .select("id, bridge_url, bridge_api_key")
+                  .select("id, bridge_url, bridge_api_key, ramp_up_stage")
                   .eq("id", pickedId)
                   .maybeSingle();
                 if (inst?.bridge_url && inst?.bridge_api_key) {
                   bridgeUrl = inst.bridge_url;
                   bridgeApiKey = inst.bridge_api_key;
                   instanceId = inst.id;
+                  currentStage = inst.ramp_up_stage || "maduro";
                 }
               }
             } else {
@@ -1057,19 +1069,20 @@ Deno.serve(async (req) => {
               if (pickedId) {
                 const { data: inst } = await adminClient
                   .from("whatsapp_instances")
-                  .select("id, bridge_url, bridge_api_key")
+                  .select("id, bridge_url, bridge_api_key, ramp_up_stage")
                   .eq("id", pickedId)
                   .maybeSingle();
                 if (inst?.bridge_url && inst?.bridge_api_key) {
                   bridgeUrl = inst.bridge_url;
                   bridgeApiKey = inst.bridge_api_key;
                   instanceId = inst.id;
+                  currentStage = inst.ramp_up_stage || "maduro";
                 }
               }
               if (!bridgeUrl) {
                 const { data: anyActive } = await adminClient
                   .from("whatsapp_instances")
-                  .select("id, bridge_url, bridge_api_key, status")
+                  .select("id, bridge_url, bridge_api_key, status, ramp_up_stage")
                   .eq("client_id", client_id)
                   .eq("is_active", true)
                   .not("bridge_api_key", "is", null)
@@ -1080,6 +1093,7 @@ Deno.serve(async (req) => {
                   bridgeUrl = anyActive.bridge_url;
                   bridgeApiKey = anyActive.bridge_api_key;
                   instanceId = anyActive.id;
+                  currentStage = anyActive.ramp_up_stage || "maduro";
                 }
               }
               if (!bridgeUrl && hasLegacyBridge && (poolCount ?? 0) === 0) {
@@ -1319,7 +1333,9 @@ Deno.serve(async (req) => {
             }).eq("id", dispatch.id);
           }
 
-          await sleep(randomDelay(DELAY_MIN_MS, DELAY_MAX_MS));
+          const baseDelay = randomDelay(DELAY_MIN_MS, DELAY_MAX_MS);
+          const minByStage = stageMinDelayMs(currentStage);
+          await sleep(Math.max(baseDelay, minByStage));
         }
 
         if (batch < Math.ceil(recipients.length / BATCH_SIZE) - 1) {

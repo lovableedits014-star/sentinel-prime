@@ -34,6 +34,11 @@ type Instance = {
   onboarding_sent_at?: string | null;
   onboarding_pending_count?: number | null;
   suspected_banned_at?: string | null;
+  auto_suspected_reason?: string | null;
+  paused_until?: string | null;
+  ramp_up_stage?: string | null;
+  daily_send_limit?: number | null;
+  first_connected_at?: string | null;
 };
 
 type RegiaoLinkRow = { value: string; label: string; link: string; jaEhMembro: boolean };
@@ -89,7 +94,7 @@ export default function StatusWhatsApp() {
 
     const [{ data: inst }, { data: queue }] = await Promise.all([
       supabase.from("whatsapp_instances")
-        .select("id,apelido,status,phone_number,is_active,is_primary,last_health_check_at,last_send_at,last_disconnected_at,connected_since,messages_sent_today,total_sent,total_failed,consecutive_failures,pending_onboarding,onboarding_sent_at,onboarding_pending_count,suspected_banned_at")
+        .select("id,apelido,status,phone_number,is_active,is_primary,last_health_check_at,last_send_at,last_disconnected_at,connected_since,messages_sent_today,total_sent,total_failed,consecutive_failures,pending_onboarding,onboarding_sent_at,onboarding_pending_count,suspected_banned_at,auto_suspected_reason,paused_until,ramp_up_stage,daily_send_limit,first_connected_at")
         .eq("client_id", client.id)
         .order("is_primary", { ascending: false })
         .order("created_at", { ascending: true }),
@@ -244,6 +249,54 @@ export default function StatusWhatsApp() {
     return () => { stopped = true; clearInterval(interval); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrModal?.instanceId, clientId]);
+
+  const handlePause = async (instanceId: string) => {
+    const raw = window.prompt("Pausar chip por quantos minutos?", "60");
+    if (!raw) return;
+    const minutes = Math.max(1, parseInt(raw, 10) || 60);
+    setBusy(`pause-${instanceId}`);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "pause_instance", client_id: clientId, instance_id: instanceId, minutes },
+    });
+    setBusy(null);
+    if (error || data?.error) toast.error("Falha ao pausar: " + (error?.message || data?.error));
+    else { toast.success(`Chip pausado por ${minutes} min.`); loadAll(true); }
+  };
+
+  const handleResume = async (instanceId: string) => {
+    setBusy(`resume-${instanceId}`);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "resume_instance", client_id: clientId, instance_id: instanceId },
+    });
+    setBusy(null);
+    if (error || data?.error) toast.error("Falha: " + (error?.message || data?.error));
+    else { toast.success("Chip retomado."); loadAll(true); }
+  };
+
+  const handleClearSuspicion = async (instanceId: string) => {
+    if (!confirm("Reativar este chip? Isso limpa a marcação de ban e zera falhas consecutivas.")) return;
+    setBusy(`clear-${instanceId}`);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "clear_suspicion", client_id: clientId, instance_id: instanceId },
+    });
+    setBusy(null);
+    if (error || data?.error) toast.error("Falha: " + (error?.message || data?.error));
+    else { toast.success("Chip reativado."); loadAll(true); }
+  };
+
+  const handleSetLimit = async (instanceId: string, current: number) => {
+    const raw = window.prompt("Novo limite diário de envios (10–5000):", String(current || 800));
+    if (!raw) return;
+    const limit = Math.max(10, Math.min(5000, parseInt(raw, 10) || 800));
+    setBusy(`limit-${instanceId}`);
+    const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
+      body: { action: "set_daily_limit", client_id: clientId, instance_id: instanceId, daily_send_limit: limit },
+    });
+    setBusy(null);
+    if (error || data?.error) toast.error("Falha: " + (error?.message || data?.error));
+    else { toast.success(`Limite atualizado para ${limit}/dia.`); loadAll(true); }
+  };
+
 
   const handleHealthCheckAll = async () => {
     if (!clientId) return;
@@ -443,6 +496,7 @@ export default function StatusWhatsApp() {
                     <th className="text-left py-2 px-3">Última verificação</th>
                     <th className="text-left py-2 px-3">Último envio</th>
                     <th className="text-left py-2 px-3">Falhas seguidas</th>
+                    <th className="text-left py-2 px-3">Cota hoje<br/><span className="text-[10px] normal-case text-muted-foreground/70">estágio & limite</span></th>
                     <th className="text-left py-2 px-3">Onboarding<br/><span className="text-[10px] normal-case text-muted-foreground/70">Links dos grupos</span></th>
                     <th className="text-right py-2 pl-3">Ações</th>
                   </tr>
@@ -466,7 +520,22 @@ export default function StatusWhatsApp() {
                           </div>
                         </td>
                         <td className="py-3 px-3">
-                          {isConn ? (
+                          {inst.suspected_banned_at ? (
+                            <div className="space-y-1">
+                              <Badge variant="outline" className="gap-1 border-red-500/60 text-red-700 dark:text-red-400">
+                                <AlertTriangle className="w-3 h-3" /> Suspeita de ban
+                              </Badge>
+                              {inst.auto_suspected_reason && (
+                                <div className="text-[10px] text-red-600/80 max-w-[200px]" title={inst.auto_suspected_reason}>
+                                  {inst.auto_suspected_reason.length > 60 ? inst.auto_suspected_reason.slice(0, 60) + "…" : inst.auto_suspected_reason}
+                                </div>
+                              )}
+                            </div>
+                          ) : inst.paused_until && new Date(inst.paused_until).getTime() > Date.now() ? (
+                            <Badge variant="outline" className="gap-1 border-amber-500/60 text-amber-700 dark:text-amber-400">
+                              <Clock className="w-3 h-3" /> Pausado até {new Date(inst.paused_until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </Badge>
+                          ) : isConn ? (
                             <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
                               <Wifi className="w-3 h-3" /> Conectado
                             </Badge>
@@ -502,6 +571,29 @@ export default function StatusWhatsApp() {
                           )}
                         </td>
                         <td className="py-3 px-3">
+                          {(() => {
+                            const stage = inst.ramp_up_stage || "maduro";
+                            const stageCap = stage === "novo" ? 100 : stage === "aquecendo" ? 400 : (inst.daily_send_limit || 800);
+                            const used = inst.messages_sent_today || 0;
+                            const pct = Math.min(100, Math.round((used / stageCap) * 100));
+                            const pctColor = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
+                            const stageBadge = stage === "novo"
+                              ? { label: "🔴 Novo", cls: "border-red-500/40 text-red-700 dark:text-red-400" }
+                              : stage === "aquecendo"
+                                ? { label: "🟡 Aquecendo", cls: "border-amber-500/40 text-amber-700 dark:text-amber-400" }
+                                : { label: "🟢 Maduro", cls: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" };
+                            return (
+                              <div className="space-y-1 min-w-[140px]">
+                                <Badge variant="outline" className={`text-[10px] ${stageBadge.cls}`}>{stageBadge.label}</Badge>
+                                <div className="text-[11px] font-mono">{used} / {stageCap}</div>
+                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                  <div className={`h-full ${pctColor}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className="py-3 px-3">
                           {inst.is_primary ? (
                             <span className="text-[11px] text-muted-foreground">—</span>
                           ) : !inst.onboarding_sent_at ? (
@@ -534,6 +626,25 @@ export default function StatusWhatsApp() {
                             <Button size="sm" variant="outline" onClick={() => handleRescan(inst.id, inst.apelido)} disabled={busy === `rescan-${inst.id}`}>
                               {busy === `rescan-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <QrCode className="w-3 h-3 mr-1" />}
                               Re-scan
+                            </Button>
+                            {inst.suspected_banned_at && (
+                              <Button size="sm" variant="outline" onClick={() => handleClearSuspicion(inst.id)} disabled={busy === `clear-${inst.id}`} title="Limpar marcação de suspeita de ban e zerar falhas" className="border-red-500/40 text-red-700 dark:text-red-400">
+                                {busy === `clear-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                Reativar
+                              </Button>
+                            )}
+                            {inst.paused_until && new Date(inst.paused_until).getTime() > Date.now() ? (
+                              <Button size="sm" variant="outline" onClick={() => handleResume(inst.id)} disabled={busy === `resume-${inst.id}`} title="Retomar chip agora">
+                                {busy === `resume-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Wifi className="w-3 h-3 mr-1" />}
+                                Retomar
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => handlePause(inst.id)} disabled={busy === `pause-${inst.id}`} title="Pausar chip por N minutos">
+                                {busy === `pause-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" onClick={() => handleSetLimit(inst.id, inst.daily_send_limit || 800)} disabled={busy === `limit-${inst.id}`} title="Ajustar limite diário de envios">
+                              {busy === `limit-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-[10px] font-mono">{inst.daily_send_limit || 800}/d</span>}
                             </Button>
                             {!inst.is_primary && isConn && (
                               <>
