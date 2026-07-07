@@ -34,6 +34,11 @@ type Instance = {
   onboarding_sent_at?: string | null;
   onboarding_pending_count?: number | null;
   suspected_banned_at?: string | null;
+  auto_suspected_reason?: string | null;
+  paused_until?: string | null;
+  ramp_up_stage?: string | null;
+  daily_send_limit?: number | null;
+  first_connected_at?: string | null;
 };
 
 type RegiaoLinkRow = { value: string; label: string; link: string; jaEhMembro: boolean };
