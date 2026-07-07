@@ -1039,13 +1039,14 @@ Deno.serve(async (req) => {
               if (pickedId) {
                 const { data: inst } = await adminClient
                   .from("whatsapp_instances")
-                  .select("id, bridge_url, bridge_api_key")
+                  .select("id, bridge_url, bridge_api_key, ramp_up_stage")
                   .eq("id", pickedId)
                   .maybeSingle();
                 if (inst?.bridge_url && inst?.bridge_api_key) {
                   bridgeUrl = inst.bridge_url;
                   bridgeApiKey = inst.bridge_api_key;
                   instanceId = inst.id;
+                  currentStage = inst.ramp_up_stage || "maduro";
                 }
               }
             } else {
@@ -1057,19 +1058,20 @@ Deno.serve(async (req) => {
               if (pickedId) {
                 const { data: inst } = await adminClient
                   .from("whatsapp_instances")
-                  .select("id, bridge_url, bridge_api_key")
+                  .select("id, bridge_url, bridge_api_key, ramp_up_stage")
                   .eq("id", pickedId)
                   .maybeSingle();
                 if (inst?.bridge_url && inst?.bridge_api_key) {
                   bridgeUrl = inst.bridge_url;
                   bridgeApiKey = inst.bridge_api_key;
                   instanceId = inst.id;
+                  currentStage = inst.ramp_up_stage || "maduro";
                 }
               }
               if (!bridgeUrl) {
                 const { data: anyActive } = await adminClient
                   .from("whatsapp_instances")
-                  .select("id, bridge_url, bridge_api_key, status")
+                  .select("id, bridge_url, bridge_api_key, status, ramp_up_stage")
                   .eq("client_id", client_id)
                   .eq("is_active", true)
                   .not("bridge_api_key", "is", null)
@@ -1080,6 +1082,7 @@ Deno.serve(async (req) => {
                   bridgeUrl = anyActive.bridge_url;
                   bridgeApiKey = anyActive.bridge_api_key;
                   instanceId = anyActive.id;
+                  currentStage = anyActive.ramp_up_stage || "maduro";
                 }
               }
               if (!bridgeUrl && hasLegacyBridge && (poolCount ?? 0) === 0) {
