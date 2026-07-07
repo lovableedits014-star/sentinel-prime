@@ -503,6 +503,36 @@ function isInstanceDisconnectedError(status: number, data: any): boolean {
   return msg.includes("instance") && (msg.includes("disconnect") || msg.includes("not connected") || msg.includes("offline"));
 }
 
+function bridgeErrorMessage(data: any): string {
+  return String(data?.error || data?.message || data?.details?.error || data?.details?.message || "").trim();
+}
+
+function isUnsupportedBridgeAction(data: any): boolean {
+  const msg = bridgeErrorMessage(data).toLowerCase();
+  return msg.includes("unsupported action") || msg.includes("unknown action") || msg.includes("available:") || msg.includes("not implemented");
+}
+
+function extractBridgeList(data: any): { found: boolean; items: any[] } {
+  if (Array.isArray(data)) return { found: true, items: data };
+  const candidates = [
+    data?.chats,
+    data?.groups,
+    data?.data,
+    data?.result,
+    data?.items,
+    data?.data?.chats,
+    data?.data?.groups,
+    data?.result?.chats,
+    data?.result?.groups,
+    data?.instance?.chats,
+    data?.instance?.groups,
+  ];
+  for (const value of candidates) {
+    if (Array.isArray(value)) return { found: true, items: value };
+  }
+  return { found: false, items: [] };
+}
+
 function getSendFailure(status: number, data: any): string | null {
   if (status < 200 || status >= 300) return data?.error || data?.message || `Erro na ponte WhatsApp (status ${status})`;
   if (data?.success === false) return data?.error || data?.message || "Ponte recusou o envio";
