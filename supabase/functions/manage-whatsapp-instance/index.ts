@@ -1510,7 +1510,7 @@ Deno.serve(async (req) => {
         return await createClientInstance({
           adminClient,
           bridgeToken,
-        supabaseUrl,
+          supabaseUrl,
           clientId: resolvedClientId,
           clientName: clientConfig?.name,
           currentApiKey: null, // No old key since we already checked !clientApiKey
