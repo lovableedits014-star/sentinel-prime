@@ -209,20 +209,39 @@ export default function StatusWhatsApp() {
     setQrModal((prev) => prev ? { ...prev, qr, loading: false, error } : prev);
   };
 
-  // Polling: enquanto o modal QR estiver aberto, verificar se a instância conectou.
+  // Polling: enquanto o modal QR estiver aberto, verificar ativamente se a instância conectou.
+  // Chama dispatch_readiness (consulta a ponte em tempo real) + lê status no banco como fallback.
   useEffect(() => {
     if (!qrModal || !clientId) return;
     const id = qrModal.instanceId;
-    const interval = setInterval(async () => {
-      const { data } = await supabase.from("whatsapp_instances")
-        .select("status,phone_number").eq("id", id).maybeSingle();
-      if (data && CONNECTED.has(String(data.status))) {
+    let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      // 1) Consulta ativa à ponte
+      try {
+        const { data } = await supabase.functions.invoke("manage-whatsapp-instance", {
+          body: { action: "dispatch_readiness", client_id: clientId },
+        });
+        const inst = (data?.instances || []).find((i: any) => i.id === id);
+        if (inst?.ready || CONNECTED.has(String(inst?.status || ""))) {
+          if (stopped) return;
+          toast.success("✅ WhatsApp conectado!");
+          setQrModal(null);
+          loadAll(true);
+          return;
+        }
+      } catch { /* ignore */ }
+      // 2) Fallback: status no banco
+      const { data: row } = await supabase.from("whatsapp_instances")
+        .select("status").eq("id", id).maybeSingle();
+      if (!stopped && row && CONNECTED.has(String(row.status))) {
         toast.success("✅ WhatsApp conectado!");
         setQrModal(null);
         loadAll(true);
       }
-    }, 3000);
-    return () => clearInterval(interval);
+    };
+    const interval = setInterval(tick, 4000);
+    return () => { stopped = true; clearInterval(interval); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qrModal?.instanceId, clientId]);
 
