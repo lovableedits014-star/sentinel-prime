@@ -893,9 +893,10 @@ Deno.serve(async (req) => {
     // resumo do tipo: ready | needs_reconnect | no_credentials | offline.
     // Isso elimina o caso "Status diz OK, Disparo diz desconectado".
     if (action === "dispatch_readiness") {
+      const forceFullCheck = Boolean((body as any)?.force);
       const { data: rows } = await adminClient
         .from("whatsapp_instances")
-        .select("id, apelido, status, is_active, is_primary, bridge_url, bridge_api_key, phone_number, last_health_check_at, last_disconnected_at, connected_since, consecutive_failures, suspected_banned_at")
+        .select("id, apelido, status, is_active, is_primary, bridge_url, bridge_api_key, phone_number, last_health_check_at, last_disconnected_at, connected_since, consecutive_failures, suspected_banned_at, paused_until, ramp_up_stage, messages_sent_today, messages_sent_today_date, daily_send_limit")
         .eq("client_id", resolvedClientId)
         .eq("is_active", true);
 
@@ -909,6 +910,8 @@ Deno.serve(async (req) => {
           last_health_check_at: inst.last_health_check_at,
           consecutive_failures: inst.consecutive_failures || 0,
           suspected_banned_at: inst.suspected_banned_at,
+          paused_until: inst.paused_until,
+          ramp_up_stage: inst.ramp_up_stage || "maduro",
         };
         if (!inst.bridge_api_key || !inst.bridge_url) {
           return { ...baseInfo, ready: false, readiness: "no_credentials", live_status: null };
@@ -916,9 +919,27 @@ Deno.serve(async (req) => {
         if (inst.suspected_banned_at) {
           return { ...baseInfo, ready: false, readiness: "suspected_ban", live_status: null };
         }
+        if (inst.paused_until && new Date(inst.paused_until).getTime() > Date.now()) {
+          return { ...baseInfo, ready: false, readiness: "paused", live_status: inst.status };
+        }
         if ((inst.consecutive_failures || 0) >= 3) {
           return { ...baseInfo, ready: false, readiness: "too_many_failures", live_status: inst.status };
         }
+
+        // FAST PATH: se health check é recente (<5min), status=connected e sem falhas,
+        // pula o probe operacional (economia de bridge quando temos 10+ chips).
+        const lastHc = inst.last_health_check_at ? new Date(inst.last_health_check_at).getTime() : 0;
+        const hcFresh = lastHc > 0 && (Date.now() - lastHc) < 5 * 60_000;
+        if (!forceFullCheck && hcFresh && inst.status === "connected" && (inst.consecutive_failures || 0) === 0) {
+          return {
+            ...baseInfo,
+            ready: true,
+            readiness: "ready",
+            live_status: "connected",
+            fast_path: true,
+          };
+        }
+
         try {
           const operational = await verifyWhatsAppOperationalSession(adminClient, inst);
           const liveStatus = operational.status;
