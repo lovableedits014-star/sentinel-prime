@@ -627,6 +627,25 @@ export default function StatusWhatsApp() {
                               {busy === `rescan-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <QrCode className="w-3 h-3 mr-1" />}
                               Re-scan
                             </Button>
+                            {inst.suspected_banned_at && (
+                              <Button size="sm" variant="outline" onClick={() => handleClearSuspicion(inst.id)} disabled={busy === `clear-${inst.id}`} title="Limpar marcação de suspeita de ban e zerar falhas" className="border-red-500/40 text-red-700 dark:text-red-400">
+                                {busy === `clear-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+                                Reativar
+                              </Button>
+                            )}
+                            {inst.paused_until && new Date(inst.paused_until).getTime() > Date.now() ? (
+                              <Button size="sm" variant="outline" onClick={() => handleResume(inst.id)} disabled={busy === `resume-${inst.id}`} title="Retomar chip agora">
+                                {busy === `resume-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Wifi className="w-3 h-3 mr-1" />}
+                                Retomar
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => handlePause(inst.id)} disabled={busy === `pause-${inst.id}`} title="Pausar chip por N minutos">
+                                {busy === `pause-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" onClick={() => handleSetLimit(inst.id, inst.daily_send_limit || 800)} disabled={busy === `limit-${inst.id}`} title="Ajustar limite diário de envios">
+                              {busy === `limit-${inst.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-[10px] font-mono">{inst.daily_send_limit || 800}/d</span>}
+                            </Button>
                             {!inst.is_primary && isConn && (
                               <>
                                 <Button
