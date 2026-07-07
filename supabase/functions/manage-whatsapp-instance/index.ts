@@ -140,9 +140,9 @@ const getBridgeRawStatus = (data: any) =>
 // para o mesmo número. Repetir login/handshake várias vezes em sequência
 // é um dos principais gatilhos de ban definitivo do WhatsApp.
 // =====================================================================
-const CREATE_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutos
-const RECONNECT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos
-const MAX_RECONNECTS_PER_DAY = 3;
+const CREATE_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutos entre QR/recriação
+const RECONNECT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutos entre reparos/reconnect
+const MAX_RECONNECTS_PER_DAY = 2;
 
 const todayDateStr = () => new Date().toISOString().slice(0, 10);
 
@@ -151,26 +151,52 @@ type CooldownCheck =
   | { allowed: false; remainingMs: number; reason: string; remainingAttempts?: number };
 
 function checkReconnectCooldown(
-  _row: any,
-  _kind: "create" | "reconnect",
+  row: any,
+  kind: "create" | "reconnect",
 ): CooldownCheck {
-  // Cooldown anti-ban desativado a pedido do usuário — sempre permite.
+  const now = Date.now();
+  const today = todayDateStr();
+  const sameDay = row?.reconnect_attempts_date === today;
+  const attemptsToday = sameDay ? Number(row?.reconnect_attempts_today || 0) : 0;
+  if (attemptsToday >= MAX_RECONNECTS_PER_DAY) {
+    return {
+      allowed: false,
+      remainingMs: Math.max(0, new Date(`${today}T23:59:59.999Z`).getTime() - now),
+      reason: `Proteção anti-ban: limite diário de ${MAX_RECONNECTS_PER_DAY} tentativas de QR/reconexão atingido para esta instância. Tente novamente amanhã para evitar novo bloqueio do WhatsApp.`,
+      remainingAttempts: 0,
+    };
+  }
+
+  const lastIso = kind === "create" ? row?.last_create_instance_at : row?.last_reconnect_attempt_at;
+  const cooldownMs = kind === "create" ? CREATE_COOLDOWN_MS : RECONNECT_COOLDOWN_MS;
+  const lastMs = lastIso ? new Date(lastIso).getTime() : 0;
+  if (lastMs > 0 && now - lastMs < cooldownMs) {
+    const remainingMs = cooldownMs - (now - lastMs);
+    return {
+      allowed: false,
+      remainingMs,
+      reason: `Proteção anti-ban: aguarde aproximadamente ${Math.ceil(remainingMs / 60000)} min antes de ${kind === "create" ? "gerar outro QR" : "reparar/reconectar"} esta instância. Tentativas repetidas derrubam a sessão e aumentam risco de banimento.`,
+      remainingAttempts: MAX_RECONNECTS_PER_DAY - attemptsToday,
+    };
+  }
+
   return { allowed: true };
 }
 
-async function recordReconnectAttempt(adminClient: any, instanceId: string, row: any) {
+async function recordReconnectAttempt(adminClient: any, instanceId: string, row: any, kind: "create" | "reconnect") {
   const today = todayDateStr();
   const sameDay = row?.reconnect_attempts_date === today;
   const next = (sameDay ? Number(row?.reconnect_attempts_today || 0) : 0) + 1;
+  const updates: any = {
+    last_reconnect_attempt_at: new Date().toISOString(),
+    reconnect_attempts_today: next,
+    reconnect_attempts_date: today,
+  };
+  if (kind === "create") updates.last_create_instance_at = new Date().toISOString();
   try {
     await adminClient
       .from("whatsapp_instances")
-      .update({
-        last_create_instance_at: new Date().toISOString(),
-        last_reconnect_attempt_at: new Date().toISOString(),
-        reconnect_attempts_today: next,
-        reconnect_attempts_date: today,
-      })
+      .update(updates)
       .eq("id", instanceId);
   } catch (err) {
     console.error("recordReconnectAttempt error", err);
