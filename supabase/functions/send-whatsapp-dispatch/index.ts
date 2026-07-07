@@ -1333,7 +1333,9 @@ Deno.serve(async (req) => {
             }).eq("id", dispatch.id);
           }
 
-          await sleep(randomDelay(DELAY_MIN_MS, DELAY_MAX_MS));
+          const baseDelay = randomDelay(DELAY_MIN_MS, DELAY_MAX_MS);
+          const minByStage = stageMinDelayMs(currentStage);
+          await sleep(Math.max(baseDelay, minByStage));
         }
 
         if (batch < Math.ceil(recipients.length / BATCH_SIZE) - 1) {
