@@ -313,6 +313,78 @@ async function fetchFreshQr(apiKey: string, attempts = 2) {
   };
 }
 
+async function bindInstanceWebhook(params: {
+  supabaseUrl: string;
+  bridgeToken: string | undefined;
+  apiKey: string;
+  clientId: string;
+  instanceId?: string | null;
+}) {
+  const { supabaseUrl, bridgeToken, apiKey, clientId, instanceId } = params;
+  if (!bridgeToken) return { ok: false, skipped: true, reason: "missing_token" };
+  const instanceParam = instanceId ? `&instance_id=${encodeURIComponent(instanceId)}` : "";
+  const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${encodeURIComponent(clientId)}${instanceParam}&token=${encodeURIComponent(bridgeToken)}`;
+  try {
+    const bridgeRes = await fetch(BRIDGE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+      body: JSON.stringify({ action: "set_webhook", instance_id: instanceId, webhook_url: webhookUrl }),
+    });
+    const bridgeData = await bridgeRes.json().catch(() => ({}));
+    return { ok: bridgeRes.ok, webhook_url: webhookUrl, details: sanitizeBridgeData(bridgeData) };
+  } catch (err) {
+    return { ok: false, webhook_url: webhookUrl, error: (err as Error).message };
+  }
+}
+
+async function verifyWhatsAppOperationalSession(adminClient: any, inst: any) {
+  if (!inst?.bridge_api_key || !inst?.bridge_url) {
+    return { ready: false, status: "no_credentials", reason: "no_credentials" };
+  }
+  if (inst.suspected_banned_at) {
+    return { ready: false, status: "suspected_ban", reason: "suspected_ban" };
+  }
+  if ((inst.consecutive_failures || 0) >= 3) {
+    return { ready: false, status: "too_many_failures", reason: "too_many_failures" };
+  }
+
+  const health = await syncInstanceHealth(adminClient, inst);
+  if (health.status !== "connected") {
+    return { ready: false, status: health.status, reason: health.status, health };
+  }
+
+  const hasPairedSession = Boolean(inst.phone_number || health.details?.phone_number || health.details?.phone || health.details?.instance?.phone_number || health.details?.instance?.phone);
+  if (!hasPairedSession) {
+    return { ready: false, status: "session_not_paired", reason: "session_not_paired", health };
+  }
+
+  try {
+    const { bridgeRes, bridgeData } = await fetchBridgeAction({
+      action: "chats",
+      apiKey: inst.bridge_api_key,
+      body: { action: "chats" },
+    });
+    const errorText = String(bridgeData?.error || bridgeData?.message || "").toLowerCase();
+    if (!bridgeRes.ok || bridgeData?.success === false || isInstanceDisconnectedError(bridgeRes.status, bridgeData)) {
+      const terminal = bridgeRes.status === 401 || errorText.includes("disconnect") || errorText.includes("not connected") || errorText.includes("offline") || errorText.includes("logged") || errorText.includes("banned");
+      if (terminal) {
+        await markInstanceDisconnected(adminClient, inst.id);
+        return { ready: false, status: "disconnected", reason: "session_probe_failed", health, probe: sanitizeBridgeData(bridgeData) };
+      }
+      return { ready: false, status: "not_ready", reason: "session_probe_failed", health, probe: sanitizeBridgeData(bridgeData) };
+    }
+    await adminClient.from("whatsapp_instances").update({
+      status: "connected",
+      last_health_check_at: new Date().toISOString(),
+      last_disconnected_at: null,
+      connected_since: inst.connected_since || new Date().toISOString(),
+    }).eq("id", inst.id);
+    return { ready: true, status: "connected", reason: "ready", health, probe: { ok: true } };
+  } catch (err) {
+    return { ready: false, status: "not_ready", reason: "session_probe_error", health, error: (err as Error).message };
+  }
+}
+
 async function syncInstanceHealth(adminClient: any, inst: any) {
   if (!inst?.bridge_api_key) return { id: inst?.id, status: "disconnected", ok: false };
 
