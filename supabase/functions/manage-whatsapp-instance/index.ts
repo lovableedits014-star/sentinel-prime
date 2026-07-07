@@ -1452,30 +1452,59 @@ Deno.serve(async (req) => {
         normalizeParticipantJid(activeInstanceRow.phone_number ? `${activeInstanceRow.phone_number}@s.whatsapp.net` : ""),
         normalizeParticipantJid(activeInstanceRow.phone_number ? `${activeInstanceRow.phone_number}@c.us` : ""),
       ].filter(Boolean));
-      // A bridge não tem action 'list_groups' — usamos 'chats' e filtramos JIDs @g.us
-      const bridgeRes = await fetch(BRIDGE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": activeInstanceRow.bridge_api_key },
-        body: JSON.stringify({ action: "chats" }),
-      });
-      const bridgeData = await bridgeRes.json().catch(() => ({}));
-      if (!bridgeRes.ok || bridgeData?.success === false) {
+      // Lista grupos com contrato tolerante: bridges diferentes expõem isto como
+      // `chats`, `groups` ou `list_groups`. Não confunda falha de listagem com
+      // instância desconectada quando o health check acabou de confirmar sessão viva.
+      const groupListActions = ["chats", "groups", "list_groups"];
+      let bridgeData: any = null;
+      let allChats: any[] = [];
+      let usedListAction = "chats";
+      let lastListFailure: { status: number; data: any; action: string } | null = null;
+
+      for (const listAction of groupListActions) {
+        const bridgeRes = await fetch(BRIDGE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Api-Key": activeInstanceRow.bridge_api_key },
+          body: JSON.stringify({ action: listAction }),
+        });
+        const data = await bridgeRes.json().catch(() => ({}));
+        const list = extractBridgeList(data);
+        const ok = bridgeRes.ok && data?.success !== false;
+
+        if (ok && list.found) {
+          bridgeData = data;
+          allChats = list.items;
+          usedListAction = listAction;
+          break;
+        }
+
+        lastListFailure = { status: bridgeRes.status, data, action: listAction };
+        if (!isUnsupportedBridgeAction(data) && !isInstanceDisconnectedError(bridgeRes.status, data) && !(ok && !list.found)) {
+          break;
+        }
+      }
+
+      if (!bridgeData) {
+        const failure = lastListFailure;
+        if (failure && isInstanceDisconnectedError(failure.status, failure.data)) {
+          const health = await syncInstanceHealth(adminClient, activeInstanceRow);
+          if (health.status !== "connected") {
+            return jsonResponse({
+              success: false,
+              error: bridgeErrorMessage(failure.data) || "A ponte confirmou que esta instância está desconectada.",
+              details: sanitizeBridgeData(failure.data),
+            });
+          }
+        }
         return jsonResponse({
           success: false,
-          error: bridgeData?.error || `Bridge respondeu ${bridgeRes.status} ao listar chats.`,
-          details: sanitizeBridgeData(bridgeData),
+          error: bridgeErrorMessage(failure?.data) || "A ponte não retornou a lista de grupos/chats desta instância conectada.",
+          details: sanitizeBridgeData(failure?.data),
+          attempted_actions: groupListActions,
         });
       }
+
       // Aceita formatos comuns e filtra só grupos (@g.us)
-      const allChats: any[] = Array.isArray(bridgeData)
-        ? bridgeData
-        : Array.isArray(bridgeData?.chats)
-          ? bridgeData.chats
-          : Array.isArray(bridgeData?.data)
-            ? bridgeData.data
-            : Array.isArray(bridgeData?.groups)
-              ? bridgeData.groups
-              : [];
       const rawGroups = allChats.filter((c: any) => {
         const id = String(c?.id || c?.jid || c?.chatId || c?.group_id || "");
         return id.endsWith("@g.us") || c?.isGroup === true || c?.is_group === true;
