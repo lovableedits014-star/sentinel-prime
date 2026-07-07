@@ -419,6 +419,8 @@ export default function Disparos() {
       toast.error(
         r?.overall === "no_instances" ? "Nenhuma instância WhatsApp cadastrada."
         : r?.overall === "no_credentials" ? "Instância sem credencial — escaneie o QR antes de disparar."
+        : (r?.instances || []).some((i: any) => i.readiness === "session_probe_failed" || i.readiness === "session_probe_error")
+          ? "A ponte diz conectado, mas a sessão WhatsApp não respondeu ao teste operacional. Repare a conexão uma vez antes de enviar."
         : "Nenhuma instância WhatsApp pronta agora. Vá em Status WhatsApp para reconectar.",
         { duration: 6000 }
       );
@@ -611,6 +613,8 @@ export default function Disparos() {
                         .map((i) => {
                           const label = i.apelido || "instância";
                           if (i.readiness === "session_not_paired") return `${label}: ponte diz conectado mas a sessão WhatsApp ainda não pareou`;
+                          if (i.readiness === "session_probe_failed") return `${label}: conectado na ponte, mas a sessão não respondeu ao teste operacional`;
+                          if (i.readiness === "session_probe_error") return `${label}: erro no teste operacional da sessão`;
                           if (i.readiness === "connecting") return `${label}: ainda conectando`;
                           if (i.readiness === "offline") return `${label}: offline`;
                           if (i.readiness === "no_credentials") return `${label}: sem credencial`;
