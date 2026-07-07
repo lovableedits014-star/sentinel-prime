@@ -371,6 +371,10 @@ async function verifyWhatsAppOperationalSession(adminClient: any, inst: any) {
         await markInstanceDisconnected(adminClient, inst.id);
         return { ready: false, status: "disconnected", reason: "session_probe_failed", health, probe: sanitizeBridgeData(bridgeData) };
       }
+      await adminClient.from("whatsapp_instances").update({
+        status: "connecting",
+        last_health_check_at: new Date().toISOString(),
+      }).eq("id", inst.id);
       return { ready: false, status: "not_ready", reason: "session_probe_failed", health, probe: sanitizeBridgeData(bridgeData) };
     }
     await adminClient.from("whatsapp_instances").update({
@@ -381,6 +385,10 @@ async function verifyWhatsAppOperationalSession(adminClient: any, inst: any) {
     }).eq("id", inst.id);
     return { ready: true, status: "connected", reason: "ready", health, probe: { ok: true } };
   } catch (err) {
+    await adminClient.from("whatsapp_instances").update({
+      status: "connecting",
+      last_health_check_at: new Date().toISOString(),
+    }).eq("id", inst.id);
     return { ready: false, status: "not_ready", reason: "session_probe_error", health, error: (err as Error).message };
   }
 }
