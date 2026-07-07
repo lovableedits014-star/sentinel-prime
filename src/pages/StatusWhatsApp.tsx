@@ -520,7 +520,22 @@ export default function StatusWhatsApp() {
                           </div>
                         </td>
                         <td className="py-3 px-3">
-                          {isConn ? (
+                          {inst.suspected_banned_at ? (
+                            <div className="space-y-1">
+                              <Badge variant="outline" className="gap-1 border-red-500/60 text-red-700 dark:text-red-400">
+                                <AlertTriangle className="w-3 h-3" /> Suspeita de ban
+                              </Badge>
+                              {inst.auto_suspected_reason && (
+                                <div className="text-[10px] text-red-600/80 max-w-[200px]" title={inst.auto_suspected_reason}>
+                                  {inst.auto_suspected_reason.length > 60 ? inst.auto_suspected_reason.slice(0, 60) + "…" : inst.auto_suspected_reason}
+                                </div>
+                              )}
+                            </div>
+                          ) : inst.paused_until && new Date(inst.paused_until).getTime() > Date.now() ? (
+                            <Badge variant="outline" className="gap-1 border-amber-500/60 text-amber-700 dark:text-amber-400">
+                              <Clock className="w-3 h-3" /> Pausado até {new Date(inst.paused_until).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </Badge>
+                          ) : isConn ? (
                             <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
                               <Wifi className="w-3 h-3" /> Conectado
                             </Badge>
@@ -554,6 +569,29 @@ export default function StatusWhatsApp() {
                           ) : (
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                           )}
+                        </td>
+                        <td className="py-3 px-3">
+                          {(() => {
+                            const stage = inst.ramp_up_stage || "maduro";
+                            const stageCap = stage === "novo" ? 100 : stage === "aquecendo" ? 400 : (inst.daily_send_limit || 800);
+                            const used = inst.messages_sent_today || 0;
+                            const pct = Math.min(100, Math.round((used / stageCap) * 100));
+                            const pctColor = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
+                            const stageBadge = stage === "novo"
+                              ? { label: "🔴 Novo", cls: "border-red-500/40 text-red-700 dark:text-red-400" }
+                              : stage === "aquecendo"
+                                ? { label: "🟡 Aquecendo", cls: "border-amber-500/40 text-amber-700 dark:text-amber-400" }
+                                : { label: "🟢 Maduro", cls: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" };
+                            return (
+                              <div className="space-y-1 min-w-[140px]">
+                                <Badge variant="outline" className={`text-[10px] ${stageBadge.cls}`}>{stageBadge.label}</Badge>
+                                <div className="text-[11px] font-mono">{used} / {stageCap}</div>
+                                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                  <div className={`h-full ${pctColor}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="py-3 px-3">
                           {inst.is_primary ? (
