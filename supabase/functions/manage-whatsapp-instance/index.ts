@@ -625,24 +625,34 @@ async function deleteExistingInstance(params: {
 async function createClientInstance(params: {
   adminClient: any;
   bridgeToken: string | undefined;
+  supabaseUrl: string;
   clientId: string;
   clientName?: string | null;
   providedName?: string | null;
   currentApiKey?: string | null;
 }) {
-  const { adminClient, bridgeToken, clientId, clientName, providedName, currentApiKey } = params;
+  const { adminClient, bridgeToken, supabaseUrl, clientId, clientName, providedName, currentApiKey } = params;
 
   if (!bridgeToken) {
     return jsonResponse({ error: "Bridge token não configurado no servidor" }, 500);
   }
 
-  // Ensure old instance is gone before creating a new one. Even if the bridge
-  // rejects the old key, clear our stored credentials before issuing a fresh QR
-  // so the user never scans a QR linked to a stale/corrupted session.
   if (currentApiKey) {
-    await deleteExistingInstance({ adminClient, clientId, clientApiKey: currentApiKey });
-  } else {
-    await deleteExistingInstance({ adminClient, clientId, clientApiKey: undefined });
+    try {
+      const repaired = await fetchFreshQr(currentApiKey, 2);
+      if (isConnectedStatus(repaired.status) || repaired.qrcode) {
+        await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: currentApiKey, clientId });
+        return jsonResponse({
+          success: true,
+          qrcode: repaired.qrcode,
+          status: repaired.status || "connecting",
+          instance: repaired.bridgeData.instance,
+          repaired: true,
+        });
+      }
+    } catch (err) {
+      console.warn("Legacy repair before create failed:", (err as Error).message);
+    }
   }
 
   const instanceName = providedName || clientName || "WhatsApp Bot";
@@ -663,6 +673,7 @@ async function createClientInstance(params: {
   // call would create another instance from scratch and loop forever.
   const apiKey = getBridgeApiKey(bridgeData);
   if (apiKey) {
+    await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId });
     const { error: updateError } = await adminClient
       .from("clients")
       .update({
@@ -1226,6 +1237,7 @@ Deno.serve(async (req) => {
       return await createClientInstance({
         adminClient,
         bridgeToken,
+        supabaseUrl,
         clientId: resolvedClientId,
         clientName: clientConfig?.name,
         providedName: name,
@@ -1506,6 +1518,7 @@ Deno.serve(async (req) => {
         return await createClientInstance({
           adminClient,
           bridgeToken,
+        supabaseUrl,
           clientId: resolvedClientId,
           clientName: clientConfig?.name,
           currentApiKey: null, // No old key since we already checked !clientApiKey
