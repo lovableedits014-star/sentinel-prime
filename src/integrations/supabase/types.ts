@@ -8671,6 +8671,7 @@ export type Database = {
       whatsapp_instances: {
         Row: {
           apelido: string | null
+          auto_suspected_reason: string | null
           bridge_api_key: string | null
           bridge_url: string | null
           client_id: string
@@ -8679,6 +8680,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           created_by_role: string | null
+          daily_send_limit: number
+          first_connected_at: string | null
           id: string
           instance_name: string | null
           instance_token: string | null
@@ -8694,9 +8697,11 @@ export type Database = {
           notes: string | null
           onboarding_pending_count: number | null
           onboarding_sent_at: string | null
+          paused_until: string | null
           pending_onboarding: boolean
           phone_number: string | null
           qr_code: string | null
+          ramp_up_stage: string
           reconnect_attempts_date: string | null
           reconnect_attempts_today: number
           status: string
@@ -8707,6 +8712,7 @@ export type Database = {
         }
         Insert: {
           apelido?: string | null
+          auto_suspected_reason?: string | null
           bridge_api_key?: string | null
           bridge_url?: string | null
           client_id: string
@@ -8715,6 +8721,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           created_by_role?: string | null
+          daily_send_limit?: number
+          first_connected_at?: string | null
           id?: string
           instance_name?: string | null
           instance_token?: string | null
@@ -8730,9 +8738,11 @@ export type Database = {
           notes?: string | null
           onboarding_pending_count?: number | null
           onboarding_sent_at?: string | null
+          paused_until?: string | null
           pending_onboarding?: boolean
           phone_number?: string | null
           qr_code?: string | null
+          ramp_up_stage?: string
           reconnect_attempts_date?: string | null
           reconnect_attempts_today?: number
           status?: string
@@ -8743,6 +8753,7 @@ export type Database = {
         }
         Update: {
           apelido?: string | null
+          auto_suspected_reason?: string | null
           bridge_api_key?: string | null
           bridge_url?: string | null
           client_id?: string
@@ -8751,6 +8762,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           created_by_role?: string | null
+          daily_send_limit?: number
+          first_connected_at?: string | null
           id?: string
           instance_name?: string | null
           instance_token?: string | null
@@ -8766,9 +8779,11 @@ export type Database = {
           notes?: string | null
           onboarding_pending_count?: number | null
           onboarding_sent_at?: string | null
+          paused_until?: string | null
           pending_onboarding?: boolean
           phone_number?: string | null
           qr_code?: string | null
+          ramp_up_stage?: string
           reconnect_attempts_date?: string | null
           reconnect_attempts_today?: number
           status?: string
@@ -9570,6 +9585,7 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: string
       }
+      promote_whatsapp_ramp_stages: { Args: never; Returns: number }
       purge_llm_usage_log: { Args: { p_days?: number }; Returns: number }
       recompute_militant: {
         Args: {
