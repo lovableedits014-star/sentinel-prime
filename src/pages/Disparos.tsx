@@ -237,7 +237,7 @@ export default function Disparos() {
   const [eleicaoEscopo, setEleicaoEscopo] = useState<"all" | "campo_grande" | "interior">("all");
   const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
   const [sending, setSending] = useState(false);
-  const [politica, setPolitica] = useState<PolicyKey>("conservador");
+  const [politica, setPolitica] = useState<PolicyKey>("furtivo");
   const [customPol, setCustomPol] = useState({ batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120 });
   const { regioes: regioesCadastradas } = useRegioesEleicao(clientId);
   const [groupSearch, setGroupSearch] = useState("");
@@ -430,6 +430,11 @@ export default function Disparos() {
     try {
       const basePol = POLICIES[politica];
       const pol = politica === "personalizado" ? { ...basePol, ...customPol } : basePol;
+      if (politica === "agressivo") {
+        toast.error("Modo agressivo bloqueado para proteger a instância WhatsApp contra queda e banimento.");
+        setSending(false);
+        return;
+      }
       if (politica === "personalizado") {
         if (customPol.delay_max < customPol.delay_min || customPol.delay_min < 1 || customPol.batch_size < 1 || customPol.batch_pause < 0) {
           toast.error("Valores inválidos na política personalizada (delay máx ≥ delay mín, valores ≥ 1).");
@@ -670,7 +675,7 @@ export default function Disparos() {
                 <SelectContent>
                   <SelectItem value="conservador">🛡️ Conservador</SelectItem>
                   <SelectItem value="moderado">⚡ Moderado</SelectItem>
-                  <SelectItem value="agressivo">🔥 Agressivo</SelectItem>
+                  <SelectItem value="agressivo" disabled>🔥 Agressivo (bloqueado)</SelectItem>
                   <SelectItem value="furtivo">🥷 Furtivo (anti-ban)</SelectItem>
                   <SelectItem value="personalizado">⚙️ Personalizado</SelectItem>
                 </SelectContent>
