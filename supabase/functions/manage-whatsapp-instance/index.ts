@@ -955,14 +955,9 @@ Deno.serve(async (req) => {
       if (isAuthenticatedUser) {
         const requestedClientId = typeof client_id === "string" ? client_id : null;
         if (!requestedClientId) return jsonResponse({ success: false, error: "client_id obrigatório" }, 400);
-        const { data: ownedClient } = await adminClient
-          .from("clients")
-          .select("id")
-          .eq("id", requestedClientId)
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (!ownedClient) return jsonResponse({ success: false, error: "Cliente não autorizado" }, 403);
-        allowedClientId = ownedClient.id;
+        const authz = await assertCanActOnClient(adminClient, user, requestedClientId);
+        if (!authz.ok) return jsonResponse({ success: false, error: "Cliente não autorizado" }, 403);
+        allowedClientId = requestedClientId;
       }
       let query = adminClient
         .from("whatsapp_instances")
