@@ -39,6 +39,12 @@ type Instance = {
   ramp_up_stage?: string | null;
   daily_send_limit?: number | null;
   first_connected_at?: string | null;
+  bridge_instance_id?: string | null;
+  last_keepalive_at?: string | null;
+  last_keepalive_status?: string | null;
+  last_auto_reconnect_at?: string | null;
+  last_webhook_rebound_at?: string | null;
+  last_disconnect_reason?: string | null;
 };
 
 type RegiaoLinkRow = { value: string; label: string; link: string; jaEhMembro: boolean };
@@ -94,7 +100,7 @@ export default function StatusWhatsApp() {
 
     const [{ data: inst }, { data: queue }] = await Promise.all([
       supabase.from("whatsapp_instances")
-        .select("id,apelido,status,phone_number,is_active,is_primary,last_health_check_at,last_send_at,last_disconnected_at,connected_since,messages_sent_today,total_sent,total_failed,consecutive_failures,pending_onboarding,onboarding_sent_at,onboarding_pending_count,suspected_banned_at,auto_suspected_reason,paused_until,ramp_up_stage,daily_send_limit,first_connected_at")
+        .select("id,apelido,status,phone_number,is_active,is_primary,last_health_check_at,last_send_at,last_disconnected_at,connected_since,messages_sent_today,total_sent,total_failed,consecutive_failures,pending_onboarding,onboarding_sent_at,onboarding_pending_count,suspected_banned_at,auto_suspected_reason,paused_until,ramp_up_stage,daily_send_limit,first_connected_at,bridge_instance_id,last_keepalive_at,last_keepalive_status,last_auto_reconnect_at,last_webhook_rebound_at,last_disconnect_reason")
         .eq("client_id", client.id)
         .order("is_primary", { ascending: false })
         .order("created_at", { ascending: true }),
@@ -302,12 +308,12 @@ export default function StatusWhatsApp() {
     if (!clientId) return;
     setBusy("check-all");
     const { data, error } = await supabase.functions.invoke("manage-whatsapp-instance", {
-      body: { action: "dispatch_readiness", client_id: clientId },
+      body: { action: "health_check_all", client_id: clientId },
     });
     setBusy(null);
     if (error || data?.error || data?.success === false) toast.error("Falha: " + (error?.message || data?.error || "verificação não concluída"));
     else {
-      toast.success(data?.ready_count > 0 ? "Sessão operacional confirmada." : "Nenhuma instância operacional para envio agora.");
+      toast.success(`Keepalive executado em ${data?.checked ?? 0} instância(s).`);
       loadAll(true);
     }
   };
@@ -399,7 +405,7 @@ export default function StatusWhatsApp() {
           </Button>
           <Button size="sm" onClick={handleHealthCheckAll} disabled={busy === "check-all"}>
             {busy === "check-all" ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Activity className="w-3.5 h-3.5 mr-1" />}
-            Verificar todas agora
+            Forçar manter conectado agora
           </Button>
         </div>
       </div>
@@ -493,7 +499,7 @@ export default function StatusWhatsApp() {
                   <tr className="border-b text-xs text-muted-foreground uppercase tracking-wide">
                     <th className="text-left py-2 pr-3">Instância</th>
                     <th className="text-left py-2 px-3">Status</th>
-                    <th className="text-left py-2 px-3">Última verificação</th>
+                    <th className="text-left py-2 px-3">Keepalive</th>
                     <th className="text-left py-2 px-3">Último envio</th>
                     <th className="text-left py-2 px-3">Falhas seguidas</th>
                     <th className="text-left py-2 px-3">Cota hoje<br/><span className="text-[10px] normal-case text-muted-foreground/70">estágio & limite</span></th>
@@ -555,6 +561,20 @@ export default function StatusWhatsApp() {
                           </div>
                           {stale && (
                             <div className="text-[10px] text-amber-600">verificação atrasada</div>
+                          )}
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            manter: {timeSince(inst.last_keepalive_at)}
+                          </div>
+                          {inst.last_keepalive_status && (
+                            <div className="text-[10px] text-muted-foreground">{inst.last_keepalive_status}</div>
+                          )}
+                          {inst.last_auto_reconnect_at && (
+                            <div className="text-[10px] text-emerald-600">recuperou {timeSince(inst.last_auto_reconnect_at)}</div>
+                          )}
+                          {inst.last_disconnect_reason && !isConn && (
+                            <div className="text-[10px] text-red-600 max-w-[180px] truncate" title={inst.last_disconnect_reason}>
+                              {inst.last_disconnect_reason}
+                            </div>
                           )}
                         </td>
                         <td className="py-3 px-3 text-xs">
@@ -683,7 +703,7 @@ export default function StatusWhatsApp() {
           <div className="mt-4 text-xs text-muted-foreground border-t pt-3 space-y-1">
             <div>
               <strong>Ações:</strong> <em>Verificar</em> consulta a ponte e atualiza o status agora ·{" "}
-              <em>Reconectar</em> tenta religar sem novo QR · <em>Re-scan</em> gera novo QR Code.
+              <em>Reconectar</em> tenta religar sem novo QR · <em>Forçar manter conectado</em> roda o keepalive agressivo · <em>Re-scan</em> gera novo QR Code.
             </div>
             <div>
               <strong>Onboarding:</strong> ao conectar uma instância secundária, ela recebe automaticamente na própria
