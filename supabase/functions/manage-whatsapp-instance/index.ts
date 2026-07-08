@@ -135,6 +135,30 @@ const getBridgeQrCode = (data: any) =>
 const getBridgeRawStatus = (data: any) =>
   data?.status || data?.instance?.status || data?.state || data?.instance?.state || null;
 
+const getBridgeInstanceId = (data: any) => {
+  const candidates = [
+    data?.instance_id,
+    data?.instanceId,
+    data?.instance?.id,
+    data?.instance?.instance_id,
+    data?.instance?.instanceId,
+    data?.data?.instance_id,
+    data?.data?.instanceId,
+    data?.data?.instance?.id,
+    data?.result?.instance_id,
+    data?.result?.instanceId,
+    data?.result?.instance?.id,
+    data?.id,
+  ];
+  const found = candidates.find((v) => typeof v === "string" && v.trim().length >= 8);
+  return found ? String(found).trim() : null;
+};
+
+const keepaliveDetails = (data: any, extra: Record<string, unknown> = {}) => ({
+  ...extra,
+  bridge: sanitizeBridgeData(data),
+});
+
 // =====================================================================
 // Anti-ban cooldown: limita chamadas a `create_instance` e `reconnect`
 // para o mesmo número. Repetir login/handshake várias vezes em sequência
@@ -620,14 +644,28 @@ async function tryReconnectInstance(adminClient: any, inst: any) {
   if (wasConnected && status !== "connected" && !isExplicitOfflineStatus(rawStatus) && !isInvalidApiKeyResponse(bridgeRes.status, bridgeData)) {
     status = "connected";
   }
-  const updates: any = { status, last_health_check_at: new Date().toISOString() };
+  const bridgeInstanceId = getBridgeInstanceId(bridgeData);
+  const updates: any = {
+    status,
+    last_health_check_at: new Date().toISOString(),
+    last_keepalive_at: new Date().toISOString(),
+    last_keepalive_status: status,
+    last_keepalive_details: keepaliveDetails(bridgeData, { source: "auto_reconnect" }),
+  };
+  if (bridgeInstanceId) updates.bridge_instance_id = bridgeInstanceId;
   const reportedPhone = bridgeData?.phone_number || bridgeData?.phone
     || bridgeData?.instance?.phone_number || bridgeData?.instance?.phone;
   if (reportedPhone) updates.phone_number = String(reportedPhone).replace(/\D/g, "");
-  if (status === "connected") updates.connected_since = new Date().toISOString();
+  if (status === "connected") {
+    updates.connected_since = inst.connected_since || new Date().toISOString();
+    updates.last_disconnected_at = null;
+    updates.last_disconnect_reason = null;
+    updates.last_auto_reconnect_at = new Date().toISOString();
+  }
   if (status === "disconnected") {
     updates.connected_since = null;
     updates.last_disconnected_at = new Date().toISOString();
+    updates.last_disconnect_reason = bridgeData?.error || bridgeData?.message || "auto_reconnect_failed";
   }
   await adminClient.from("whatsapp_instances").update(updates).eq("id", inst.id);
   return { id: inst.id, reconnected: status === "connected", status, ok: bridgeRes.ok, details: sanitizeBridgeData(bridgeData) };
@@ -865,19 +903,30 @@ Deno.serve(async (req) => {
       }
       let query = adminClient
         .from("whatsapp_instances")
-        .select("id, bridge_api_key, status, connected_since, is_active, last_reconnect_attempt_at")
+        .select("id, client_id, bridge_url, bridge_api_key, bridge_instance_id, phone_number, status, connected_since, is_active, last_reconnect_attempt_at, consecutive_failures, suspected_banned_at")
         .eq("is_active", true)
         .not("bridge_api_key", "is", null)
         .limit(50);
       if (isAuthenticatedUser && allowedClientId) query = query.eq("client_id", allowedClientId);
       const { data: rows, error } = await query;
       if (error) return jsonResponse({ success: false, error: error.message }, 500);
-      // IMPORTANTE: health_check_all NÃO reconecta automaticamente. Reconexões em
-      // cascata para várias instâncias offline foram o gatilho do banimento na
-      // Bridge WhatsHub. Aqui apenas sincronizamos o status atual; a reconexão
-      // deve ser explícita (botão na UI -> action="reconnect").
+      // Keepalive agressivo: verifica status real e tenta recuperar a mesma
+      // sessão com reconnect, sem deletar/recriar a instância. Isso mantém a
+      // sessão viva quando a ponte permite recuperar pelo mesmo API key.
       const results = await Promise.allSettled((rows || []).map(async (inst: any) => {
-        return await syncInstanceHealth(adminClient, inst);
+        const health = await syncInstanceHealth(adminClient, inst);
+        if (health.status === "connected") {
+          await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
+          return { ...health, keepalive: "connected" };
+        }
+        if (health.status === "disconnected") {
+          const recovered = await tryReconnectInstance(adminClient, { ...inst, status: health.status });
+          if (recovered.status === "connected") {
+            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
+          }
+          return { ...health, keepalive: "reconnect_attempted", reconnect: recovered };
+        }
+        return { ...health, keepalive: "waiting" };
       }));
       return jsonResponse({ success: true, checked: results.length, results });
     }
@@ -928,7 +977,7 @@ Deno.serve(async (req) => {
     if (action === "list_instances") {
       const { data, error } = await adminClient
         .from("whatsapp_instances")
-        .select("id, apelido, phone_number, status, is_active, is_primary, last_send_at, messages_sent_today, messages_sent_today_date, total_sent, total_failed, consecutive_failures, connected_since, last_disconnected_at, notes, bridge_url, created_at, updated_at")
+        .select("id, apelido, phone_number, status, is_active, is_primary, last_send_at, messages_sent_today, messages_sent_today_date, total_sent, total_failed, consecutive_failures, connected_since, last_disconnected_at, notes, bridge_url, bridge_instance_id, last_keepalive_at, last_keepalive_status, last_auto_reconnect_at, last_webhook_rebound_at, last_disconnect_reason, created_at, updated_at")
         .eq("client_id", resolvedClientId)
         .order("is_primary", { ascending: false })
         .order("created_at", { ascending: true });
@@ -1260,7 +1309,7 @@ Deno.serve(async (req) => {
     if (instance_id) {
       const { data: inst } = await adminClient
         .from("whatsapp_instances")
-        .select("id, apelido, bridge_api_key, bridge_url, status, connected_since, phone_number, last_reconnect_attempt_at, last_create_instance_at, reconnect_attempts_today, reconnect_attempts_date")
+        .select("id, client_id, apelido, bridge_api_key, bridge_url, bridge_instance_id, status, connected_since, phone_number, last_reconnect_attempt_at, last_create_instance_at, reconnect_attempts_today, reconnect_attempts_date, consecutive_failures, suspected_banned_at")
         .eq("id", instance_id)
         .eq("client_id", resolvedClientId)
         .maybeSingle();
