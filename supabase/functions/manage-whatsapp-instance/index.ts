@@ -973,24 +973,7 @@ Deno.serve(async (req) => {
       if (isAuthenticatedUser && allowedClientId) query = query.eq("client_id", allowedClientId);
       const { data: rows, error } = await query;
       if (error) return jsonResponse({ success: false, error: error.message }, 500);
-      // Keepalive agressivo: verifica status real e tenta recuperar a mesma
-      // sessão com reconnect, sem deletar/recriar a instância. Isso mantém a
-      // sessão viva quando a ponte permite recuperar pelo mesmo API key.
-      const results = await Promise.allSettled((rows || []).map(async (inst: any) => {
-        const health = await syncInstanceHealth(adminClient, inst);
-        if (health.status === "connected") {
-          await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
-          return { ...health, keepalive: "connected" };
-        }
-        if (health.status === "disconnected") {
-          const recovered = await tryReconnectInstance(adminClient, { ...inst, status: health.status });
-          if (recovered.status === "connected") {
-            await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
-          }
-          return { ...health, keepalive: "reconnect_attempted", reconnect: recovered };
-        }
-        return { ...health, keepalive: "waiting" };
-      }));
+      const results = await keepaliveInstances({ adminClient, rows: rows || [], supabaseUrl, bridgeToken });
       return jsonResponse({ success: true, checked: results.length, results });
     }
 
