@@ -1956,16 +1956,27 @@ Deno.serve(async (req) => {
         : isExplicitOfflineStatus(rawStatus) ? "disconnected"
         : (activeInstanceRow.status || "disconnected");
       if (wasConnected && status !== "connected" && !isExplicitOfflineStatus(rawStatus)) status = "connected";
-      const updates: any = { status, last_health_check_at: new Date().toISOString() };
+      const bridgeInstanceId = getBridgeInstanceId(bridgeData);
+      const nowIso = new Date().toISOString();
+      const updates: any = {
+        status,
+        last_health_check_at: nowIso,
+        last_keepalive_at: nowIso,
+        last_keepalive_status: status,
+        last_keepalive_details: keepaliveDetails(bridgeData, { source: "instance_status", raw_status: rawStatus || null }),
+      };
+      if (bridgeInstanceId) updates.bridge_instance_id = bridgeInstanceId;
       if (status === "connected") {
         if (!activeInstanceRow.connected_since) updates.connected_since = new Date().toISOString();
         // Mesma lógica do syncInstanceHealth: limpa quarentena quando a ponte
         // confirma "connected" ao vivo via UI (Status/Reconectar).
         updates.last_disconnected_at = null;
+        updates.last_disconnect_reason = null;
       }
       if (status === "disconnected") {
         updates.connected_since = null;
-        updates.last_disconnected_at = new Date().toISOString();
+        updates.last_disconnected_at = nowIso;
+        updates.last_disconnect_reason = bridgeErrorMessage(bridgeData) || rawStatus || "instance_status_disconnected";
       }
       // Sincroniza telefone sempre que a bridge informar (mesmo em connecting)
       const reportedPhone = bridgeData?.phone_number || bridgeData?.phone
