@@ -1195,6 +1195,7 @@ Deno.serve(async (req) => {
       if (inst.bridge_api_key) {
         try {
           const rebound = await bindInstanceWebhook({
+            adminClient,
             supabaseUrl,
             bridgeToken,
             apiKey: inst.bridge_api_key,
@@ -1491,6 +1492,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ success: false, error: "Instância sem API key — conecte primeiro" }, 400);
       }
       const rebound = await bindInstanceWebhook({
+        adminClient,
         supabaseUrl,
         bridgeToken,
         apiKey: activeInstanceRow.bridge_api_key,
