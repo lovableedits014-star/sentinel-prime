@@ -36,6 +36,12 @@ export interface PoolInstance {
   success_rate_24h: number;
   sent_24h: number;
   bridge_url: string | null;
+  bridge_instance_id?: string | null;
+  last_keepalive_at?: string | null;
+  last_keepalive_status?: string | null;
+  last_auto_reconnect_at?: string | null;
+  last_webhook_rebound_at?: string | null;
+  last_disconnect_reason?: string | null;
   created_at: string;
 }
 
@@ -421,7 +427,21 @@ export default function WhatsAppInstancePoolCard({ clientId, instance, onChange 
             {isNew && (
               <Badge variant="outline" className="text-[10px] border-blue-500/40 text-blue-700 dark:text-blue-400">Chip novo</Badge>
             )}
+            {instance.last_keepalive_at && (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-700 dark:text-emerald-400">
+                Mantendo conectado · {timeSince(instance.last_keepalive_at)}
+              </Badge>
+            )}
           </div>
+          {(instance.last_auto_reconnect_at || instance.last_disconnect_reason || instance.bridge_instance_id) && (
+            <div className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
+              {instance.last_auto_reconnect_at && <div>Recuperado automaticamente {timeSince(instance.last_auto_reconnect_at)}</div>}
+              {instance.bridge_instance_id && <div className="font-mono truncate">ponte: {instance.bridge_instance_id}</div>}
+              {instance.last_disconnect_reason && !isConnected && (
+                <div className="text-red-600 truncate" title={instance.last_disconnect_reason}>{instance.last_disconnect_reason}</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
