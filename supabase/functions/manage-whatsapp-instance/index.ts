@@ -579,6 +579,8 @@ async function markInstanceDisconnected(adminClient: any, instanceId: string) {
     status: "disconnected",
     connected_since: null,
     last_disconnected_at: new Date().toISOString(),
+    last_disconnect_reason: "send_failure_not_connected",
+    last_keepalive_status: "disconnected",
   }).eq("id", instanceId);
 }
 
