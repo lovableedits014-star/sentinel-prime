@@ -348,13 +348,14 @@ async function fetchFreshQr(apiKey: string, attempts = 2) {
 }
 
 async function bindInstanceWebhook(params: {
+  adminClient?: any;
   supabaseUrl: string;
   bridgeToken: string | undefined;
   apiKey: string;
   clientId: string;
   instanceId?: string | null;
 }) {
-  const { supabaseUrl, bridgeToken, apiKey, clientId, instanceId } = params;
+  const { adminClient, supabaseUrl, bridgeToken, apiKey, clientId, instanceId } = params;
   if (!bridgeToken) return { ok: false, skipped: true, reason: "missing_token" };
   const instanceParam = instanceId ? `&instance_id=${encodeURIComponent(instanceId)}` : "";
   const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-inbound-webhook?client_id=${encodeURIComponent(clientId)}${instanceParam}&token=${encodeURIComponent(bridgeToken)}`;
@@ -365,6 +366,12 @@ async function bindInstanceWebhook(params: {
       body: JSON.stringify({ action: "set_webhook", instance_id: instanceId, webhook_url: webhookUrl }),
     });
     const bridgeData = await bridgeRes.json().catch(() => ({}));
+    if (bridgeRes.ok && adminClient && instanceId) {
+      const bridgeInstanceId = getBridgeInstanceId(bridgeData);
+      const updates: any = { last_webhook_rebound_at: new Date().toISOString() };
+      if (bridgeInstanceId) updates.bridge_instance_id = bridgeInstanceId;
+      await adminClient.from("whatsapp_instances").update(updates).eq("id", instanceId).eq("client_id", clientId);
+    }
     return { ok: bridgeRes.ok, webhook_url: webhookUrl, details: sanitizeBridgeData(bridgeData) };
   } catch (err) {
     return { ok: false, webhook_url: webhookUrl, error: (err as Error).message };
