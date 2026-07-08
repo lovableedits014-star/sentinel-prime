@@ -8676,6 +8676,7 @@ export type Database = {
           apelido: string | null
           auto_suspected_reason: string | null
           bridge_api_key: string | null
+          bridge_instance_id: string | null
           bridge_url: string | null
           client_id: string
           connected_since: string | null
@@ -8690,11 +8691,17 @@ export type Database = {
           instance_token: string | null
           is_active: boolean
           is_primary: boolean
+          last_auto_reconnect_at: string | null
           last_create_instance_at: string | null
+          last_disconnect_reason: string | null
           last_disconnected_at: string | null
           last_health_check_at: string | null
+          last_keepalive_at: string | null
+          last_keepalive_details: Json | null
+          last_keepalive_status: string | null
           last_reconnect_attempt_at: string | null
           last_send_at: string | null
+          last_webhook_rebound_at: string | null
           messages_sent_today: number
           messages_sent_today_date: string
           notes: string | null
@@ -8717,6 +8724,7 @@ export type Database = {
           apelido?: string | null
           auto_suspected_reason?: string | null
           bridge_api_key?: string | null
+          bridge_instance_id?: string | null
           bridge_url?: string | null
           client_id: string
           connected_since?: string | null
@@ -8731,11 +8739,17 @@ export type Database = {
           instance_token?: string | null
           is_active?: boolean
           is_primary?: boolean
+          last_auto_reconnect_at?: string | null
           last_create_instance_at?: string | null
+          last_disconnect_reason?: string | null
           last_disconnected_at?: string | null
           last_health_check_at?: string | null
+          last_keepalive_at?: string | null
+          last_keepalive_details?: Json | null
+          last_keepalive_status?: string | null
           last_reconnect_attempt_at?: string | null
           last_send_at?: string | null
+          last_webhook_rebound_at?: string | null
           messages_sent_today?: number
           messages_sent_today_date?: string
           notes?: string | null
@@ -8758,6 +8772,7 @@ export type Database = {
           apelido?: string | null
           auto_suspected_reason?: string | null
           bridge_api_key?: string | null
+          bridge_instance_id?: string | null
           bridge_url?: string | null
           client_id?: string
           connected_since?: string | null
@@ -8772,11 +8787,17 @@ export type Database = {
           instance_token?: string | null
           is_active?: boolean
           is_primary?: boolean
+          last_auto_reconnect_at?: string | null
           last_create_instance_at?: string | null
+          last_disconnect_reason?: string | null
           last_disconnected_at?: string | null
           last_health_check_at?: string | null
+          last_keepalive_at?: string | null
+          last_keepalive_details?: Json | null
+          last_keepalive_status?: string | null
           last_reconnect_attempt_at?: string | null
           last_send_at?: string | null
+          last_webhook_rebound_at?: string | null
           messages_sent_today?: number
           messages_sent_today_date?: string
           notes?: string | null
