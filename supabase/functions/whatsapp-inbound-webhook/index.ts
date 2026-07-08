@@ -88,6 +88,81 @@ function isInboundMessage(payload: any): boolean {
   );
 }
 
+const isUuid = (value: unknown) =>
+  typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+function extractBridgeInstanceId(payload: any, url: URL): string | null {
+  const candidates = [
+    payload?.instance_id,
+    payload?.instanceId,
+    payload?.data?.instance_id,
+    payload?.data?.instanceId,
+    payload?.instance?.id,
+    payload?.data?.instance?.id,
+    url.searchParams.get("instance_id"),
+  ];
+  const found = candidates.find((v) => typeof v === "string" && v.trim().length >= 8);
+  return found ? String(found).trim() : null;
+}
+
+function extractBridgeInstanceName(payload: any): string | null {
+  const candidates = [
+    payload?.instance_name,
+    payload?.instanceName,
+    payload?.name,
+    payload?.data?.instance_name,
+    payload?.data?.instanceName,
+    payload?.data?.name,
+    payload?.instance?.name,
+    payload?.data?.instance?.name,
+  ];
+  const found = candidates.find((v) => typeof v === "string" && v.trim().length > 0);
+  return found ? String(found).trim() : null;
+}
+
+async function resolveWebhookInstance(admin: any, clientId: string, reportedInstanceId: string | null, reportedName: string | null) {
+  if (reportedInstanceId) {
+    if (isUuid(reportedInstanceId)) {
+      const { data: byDbId } = await admin
+        .from("whatsapp_instances")
+        .select("id, client_id, apelido, instance_name, bridge_api_key, bridge_url, bridge_instance_id")
+        .eq("id", reportedInstanceId)
+        .eq("client_id", clientId)
+        .maybeSingle();
+      if (byDbId) return { inst: byDbId, mode: "db_id" };
+    }
+
+    const { data: byBridgeId } = await admin
+      .from("whatsapp_instances")
+      .select("id, client_id, apelido, instance_name, bridge_api_key, bridge_url, bridge_instance_id")
+      .eq("client_id", clientId)
+      .eq("bridge_instance_id", reportedInstanceId)
+      .maybeSingle();
+    if (byBridgeId) return { inst: byBridgeId, mode: "bridge_instance_id" };
+  }
+
+  const { data: candidates } = await admin
+    .from("whatsapp_instances")
+    .select("id, client_id, apelido, instance_name, bridge_api_key, bridge_url, bridge_instance_id, is_active")
+    .eq("client_id", clientId)
+    .eq("is_active", true);
+
+  const rows = candidates || [];
+  if (reportedName) {
+    const wanted = reportedName.trim().toLowerCase();
+    const named = rows.filter((r: any) =>
+      String(r.apelido || "").trim().toLowerCase() === wanted ||
+      String(r.instance_name || "").trim().toLowerCase() === wanted,
+    );
+    if (named.length === 1) return { inst: named[0], mode: "name_fallback" };
+  }
+
+  const withCredentials = rows.filter((r: any) => r.bridge_api_key && r.bridge_url);
+  if (withCredentials.length === 1) return { inst: withCredentials[0], mode: "single_active_fallback" };
+
+  return { inst: null, mode: "not_found" };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -132,27 +207,24 @@ Deno.serve(async (req) => {
     // Refletimos no banco IMEDIATAMENTE para evitar envios "fantasma" (status
     // OK no banco enquanto a sessão real está caída).
     const eventName = String(payload?.event || payload?.type || "").toLowerCase();
-    const instanceId = payload?.instance_id || payload?.instanceId || payload?.data?.instance_id || url.searchParams.get("instance_id");
+    const reportedInstanceId = extractBridgeInstanceId(payload, url);
+    const reportedInstanceName = extractBridgeInstanceName(payload);
+    const resolved = await resolveWebhookInstance(admin, clientId, reportedInstanceId, reportedInstanceName);
+    const matchedInstance = resolved.inst;
+    const instanceId = matchedInstance?.id || null;
 
-    // Verify instance belongs to the client_id in the URL before any status mutation
-    let instanceOwnedByClient = false;
-    if (instanceId) {
-      const { data: inst } = await admin
-        .from("whatsapp_instances")
-        .select("id, client_id")
-        .eq("id", instanceId)
-        .maybeSingle();
-      instanceOwnedByClient = !!inst && (inst as any).client_id === clientId;
-      if (!instanceOwnedByClient) {
-        console.warn("[whatsapp-inbound-webhook] instance/client mismatch", { instanceId, clientId, found: inst });
-        await admin.from("action_logs").insert({
-          client_id: clientId,
-          action: "whatsapp_webhook_instance_mismatch",
-          status: "warn",
-          details: { instance_id: instanceId, event: eventName, found: inst },
-        });
-      }
-    } else if (eventName) {
+    if (matchedInstance && reportedInstanceId && matchedInstance.bridge_instance_id !== reportedInstanceId && resolved.mode !== "db_id") {
+      await admin.from("whatsapp_instances").update({ bridge_instance_id: reportedInstanceId }).eq("id", matchedInstance.id);
+    }
+    if (reportedInstanceId && !matchedInstance) {
+      console.warn("[whatsapp-inbound-webhook] instance/client mismatch", { reportedInstanceId, reportedInstanceName, clientId, mode: resolved.mode });
+      await admin.from("action_logs").insert({
+        client_id: clientId,
+        action: "whatsapp_webhook_instance_mismatch",
+        status: "warn",
+        details: { reported_instance_id: reportedInstanceId, reported_instance_name: reportedInstanceName, event: eventName, match_mode: resolved.mode },
+      });
+    } else if (!reportedInstanceId && eventName) {
       await admin.from("action_logs").insert({
         client_id: clientId,
         action: "whatsapp_webhook_without_instance_id",
@@ -161,7 +233,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (instanceId && instanceOwnedByClient && (eventName === "disconnected" || eventName.includes("logout") || eventName.includes("banned"))) {
+    if (instanceId && (eventName === "disconnected" || eventName.includes("logout") || eventName.includes("banned"))) {
       // Eventos `logout`/`banned` são terminais — marca offline imediatamente.
       const isTerminal = eventName.includes("logout") || eventName.includes("banned");
       let confirmedOffline = isTerminal;
@@ -177,7 +249,7 @@ Deno.serve(async (req) => {
           const { data: instRow } = await admin
             .from("whatsapp_instances")
             .select("bridge_url, bridge_api_key")
-            .eq("id", instanceId)
+              .eq("id", instanceId)
             .maybeSingle();
           if (instRow?.bridge_url && instRow?.bridge_api_key) {
             await new Promise((r) => setTimeout(r, 3000));
@@ -198,6 +270,8 @@ Deno.serve(async (req) => {
               console.log("[whatsapp-inbound-webhook] disconnected event ignorado — status na ponte:", instanceId, vStatus || "vazio");
               await admin.from("whatsapp_instances").update({
                 last_health_check_at: new Date().toISOString(),
+                last_keepalive_at: new Date().toISOString(),
+                last_keepalive_status: "transient",
               }).eq("id", instanceId).eq("client_id", clientId);
               return json({ ok: true, handled: "disconnected_ignored", instance_id: instanceId, verified_status: vStatus || "transient" });
             }
@@ -206,6 +280,8 @@ Deno.serve(async (req) => {
           console.warn("[whatsapp-inbound-webhook] falha ao reverificar status, ignorando evento:", (err as Error).message);
           await admin.from("whatsapp_instances").update({
             last_health_check_at: new Date().toISOString(),
+            last_keepalive_at: new Date().toISOString(),
+            last_keepalive_status: "verify_error",
           }).eq("id", instanceId).eq("client_id", clientId);
           return json({ ok: true, handled: "disconnected_ignored_verify_error", instance_id: instanceId });
         }
@@ -217,6 +293,9 @@ Deno.serve(async (req) => {
           status: "disconnected",
           connected_since: null,
           last_disconnected_at: new Date().toISOString(),
+          last_disconnect_reason: payload?.data?.reason || eventName,
+          last_keepalive_at: new Date().toISOString(),
+          last_keepalive_status: "disconnected",
         }).eq("id", instanceId).eq("client_id", clientId);
         if (upErr) console.error("[whatsapp-inbound-webhook] failed to mark disconnected:", upErr);
         else {
@@ -225,32 +304,37 @@ Deno.serve(async (req) => {
             client_id: clientId,
             action: "whatsapp_webhook_disconnected",
             status: "ok",
-            details: { instance_id: instanceId, event: eventName, reason: payload?.data?.reason || null },
+            details: { instance_id: instanceId, reported_instance_id: reportedInstanceId, match_mode: resolved.mode, event: eventName, reason: payload?.data?.reason || null },
           });
         }
         return json({ ok: true, handled: "disconnected", instance_id: instanceId });
       }
     }
 
-    if (instanceId && instanceOwnedByClient && (eventName === "connected" || eventName === "ready" || eventName === "open")) {
+    if (instanceId && (eventName === "connected" || eventName === "ready" || eventName === "open")) {
       await admin.from("whatsapp_instances").update({
         status: "connected",
         connected_since: new Date().toISOString(),
         last_disconnected_at: null,
         last_health_check_at: new Date().toISOString(),
+        last_keepalive_at: new Date().toISOString(),
+        last_keepalive_status: "connected",
+        last_disconnect_reason: null,
       }).eq("id", instanceId).eq("client_id", clientId);
       await admin.from("action_logs").insert({
         client_id: clientId,
         action: "whatsapp_webhook_connected",
         status: "ok",
-        details: { instance_id: instanceId, event: eventName },
+        details: { instance_id: instanceId, reported_instance_id: reportedInstanceId, match_mode: resolved.mode, event: eventName },
       });
       return json({ ok: true, handled: "connected", instance_id: instanceId });
     }
 
-    if (instanceId && instanceOwnedByClient && eventName === "health_check") {
+    if (instanceId && eventName === "health_check") {
       await admin.from("whatsapp_instances").update({
         last_health_check_at: new Date().toISOString(),
+        last_keepalive_at: new Date().toISOString(),
+        last_keepalive_status: "webhook_health_check",
       }).eq("id", instanceId).eq("client_id", clientId);
       // não retorna — health_check pode coexistir com payload de mensagem
     }
