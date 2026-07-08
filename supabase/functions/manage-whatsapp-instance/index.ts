@@ -749,7 +749,7 @@ async function createClientInstance(params: {
     try {
       const repaired = await fetchFreshQr(currentApiKey, 2);
       if (isConnectedStatus(repaired.status) || repaired.qrcode) {
-        await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: currentApiKey, clientId });
+        await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: currentApiKey, clientId });
         return jsonResponse({
           success: true,
           qrcode: repaired.qrcode,
@@ -790,7 +790,7 @@ async function createClientInstance(params: {
   // call would create another instance from scratch and loop forever.
   const apiKey = getBridgeApiKey(bridgeData);
   if (apiKey) {
-    await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId });
+    await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey, clientId });
     const { error: updateError } = await adminClient
       .from("clients")
       .update({
@@ -937,13 +937,13 @@ Deno.serve(async (req) => {
       const results = await Promise.allSettled((rows || []).map(async (inst: any) => {
         const health = await syncInstanceHealth(adminClient, inst);
         if (health.status === "connected") {
-          await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
+          await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
           return { ...health, keepalive: "connected" };
         }
         if (health.status === "disconnected") {
           const recovered = await tryReconnectInstance(adminClient, { ...inst, status: health.status });
           if (recovered.status === "connected") {
-            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
+            await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
           }
           return { ...health, keepalive: "reconnect_attempted", reconnect: recovered };
         }
@@ -1376,7 +1376,7 @@ Deno.serve(async (req) => {
               last_disconnected_at: null,
               connected_since: activeInstanceRow.connected_since || new Date().toISOString(),
             }).eq("id", instance_id);
-            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
+            await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
             return jsonResponse({ success: true, status: fresh.status, instance: fresh.bridgeData.instance, repaired: true });
           }
           if (fresh.qrcode) {
@@ -1384,7 +1384,7 @@ Deno.serve(async (req) => {
               status: "connecting",
               last_health_check_at: new Date().toISOString(),
             }).eq("id", instance_id);
-            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
+            await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
             return jsonResponse({ success: true, qrcode: fresh.qrcode, status: fresh.status || "connecting", instance: fresh.bridgeData.instance, repaired: true });
           }
           return jsonResponse({
@@ -1419,7 +1419,7 @@ Deno.serve(async (req) => {
             .from("whatsapp_instances")
             .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
             .eq("id", instance_id);
-          await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
+          await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
           try {
             const fresh = await fetchFreshQr(apiKey, 2);
             if (fresh.qrcode) {
@@ -1728,7 +1728,7 @@ Deno.serve(async (req) => {
               .from("whatsapp_instances")
               .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
               .eq("id", instance_id);
-            await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
+            await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
             try {
               const fresh = await fetchFreshQr(apiKey, 2);
               if (fresh.qrcode) {
@@ -1783,7 +1783,7 @@ Deno.serve(async (req) => {
         updates.last_disconnected_at = new Date().toISOString();
       }
       await adminClient.from("whatsapp_instances").update(updates).eq("id", instance_id);
-      await bindInstanceWebhook({ supabaseUrl, bridgeToken, apiKey: clientApiKey, clientId: resolvedClientId, instanceId: instance_id });
+      await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: clientApiKey, clientId: resolvedClientId, instanceId: instance_id });
       return jsonResponse({
         success: bridgeRes.ok && bridgeData?.success !== false,
         qrcode,
