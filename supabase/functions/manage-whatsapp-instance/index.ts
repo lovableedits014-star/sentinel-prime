@@ -1745,7 +1745,15 @@ Deno.serve(async (req) => {
           if (apiKey) {
             await adminClient
               .from("whatsapp_instances")
-              .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
+              .update({
+                bridge_url: BRIDGE_URL,
+                bridge_api_key: apiKey,
+                bridge_instance_id: getBridgeInstanceId(bridgeData),
+                status: "connecting",
+                last_keepalive_at: new Date().toISOString(),
+                last_keepalive_status: "reconnect_created",
+                last_keepalive_details: keepaliveDetails(bridgeData, { source: "reconnect_create" }),
+              })
               .eq("id", instance_id);
             await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
             try {
@@ -1792,14 +1800,25 @@ Deno.serve(async (req) => {
       const normalizedStatus = isConnectedStatus(rawStatus) ? "connected"
         : isExplicitOfflineStatus(rawStatus) || isInvalidApiKeyResponse(bridgeRes.status, bridgeData) ? "disconnected"
         : "connecting";
-      const updates: any = { status: normalizedStatus, last_health_check_at: new Date().toISOString() };
+      const bridgeInstanceId = getBridgeInstanceId(bridgeData);
+      const nowIso = new Date().toISOString();
+      const updates: any = {
+        status: normalizedStatus,
+        last_health_check_at: nowIso,
+        last_keepalive_at: nowIso,
+        last_keepalive_status: normalizedStatus,
+        last_keepalive_details: keepaliveDetails(bridgeData, { source: "manual_reconnect", raw_status: rawStatus || null }),
+      };
+      if (bridgeInstanceId) updates.bridge_instance_id = bridgeInstanceId;
       if (normalizedStatus === "connected") {
         updates.connected_since = activeInstanceRow.connected_since || new Date().toISOString();
         updates.last_disconnected_at = null;
+        updates.last_disconnect_reason = null;
       }
       if (normalizedStatus === "disconnected") {
         updates.connected_since = null;
-        updates.last_disconnected_at = new Date().toISOString();
+        updates.last_disconnected_at = nowIso;
+        updates.last_disconnect_reason = bridgeErrorMessage(bridgeData) || rawStatus || "manual_reconnect_failed";
       }
       await adminClient.from("whatsapp_instances").update(updates).eq("id", instance_id);
       await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: clientApiKey, clientId: resolvedClientId, instanceId: instance_id });
