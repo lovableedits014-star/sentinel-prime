@@ -513,10 +513,12 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
     // Sem isso, last_disconnected_at antigo segue bloqueando envios por até 90s
     // mesmo com a sessão WhatsApp comprovadamente viva.
     updates.last_disconnected_at = null;
+    updates.last_disconnect_reason = null;
   }
   if (status === "disconnected") {
     updates.connected_since = null;
-    updates.last_disconnected_at = new Date().toISOString();
+    updates.last_disconnected_at = nowIso;
+    updates.last_disconnect_reason = bridgeErrorMessage(bridgeData) || rawStatus || "health_check_disconnected";
     try {
       await adminClient.from("action_logs").insert({
         client_id: inst.client_id || null,
