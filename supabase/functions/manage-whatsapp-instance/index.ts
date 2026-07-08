@@ -692,6 +692,48 @@ async function tryReconnectInstance(adminClient: any, inst: any) {
   return { id: inst.id, reconnected: status === "connected", status, ok: bridgeRes.ok, details: sanitizeBridgeData(bridgeData) };
 }
 
+async function keepaliveInstances(params: {
+  adminClient: any;
+  rows: any[];
+  supabaseUrl: string;
+  bridgeToken: string | undefined;
+}) {
+  const { adminClient, rows, supabaseUrl, bridgeToken } = params;
+  return await Promise.allSettled((rows || []).map(async (inst: any) => {
+    const health = await syncInstanceHealth(adminClient, inst);
+    if (health.status === "connected") {
+      await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
+      await adminClient.from("action_logs").insert({
+        client_id: inst.client_id,
+        action: "whatsapp_keepalive_connected",
+        status: "ok",
+        details: { instance_id: inst.id, health },
+      });
+      return { ...health, keepalive: "connected" };
+    }
+    if (health.status === "disconnected") {
+      const recovered = await tryReconnectInstance(adminClient, { ...inst, status: health.status });
+      if (recovered.status === "connected") {
+        await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: inst.bridge_api_key, clientId: inst.client_id, instanceId: inst.id });
+      }
+      await adminClient.from("action_logs").insert({
+        client_id: inst.client_id,
+        action: "whatsapp_keepalive_reconnect",
+        status: recovered.status === "connected" ? "ok" : "warn",
+        details: { instance_id: inst.id, health, reconnect: recovered },
+      });
+      return { ...health, keepalive: "reconnect_attempted", reconnect: recovered };
+    }
+    await adminClient.from("action_logs").insert({
+      client_id: inst.client_id,
+      action: "whatsapp_keepalive_waiting",
+      status: "ok",
+      details: { instance_id: inst.id, health },
+    });
+    return { ...health, keepalive: "waiting" };
+  }));
+}
+
 async function deleteExistingInstance(params: {
   adminClient: any;
   clientId: string;
