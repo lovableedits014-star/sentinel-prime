@@ -54,7 +54,7 @@ type RetryRow = { status: string; count: number };
 
 const CONNECTED = new Set(["connected", "open"]);
 
-function timeSince(iso: string | null): string {
+function timeSince(iso: string | null | undefined): string {
   if (!iso) return "nunca";
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
   if (diff < 60) return `há ${Math.floor(diff)}s`;
