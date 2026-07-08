@@ -1374,7 +1374,12 @@ Deno.serve(async (req) => {
             await adminClient.from("whatsapp_instances").update({
               status: "connected",
               last_health_check_at: new Date().toISOString(),
+              last_keepalive_at: new Date().toISOString(),
+              last_keepalive_status: "connected",
+              last_keepalive_details: keepaliveDetails(fresh.bridgeData, { source: "create_instance_repair" }),
+              ...(getBridgeInstanceId(fresh.bridgeData) ? { bridge_instance_id: getBridgeInstanceId(fresh.bridgeData) } : {}),
               last_disconnected_at: null,
+              last_disconnect_reason: null,
               connected_since: activeInstanceRow.connected_since || new Date().toISOString(),
             }).eq("id", instance_id);
             await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
@@ -1384,6 +1389,10 @@ Deno.serve(async (req) => {
             await adminClient.from("whatsapp_instances").update({
               status: "connecting",
               last_health_check_at: new Date().toISOString(),
+              last_keepalive_at: new Date().toISOString(),
+              last_keepalive_status: "awaiting_qr",
+              last_keepalive_details: keepaliveDetails(fresh.bridgeData, { source: "create_instance_repair_qr" }),
+              ...(getBridgeInstanceId(fresh.bridgeData) ? { bridge_instance_id: getBridgeInstanceId(fresh.bridgeData) } : {}),
             }).eq("id", instance_id);
             await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey: activeInstanceRow.bridge_api_key, clientId: resolvedClientId, instanceId: instance_id });
             return jsonResponse({ success: true, qrcode: fresh.qrcode, status: fresh.status || "connecting", instance: fresh.bridgeData.instance, repaired: true });
@@ -1418,7 +1427,15 @@ Deno.serve(async (req) => {
         if (apiKey) {
           await adminClient
             .from("whatsapp_instances")
-            .update({ bridge_url: BRIDGE_URL, bridge_api_key: apiKey, status: "connecting" })
+            .update({
+              bridge_url: BRIDGE_URL,
+              bridge_api_key: apiKey,
+              bridge_instance_id: getBridgeInstanceId(bridgeData),
+              status: "connecting",
+              last_keepalive_at: new Date().toISOString(),
+              last_keepalive_status: "created",
+              last_keepalive_details: keepaliveDetails(bridgeData, { source: "create_instance" }),
+            })
             .eq("id", instance_id);
           await bindInstanceWebhook({ adminClient, supabaseUrl, bridgeToken, apiKey, clientId: resolvedClientId, instanceId: instance_id });
           try {
