@@ -490,10 +490,20 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
     }
   }
 
+  const bridgeInstanceId = getBridgeInstanceId(bridgeData);
+  const nowIso = new Date().toISOString();
   const updates: any = {
     status,
-    last_health_check_at: new Date().toISOString(),
+    last_health_check_at: nowIso,
+    last_keepalive_at: nowIso,
+    last_keepalive_status: status,
+    last_keepalive_details: keepaliveDetails(bridgeData, {
+      source: "syncInstanceHealth",
+      raw_status: rawStatus || null,
+      bridge_http_ok: bridgeRes.ok,
+    }),
   };
+  if (bridgeInstanceId) updates.bridge_instance_id = bridgeInstanceId;
   const reportedPhone = bridgeData?.phone_number || bridgeData?.phone
     || bridgeData?.instance?.phone_number || bridgeData?.instance?.phone;
   if (reportedPhone) updates.phone_number = String(reportedPhone).replace(/\D/g, "");
