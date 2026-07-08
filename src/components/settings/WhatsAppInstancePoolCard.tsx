@@ -51,7 +51,7 @@ interface Props {
   onChange: () => void;
 }
 
-function timeSince(iso: string | null): string {
+function timeSince(iso: string | null | undefined): string {
   if (!iso) return "nunca";
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
   if (diff < 60) return `há ${Math.floor(diff)}s`;
