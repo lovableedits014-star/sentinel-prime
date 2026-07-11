@@ -1321,6 +1321,14 @@ Deno.serve(async (req) => {
               }
             }
 
+            // Entrega 4: se o disparo limita o número de instâncias, descarta escolhas fora do pool.
+            if (allowedInstanceIds && instanceId && !allowedInstanceIds.has(instanceId)) {
+              console.log(`[dispatch] instância ${instanceId} fora do pool restrito (max_instances=${maxInstancesForDispatch}) — descartando`);
+              bridgeUrl = null;
+              bridgeApiKey = null;
+              instanceId = null;
+            }
+
             if (!bridgeUrl || !bridgeApiKey) {
               if (isGroup && attempt > 1) {
                 // Já tentamos com outras instâncias e esgotamos os membros do grupo
