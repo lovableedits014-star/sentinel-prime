@@ -77,6 +77,7 @@ type DispatchRow = {
   status: string;
   tag_filtro: string | null;
   error_message: string | null;
+  pause_reason?: string | null;
   created_at: string;
   completed_at: string | null;
 };
@@ -243,6 +244,11 @@ export default function Disparos() {
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("furtivo");
   const [customPol, setCustomPol] = useState({ batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120 });
+  // Entrega 4: controle de instâncias por disparo.
+  const [instanceMode, setInstanceMode] = useState<"auto" | "fixed">("auto");
+  const [maxInstances, setMaxInstances] = useState<number>(1);
+  const [ignoreStageCap, setIgnoreStageCap] = useState<boolean>(false);
+  const [resumeIgnoreCap, setResumeIgnoreCap] = useState<boolean>(false);
   const { regioes: regioesCadastradas } = useRegioesEleicao(clientId);
   const [groupSearch, setGroupSearch] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
@@ -476,6 +482,8 @@ export default function Disparos() {
           batch_pause: pol.batch_pause,
           humanization_config: {},
           cta_config: ctaConfig,
+          max_instances: instanceMode === "fixed" ? Math.max(1, Math.floor(maxInstances)) : null,
+          ignore_stage_cap: ignoreStageCap,
         },
       });
       if (error) throw error;
@@ -534,9 +542,10 @@ export default function Disparos() {
     }
   };
 
-  const handleResumeDispatch = async (dispatchId: string, titulo: string) => {
+  const handleResumeDispatch = async (dispatchId: string, titulo: string, opts?: { ignoreCap?: boolean }) => {
     try {
-      // Reativa itens que foram marcados como cancelados ao parar o disparo
+      // Reativa itens que foram marcados como cancelados ao parar o disparo.
+      // (Itens 'pendente' já são retomados automaticamente pelo motor.)
       const { data: resetItems, error: resetErr } = await supabase
         .from("whatsapp_dispatch_items" as any)
         .update({ status: "pendente", erro: null })
@@ -544,21 +553,30 @@ export default function Disparos() {
         .eq("status", "cancelado")
         .select("id");
       if (resetErr) throw resetErr;
-      const resetCount = resetItems?.length || 0;
-      if (resetCount === 0) {
+
+      // Conta o que ainda está pendente pra confirmar que há trabalho pra retomar.
+      const { count: pendingCount } = await supabase
+        .from("whatsapp_dispatch_items" as any)
+        .select("id", { count: "exact", head: true })
+        .eq("dispatch_id", dispatchId)
+        .eq("status", "pendente");
+      const total = (resetItems?.length || 0) + (pendingCount || 0);
+      if (total === 0) {
         toast.info("Nenhum envio pendente para retomar neste disparo.");
         return;
       }
 
-      // Volta o disparo para em_andamento e limpa motivo de pausa
+      // Atualiza o disparo — inclui opcionalmente o override de "ignorar cap".
+      const updatePayload: any = {
+        status: "em_andamento",
+        pause_reason: null,
+        completed_at: null,
+        updated_at: new Date().toISOString(),
+      };
+      if (opts?.ignoreCap) updatePayload.ignore_stage_cap = true;
       const { error: e2 } = await supabase
         .from("whatsapp_dispatches" as any)
-        .update({
-          status: "em_andamento",
-          pause_reason: null,
-          completed_at: null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("id", dispatchId);
       if (e2) throw e2;
 
@@ -568,7 +586,8 @@ export default function Disparos() {
       });
       if (invErr) throw invErr;
 
-      toast.success(`Retomando "${titulo}" — ${resetCount} envio(s) restantes.`);
+      toast.success(`Retomando "${titulo}" — ${total} envio(s) restante(s).`);
+      setResumeIgnoreCap(false);
       refetch();
     } catch (err: any) {
       toast.error("Erro ao retomar: " + (err.message || "tente novamente"));
@@ -842,9 +861,65 @@ export default function Disparos() {
                 {customPol.delay_max < customPol.delay_min && (
                   <span className="block text-destructive mt-1">⚠️ Delay máximo precisa ser maior ou igual ao mínimo.</span>
                 )}
-              </p>
+            </p>
             </div>
           )}
+
+          {/* Entrega 4: Configuração de instâncias por disparo */}
+          <div className="space-y-2 rounded-md border p-3 bg-muted/10">
+            <Label className="flex items-center gap-1.5 text-sm">
+              <Wifi className="w-3.5 h-3.5" /> Instâncias a usar
+            </Label>
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="instance-mode"
+                  checked={instanceMode === "auto"}
+                  onChange={() => setInstanceMode("auto")}
+                />
+                <span>Automático <span className="text-xs text-muted-foreground">(todas as conectadas)</span></span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="instance-mode"
+                  checked={instanceMode === "fixed"}
+                  onChange={() => setInstanceMode("fixed")}
+                />
+                <span>Fixo</span>
+              </label>
+              {instanceMode === "fixed" && (
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={maxInstances}
+                  onChange={(e) => setMaxInstances(Math.max(1, Number(e.target.value) || 1))}
+                  className="w-20 h-8"
+                />
+              )}
+            </div>
+            <label className="flex items-start gap-2 cursor-pointer pt-1">
+              <Checkbox
+                checked={ignoreStageCap}
+                onCheckedChange={(v) => setIgnoreStageCap(!!v)}
+                className="mt-0.5"
+              />
+              <span className="text-xs">
+                Ignorar cap de aquecimento neste disparo
+                <span className="block text-[11px] text-muted-foreground">
+                  Envia até esgotar a fila mesmo se a instância estiver em fase "novo/aquecendo". Use só com chips maduros — pode acionar bloqueio da Meta.
+                </span>
+              </span>
+            </label>
+            {ignoreStageCap && (
+              <div className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-800 dark:text-amber-300">
+                ⚠️ Cap de aquecimento ignorado — o limite diário global da instância (<code>daily_send_limit</code>) continua valendo.
+              </div>
+            )}
+          </div>
+
 
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
@@ -1538,8 +1613,8 @@ export default function Disparos() {
                         {(d.status === "enviando" || d.status === "concluido") && d.total_destinatarios > 0 && (
                           <Progress value={progress} className="h-1.5" />
                           )}
-                          {d.status === "cancelado" && (d.total_destinatarios - d.enviados - d.falhas) > 0 && (
-                            <AlertDialog>
+                          {(["cancelado","pausado_timeout","pausado_janela","pausado_sem_instancia","falhou"].includes(d.status)) && (d.total_destinatarios - d.enviados - d.falhas) > 0 && (
+                            <AlertDialog onOpenChange={(open) => { if (!open) setResumeIgnoreCap(false); }}>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-emerald-600 hover:text-emerald-600">
                                   <Send className="h-3 w-3" /> Retomar
@@ -1548,20 +1623,47 @@ export default function Disparos() {
                               <AlertDialogContent>
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Retomar disparo?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    "{d.titulo}" continuará de onde parou. {Math.max(0, d.total_destinatarios - d.enviados - d.falhas)} envio(s) restante(s) serão enviados.
+                                  <AlertDialogDescription asChild>
+                                    <div className="space-y-3">
+                                      <p>
+                                        "{d.titulo}" continuará de onde parou. {Math.max(0, d.total_destinatarios - d.enviados - d.falhas)} envio(s) restante(s) serão enviados.
+                                      </p>
+                                      {d.pause_reason && (
+                                        <p className="rounded-md bg-amber-500/10 border border-amber-500/30 px-2 py-1.5 text-xs text-amber-800 dark:text-amber-300">
+                                          <span className="font-medium">Motivo da pausa:</span> {d.pause_reason}
+                                        </p>
+                                      )}
+                                      <label className="flex items-start gap-2 text-xs cursor-pointer">
+                                        <Checkbox
+                                          checked={resumeIgnoreCap}
+                                          onCheckedChange={(v) => setResumeIgnoreCap(!!v)}
+                                          className="mt-0.5"
+                                        />
+                                        <span>
+                                          Ignorar cap de aquecimento neste disparo
+                                          <span className="block text-[10px] text-muted-foreground">
+                                            Marque para continuar enviando mesmo se a instância estiver em fase "novo/aquecendo". Use só com chips maduros — pode acionar bloqueio da Meta.
+                                          </span>
+                                        </span>
+                                      </label>
+                                    </div>
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Voltar</AlertDialogCancel>
                                   <AlertDialogAction
-                                    onClick={() => handleResumeDispatch(d.id, d.titulo)}
+                                    onClick={() => handleResumeDispatch(d.id, d.titulo, { ignoreCap: resumeIgnoreCap })}
                                   >
                                     Sim, retomar
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
+                          )}
+                          {d.status?.startsWith("pausado_") && d.pause_reason && (
+                            <div className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1">
+                              ⚠️ {d.pause_reason}
+                            </div>
                           )}
 
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">

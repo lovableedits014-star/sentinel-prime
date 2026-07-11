@@ -585,6 +585,9 @@ Deno.serve(async (req) => {
       humanizationConfig = (d.humanization_config as any) || {};
       ctaConfig = (d.cta_config as any) || {};
       existingDispatchId = d.id;
+      // Overrides opcionais do disparo (Entrega 4): quantas instâncias usar e se ignora cap de aquecimento.
+      var dispatchMaxInstances: number | null = (d.max_instances as number | null) ?? null;
+      var dispatchIgnoreStageCap: boolean = !!d.ignore_stage_cap;
       await adminClient.from("whatsapp_dispatches").update({
         status: "enviando",
         pause_reason: null,
@@ -609,6 +612,8 @@ Deno.serve(async (req) => {
       media_url = (payload.media_url as string | null) || null;
       humanizationConfig = (payload.humanization_config as any) || {};
       ctaConfig = (payload.cta_config as any) || {};
+      var dispatchMaxInstances: number | null = (payload.max_instances as number | null) ?? null;
+      var dispatchIgnoreStageCap: boolean = !!payload.ignore_stage_cap;
       var eleicao_tipo = payload.eleicao_tipo || null;
       var eleicao_escopo = payload.eleicao_escopo || null;
       var eleicao_regiao = payload.eleicao_regiao || null;
@@ -998,6 +1003,8 @@ Deno.serve(async (req) => {
           batch_pause_seconds: Math.round(BATCH_PAUSE_MS / 1000),
           humanization_config: humanizationConfig,
           cta_config: ctaConfig,
+          max_instances: dispatchMaxInstances,
+          ignore_stage_cap: dispatchIgnoreStageCap,
         })
         .select()
         .single();
@@ -1047,10 +1054,17 @@ Deno.serve(async (req) => {
       // não tenta de novo com X nesse mesmo grupo.
       const excludedByGroup: Record<string, Set<string>> = {};
 
-      // ==== Entrega 3: anti-ban helpers ====
+      // ==== Entrega 3/4: anti-ban helpers ====
       // Cap diário por stage (override por instância via stage_daily_cap).
+      // Se o disparo estiver marcado com ignore_stage_cap, o cap efetivo vira Infinity
+      // (o daily_send_limit da instância continua valendo, se configurado explicitamente).
       const STAGE_DEFAULT_CAP: Record<string, number> = { novo: 40, aquecendo: 150, maduro: 400 };
+      const ignoreStageCap = !!(typeof dispatchIgnoreStageCap !== "undefined" && dispatchIgnoreStageCap);
+      const maxInstancesForDispatch: number | null =
+        typeof dispatchMaxInstances !== "undefined" && dispatchMaxInstances && dispatchMaxInstances > 0
+          ? dispatchMaxInstances : null;
       const effectiveCap = (inst: { ramp_up_stage?: string | null; stage_daily_cap?: number | null; daily_send_limit?: number | null }) => {
+        if (ignoreStageCap) return Number.POSITIVE_INFINITY;
         if (inst.stage_daily_cap && inst.stage_daily_cap > 0) return inst.stage_daily_cap;
         const stage = (inst.ramp_up_stage as string) || "maduro";
         return STAGE_DEFAULT_CAP[stage] ?? (inst.daily_send_limit || 400);
@@ -1062,6 +1076,27 @@ Deno.serve(async (req) => {
       const CIRCUIT_BREAKER_THRESHOLD = 2;
       // Sticky: cache em memória do último chip usado por telefone (evita re-consulta).
       const stickyByPhone: Record<string, string> = {};
+
+      // Se o usuário limitou o número de instâncias no disparo, pré-selecionamos
+      // as top-N conectadas (primárias primeiro, depois menos usadas hoje) e usamos
+      // apenas essas — qualquer outra que a lógica escolher é descartada.
+      let allowedInstanceIds: Set<string> | null = null;
+      if (maxInstancesForDispatch) {
+        const { data: pool } = await adminClient
+          .from("whatsapp_instances")
+          .select("id, is_primary, messages_sent_today")
+          .eq("client_id", client_id)
+          .eq("is_active", true)
+          .eq("status", "connected")
+          .is("suspected_banned_at", null)
+          .not("bridge_api_key", "is", null)
+          .order("is_primary", { ascending: false })
+          .order("messages_sent_today", { ascending: true })
+          .limit(maxInstancesForDispatch);
+        allowedInstanceIds = new Set((pool || []).map((p: any) => p.id));
+        console.log(`[dispatch] max_instances=${maxInstancesForDispatch} — pool restrito a ${allowedInstanceIds.size} instância(s): ${Array.from(allowedInstanceIds).join(",")}`);
+      }
+
 
 
       for (let batch = 0; batch < Math.ceil(recipients.length / BATCH_SIZE); batch++) {
@@ -1284,6 +1319,14 @@ Deno.serve(async (req) => {
                 bridgeUrl = clientData.whatsapp_bridge_url!;
                 bridgeApiKey = clientData.whatsapp_bridge_api_key!;
               }
+            }
+
+            // Entrega 4: se o disparo limita o número de instâncias, descarta escolhas fora do pool.
+            if (allowedInstanceIds && instanceId && !allowedInstanceIds.has(instanceId)) {
+              console.log(`[dispatch] instância ${instanceId} fora do pool restrito (max_instances=${maxInstancesForDispatch}) — descartando`);
+              bridgeUrl = null;
+              bridgeApiKey = null;
+              instanceId = null;
             }
 
             if (!bridgeUrl || !bridgeApiKey) {
