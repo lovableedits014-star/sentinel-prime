@@ -1551,6 +1551,7 @@ export type Database = {
           presence_absence_days_threshold: number
           presence_absence_message_template: string
           public_slug: string | null
+          response_ctas: Json
           updated_at: string | null
           user_id: string
           whatsapp_bridge_api_key: string | null
@@ -1572,6 +1573,7 @@ export type Database = {
           presence_absence_days_threshold?: number
           presence_absence_message_template?: string
           public_slug?: string | null
+          response_ctas?: Json
           updated_at?: string | null
           user_id: string
           whatsapp_bridge_api_key?: string | null
@@ -1593,6 +1595,7 @@ export type Database = {
           presence_absence_days_threshold?: number
           presence_absence_message_template?: string
           public_slug?: string | null
+          response_ctas?: Json
           updated_at?: string | null
           user_id?: string
           whatsapp_bridge_api_key?: string | null
@@ -8340,6 +8343,7 @@ export type Database = {
       whatsapp_dispatch_items: {
         Row: {
           created_at: string
+          cta_used: string | null
           dispatch_id: string
           enviado_em: string | null
           erro: string | null
@@ -8347,11 +8351,15 @@ export type Database = {
           id: string
           mensagem_personalizada: string | null
           nome: string
+          replied_at: string | null
+          reply_text: string | null
           status: string
           telefone: string | null
+          variant_used: string | null
         }
         Insert: {
           created_at?: string
+          cta_used?: string | null
           dispatch_id: string
           enviado_em?: string | null
           erro?: string | null
@@ -8359,11 +8367,15 @@ export type Database = {
           id?: string
           mensagem_personalizada?: string | null
           nome: string
+          replied_at?: string | null
+          reply_text?: string | null
           status?: string
           telefone?: string | null
+          variant_used?: string | null
         }
         Update: {
           created_at?: string
+          cta_used?: string | null
           dispatch_id?: string
           enviado_em?: string | null
           erro?: string | null
@@ -8371,8 +8383,11 @@ export type Database = {
           id?: string
           mensagem_personalizada?: string | null
           nome?: string
+          replied_at?: string | null
+          reply_text?: string | null
           status?: string
           telefone?: string | null
+          variant_used?: string | null
         }
         Relationships: [
           {
@@ -8391,11 +8406,13 @@ export type Database = {
           client_id: string
           completed_at: string | null
           created_at: string
+          cta_config: Json
           delay_max_seconds: number
           delay_min_seconds: number
           enviados: number
           error_message: string | null
           falhas: number
+          humanization_config: Json
           id: string
           media_type: string | null
           media_url: string | null
@@ -8417,11 +8434,13 @@ export type Database = {
           client_id: string
           completed_at?: string | null
           created_at?: string
+          cta_config?: Json
           delay_max_seconds?: number
           delay_min_seconds?: number
           enviados?: number
           error_message?: string | null
           falhas?: number
+          humanization_config?: Json
           id?: string
           media_type?: string | null
           media_url?: string | null
@@ -8443,11 +8462,13 @@ export type Database = {
           client_id?: string
           completed_at?: string | null
           created_at?: string
+          cta_config?: Json
           delay_max_seconds?: number
           delay_min_seconds?: number
           enviados?: number
           error_message?: string | null
           falhas?: number
+          humanization_config?: Json
           id?: string
           media_type?: string | null
           media_url?: string | null

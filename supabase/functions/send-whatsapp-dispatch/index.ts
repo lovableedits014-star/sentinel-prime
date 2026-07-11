@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { renderMessage, type Recipient as VarRecipient, type RenderContext } from "../_shared/message-variation.ts";
+import { pickCta, type Cta, type CtaCategory } from "../_shared/response-ctas.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -468,7 +470,7 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const personalizedMsg = queueMsg.replace(/{nome}/g, queueRecipient.nome || "");
+        const personalizedMsg = renderMessage(queueMsg, { nome: queueRecipient.nome ?? "" }).text;
         const phoneClean = cleanPhoneForBridge(queueRecipient.telefone);
 
         // Preflight
@@ -552,6 +554,9 @@ Deno.serve(async (req) => {
     let batch_pause: number | undefined;
     let existingDispatchId: string | null = null;
     let media_url: string | null = null;
+    // Anti-ban: configuração de humanização e CTA carregada por disparo.
+    let humanizationConfig: Record<string, any> = {};
+    let ctaConfig: { auto_append?: boolean; categories?: CtaCategory[] } = {};
 
     if (isResume) {
       const { data: d } = await adminClient
@@ -577,6 +582,8 @@ Deno.serve(async (req) => {
       delay_min = d.delay_min_seconds;
       delay_max = d.delay_max_seconds;
       batch_pause = d.batch_pause_seconds;
+      humanizationConfig = (d.humanization_config as any) || {};
+      ctaConfig = (d.cta_config as any) || {};
       existingDispatchId = d.id;
       await adminClient.from("whatsapp_dispatches").update({
         status: "enviando",
@@ -600,6 +607,8 @@ Deno.serve(async (req) => {
       }
       ({ client_id, titulo, mensagem, tipo, tag_filtro, batch_size, delay_min, delay_max, batch_pause } = payload);
       media_url = (payload.media_url as string | null) || null;
+      humanizationConfig = (payload.humanization_config as any) || {};
+      ctaConfig = (payload.cta_config as any) || {};
       var eleicao_tipo = payload.eleicao_tipo || null;
       var eleicao_escopo = payload.eleicao_escopo || null;
       var eleicao_regiao = payload.eleicao_regiao || null;
@@ -621,15 +630,54 @@ Deno.serve(async (req) => {
     const DELAY_MAX_MS = (delay_max || DEFAULT_DELAY_MAX) * 1000;
     const BATCH_PAUSE_MS = (batch_pause || DEFAULT_BATCH_PAUSE) * 1000;
 
-    // Get bridge config + window settings
+    // Get bridge config + window settings + CTAs personalizados do cliente
     const { data: clientData } = await adminClient
       .from("clients")
-      .select("id, whatsapp_bridge_url, whatsapp_bridge_api_key, whatsapp_window_enabled, whatsapp_window_start, whatsapp_window_end, whatsapp_inter_instance_delay_min, whatsapp_inter_instance_delay_max")
+      .select("id, whatsapp_bridge_url, whatsapp_bridge_api_key, whatsapp_window_enabled, whatsapp_window_start, whatsapp_window_end, whatsapp_inter_instance_delay_min, whatsapp_inter_instance_delay_max, response_ctas")
       .eq("id", client_id)
       .single();
     if (!clientData) {
       return new Response(JSON.stringify({ error: "Client not found" }), { status: 404, headers: corsHeaders });
     }
+
+    // Anti-ban: helper que renderiza a mensagem para cada destinatário
+    // (spintax + placeholders + CTA + preservação de URL).
+    // Retrocompatível: template sem spintax/placeholders/CTA → saída idêntica ao antigo replace.
+    const clientCtas = ((clientData as any).response_ctas as Cta[] | null) || [];
+    const ctaCategories = (ctaConfig?.categories && Array.isArray(ctaConfig.categories))
+      ? ctaConfig.categories
+      : undefined;
+    const ctaAutoAppend = ctaConfig?.auto_append === true;
+    const recentCtaIds = new Set<string>();
+
+    function renderForRecipient(template: string, r: { nome?: string | null; telefone?: string | null }): {
+      text: string;
+      ctaUsed: string | null;
+    } {
+      // Sorteia CTA (se auto_append ou se template contém {cta_resposta})
+      const needsCta = ctaAutoAppend || template.includes("{cta_resposta}");
+      let ctaText: string | null = null;
+      if (needsCta) {
+        const picked = pickCta(clientCtas, ctaCategories, { avoidIds: recentCtaIds });
+        if (picked) {
+          ctaText = picked.text;
+          recentCtaIds.add(picked.id);
+          if (recentCtaIds.size > 5) {
+            // mantém janela pequena para não zerar o pool em disparos grandes
+            const first = recentCtaIds.values().next().value;
+            if (first) recentCtaIds.delete(first);
+          }
+        }
+      }
+      const ctx: RenderContext = {
+        cta: ctaText,
+        autoAppendCta: ctaAutoAppend,
+        assinaturas: Array.isArray(humanizationConfig?.assinaturas) ? humanizationConfig.assinaturas : undefined,
+      };
+      const out = renderMessage(template, r as VarRecipient, ctx);
+      return { text: out.text, ctaUsed: out.ctaUsed };
+    }
+
 
     // Verifica se há pelo menos uma instância no pool ou bridge legada
     const { count: poolCount } = await adminClient
@@ -931,6 +979,8 @@ Deno.serve(async (req) => {
           delay_min_seconds: Math.round(DELAY_MIN_MS / 1000),
           delay_max_seconds: Math.round(DELAY_MAX_MS / 1000),
           batch_pause_seconds: Math.round(BATCH_PAUSE_MS / 1000),
+          humanization_config: humanizationConfig,
+          cta_config: ctaConfig,
         })
         .select()
         .single();
@@ -1264,9 +1314,17 @@ Deno.serve(async (req) => {
               const baseMsg = (recipient as any).mensagem_personalizada
                 ? (recipient as any).mensagem_personalizada
                 : mensagem;
-              const personalizedMsg = isGroup
-                ? baseMsg
-                : baseMsg.replace(/{nome}/g, recipient.nome);
+              // Anti-ban: renderiza mensagem única por destinatário (spintax + CTA + placeholders).
+              // Grupos NÃO recebem transformação — a mesma mensagem vai pra todos do grupo.
+              let personalizedMsg: string;
+              let ctaUsedForItem: string | null = null;
+              if (isGroup) {
+                personalizedMsg = baseMsg;
+              } else {
+                const rendered = renderForRecipient(baseMsg, { nome: recipient.nome, telefone: recipient.telefone });
+                personalizedMsg = rendered.text;
+                ctaUsedForItem = rendered.ctaUsed;
+              }
               console.log(`[dispatch] inst=${instanceId ?? "legacy"} attempt=${attempt} preflight=${preflight.status}${preflight.reconnected ? "(reconectado)" : ""} ${isGroup ? "group" : "phone"}=${destination}`);
 
               const { res: sendRes, data: sendData } = await fetchBridgeSend({
@@ -1282,7 +1340,12 @@ Deno.serve(async (req) => {
               if (!failure) {
                 sent++;
                 await itemMatch(adminClient.from("whatsapp_dispatch_items")
-                  .update({ status: "enviado", enviado_em: new Date().toISOString() }));
+                  .update({
+                    status: "enviado",
+                    enviado_em: new Date().toISOString(),
+                    variant_used: personalizedMsg.slice(0, 2000),
+                    cta_used: ctaUsedForItem,
+                  }));
                 if (instanceId) {
                   await adminClient.rpc("log_whatsapp_send", {
                     p_instance_id: instanceId, p_client_id: client_id,

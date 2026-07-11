@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import MessageEditor, { DEFAULT_CTA_CONFIG, isTemplateReady, type CtaConfig } from "@/components/disparos/MessageEditor";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -229,6 +230,7 @@ export default function Disparos() {
   // Composer state
   const [titulo, setTitulo] = useState("");
   const [mensagem, setMensagem] = useState("");
+  const [ctaConfig, setCtaConfig] = useState<CtaConfig>(DEFAULT_CTA_CONFIG);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [tipoDisparo, setTipoDisparo] = useState("manual");
