@@ -88,6 +88,33 @@ function isInboundMessage(payload: any): boolean {
   );
 }
 
+/**
+ * Extrai o texto da mensagem recebida (para gravar como `reply_text`).
+ * Cobre os formatos comuns: Baileys, Evolution, uazapi.
+ */
+function extractMessageText(payload: any): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const candidates = [
+    payload.body,
+    payload.text,
+    payload.message,
+    payload.data?.body,
+    payload.data?.text,
+    payload.data?.message?.conversation,
+    payload.data?.message?.extendedTextMessage?.text,
+    payload.data?.message?.imageMessage?.caption,
+    payload.data?.message?.videoMessage?.caption,
+    payload.message?.conversation,
+    payload.message?.text,
+    payload.message?.body,
+    payload.message?.extendedTextMessage?.text,
+    payload.messages?.[0]?.body,
+    payload.messages?.[0]?.text,
+  ];
+  const found = candidates.find((v) => typeof v === "string" && v.trim().length > 0);
+  return found ? String(found).trim() : null;
+}
+
 const isUuid = (value: unknown) =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
@@ -348,6 +375,40 @@ Deno.serve(async (req) => {
     if (!senderPhone) {
       console.log("[whatsapp-inbound-webhook] ignored no_sender_phone. payload keys=", Object.keys(payload || {}));
       return json({ ok: true, ignored: "no_sender_phone" });
+    }
+
+    // Anti-ban: se o remetente respondeu a um disparo recente, marca o item
+    // como respondido. Alimenta a métrica de reciprocidade (Entrega 3).
+    // Janela de 48h; casamento tolerante a variações do telefone.
+    try {
+      const replyText = extractMessageText(payload);
+      const phoneDigits = String(senderPhone).replace(/\D/g, "");
+      const phoneCandidates = new Set<string>([senderPhone, phoneDigits]);
+      if (phoneDigits.startsWith("55")) phoneCandidates.add(phoneDigits.slice(2));
+      else phoneCandidates.add(`55${phoneDigits}`);
+
+      const cutoff = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+      // Junta com dispatches do mesmo client_id (garante isolamento) e pega o mais recente.
+      const { data: recent } = await admin
+        .from("whatsapp_dispatch_items")
+        .select("id, telefone, enviado_em, whatsapp_dispatches!inner(client_id)")
+        .in("telefone", Array.from(phoneCandidates))
+        .is("replied_at", null)
+        .gte("enviado_em", cutoff)
+        .eq("whatsapp_dispatches.client_id", clientId)
+        .order("enviado_em", { ascending: false })
+        .limit(1);
+
+      if (recent && recent.length > 0) {
+        await admin.from("whatsapp_dispatch_items").update({
+          replied_at: new Date().toISOString(),
+          reply_text: replyText ? replyText.slice(0, 500) : null,
+        }).eq("id", (recent[0] as any).id);
+        console.log("[whatsapp-inbound-webhook] recorded reply for dispatch_item", (recent[0] as any).id);
+      }
+    } catch (replyErr) {
+      // Nunca bloqueia a confirmação por causa da métrica de reciprocidade.
+      console.warn("[whatsapp-inbound-webhook] reply-match error:", (replyErr as Error).message);
     }
 
     const { data, error } = await admin.rpc("confirm_whatsapp_by_phone", {

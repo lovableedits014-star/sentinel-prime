@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import MessageEditor, { DEFAULT_CTA_CONFIG, isTemplateReady, type CtaConfig } from "@/components/disparos/MessageEditor";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -229,6 +230,7 @@ export default function Disparos() {
   // Composer state
   const [titulo, setTitulo] = useState("");
   const [mensagem, setMensagem] = useState("");
+  const [ctaConfig, setCtaConfig] = useState<CtaConfig>(DEFAULT_CTA_CONFIG);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [tipoDisparo, setTipoDisparo] = useState("manual");
@@ -406,6 +408,13 @@ export default function Disparos() {
       toast.error("Escreva uma mensagem ou anexe uma imagem");
       return;
     }
+    if (hasText) {
+      const check = isTemplateReady(mensagem);
+      if (!check.ok) {
+        toast.error(`Corrija a spintax: ${check.error}`);
+        return;
+      }
+    }
     if (recipientCount === 0) {
       toast.error("Nenhum destinatário encontrado com o filtro selecionado");
       return;
@@ -461,6 +470,8 @@ export default function Disparos() {
           delay_min: pol.delay_min,
           delay_max: pol.delay_max,
           batch_pause: pol.batch_pause,
+          humanization_config: {},
+          cta_config: ctaConfig,
         },
       });
       if (error) throw error;
@@ -472,6 +483,7 @@ export default function Disparos() {
       }
       setTitulo("");
       setMensagem("");
+      setCtaConfig(DEFAULT_CTA_CONFIG);
       setMediaUrl(null);
       setTagFiltro("_all");
       setSelectedGroupJids([]);
@@ -1263,16 +1275,14 @@ export default function Disparos() {
 
           <div className="space-y-2">
             <Label>Mensagem</Label>
-            <Textarea
+            <MessageEditor
               value={mensagem}
-              onChange={(e) => setMensagem(e.target.value)}
-              placeholder="Olá {nome}! Temos uma missão importante..."
-              rows={4}
+              onChange={setMensagem}
               disabled={sending}
+              clientCtas={(client as any)?.response_ctas || []}
+              ctaConfig={ctaConfig}
+              onCtaConfigChange={setCtaConfig}
             />
-            <p className="text-xs text-muted-foreground">
-              Use <code className="bg-muted px-1 rounded">{"{nome}"}</code> para personalizar com o nome do destinatário.
-            </p>
           </div>
 
           <div className="space-y-2">
