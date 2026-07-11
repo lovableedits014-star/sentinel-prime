@@ -1362,6 +1362,7 @@ Deno.serve(async (req) => {
                     enviado_em: new Date().toISOString(),
                     variant_used: personalizedMsg.slice(0, 2000),
                     cta_used: ctaUsedForItem,
+                    instance_id: instanceId,
                   }));
                 if (instanceId) {
                   await adminClient.rpc("log_whatsapp_send", {
