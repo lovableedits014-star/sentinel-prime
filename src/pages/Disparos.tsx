@@ -491,6 +491,7 @@ export default function Disparos() {
       setMediaUrl(null);
       setTagFiltro("_all");
       setSelectedGroupJids([]);
+      setAdhocContacts([]);
       refetch();
     } catch (err: any) {
       toast.error("Erro: " + (err.message || "tente novamente"));
