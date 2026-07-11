@@ -1,89 +1,98 @@
-## Objetivo
-Voltar a tratar a instância como uma sessão persistente: não recriar/destruir a conexão à toa, corrigir o webhook que hoje não encontra a instância certa, e adicionar uma rotina agressiva de manutenção para manter o WhatsApp vivo.
+## Escopo travado (nada além disto)
 
-Importante: nenhum sistema consegue garantir 100% se o próprio WhatsApp derrubar/logoutar e exigir QR novamente. O plano abaixo torna o app autocorretivo sempre que a sessão ainda puder ser recuperada pela ponte.
+**3 entregas sequenciais**, cada uma auto-suficiente. Sem homóglifos, sem VPN por envio, sem auto-resposta. Proxy/IP por chip fica como "Entrega 4 opcional futura" (só quando você contratar proxies e a bridge suportar).
 
-## O problema encontrado
-Nos logs, a ponte enviou:
+---
 
-```text
-instance_id: 4cf4e412-8230-4e62-b590-1f0780c7a34a
-client_id: 6879803f-fd2e-4a43-8d0d-4417e1b1fe15
-reason: vps_reported_disconnected
-```
+## Entrega 1 — Motor de variação + CTA de resposta + captura de respostas
 
-Mas no banco a instância do cliente é:
+Núcleo do ganho anti-ban. Retrocompatível: templates atuais continuam funcionando idênticos.
 
-```text
-id: 9824d79a-b6c5-4410-a29a-b8ccbaf21a85
-apelido: Mayer
-status: connecting
-phone: 556792773931
-```
+### 1.1. Migração SQL (única da entrega)
+- `whatsapp_dispatches`: `humanization_config jsonb default '{}'`, `cta_config jsonb default '{}'`.
+- `whatsapp_dispatch_items`: `variant_used text`, `cta_used text`, `replied_at timestamptz`, `reply_text text`.
+- `clients`: `response_ctas jsonb default '[]'` (biblioteca personalizada do cliente).
 
-Ou seja: o webhook está recebendo o ID interno da ponte, não o ID da linha no banco. Ele registra `instance/client mismatch`, não consegue amarrar o evento na instância correta, e o app passa a ficar com estado inconsistente.
+Tudo nullable/default seguro. Nenhum registro existente quebra.
 
-## Plano de correção
+### 1.2. Motor puro backend — `supabase/functions/_shared/message-variation.ts`
+- `protectUrls` / `restoreUrls` (tokens `⟦URL0⟧`, links intocados).
+- `expandSpintax` (`{a|b|c}` e blocos `[[A|B]]` recursivos).
+- `applyPlaceholders` (`{nome}`, `{primeiro_nome}`, `{saudacao}`, `{dia_semana}`, `{assinatura}`, `{emoji_positivo}`, `{cta_resposta}`).
+- `renderMessage(template, recipient, ctx)` orquestra e valida que URLs originais aparecem no output.
+- `message-variation.test.ts`: preservação de URL, spintax aninhada, placeholder ausente, colisão.
 
-### 1. Persistir o ID real da ponte
-- Adicionar/usar um campo para guardar o `bridge_instance_id` retornado pela ponte quando cria/reconecta a sessão.
-- Em `create_instance`, `reconnect`, `instance_status` e `syncInstanceHealth`, salvar esse ID sempre que a ponte devolver `instance_id`, `instance.id`, `id` ou equivalente.
-- Para a instância atual “Mayer”, fazer uma migração/ajuste seguro preenchendo esse vínculo quando possível pelo status atual da ponte ou pelo nome/telefone.
+### 1.3. Biblioteca de CTAs — `supabase/functions/_shared/response-ctas.ts`
+- ~30 CTAs default em 6 categorias (pergunta leve, confirmação, escolha binária, opinião, ajuda mútua, micro-compromisso).
+- `pickCta(clientCtas, categories, seed)` — merge defaults + custom, evita repetir consecutivamente.
+- `hasQuestionAtEnd(text)` — não anexa CTA se template já termina em pergunta.
 
-### 2. Corrigir o webhook de status
-- No `whatsapp-inbound-webhook`, localizar a instância por esta ordem:
-  1. `whatsapp_instances.id` igual ao ID recebido;
-  2. `bridge_instance_id` igual ao ID recebido;
-  3. fallback por `client_id + instance_name/apelido`, quando houver apenas uma instância compatível.
-- Só depois disso atualizar `connected`, `connecting` ou `disconnected`.
-- Logar claramente quando o evento foi associado por fallback, para auditar se a ponte mudou o formato.
+### 1.4. Patch em `send-whatsapp-dispatch/index.ts`
+Trocar os 2 `replace(/{nome}/g, ...)` por `renderMessage(...)`. Todo o resto (ramp-up, janela, delays, retry, cota) fica igual.
 
-### 3. Reativar “manter conectado” de forma agressiva
-- Alterar `health_check_all` para ter modo agressivo por padrão:
-  - verificar instâncias ativas com credencial a cada ciclo;
-  - se a ponte responder `connected/open`, manter como conectado;
-  - se responder `connecting`, não derrubar imediatamente;
-  - se responder `disconnected/offline` duas vezes seguidas, tentar `reconnect` com a mesma API key;
-  - se voltar `connected`, limpar `last_disconnected_at` e manter a linha operacional;
-  - se voltar QR, marcar como `awaiting_qr/connecting` e exibir no painel.
-- Não usar `delete_instance` automaticamente. Recriação/destruição só por botão explícito, porque isso troca a sessão e costuma quebrar mais.
+### 1.5. Patch em `whatsapp-inbound-webhook/index.ts`
+Após identificar `client_id + phone`, buscar último `whatsapp_dispatch_items` desse phone com `sent_at > now() - 48h` e `replied_at is null`; se achar, grava `replied_at` e `reply_text` (500 chars). Nada mais.
 
-### 4. Criar rotina automática de keepalive
-- Usar o endpoint já existente `health_check_all` com token seguro.
-- Configurar uma chamada periódica curta para todas as instâncias ativas do cliente:
-  - intervalo alvo: 2 a 5 minutos;
-  - sem enviar mensagem para ninguém;
-  - apenas checar sessão, reamarrar webhook e tentar recuperar conexão se a ponte permitir.
-- Registrar resultado em `action_logs` para saber exatamente quando caiu, quando reconectou e por quê.
+### 1.6. Motor isomórfico frontend — `src/lib/message-variation.ts`
+Espelho 1:1 do backend (sem I/O), para preview instantâneo.
 
-### 5. Reamarrar webhook automaticamente
-- Sempre que `instance_status`, `reconnect`, `create_instance` ou `health_check_all` confirmar uma instância, chamar `set_webhook` novamente apontando para:
+### 1.7. Editor — `src/components/disparos/MessageEditor.tsx`
+- Textarea + toolbar (spintax, placeholders, `{cta_resposta}`).
+- Aba lateral CTAs: lista com toggle por categoria, botão "Gerar 10 CTAs com IA" (reusa `ic-generate-text`), toggle "Adicionar CTA automático".
+- Preview: 5 amostras renderizadas com nomes reais + contador de unicidade.
+- Validação bloqueia envio se spintax malformada.
 
-```text
-whatsapp-inbound-webhook?client_id=<client_id>&instance_id=<db_instance_id>&token=<token>
-```
+### 1.8. Ordem de execução Entrega 1
+1. Migração SQL → aguarda aprovação.
+2. Motor puro backend + testes + biblioteca CTAs.
+3. Motor isomórfico frontend.
+4. `MessageEditor` + integração em `Disparos.tsx`.
+5. Patch nas 2 edge functions.
+6. Validação manual (1 disparo de teste com 3 contatos).
 
-- Mesmo se a ponte enviar o ID interno dela, o banco já terá o `bridge_instance_id` para associar.
+---
 
-### 6. Melhorar o painel para operação real
-- Na tela Status WhatsApp, mostrar:
-  - “Mantendo conectado” quando a rotina automática está ativa;
-  - último keepalive;
-  - última tentativa de recuperação;
-  - motivo real da queda (`vps_reported_disconnected`, logout, offline etc.);
-  - botão “Forçar manter conectado agora” para rodar o keepalive imediatamente.
+## Entrega 2 — Import/export de contatos
 
-### 7. Validar na sua instância atual
-- Depois da implementação, rodar uma checagem manual da instância Mayer.
-- Confirmar que o webhook não mostra mais `instance/client mismatch`.
-- Confirmar que a instância sai de `connecting/disconnected` para `connected` quando a ponte estiver viva.
-- Sincronizar grupos novamente usando a mesma instância, sem exigir criar outro número.
+- `src/components/disparos/ImportContactsDialog.tsx`: CSV/XLSX, detecta encoding/separador, normaliza telefone, preview, destino (lista ad-hoc OU grava em `pessoas` com tag).
+- Botão "Exportar contatos" no disparo → CSV com `nome, telefone, variante_enviada, status, replied_at`.
+- Sem migração SQL (reusa tabelas existentes).
 
-## Arquivos/áreas que serão alterados
-- `supabase/functions/manage-whatsapp-instance/index.ts`
-- `supabase/functions/whatsapp-inbound-webhook/index.ts`
-- painel de Status WhatsApp / cards de instância
-- banco: campo de vínculo com ID interno da ponte e, se necessário, configuração do keepalive
+---
 
-## Resultado esperado
-A sessão deixa de depender de estado manual quebradiço: o app reconhece corretamente a instância da ponte, reamarra webhook, checa periodicamente e tenta recuperar automaticamente sem recriar a instância. Se o WhatsApp exigir QR de novo, o painel mostra isso imediatamente em vez de deixar a linha perdida em `connecting`.
+## Entrega 3 — Painel de saúde + rotação + cotas + sticky
+
+### 3.1. Migração SQL
+- `whatsapp_instances`: `reciprocity_rate numeric default 0`, `stage_daily_cap int`.
+
+### 3.2. Backend `send-whatsapp-dispatch`
+- Cap por stage antes de enviar (novo=40, aquecendo=150, maduro=400; override por disparo).
+- Micro-pausa: 5% chance de 30–120s.
+- **Sticky por destinatário**: consulta último `whatsapp_dispatch_items` do phone; se chip anterior saudável + com cota → reusa; senão, round-robin ponderado por saúde/reciprocidade.
+
+### 3.3. Painel em `StatusWhatsApp.tsx`
+Por chip: reciprocidade 7d, % unicidade 24h, cota consumida/cap, alertas de queda súbita. Ranking de CTAs (uso × resposta).
+
+### 3.4. Circuit breaker
+2 falhas de bridge consecutivas → `is_active=false` + log. Retomada manual.
+
+---
+
+## Riscos previstos e mitigação
+- URL quebrada → `protectUrls` + assert no fim de `renderMessage` + teste dedicado.
+- Spintax malformada → validador no editor + fallback literal no backend.
+- Colisão do spintax (poucas combinações) → aviso no preview.
+- IA gerando CTA com link → validador rejeita variantes que introduzem URL nova.
+- Resposta atrasada → janela 48h configurável.
+- Cota bloqueando urgente → override `humanization_config.ignore_cap: true`.
+- Drift JS/Deno → motor puro sem deps de runtime; mesmos testes rodam nos dois lados.
+
+## Redundâncias eliminadas
+- Ramp-up, janela, `randomDelay`, `ic-generate-text`, roteamento do webhook, `whatsapp_dispatch_items` — tudo já existe e é reusado, não recriado.
+- Spintax e CTA compartilham o mesmo `renderMessage`, não dois pipelines.
+- Frontend e backend compartilham fixtures de teste para não divergir.
+
+---
+
+## Confirmação
+Começo por **Entrega 1**, iniciando pela migração SQL. Nada além do combinado até você aprovar a próxima entrega.
