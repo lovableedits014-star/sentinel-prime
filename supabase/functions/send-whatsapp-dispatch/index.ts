@@ -1487,6 +1487,26 @@ Deno.serve(async (req) => {
                 });
               }
 
+              // ==== Circuit breaker: falhas de rede/ponte consecutivas ====
+              // Se a ponte respondeu erro HTTP >= 500 ou o fetch falhou (sendRes.status === 0),
+              // contamos como falha de infra. 2 seguidas → desativa o chip pra intervenção manual.
+              const isBridgeInfraError = !disconnectErr && (sendRes.status === 0 || sendRes.status >= 500);
+              if (instanceId && isBridgeInfraError) {
+                bridgeFailStreak[instanceId] = (bridgeFailStreak[instanceId] || 0) + 1;
+                if (bridgeFailStreak[instanceId] >= CIRCUIT_BREAKER_THRESHOLD) {
+                  console.log(`[circuit-breaker] instance=${instanceId} desativada após ${bridgeFailStreak[instanceId]} falhas de ponte`);
+                  await adminClient.from("whatsapp_instances")
+                    .update({
+                      is_active: false,
+                      auto_suspected_reason: `Circuit breaker: ${bridgeFailStreak[instanceId]} falhas de ponte consecutivas. Reative manualmente após revisar.`,
+                    })
+                    .eq("id", instanceId);
+                  bridgeFailStreak[instanceId] = 0;
+                }
+              } else if (instanceId) {
+                bridgeFailStreak[instanceId] = 0;
+              }
+
               if (isGroup && instanceId) {
                 // Failover dentro do mesmo grupo: exclui essa instância e tenta a próxima
                 (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
