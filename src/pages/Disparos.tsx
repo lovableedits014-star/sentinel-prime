@@ -481,6 +481,8 @@ export default function Disparos() {
           batch_pause: pol.batch_pause,
           humanization_config: {},
           cta_config: ctaConfig,
+          max_instances: instanceMode === "fixed" ? Math.max(1, Math.floor(maxInstances)) : null,
+          ignore_stage_cap: ignoreStageCap,
         },
       });
       if (error) throw error;
