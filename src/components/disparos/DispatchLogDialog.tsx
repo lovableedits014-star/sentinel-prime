@@ -201,7 +201,12 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
                   <div key={item.id} className="flex items-center gap-2 rounded border px-3 py-1.5 text-sm">
                     <Icon className={`h-3.5 w-3.5 shrink-0 ${cfg.className}`} />
                     <span className="flex-1 truncate">{item.nome}</span>
-                    <span className="text-xs text-muted-foreground font-mono">{item.telefone}</span>
+                    <span className="text-xs text-muted-foreground font-mono">{fmtPhoneBR(item.telefone)}</span>
+                    {item.replied_at && (
+                      <span className="text-[10px] px-1 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" title={item.reply_text || ""}>
+                        respondeu
+                      </span>
+                    )}
                     {item.enviado_em && (
                       <span className="text-xs text-muted-foreground">
                         {new Date(item.enviado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
