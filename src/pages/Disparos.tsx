@@ -234,6 +234,7 @@ export default function Disparos() {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [tipoDisparo, setTipoDisparo] = useState("manual");
+  const [adhocContacts, setAdhocContacts] = useState<{ nome: string; telefone: string }[]>([]);
   const [tagFiltro, setTagFiltro] = useState("_all");
   const [eleicaoTipo, setEleicaoTipo] = useState<"all" | "coordenador" | "lider" | "cabo">("all");
   const [eleicaoEscopo, setEleicaoEscopo] = useState<"all" | "campo_grande" | "interior">("all");
