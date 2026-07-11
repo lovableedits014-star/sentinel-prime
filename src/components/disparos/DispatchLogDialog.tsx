@@ -163,18 +163,30 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
           <Badge variant="outline" className="gap-1">✅ {sent} enviados</Badge>
           <Badge variant="outline" className="gap-1">❌ {failed} falhas</Badge>
           <Badge variant="outline" className="gap-1">⏳ {pending} pendentes</Badge>
-          {failed > 0 && pending === 0 && (
+          <div className="ml-auto flex gap-1">
             <Button
               size="sm"
-              variant="default"
-              className="h-7 ml-auto gap-1"
-              onClick={handleRetryFailed}
-              disabled={retrying}
+              variant="outline"
+              className="h-7 gap-1"
+              onClick={handleExportCsv}
+              disabled={exporting || items.length === 0}
             >
-              {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-              Reenviar falhas ({failed})
+              {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+              Exportar CSV
             </Button>
-          )}
+            {failed > 0 && pending === 0 && (
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 gap-1"
+                onClick={handleRetryFailed}
+                disabled={retrying}
+              >
+                {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                Reenviar falhas ({failed})
+              </Button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
