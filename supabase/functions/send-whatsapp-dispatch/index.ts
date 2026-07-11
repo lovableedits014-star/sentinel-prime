@@ -585,6 +585,9 @@ Deno.serve(async (req) => {
       humanizationConfig = (d.humanization_config as any) || {};
       ctaConfig = (d.cta_config as any) || {};
       existingDispatchId = d.id;
+      // Overrides opcionais do disparo (Entrega 4): quantas instâncias usar e se ignora cap de aquecimento.
+      var dispatchMaxInstances: number | null = (d.max_instances as number | null) ?? null;
+      var dispatchIgnoreStageCap: boolean = !!d.ignore_stage_cap;
       await adminClient.from("whatsapp_dispatches").update({
         status: "enviando",
         pause_reason: null,
