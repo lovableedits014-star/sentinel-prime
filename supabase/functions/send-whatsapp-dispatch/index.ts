@@ -1139,7 +1139,7 @@ Deno.serve(async (req) => {
             enviados: sent,
             falhas: failed,
             status: "pausado_timeout",
-            pause_reason: `Pausado por tempo limite (${sent}/${totalKnown} enviados). Retomando automaticamente em 30s…`,
+            pause_reason: `Ciclo automático concluído (${sent}/${totalKnown} enviados). Continuando em ~30s…`,
             paused_until: new Date(Date.now() + 30_000).toISOString(),
             updated_at: new Date().toISOString(),
           }).eq("id", dispatch.id);
@@ -1169,7 +1169,7 @@ Deno.serve(async (req) => {
               enviados: sent,
               falhas: failed,
               status: "pausado_timeout",
-              pause_reason: `Pausado por tempo limite (${sent}/${totalKnown2} enviados). Retomando automaticamente em 30s…`,
+              pause_reason: `Ciclo automático concluído (${sent}/${totalKnown2} enviados). Continuando em ~30s…`,
               paused_until: new Date(Date.now() + 30_000).toISOString(),
               updated_at: new Date().toISOString(),
             }).eq("id", dispatch.id);

@@ -84,11 +84,21 @@ type DispatchRow = {
 
 type TagOption = { nome: string; count: number };
 
+function getPauseDisplay(status: string, reason?: string | null) {
+  if (!reason) return null;
+  if (status === "pausado_timeout") {
+    return reason
+      .replace("Pausado por tempo limite", "Ciclo automático concluído")
+      .replace("Retomando automaticamente em", "Continuando em");
+  }
+  return reason;
+}
+
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   pendente: { label: "Aguardando", color: "bg-muted text-muted-foreground", icon: Clock },
   enfileirado: { label: "Na fila", color: "bg-sky-500/15 text-sky-700 dark:text-sky-400", icon: Clock },
   enviando: { label: "Enviando...", color: "bg-primary/10 text-primary", icon: Loader2 },
-  pausado_timeout: { label: "Retomando…", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Loader2 },
+  pausado_timeout: { label: "Continuando…", color: "bg-primary/10 text-primary", icon: Loader2 },
   pausado_janela: { label: "Aguardando janela", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Clock },
   pausado_sem_instancia: { label: "Sem instância", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: WifiOff },
   concluido: { label: "Concluído", color: "bg-emerald-500/15 text-emerald-600", icon: CheckCircle },
