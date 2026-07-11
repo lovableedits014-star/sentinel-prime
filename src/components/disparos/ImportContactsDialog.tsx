@@ -19,7 +19,7 @@ export type AdHocContact = { nome: string; telefone: string };
 type Row = { nome: string; telefone_raw: string; telefone: string; valid: boolean; duplicate: boolean };
 
 type Props = {
-  clientId: string | null;
+  clientId: string | null | undefined;
   onUseAsList?: (contacts: AdHocContact[]) => void;
   trigger?: React.ReactNode;
 };
