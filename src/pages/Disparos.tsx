@@ -782,6 +782,33 @@ export default function Disparos() {
             )}
           </div>
 
+          {tipoDisparo === "lista_adhoc" && (
+            <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  <div className="font-medium">Lista importada</div>
+                  <div className="text-xs text-muted-foreground">
+                    {adhocContacts.length > 0
+                      ? `${adhocContacts.length} contatos carregados para este disparo.`
+                      : "Nenhum contato carregado. Importe um arquivo CSV ou XLSX."}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <ImportContactsDialog
+                    clientId={clientId}
+                    onUseAsList={(list) => setAdhocContacts(list)}
+                  />
+                  {adhocContacts.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={() => setAdhocContacts([])}>
+                      <X className="h-4 w-4 mr-1" /> Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+
 
           {politica === "personalizado" && (
             <div className="border rounded-md p-3 bg-muted/20 space-y-3">
