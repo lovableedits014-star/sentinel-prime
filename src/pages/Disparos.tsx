@@ -243,6 +243,11 @@ export default function Disparos() {
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("furtivo");
   const [customPol, setCustomPol] = useState({ batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120 });
+  // Entrega 4: controle de instâncias por disparo.
+  const [instanceMode, setInstanceMode] = useState<"auto" | "fixed">("auto");
+  const [maxInstances, setMaxInstances] = useState<number>(1);
+  const [ignoreStageCap, setIgnoreStageCap] = useState<boolean>(false);
+  const [resumeIgnoreCap, setResumeIgnoreCap] = useState<boolean>(false);
   const { regioes: regioesCadastradas } = useRegioesEleicao(clientId);
   const [groupSearch, setGroupSearch] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
