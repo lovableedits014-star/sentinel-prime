@@ -10084,6 +10084,7 @@ export type Database = {
           nome: string
         }[]
       }
+      watchdog_resume_stuck_dispatches: { Args: never; Returns: number }
       whatsapp_effective_daily_limit: {
         Args: { p_daily_limit: number; p_stage: string }
         Returns: number
