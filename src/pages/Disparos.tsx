@@ -861,9 +861,65 @@ export default function Disparos() {
                 {customPol.delay_max < customPol.delay_min && (
                   <span className="block text-destructive mt-1">⚠️ Delay máximo precisa ser maior ou igual ao mínimo.</span>
                 )}
-              </p>
+            </p>
             </div>
           )}
+
+          {/* Entrega 4: Configuração de instâncias por disparo */}
+          <div className="space-y-2 rounded-md border p-3 bg-muted/10">
+            <Label className="flex items-center gap-1.5 text-sm">
+              <Wifi className="w-3.5 h-3.5" /> Instâncias a usar
+            </Label>
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="instance-mode"
+                  checked={instanceMode === "auto"}
+                  onChange={() => setInstanceMode("auto")}
+                />
+                <span>Automático <span className="text-xs text-muted-foreground">(todas as conectadas)</span></span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="instance-mode"
+                  checked={instanceMode === "fixed"}
+                  onChange={() => setInstanceMode("fixed")}
+                />
+                <span>Fixo</span>
+              </label>
+              {instanceMode === "fixed" && (
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={maxInstances}
+                  onChange={(e) => setMaxInstances(Math.max(1, Number(e.target.value) || 1))}
+                  className="w-20 h-8"
+                />
+              )}
+            </div>
+            <label className="flex items-start gap-2 cursor-pointer pt-1">
+              <Checkbox
+                checked={ignoreStageCap}
+                onCheckedChange={(v) => setIgnoreStageCap(!!v)}
+                className="mt-0.5"
+              />
+              <span className="text-xs">
+                Ignorar cap de aquecimento neste disparo
+                <span className="block text-[11px] text-muted-foreground">
+                  Envia até esgotar a fila mesmo se a instância estiver em fase "novo/aquecendo". Use só com chips maduros — pode acionar bloqueio da Meta.
+                </span>
+              </span>
+            </label>
+            {ignoreStageCap && (
+              <div className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-800 dark:text-amber-300">
+                ⚠️ Cap de aquecimento ignorado — o limite diário global da instância (<code>daily_send_limit</code>) continua valendo.
+              </div>
+            )}
+          </div>
+
 
           {/* Seletor de grupos */}
           {tipoDisparo === "grupos" && (
