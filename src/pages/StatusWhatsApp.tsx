@@ -45,6 +45,16 @@ type Instance = {
   last_auto_reconnect_at?: string | null;
   last_webhook_rebound_at?: string | null;
   last_disconnect_reason?: string | null;
+  stage_daily_cap?: number | null;
+};
+
+type InstanceHealth = {
+  instance_id: string;
+  reciprocity_pct_7d: number;
+  unicity_pct_24h: number;
+  sent_7d: number;
+  sent_24h: number;
+  top_cta_7d: string | null;
 };
 
 type RegiaoLinkRow = { value: string; label: string; link: string; jaEhMembro: boolean };
