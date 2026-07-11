@@ -151,7 +151,7 @@ export default function ImportContactsDialog({ clientId, onUseAsList, trigger }:
             nome: c.nome || "Contato importado",
             telefone: c.telefone,
             tipo_pessoa: "apoiador",
-          })))
+          })) as any)
           .select("id, telefone");
         if (insErr) throw insErr;
         (inserted || []).forEach((p: any) => {
