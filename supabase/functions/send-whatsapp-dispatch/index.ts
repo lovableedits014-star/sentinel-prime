@@ -1109,11 +1109,12 @@ Deno.serve(async (req) => {
         }
         if (Date.now() - startTime > MAX_RUNTIME_MS) {
           if (await guardResumeLimit(adminClient, dispatch.id, sent, failed)) return;
+          const totalKnown = recipients.length + sent + failed;
           await adminClient.from("whatsapp_dispatches").update({
             enviados: sent,
             falhas: failed,
             status: "pausado_timeout",
-            pause_reason: `Pausado por tempo limite. Retomando em 30s…`,
+            pause_reason: `Pausado por tempo limite (${sent}/${totalKnown} enviados). Retomando automaticamente em 30s…`,
             paused_until: new Date(Date.now() + 30_000).toISOString(),
             updated_at: new Date().toISOString(),
           }).eq("id", dispatch.id);
@@ -1138,11 +1139,12 @@ Deno.serve(async (req) => {
           }
           if (Date.now() - startTime > MAX_RUNTIME_MS) {
             if (await guardResumeLimit(adminClient, dispatch.id, sent, failed)) return;
+            const totalKnown2 = recipients.length + sent + failed;
             await adminClient.from("whatsapp_dispatches").update({
               enviados: sent,
               falhas: failed,
               status: "pausado_timeout",
-              pause_reason: "Pausado por tempo limite. Retomando em 30s…",
+              pause_reason: `Pausado por tempo limite (${sent}/${totalKnown2} enviados). Retomando automaticamente em 30s…`,
               paused_until: new Date(Date.now() + 30_000).toISOString(),
               updated_at: new Date().toISOString(),
             }).eq("id", dispatch.id);
