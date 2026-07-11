@@ -714,6 +714,7 @@ export default function Disparos() {
                   <SelectItem value="funcionarios">👷 Funcionários</SelectItem>
                   <SelectItem value="eleicao">🗳️ Eleição (Coord/Líder/Cabo)</SelectItem>
                   <SelectItem value="grupos">👥 Grupos de WhatsApp</SelectItem>
+                  <SelectItem value="lista_adhoc">📥 Lista importada (CSV/XLSX)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
