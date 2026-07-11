@@ -8417,6 +8417,8 @@ export type Database = {
           falhas: number
           humanization_config: Json
           id: string
+          ignore_stage_cap: boolean
+          max_instances: number | null
           media_type: string | null
           media_url: string | null
           mensagem_template: string
@@ -8445,6 +8447,8 @@ export type Database = {
           falhas?: number
           humanization_config?: Json
           id?: string
+          ignore_stage_cap?: boolean
+          max_instances?: number | null
           media_type?: string | null
           media_url?: string | null
           mensagem_template: string
@@ -8473,6 +8477,8 @@ export type Database = {
           falhas?: number
           humanization_config?: Json
           id?: string
+          ignore_stage_cap?: boolean
+          max_instances?: number | null
           media_type?: string | null
           media_url?: string | null
           mensagem_template?: string
