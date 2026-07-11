@@ -886,6 +886,23 @@ Deno.serve(async (req) => {
             mensagem_personalizada: render(mensagem || "", r),
           }));
       }
+    } else if (tipo === "lista_adhoc") {
+      // ====== Lista ad-hoc: contatos vindos do payload (importação CSV/XLSX) ======
+      const rawList: any[] = Array.isArray(payload.recipients_list) ? payload.recipients_list : [];
+      const seen = new Set<string>();
+      recipients = [];
+      for (const r of rawList) {
+        const digits = String(r?.telefone ?? "").replace(/\D/g, "");
+        // Aceita 12 ou 13 dígitos com DDI 55; caso venha só DDD+num, prefixa 55.
+        let tel = digits;
+        if (tel.length === 10 || tel.length === 11) tel = `55${tel}`;
+        if (!(tel.length === 12 || tel.length === 13) || !tel.startsWith("55")) continue;
+        if (seen.has(tel)) continue;
+        seen.add(tel);
+        const nome = String(r?.nome ?? "").trim().slice(0, 120) || "Contato";
+        recipients.push({ telefone: tel, nome });
+        if (recipients.length >= 5000) break; // guarda-corpo
+      }
     } else {
       if (tag_filtro) {
         const { data: tagData } = await adminClient
