@@ -1054,10 +1054,17 @@ Deno.serve(async (req) => {
       // não tenta de novo com X nesse mesmo grupo.
       const excludedByGroup: Record<string, Set<string>> = {};
 
-      // ==== Entrega 3: anti-ban helpers ====
+      // ==== Entrega 3/4: anti-ban helpers ====
       // Cap diário por stage (override por instância via stage_daily_cap).
+      // Se o disparo estiver marcado com ignore_stage_cap, o cap efetivo vira Infinity
+      // (o daily_send_limit da instância continua valendo, se configurado explicitamente).
       const STAGE_DEFAULT_CAP: Record<string, number> = { novo: 40, aquecendo: 150, maduro: 400 };
+      const ignoreStageCap = !!(typeof dispatchIgnoreStageCap !== "undefined" && dispatchIgnoreStageCap);
+      const maxInstancesForDispatch: number | null =
+        typeof dispatchMaxInstances !== "undefined" && dispatchMaxInstances && dispatchMaxInstances > 0
+          ? dispatchMaxInstances : null;
       const effectiveCap = (inst: { ramp_up_stage?: string | null; stage_daily_cap?: number | null; daily_send_limit?: number | null }) => {
+        if (ignoreStageCap) return Number.POSITIVE_INFINITY;
         if (inst.stage_daily_cap && inst.stage_daily_cap > 0) return inst.stage_daily_cap;
         const stage = (inst.ramp_up_stage as string) || "maduro";
         return STAGE_DEFAULT_CAP[stage] ?? (inst.daily_send_limit || 400);
@@ -1069,6 +1076,27 @@ Deno.serve(async (req) => {
       const CIRCUIT_BREAKER_THRESHOLD = 2;
       // Sticky: cache em memória do último chip usado por telefone (evita re-consulta).
       const stickyByPhone: Record<string, string> = {};
+
+      // Se o usuário limitou o número de instâncias no disparo, pré-selecionamos
+      // as top-N conectadas (primárias primeiro, depois menos usadas hoje) e usamos
+      // apenas essas — qualquer outra que a lógica escolher é descartada.
+      let allowedInstanceIds: Set<string> | null = null;
+      if (maxInstancesForDispatch) {
+        const { data: pool } = await adminClient
+          .from("whatsapp_instances")
+          .select("id, is_primary, messages_sent_today")
+          .eq("client_id", client_id)
+          .eq("is_active", true)
+          .eq("status", "connected")
+          .is("suspected_banned_at", null)
+          .not("bridge_api_key", "is", null)
+          .order("is_primary", { ascending: false })
+          .order("messages_sent_today", { ascending: true })
+          .limit(maxInstancesForDispatch);
+        allowedInstanceIds = new Set((pool || []).map((p: any) => p.id));
+        console.log(`[dispatch] max_instances=${maxInstancesForDispatch} — pool restrito a ${allowedInstanceIds.size} instância(s): ${Array.from(allowedInstanceIds).join(",")}`);
+      }
+
 
 
       for (let batch = 0; batch < Math.ceil(recipients.length / BATCH_SIZE); batch++) {
