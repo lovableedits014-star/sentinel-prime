@@ -124,6 +124,16 @@ export default function StatusWhatsApp() {
     const counts: Record<string, number> = {};
     (queue || []).forEach((q: any) => { counts[q.status] = (counts[q.status] || 0) + 1; });
     setRetryStats(Object.entries(counts).map(([status, count]) => ({ status, count })));
+
+    // Health: métricas anti-ban por chip (reciprocidade 7d, unicidade 24h, top CTA).
+    const { data: healthRows } = await supabase
+      .from("v_whatsapp_instance_health" as any)
+      .select("instance_id, reciprocity_pct_7d, unicity_pct_24h, sent_7d, sent_24h, top_cta_7d")
+      .eq("client_id", client.id);
+    const hmap: Record<string, InstanceHealth> = {};
+    (healthRows as any[] || []).forEach((h: any) => { hmap[h.instance_id] = h; });
+    setHealthByInstance(hmap);
+
     setLastRefresh(new Date());
     setLoading(false);
     // Mantém o Disparos em sincronia: sempre que o Status atualizar, o cache de
