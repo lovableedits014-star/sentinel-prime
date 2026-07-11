@@ -5,8 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, CheckCircle, XCircle, Clock, Loader2, RefreshCw } from "lucide-react";
+import { FileText, CheckCircle, XCircle, Clock, Loader2, RefreshCw, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { fmtPhoneBR } from "@/lib/phone-utils";
 
 type LogItem = {
   id: string;
@@ -15,17 +16,30 @@ type LogItem = {
   status: string;
   enviado_em: string | null;
   erro: string | null;
+  mensagem_personalizada?: string | null;
+  variant_used?: string | null;
+  cta_used?: string | null;
+  replied_at?: string | null;
+  reply_text?: string | null;
 };
 
 const itemStatusMap: Record<string, { label: string; icon: typeof Clock; className: string }> = {
   pendente: { label: "Pendente", icon: Clock, className: "text-muted-foreground" },
   enviado: { label: "Enviado", icon: CheckCircle, className: "text-emerald-600" },
   falha: { label: "Falha", icon: XCircle, className: "text-destructive" },
+  cancelado: { label: "Cancelado", icon: XCircle, className: "text-muted-foreground" },
 };
+
+function csvEscape(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  if (/[",;\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
 
 export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: string; titulo: string }) {
   const [open, setOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: items = [], isLoading } = useQuery<LogItem[]>({
@@ -36,7 +50,7 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
         .select("*")
         .eq("dispatch_id", dispatchId)
         .order("created_at", { ascending: true })
-        .limit(500);
+        .limit(2000);
       return (data as unknown as LogItem[]) || [];
     },
     enabled: open,
