@@ -84,11 +84,21 @@ type DispatchRow = {
 
 type TagOption = { nome: string; count: number };
 
+function getPauseDisplay(status: string, reason?: string | null) {
+  if (!reason) return null;
+  if (status === "pausado_timeout") {
+    return reason
+      .replace("Pausado por tempo limite", "Ciclo automático concluído")
+      .replace("Retomando automaticamente em", "Continuando em");
+  }
+  return reason;
+}
+
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   pendente: { label: "Aguardando", color: "bg-muted text-muted-foreground", icon: Clock },
   enfileirado: { label: "Na fila", color: "bg-sky-500/15 text-sky-700 dark:text-sky-400", icon: Clock },
   enviando: { label: "Enviando...", color: "bg-primary/10 text-primary", icon: Loader2 },
-  pausado_timeout: { label: "Retomando…", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Loader2 },
+  pausado_timeout: { label: "Continuando…", color: "bg-primary/10 text-primary", icon: Loader2 },
   pausado_janela: { label: "Aguardando janela", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Clock },
   pausado_sem_instancia: { label: "Sem instância", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: WifiOff },
   concluido: { label: "Concluído", color: "bg-emerald-500/15 text-emerald-600", icon: CheckCircle },
@@ -1593,6 +1603,7 @@ export default function Disparos() {
                   {dispatches.map((d) => {
                     const cfg = statusConfig[d.status] || statusConfig.pendente;
                     const StatusIcon = cfg.icon;
+                    const pauseDisplay = getPauseDisplay(d.status, d.pause_reason);
                     const progress = d.total_destinatarios > 0
                       ? Math.round(((d.enviados + d.falhas) / d.total_destinatarios) * 100)
                       : 0;
@@ -1628,9 +1639,9 @@ export default function Disparos() {
                                       <p>
                                         "{d.titulo}" continuará de onde parou. {Math.max(0, d.total_destinatarios - d.enviados - d.falhas)} envio(s) restante(s) serão enviados.
                                       </p>
-                                      {d.pause_reason && (
+                                      {pauseDisplay && (
                                         <p className="rounded-md bg-amber-500/10 border border-amber-500/30 px-2 py-1.5 text-xs text-amber-800 dark:text-amber-300">
-                                          <span className="font-medium">Motivo da pausa:</span> {d.pause_reason}
+                                          <span className="font-medium">Motivo da pausa:</span> {pauseDisplay}
                                         </p>
                                       )}
                                       <label className="flex items-start gap-2 text-xs cursor-pointer">
@@ -1660,9 +1671,9 @@ export default function Disparos() {
                               </AlertDialogContent>
                             </AlertDialog>
                           )}
-                          {d.status?.startsWith("pausado_") && d.pause_reason && (
-                            <div className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1">
-                              ⚠️ {d.pause_reason}
+                          {d.status?.startsWith("pausado_") && pauseDisplay && (
+                            <div className={`text-[11px] border rounded px-2 py-1 ${d.status === "pausado_timeout" ? "text-primary bg-primary/5 border-primary/20" : "text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/20"}`}>
+                              {d.status === "pausado_timeout" ? "↻" : "⚠️"} {pauseDisplay}
                             </div>
                           )}
 
