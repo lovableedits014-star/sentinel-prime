@@ -408,6 +408,13 @@ export default function Disparos() {
       toast.error("Escreva uma mensagem ou anexe uma imagem");
       return;
     }
+    if (hasText) {
+      const check = isTemplateReady(mensagem);
+      if (!check.ok) {
+        toast.error(`Corrija a spintax: ${check.error}`);
+        return;
+      }
+    }
     if (recipientCount === 0) {
       toast.error("Nenhum destinatário encontrado com o filtro selecionado");
       return;
