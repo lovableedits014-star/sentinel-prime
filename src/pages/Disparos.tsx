@@ -470,6 +470,8 @@ export default function Disparos() {
           delay_min: pol.delay_min,
           delay_max: pol.delay_max,
           batch_pause: pol.batch_pause,
+          humanization_config: {},
+          cta_config: ctaConfig,
         },
       });
       if (error) throw error;
