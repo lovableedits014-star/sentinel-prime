@@ -1445,6 +1445,18 @@ Deno.serve(async (req) => {
                     p_preflight_reconnected: preflight.reconnected,
                   });
                 }
+                // Reset do streak de falha de ponte para este chip (sucesso).
+                if (instanceId) bridgeFailStreak[instanceId] = 0;
+                // Marca sticky para o telefone: próximo envio para este número tenta o mesmo chip.
+                if (!isGroup && recipient.telefone && instanceId) {
+                  stickyByPhone[String(recipient.telefone)] = instanceId;
+                }
+                // Micro-pausa aleatória (5%) para quebrar padrão de intervalos.
+                if (Math.random() < 0.05) {
+                  const microPause = randomDelay(30_000, 120_000);
+                  console.log(`[micro-pause] ${Math.round(microPause / 1000)}s`);
+                  await sleep(microPause);
+                }
                 // Registra cobrança de indicador (se aplicável)
                 if (tipo === "indicadores_cobranca" && (recipient as any).indicador_id) {
                   await adminClient.from("eleicao_cobranca_log").insert({
