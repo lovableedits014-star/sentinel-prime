@@ -1047,6 +1047,23 @@ Deno.serve(async (req) => {
       // não tenta de novo com X nesse mesmo grupo.
       const excludedByGroup: Record<string, Set<string>> = {};
 
+      // ==== Entrega 3: anti-ban helpers ====
+      // Cap diário por stage (override por instância via stage_daily_cap).
+      const STAGE_DEFAULT_CAP: Record<string, number> = { novo: 40, aquecendo: 150, maduro: 400 };
+      const effectiveCap = (inst: { ramp_up_stage?: string | null; stage_daily_cap?: number | null; daily_send_limit?: number | null }) => {
+        if (inst.stage_daily_cap && inst.stage_daily_cap > 0) return inst.stage_daily_cap;
+        const stage = (inst.ramp_up_stage as string) || "maduro";
+        return STAGE_DEFAULT_CAP[stage] ?? (inst.daily_send_limit || 400);
+      };
+      // Instâncias que atingiram o cap NESTE disparo — não são escolhidas de novo.
+      const cappedInstances = new Set<string>();
+      // Circuit breaker: contagem de falhas de rede/ponte consecutivas por instância.
+      const bridgeFailStreak: Record<string, number> = {};
+      const CIRCUIT_BREAKER_THRESHOLD = 2;
+      // Sticky: cache em memória do último chip usado por telefone (evita re-consulta).
+      const stickyByPhone: Record<string, string> = {};
+
+
       for (let batch = 0; batch < Math.ceil(recipients.length / BATCH_SIZE); batch++) {
         // Checa se o disparo foi cancelado pelo usuário
         const { data: statusCheck } = await adminClient
@@ -1167,18 +1184,72 @@ Deno.serve(async (req) => {
                 }
               }
             } else {
-              // Telefone individual: pool padrão
-              const { data: pickedId } = await adminClient.rpc(
-                "pick_healthy_whatsapp_instance",
-                { p_client_id: client_id },
-              );
-              if (pickedId) {
-                const { data: inst } = await adminClient
-                  .from("whatsapp_instances")
-                  .select("id, bridge_url, bridge_api_key, ramp_up_stage")
-                  .eq("id", pickedId)
-                  .maybeSingle();
-                if (inst?.bridge_url && inst?.bridge_api_key) {
+              // ==== Sticky por destinatário ====
+              // Se este telefone já recebeu de uma instância saudável neste cliente,
+              // reusa. Preserva histórico de conversa → menor risco de sinalização.
+              const phoneKey = String(recipient.telefone || "");
+              if (phoneKey && !instanceId) {
+                let stickyId: string | null = stickyByPhone[phoneKey] || null;
+                if (!stickyId) {
+                  const { data: last } = await adminClient
+                    .from("whatsapp_dispatch_items")
+                    .select("instance_id")
+                    .eq("telefone", phoneKey)
+                    .eq("status", "enviado")
+                    .not("instance_id", "is", null)
+                    .order("enviado_em", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                  stickyId = (last as any)?.instance_id || null;
+                  if (stickyId) stickyByPhone[phoneKey] = stickyId;
+                }
+                if (stickyId && !cappedInstances.has(stickyId)) {
+                  const { data: stickyInst } = await adminClient
+                    .from("whatsapp_instances")
+                    .select("id, bridge_url, bridge_api_key, ramp_up_stage, stage_daily_cap, daily_send_limit, messages_sent_today, is_active, status, suspected_banned_at")
+                    .eq("id", stickyId)
+                    .maybeSingle();
+                  if (
+                    stickyInst && stickyInst.is_active && stickyInst.status === "connected" &&
+                    !stickyInst.suspected_banned_at && stickyInst.bridge_url && stickyInst.bridge_api_key &&
+                    (stickyInst.messages_sent_today || 0) < effectiveCap(stickyInst)
+                  ) {
+                    bridgeUrl = stickyInst.bridge_url;
+                    bridgeApiKey = stickyInst.bridge_api_key;
+                    instanceId = stickyInst.id;
+                    currentStage = stickyInst.ramp_up_stage || "maduro";
+                    console.log(`[sticky] phone=${phoneKey} reuse=${stickyId}`);
+                  } else if (stickyInst && (stickyInst.messages_sent_today || 0) >= effectiveCap(stickyInst)) {
+                    cappedInstances.add(stickyId);
+                  }
+                }
+              }
+
+              // Telefone individual: pool padrão (com retry se pegou instância no cap).
+              if (!bridgeUrl) {
+                for (let pickTry = 0; pickTry < 5 && !bridgeUrl; pickTry++) {
+                  const { data: pickedId } = await adminClient.rpc(
+                    "pick_healthy_whatsapp_instance",
+                    { p_client_id: client_id },
+                  );
+                  if (!pickedId) break;
+                  if (cappedInstances.has(pickedId)) {
+                    // Cap já atingido neste run — força RPC a olhar outra na próxima iter.
+                    // (RPC provavelmente ordena por menos usada; ao atualizar a saúde
+                    // via last_send_at ou consecutive_failures elevaria; aqui só marcamos.)
+                    continue;
+                  }
+                  const { data: inst } = await adminClient
+                    .from("whatsapp_instances")
+                    .select("id, bridge_url, bridge_api_key, ramp_up_stage, stage_daily_cap, daily_send_limit, messages_sent_today")
+                    .eq("id", pickedId)
+                    .maybeSingle();
+                  if (!inst?.bridge_url || !inst?.bridge_api_key) break;
+                  if ((inst.messages_sent_today || 0) >= effectiveCap(inst)) {
+                    cappedInstances.add(inst.id);
+                    console.log(`[cap] instance=${inst.id} atingiu cap diário (${inst.messages_sent_today}/${effectiveCap(inst)}) — pulando`);
+                    continue;
+                  }
                   bridgeUrl = inst.bridge_url;
                   bridgeApiKey = inst.bridge_api_key;
                   instanceId = inst.id;
@@ -1191,20 +1262,22 @@ Deno.serve(async (req) => {
                 // aciona o auto-suspect (>=10 falhas em 15min derrubam o chip).
                 const { data: anyActive } = await adminClient
                   .from("whatsapp_instances")
-                  .select("id, bridge_url, bridge_api_key, status, ramp_up_stage")
+                  .select("id, bridge_url, bridge_api_key, status, ramp_up_stage, stage_daily_cap, daily_send_limit, messages_sent_today")
                   .eq("client_id", client_id)
                   .eq("is_active", true)
                   .eq("status", "connected")
                   .is("suspected_banned_at", null)
                   .not("bridge_api_key", "is", null)
                   .order("consecutive_failures", { ascending: true })
-                  .limit(1)
-                  .maybeSingle();
-                if (anyActive?.bridge_url && anyActive?.bridge_api_key) {
-                  bridgeUrl = anyActive.bridge_url;
-                  bridgeApiKey = anyActive.bridge_api_key;
-                  instanceId = anyActive.id;
-                  currentStage = anyActive.ramp_up_stage || "maduro";
+                  .limit(5);
+                const usable = (anyActive || []).find((a: any) =>
+                  !cappedInstances.has(a.id) && (a.messages_sent_today || 0) < effectiveCap(a)
+                );
+                if (usable?.bridge_url && usable?.bridge_api_key) {
+                  bridgeUrl = usable.bridge_url;
+                  bridgeApiKey = usable.bridge_api_key;
+                  instanceId = usable.id;
+                  currentStage = usable.ramp_up_stage || "maduro";
                 }
               }
               if (!bridgeUrl && hasLegacyBridge && (poolCount ?? 0) === 0) {
@@ -1362,6 +1435,7 @@ Deno.serve(async (req) => {
                     enviado_em: new Date().toISOString(),
                     variant_used: personalizedMsg.slice(0, 2000),
                     cta_used: ctaUsedForItem,
+                    instance_id: instanceId,
                   }));
                 if (instanceId) {
                   await adminClient.rpc("log_whatsapp_send", {
@@ -1370,6 +1444,18 @@ Deno.serve(async (req) => {
                     p_preflight_status: preflight.status,
                     p_preflight_reconnected: preflight.reconnected,
                   });
+                }
+                // Reset do streak de falha de ponte para este chip (sucesso).
+                if (instanceId) bridgeFailStreak[instanceId] = 0;
+                // Marca sticky para o telefone: próximo envio para este número tenta o mesmo chip.
+                if (!isGroup && recipient.telefone && instanceId) {
+                  stickyByPhone[String(recipient.telefone)] = instanceId;
+                }
+                // Micro-pausa aleatória (5%) para quebrar padrão de intervalos.
+                if (Math.random() < 0.05) {
+                  const microPause = randomDelay(30_000, 120_000);
+                  console.log(`[micro-pause] ${Math.round(microPause / 1000)}s`);
+                  await sleep(microPause);
                 }
                 // Registra cobrança de indicador (se aplicável)
                 if (tipo === "indicadores_cobranca" && (recipient as any).indicador_id) {
@@ -1399,6 +1485,26 @@ Deno.serve(async (req) => {
                   p_preflight_status: preflight.status,
                   p_preflight_reconnected: preflight.reconnected,
                 });
+              }
+
+              // ==== Circuit breaker: falhas de rede/ponte consecutivas ====
+              // Se a ponte respondeu erro HTTP >= 500 ou o fetch falhou (sendRes.status === 0),
+              // contamos como falha de infra. 2 seguidas → desativa o chip pra intervenção manual.
+              const isBridgeInfraError = !disconnectErr && (sendRes.status === 0 || sendRes.status >= 500);
+              if (instanceId && isBridgeInfraError) {
+                bridgeFailStreak[instanceId] = (bridgeFailStreak[instanceId] || 0) + 1;
+                if (bridgeFailStreak[instanceId] >= CIRCUIT_BREAKER_THRESHOLD) {
+                  console.log(`[circuit-breaker] instance=${instanceId} desativada após ${bridgeFailStreak[instanceId]} falhas de ponte`);
+                  await adminClient.from("whatsapp_instances")
+                    .update({
+                      is_active: false,
+                      auto_suspected_reason: `Circuit breaker: ${bridgeFailStreak[instanceId]} falhas de ponte consecutivas. Reative manualmente após revisar.`,
+                    })
+                    .eq("id", instanceId);
+                  bridgeFailStreak[instanceId] = 0;
+                }
+              } else if (instanceId) {
+                bridgeFailStreak[instanceId] = 0;
               }
 
               if (isGroup && instanceId) {
