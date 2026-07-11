@@ -1265,16 +1265,14 @@ export default function Disparos() {
 
           <div className="space-y-2">
             <Label>Mensagem</Label>
-            <Textarea
+            <MessageEditor
               value={mensagem}
-              onChange={(e) => setMensagem(e.target.value)}
-              placeholder="Olá {nome}! Temos uma missão importante..."
-              rows={4}
+              onChange={setMensagem}
               disabled={sending}
+              clientCtas={(client as any)?.response_ctas || []}
+              ctaConfig={ctaConfig}
+              onCtaConfigChange={setCtaConfig}
             />
-            <p className="text-xs text-muted-foreground">
-              Use <code className="bg-muted px-1 rounded">{"{nome}"}</code> para personalizar com o nome do destinatário.
-            </p>
           </div>
 
           <div className="space-y-2">
