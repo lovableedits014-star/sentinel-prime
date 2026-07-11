@@ -541,9 +541,10 @@ export default function Disparos() {
     }
   };
 
-  const handleResumeDispatch = async (dispatchId: string, titulo: string) => {
+  const handleResumeDispatch = async (dispatchId: string, titulo: string, opts?: { ignoreCap?: boolean }) => {
     try {
-      // Reativa itens que foram marcados como cancelados ao parar o disparo
+      // Reativa itens que foram marcados como cancelados ao parar o disparo.
+      // (Itens 'pendente' já são retomados automaticamente pelo motor.)
       const { data: resetItems, error: resetErr } = await supabase
         .from("whatsapp_dispatch_items" as any)
         .update({ status: "pendente", erro: null })
@@ -551,21 +552,30 @@ export default function Disparos() {
         .eq("status", "cancelado")
         .select("id");
       if (resetErr) throw resetErr;
-      const resetCount = resetItems?.length || 0;
-      if (resetCount === 0) {
+
+      // Conta o que ainda está pendente pra confirmar que há trabalho pra retomar.
+      const { count: pendingCount } = await supabase
+        .from("whatsapp_dispatch_items" as any)
+        .select("id", { count: "exact", head: true })
+        .eq("dispatch_id", dispatchId)
+        .eq("status", "pendente");
+      const total = (resetItems?.length || 0) + (pendingCount || 0);
+      if (total === 0) {
         toast.info("Nenhum envio pendente para retomar neste disparo.");
         return;
       }
 
-      // Volta o disparo para em_andamento e limpa motivo de pausa
+      // Atualiza o disparo — inclui opcionalmente o override de "ignorar cap".
+      const updatePayload: any = {
+        status: "em_andamento",
+        pause_reason: null,
+        completed_at: null,
+        updated_at: new Date().toISOString(),
+      };
+      if (opts?.ignoreCap) updatePayload.ignore_stage_cap = true;
       const { error: e2 } = await supabase
         .from("whatsapp_dispatches" as any)
-        .update({
-          status: "em_andamento",
-          pause_reason: null,
-          completed_at: null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("id", dispatchId);
       if (e2) throw e2;
 
@@ -575,7 +585,8 @@ export default function Disparos() {
       });
       if (invErr) throw invErr;
 
-      toast.success(`Retomando "${titulo}" — ${resetCount} envio(s) restantes.`);
+      toast.success(`Retomando "${titulo}" — ${total} envio(s) restante(s).`);
+      setResumeIgnoreCap(false);
       refetch();
     } catch (err: any) {
       toast.error("Erro ao retomar: " + (err.message || "tente novamente"));
