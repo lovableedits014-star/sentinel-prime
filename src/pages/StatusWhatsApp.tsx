@@ -111,7 +111,7 @@ export default function StatusWhatsApp() {
 
     const [{ data: inst }, { data: queue }] = await Promise.all([
       supabase.from("whatsapp_instances")
-        .select("id,apelido,status,phone_number,is_active,is_primary,last_health_check_at,last_send_at,last_disconnected_at,connected_since,messages_sent_today,total_sent,total_failed,consecutive_failures,pending_onboarding,onboarding_sent_at,onboarding_pending_count,suspected_banned_at,auto_suspected_reason,paused_until,ramp_up_stage,daily_send_limit,first_connected_at,bridge_instance_id,last_keepalive_at,last_keepalive_status,last_auto_reconnect_at,last_webhook_rebound_at,last_disconnect_reason")
+        .select("id,apelido,status,phone_number,is_active,is_primary,last_health_check_at,last_send_at,last_disconnected_at,connected_since,messages_sent_today,total_sent,total_failed,consecutive_failures,pending_onboarding,onboarding_sent_at,onboarding_pending_count,suspected_banned_at,auto_suspected_reason,paused_until,ramp_up_stage,daily_send_limit,first_connected_at,bridge_instance_id,last_keepalive_at,last_keepalive_status,last_auto_reconnect_at,last_webhook_rebound_at,last_disconnect_reason,stage_daily_cap")
         .eq("client_id", client.id)
         .order("is_primary", { ascending: false })
         .order("created_at", { ascending: true }),
