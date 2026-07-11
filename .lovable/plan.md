@@ -1,98 +1,63 @@
-## Escopo travado (nada além disto)
+# Corrigir parada em 15 envios e adicionar retomada robusta
 
-**3 entregas sequenciais**, cada uma auto-suficiente. Sem homóglifos, sem VPN por envio, sem auto-resposta. Proxy/IP por chip fica como "Entrega 4 opcional futura" (só quando você contratar proxies e a bridge suportar).
+## Diagnóstico
 
----
+O disparo parou em 15 porque a única instância conectada bateu o **cap diário do estágio de aquecimento** (`ramp_up_stage`). Hoje, quando não há outra instância viva, o loop marca o disparo como `pausado_sem_instancia` e sai — e o botão "Retomar" só aparece se o disparo estiver `cancelado`.
 
-## Entrega 1 — Motor de variação + CTA de resposta + captura de respostas
+Além disso, não existe controle por disparo de **quantas instâncias** você quer usar. O motor sempre tenta distribuir entre todas as saudáveis; com só uma conectada, ele respeita o cap dela e para.
 
-Núcleo do ganho anti-ban. Retrocompatível: templates atuais continuam funcionando idênticos.
+## O que vai mudar
 
-### 1.1. Migração SQL (única da entrega)
-- `whatsapp_dispatches`: `humanization_config jsonb default '{}'`, `cta_config jsonb default '{}'`.
-- `whatsapp_dispatch_items`: `variant_used text`, `cta_used text`, `replied_at timestamptz`, `reply_text text`.
-- `clients`: `response_ctas jsonb default '[]'` (biblioteca personalizada do cliente).
+### 1. Configuração de instâncias por disparo (Disparos.tsx / wizard de criação)
 
-Tudo nullable/default seguro. Nenhum registro existente quebra.
+No card de criação de disparo, adicionar um bloco "Instâncias":
 
-### 1.2. Motor puro backend — `supabase/functions/_shared/message-variation.ts`
-- `protectUrls` / `restoreUrls` (tokens `⟦URL0⟧`, links intocados).
-- `expandSpintax` (`{a|b|c}` e blocos `[[A|B]]` recursivos).
-- `applyPlaceholders` (`{nome}`, `{primeiro_nome}`, `{saudacao}`, `{dia_semana}`, `{assinatura}`, `{emoji_positivo}`, `{cta_resposta}`).
-- `renderMessage(template, recipient, ctx)` orquestra e valida que URLs originais aparecem no output.
-- `message-variation.test.ts`: preservação de URL, spintax aninhada, placeholder ausente, colisão.
+- **Modo de distribuição** (radio):
+  - `Automático` (padrão) — usa todas as instâncias conectadas saudáveis
+  - `Fixo` — você escolhe quantas instâncias no máximo (1–N das conectadas)
+- **Ignorar cap de aquecimento neste disparo** (checkbox, off por padrão, com aviso amarelo): "Envia até esgotar a fila mesmo se a instância estiver em fase 'novo/aquecendo'. Use só com instâncias maduras — pode acionar bloqueio da Meta."
 
-### 1.3. Biblioteca de CTAs — `supabase/functions/_shared/response-ctas.ts`
-- ~30 CTAs default em 6 categorias (pergunta leve, confirmação, escolha binária, opinião, ajuda mútua, micro-compromisso).
-- `pickCta(clientCtas, categories, seed)` — merge defaults + custom, evita repetir consecutivamente.
-- `hasQuestionAtEnd(text)` — não anexa CTA se template já termina em pergunta.
+Persistir em duas colunas novas em `whatsapp_dispatches`:
+- `max_instances INT` (null = automático)
+- `ignore_stage_cap BOOLEAN DEFAULT false`
 
-### 1.4. Patch em `send-whatsapp-dispatch/index.ts`
-Trocar os 2 `replace(/{nome}/g, ...)` por `renderMessage(...)`. Todo o resto (ramp-up, janela, delays, retry, cota) fica igual.
+### 2. Motor `send-whatsapp-dispatch` respeitando a config
 
-### 1.5. Patch em `whatsapp-inbound-webhook/index.ts`
-Após identificar `client_id + phone`, buscar último `whatsapp_dispatch_items` desse phone com `sent_at > now() - 48h` e `replied_at is null`; se achar, grava `replied_at` e `reply_text` (500 chars). Nada mais.
+- Ao selecionar instâncias saudáveis, aplicar `LIMIT max_instances` (ou usar todas se null).
+- Em `effectiveCap()`, se `ignore_stage_cap` do dispatch atual for true, retornar `Infinity` (ou seja, cap ignorado — o `daily_send_limit` global da instância continua valendo como teto de segurança).
+- Se sobrar apenas 1 instância viva e o cap dela já foi atingido **e** `ignore_stage_cap=false`, pausar como hoje (`pausado_sem_instancia`), mas registrar `pause_reason: "Cap diário atingido — retomar amanhã ou marcar 'ignorar cap'"` para dar contexto no card.
 
-### 1.6. Motor isomórfico frontend — `src/lib/message-variation.ts`
-Espelho 1:1 do backend (sem I/O), para preview instantâneo.
+### 3. Botão "Retomar" universal
 
-### 1.7. Editor — `src/components/disparos/MessageEditor.tsx`
-- Textarea + toolbar (spintax, placeholders, `{cta_resposta}`).
-- Aba lateral CTAs: lista com toggle por categoria, botão "Gerar 10 CTAs com IA" (reusa `ic-generate-text`), toggle "Adicionar CTA automático".
-- Preview: 5 amostras renderizadas com nomes reais + contador de unicidade.
-- Validação bloqueia envio se spintax malformada.
+Trocar a condição atual (`status === "cancelado"`) por:
 
-### 1.8. Ordem de execução Entrega 1
-1. Migração SQL → aguarda aprovação.
-2. Motor puro backend + testes + biblioteca CTAs.
-3. Motor isomórfico frontend.
-4. `MessageEditor` + integração em `Disparos.tsx`.
-5. Patch nas 2 edge functions.
-6. Validação manual (1 disparo de teste com 3 contatos).
+```
+status ∈ {cancelado, pausado_timeout, pausado_janela, pausado_sem_instancia}
+E (total_destinatarios - enviados - falhas) > 0
+```
 
----
+E ajustar `handleResumeDispatch`:
+- Reativar itens com `status IN ('cancelado', 'pendente')` que ainda não foram enviados (hoje só pega `cancelado`).
+- Se o disparo estava `pausado_sem_instancia` por cap, o resume só faz sentido se: (a) uma nova instância ficou saudável, **ou** (b) hoje é outro dia (contador zerou), **ou** (c) o usuário marcar "ignorar cap" ao retomar. Adicionar checkbox "Ignorar cap de aquecimento" no modal de retomar, que atualiza `ignore_stage_cap=true` no dispatch antes de invocar.
+- Toast de erro claro quando não houver instância viva: "Nenhuma instância conectada. Conecte um chip em Status WhatsApp antes de retomar."
 
-## Entrega 2 — Import/export de contatos
+### 4. UX — mostrar por que parou
 
-- `src/components/disparos/ImportContactsDialog.tsx`: CSV/XLSX, detecta encoding/separador, normaliza telefone, preview, destino (lista ad-hoc OU grava em `pessoas` com tag).
-- Botão "Exportar contatos" no disparo → CSV com `nome, telefone, variante_enviada, status, replied_at`.
-- Sem migração SQL (reusa tabelas existentes).
+No card do histórico (`dispatches.map`), quando `status` começar com `pausado_`, exibir uma linha em amarelo com `pause_reason`. Já existe a coluna, só não está sendo mostrada.
 
----
+## Detalhes técnicos
 
-## Entrega 3 — Painel de saúde + rotação + cotas + sticky
+- Migration: adicionar `max_instances` e `ignore_stage_cap` em `whatsapp_dispatches` (nullable / default false). Sem RLS nova — herdam as políticas existentes.
+- Arquivos:
+  - `src/pages/Disparos.tsx` — bloco de config no wizard, insert do dispatch com os 2 campos novos, condição de resume ampliada, exibir `pause_reason`.
+  - `supabase/functions/send-whatsapp-dispatch/index.ts` — ler `max_instances`/`ignore_stage_cap` do dispatch atual em memória, aplicar em `effectiveCap()` e na query de seleção de instâncias.
+- Sem mudança no schema de itens; o motor continua puxando o próximo `pendente`.
 
-### 3.1. Migração SQL
-- `whatsapp_instances`: `reciprocity_rate numeric default 0`, `stage_daily_cap int`.
+## Fora do escopo
 
-### 3.2. Backend `send-whatsapp-dispatch`
-- Cap por stage antes de enviar (novo=40, aquecendo=150, maduro=400; override por disparo).
-- Micro-pausa: 5% chance de 30–120s.
-- **Sticky por destinatário**: consulta último `whatsapp_dispatch_items` do phone; se chip anterior saudável + com cota → reusa; senão, round-robin ponderado por saúde/reciprocidade.
-
-### 3.3. Painel em `StatusWhatsApp.tsx`
-Por chip: reciprocidade 7d, % unicidade 24h, cota consumida/cap, alertas de queda súbita. Ranking de CTAs (uso × resposta).
-
-### 3.4. Circuit breaker
-2 falhas de bridge consecutivas → `is_active=false` + log. Retomada manual.
+- Auto-promover ramp_up_stage após X envios sem falha (mecânica separada, não pedida).
+- Rebalancear disparos entre instâncias em tempo real além do que já existe.
 
 ---
 
-## Riscos previstos e mitigação
-- URL quebrada → `protectUrls` + assert no fim de `renderMessage` + teste dedicado.
-- Spintax malformada → validador no editor + fallback literal no backend.
-- Colisão do spintax (poucas combinações) → aviso no preview.
-- IA gerando CTA com link → validador rejeita variantes que introduzem URL nova.
-- Resposta atrasada → janela 48h configurável.
-- Cota bloqueando urgente → override `humanization_config.ignore_cap: true`.
-- Drift JS/Deno → motor puro sem deps de runtime; mesmos testes rodam nos dois lados.
-
-## Redundâncias eliminadas
-- Ramp-up, janela, `randomDelay`, `ic-generate-text`, roteamento do webhook, `whatsapp_dispatch_items` — tudo já existe e é reusado, não recriado.
-- Spintax e CTA compartilham o mesmo `renderMessage`, não dois pipelines.
-- Frontend e backend compartilham fixtures de teste para não divergir.
-
----
-
-## Confirmação
-Começo por **Entrega 1**, iniciando pela migração SQL. Nada além do combinado até você aprovar a próxima entrega.
+Confirma que posso implementar assim, ou quer ajustar o comportamento do "ignorar cap" (por exemplo, exigir confirmação em dois cliques)?
