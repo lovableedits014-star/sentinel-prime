@@ -614,7 +614,11 @@ export default function StatusWhatsApp() {
                         <td className="py-3 px-3">
                           {(() => {
                             const stage = inst.ramp_up_stage || "maduro";
-                            const stageCap = stage === "novo" ? 100 : stage === "aquecendo" ? 400 : (inst.daily_send_limit || 800);
+                            // Cap efetivo: override manual (stage_daily_cap) > default por stage.
+                            const stageDefault = stage === "novo" ? 40 : stage === "aquecendo" ? 150 : 400;
+                            const stageCap = inst.stage_daily_cap && inst.stage_daily_cap > 0
+                              ? inst.stage_daily_cap
+                              : stageDefault;
                             const used = inst.messages_sent_today || 0;
                             const pct = Math.min(100, Math.round((used / stageCap) * 100));
                             const pctColor = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : "bg-emerald-500";
@@ -623,13 +627,40 @@ export default function StatusWhatsApp() {
                               : stage === "aquecendo"
                                 ? { label: "🟡 Aquecendo", cls: "border-amber-500/40 text-amber-700 dark:text-amber-400" }
                                 : { label: "🟢 Maduro", cls: "border-emerald-500/40 text-emerald-700 dark:text-emerald-400" };
+                            const h = healthByInstance[inst.id];
+                            const reciprocity = h?.reciprocity_pct_7d ?? 0;
+                            const unicity = h?.unicity_pct_24h ?? 0;
+                            const recColor = reciprocity >= 5 ? "text-emerald-600" : reciprocity > 0 ? "text-amber-600" : "text-muted-foreground";
+                            const uniColor = unicity >= 70 ? "text-emerald-600" : unicity >= 40 ? "text-amber-600" : unicity > 0 ? "text-red-600" : "text-muted-foreground";
                             return (
-                              <div className="space-y-1 min-w-[140px]">
-                                <Badge variant="outline" className={`text-[10px] ${stageBadge.cls}`}>{stageBadge.label}</Badge>
+                              <div className="space-y-1 min-w-[160px]">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  <Badge variant="outline" className={`text-[10px] ${stageBadge.cls}`}>{stageBadge.label}</Badge>
+                                  {inst.stage_daily_cap && inst.stage_daily_cap > 0 && (
+                                    <Badge variant="outline" className="text-[9px] py-0 px-1.5" title="Cap diário sobrescrito manualmente">cap manual</Badge>
+                                  )}
+                                </div>
                                 <div className="text-[11px] font-mono">{used} / {stageCap}</div>
                                 <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                                   <div className={`h-full ${pctColor}`} style={{ width: `${pct}%` }} />
                                 </div>
+                                {(h && (h.sent_7d > 0 || h.sent_24h > 0)) && (
+                                  <div className="pt-0.5 space-y-0.5 text-[10px]" title="Métricas anti-ban dos últimos 7 dias / 24h">
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">recíproca 7d</span>
+                                      <span className={`font-mono ${recColor}`}>{reciprocity}%</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">unicidade 24h</span>
+                                      <span className={`font-mono ${uniColor}`}>{unicity}%</span>
+                                    </div>
+                                    {h.top_cta_7d && (
+                                      <div className="truncate text-muted-foreground" title={h.top_cta_7d}>
+                                        CTA top: <span className="italic">{h.top_cta_7d}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             );
                           })()}
