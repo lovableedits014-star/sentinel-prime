@@ -8349,6 +8349,7 @@ export type Database = {
           erro: string | null
           group_jid: string | null
           id: string
+          instance_id: string | null
           mensagem_personalizada: string | null
           nome: string
           replied_at: string | null
@@ -8365,6 +8366,7 @@ export type Database = {
           erro?: string | null
           group_jid?: string | null
           id?: string
+          instance_id?: string | null
           mensagem_personalizada?: string | null
           nome: string
           replied_at?: string | null
@@ -8381,6 +8383,7 @@ export type Database = {
           erro?: string | null
           group_jid?: string | null
           id?: string
+          instance_id?: string | null
           mensagem_personalizada?: string | null
           nome?: string
           replied_at?: string | null
@@ -8636,6 +8639,13 @@ export type Database = {
             foreignKeyName: "whatsapp_groups_instance_id_fkey"
             columns: ["instance_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_instance_health"
+            referencedColumns: ["instance_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_groups_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
@@ -8687,6 +8697,13 @@ export type Database = {
             foreignKeyName: "whatsapp_instance_send_log_instance_id_fkey"
             columns: ["instance_id"]
             isOneToOne: false
+            referencedRelation: "v_whatsapp_instance_health"
+            referencedColumns: ["instance_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_instance_send_log_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
             referencedRelation: "whatsapp_instances"
             referencedColumns: ["id"]
           },
@@ -8733,8 +8750,10 @@ export type Database = {
           phone_number: string | null
           qr_code: string | null
           ramp_up_stage: string
+          reciprocity_rate: number
           reconnect_attempts_date: string | null
           reconnect_attempts_today: number
+          stage_daily_cap: number | null
           status: string
           suspected_banned_at: string | null
           total_failed: number
@@ -8781,8 +8800,10 @@ export type Database = {
           phone_number?: string | null
           qr_code?: string | null
           ramp_up_stage?: string
+          reciprocity_rate?: number
           reconnect_attempts_date?: string | null
           reconnect_attempts_today?: number
+          stage_daily_cap?: number | null
           status?: string
           suspected_banned_at?: string | null
           total_failed?: number
@@ -8829,8 +8850,10 @@ export type Database = {
           phone_number?: string | null
           qr_code?: string | null
           ramp_up_stage?: string
+          reciprocity_rate?: number
           reconnect_attempts_date?: string | null
           reconnect_attempts_today?: number
+          stage_daily_cap?: number | null
           status?: string
           suspected_banned_at?: string | null
           total_failed?: number
@@ -9004,6 +9027,34 @@ export type Database = {
           readiness?: never
           status?: string | null
           suspected_banned_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_whatsapp_instance_health: {
+        Row: {
+          apelido: string | null
+          client_id: string | null
+          daily_send_limit: number | null
+          instance_id: string | null
+          messages_sent_today: number | null
+          ramp_up_stage: string | null
+          reciprocity_pct_7d: number | null
+          replied_7d: number | null
+          sent_24h: number | null
+          sent_7d: number | null
+          stage_daily_cap: number | null
+          status: string | null
+          top_cta_7d: string | null
+          unicity_pct_24h: number | null
+          unique_variants_24h: number | null
         }
         Relationships: [
           {
