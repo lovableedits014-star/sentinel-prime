@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SugestoesPanel } from "@/components/disparos/SugestoesPanel";
 import DispatchLogDialog from "@/components/disparos/DispatchLogDialog";
 import BirthdayConfigPanel from "@/components/disparos/BirthdayConfigPanel";
+import ImportContactsDialog from "@/components/disparos/ImportContactsDialog";
 
 const POLICIES = {
   conservador: {
@@ -234,6 +235,7 @@ export default function Disparos() {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [tipoDisparo, setTipoDisparo] = useState("manual");
+  const [adhocContacts, setAdhocContacts] = useState<{ nome: string; telefone: string }[]>([]);
   const [tagFiltro, setTagFiltro] = useState("_all");
   const [eleicaoTipo, setEleicaoTipo] = useState<"all" | "coordenador" | "lider" | "cabo">("all");
   const [eleicaoEscopo, setEleicaoEscopo] = useState<"all" | "campo_grande" | "interior">("all");
@@ -324,9 +326,10 @@ export default function Disparos() {
 
   // Count recipients based on filter
   const { data: recipientCount = 0 } = useQuery<number>({
-    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao, selectedGroupJids.length],
+    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao, selectedGroupJids.length, adhocContacts.length],
     queryFn: async () => {
       if (tipoDisparo === "grupos") return selectedGroupJids.length;
+      if (tipoDisparo === "lista_adhoc") return adhocContacts.length;
       if (tipoDisparo === "eleicao") {
         let q = supabase.from("eleicao_pessoas" as any)
           .select("*", { count: "exact", head: true })
@@ -466,6 +469,7 @@ export default function Disparos() {
           eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
           eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
           group_jids: tipoDisparo === "grupos" ? selectedGroupJids : undefined,
+          recipients_list: tipoDisparo === "lista_adhoc" ? adhocContacts : undefined,
           batch_size: pol.batch_size,
           delay_min: pol.delay_min,
           delay_max: pol.delay_max,
@@ -487,6 +491,7 @@ export default function Disparos() {
       setMediaUrl(null);
       setTagFiltro("_all");
       setSelectedGroupJids([]);
+      setAdhocContacts([]);
       refetch();
     } catch (err: any) {
       toast.error("Erro: " + (err.message || "tente novamente"));
@@ -709,6 +714,7 @@ export default function Disparos() {
                   <SelectItem value="funcionarios">👷 Funcionários</SelectItem>
                   <SelectItem value="eleicao">🗳️ Eleição (Coord/Líder/Cabo)</SelectItem>
                   <SelectItem value="grupos">👥 Grupos de WhatsApp</SelectItem>
+                  <SelectItem value="lista_adhoc">📥 Lista importada (CSV/XLSX)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -775,6 +781,33 @@ export default function Disparos() {
               </>
             )}
           </div>
+
+          {tipoDisparo === "lista_adhoc" && (
+            <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  <div className="font-medium">Lista importada</div>
+                  <div className="text-xs text-muted-foreground">
+                    {adhocContacts.length > 0
+                      ? `${adhocContacts.length} contatos carregados para este disparo.`
+                      : "Nenhum contato carregado. Importe um arquivo CSV ou XLSX."}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <ImportContactsDialog
+                    clientId={clientId}
+                    onUseAsList={(list) => setAdhocContacts(list)}
+                  />
+                  {adhocContacts.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={() => setAdhocContacts([])}>
+                      <X className="h-4 w-4 mr-1" /> Limpar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
 
 
           {politica === "personalizado" && (

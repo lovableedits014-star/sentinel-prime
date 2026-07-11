@@ -5,8 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, CheckCircle, XCircle, Clock, Loader2, RefreshCw } from "lucide-react";
+import { FileText, CheckCircle, XCircle, Clock, Loader2, RefreshCw, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { fmtPhoneBR } from "@/lib/phone-utils";
 
 type LogItem = {
   id: string;
@@ -15,17 +16,30 @@ type LogItem = {
   status: string;
   enviado_em: string | null;
   erro: string | null;
+  mensagem_personalizada?: string | null;
+  variant_used?: string | null;
+  cta_used?: string | null;
+  replied_at?: string | null;
+  reply_text?: string | null;
 };
 
 const itemStatusMap: Record<string, { label: string; icon: typeof Clock; className: string }> = {
   pendente: { label: "Pendente", icon: Clock, className: "text-muted-foreground" },
   enviado: { label: "Enviado", icon: CheckCircle, className: "text-emerald-600" },
   falha: { label: "Falha", icon: XCircle, className: "text-destructive" },
+  cancelado: { label: "Cancelado", icon: XCircle, className: "text-muted-foreground" },
 };
+
+function csvEscape(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  if (/[",;\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
 
 export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: string; titulo: string }) {
   const [open, setOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: items = [], isLoading } = useQuery<LogItem[]>({
@@ -36,7 +50,7 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
         .select("*")
         .eq("dispatch_id", dispatchId)
         .order("created_at", { ascending: true })
-        .limit(500);
+        .limit(2000);
       return (data as unknown as LogItem[]) || [];
     },
     enabled: open,
@@ -72,6 +86,66 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
     }
   };
 
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      // Busca até 20k itens para exportação — muito além dos 2k do preview.
+      const pageSize = 1000;
+      let all: LogItem[] = [];
+      for (let from = 0; from < 20000; from += pageSize) {
+        const { data, error } = await supabase
+          .from("whatsapp_dispatch_items" as any)
+          .select("*")
+          .eq("dispatch_id", dispatchId)
+          .order("created_at", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const chunk = (data as unknown as LogItem[]) || [];
+        all = all.concat(chunk);
+        if (chunk.length < pageSize) break;
+      }
+
+      const header = [
+        "nome", "telefone", "status", "enviado_em", "cta_used",
+        "variante_enviada", "replied_at", "reply_text", "erro",
+      ];
+      const lines = [header.join(",")];
+      for (const it of all) {
+        lines.push([
+          csvEscape(it.nome),
+          csvEscape(it.telefone),
+          csvEscape(it.status),
+          csvEscape(it.enviado_em || ""),
+          csvEscape(it.cta_used || ""),
+          csvEscape(it.variant_used || it.mensagem_personalizada || ""),
+          csvEscape(it.replied_at || ""),
+          csvEscape(it.reply_text || ""),
+          csvEscape(it.erro || ""),
+        ].join(","));
+      }
+      // BOM para Excel abrir com acentos corretos.
+      const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeTitle = (titulo || "disparo").replace(/[^\w\-]+/g, "_").slice(0, 40);
+      a.href = url;
+      a.download = `disparo_${safeTitle}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Exportação concluída", description: `${all.length} contatos exportados.` });
+    } catch (err: any) {
+      toast({
+        title: "Falha ao exportar",
+        description: err?.message || "Não foi possível gerar o CSV.",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -89,18 +163,30 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
           <Badge variant="outline" className="gap-1">✅ {sent} enviados</Badge>
           <Badge variant="outline" className="gap-1">❌ {failed} falhas</Badge>
           <Badge variant="outline" className="gap-1">⏳ {pending} pendentes</Badge>
-          {failed > 0 && pending === 0 && (
+          <div className="ml-auto flex gap-1">
             <Button
               size="sm"
-              variant="default"
-              className="h-7 ml-auto gap-1"
-              onClick={handleRetryFailed}
-              disabled={retrying}
+              variant="outline"
+              className="h-7 gap-1"
+              onClick={handleExportCsv}
+              disabled={exporting || items.length === 0}
             >
-              {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-              Reenviar falhas ({failed})
+              {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+              Exportar CSV
             </Button>
-          )}
+            {failed > 0 && pending === 0 && (
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 gap-1"
+                onClick={handleRetryFailed}
+                disabled={retrying}
+              >
+                {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                Reenviar falhas ({failed})
+              </Button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -115,7 +201,12 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
                   <div key={item.id} className="flex items-center gap-2 rounded border px-3 py-1.5 text-sm">
                     <Icon className={`h-3.5 w-3.5 shrink-0 ${cfg.className}`} />
                     <span className="flex-1 truncate">{item.nome}</span>
-                    <span className="text-xs text-muted-foreground font-mono">{item.telefone}</span>
+                    <span className="text-xs text-muted-foreground font-mono">{fmtPhoneBR(item.telefone)}</span>
+                    {item.replied_at && (
+                      <span className="text-[10px] px-1 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" title={item.reply_text || ""}>
+                        respondeu
+                      </span>
+                    )}
                     {item.enviado_em && (
                       <span className="text-xs text-muted-foreground">
                         {new Date(item.enviado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
