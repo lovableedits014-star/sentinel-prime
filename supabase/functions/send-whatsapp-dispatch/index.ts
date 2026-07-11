@@ -1003,6 +1003,8 @@ Deno.serve(async (req) => {
           batch_pause_seconds: Math.round(BATCH_PAUSE_MS / 1000),
           humanization_config: humanizationConfig,
           cta_config: ctaConfig,
+          max_instances: dispatchMaxInstances,
+          ignore_stage_cap: dispatchIgnoreStageCap,
         })
         .select()
         .single();
