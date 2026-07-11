@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SugestoesPanel } from "@/components/disparos/SugestoesPanel";
 import DispatchLogDialog from "@/components/disparos/DispatchLogDialog";
 import BirthdayConfigPanel from "@/components/disparos/BirthdayConfigPanel";
+import ImportContactsDialog from "@/components/disparos/ImportContactsDialog";
 
 const POLICIES = {
   conservador: {
