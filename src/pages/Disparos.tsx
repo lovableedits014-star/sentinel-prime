@@ -77,6 +77,7 @@ type DispatchRow = {
   status: string;
   tag_filtro: string | null;
   error_message: string | null;
+  pause_reason?: string | null;
   created_at: string;
   completed_at: string | null;
 };
