@@ -1047,6 +1047,23 @@ Deno.serve(async (req) => {
       // não tenta de novo com X nesse mesmo grupo.
       const excludedByGroup: Record<string, Set<string>> = {};
 
+      // ==== Entrega 3: anti-ban helpers ====
+      // Cap diário por stage (override por instância via stage_daily_cap).
+      const STAGE_DEFAULT_CAP: Record<string, number> = { novo: 40, aquecendo: 150, maduro: 400 };
+      const effectiveCap = (inst: { ramp_up_stage?: string | null; stage_daily_cap?: number | null; daily_send_limit?: number | null }) => {
+        if (inst.stage_daily_cap && inst.stage_daily_cap > 0) return inst.stage_daily_cap;
+        const stage = (inst.ramp_up_stage as string) || "maduro";
+        return STAGE_DEFAULT_CAP[stage] ?? (inst.daily_send_limit || 400);
+      };
+      // Instâncias que atingiram o cap NESTE disparo — não são escolhidas de novo.
+      const cappedInstances = new Set<string>();
+      // Circuit breaker: contagem de falhas de rede/ponte consecutivas por instância.
+      const bridgeFailStreak: Record<string, number> = {};
+      const CIRCUIT_BREAKER_THRESHOLD = 2;
+      // Sticky: cache em memória do último chip usado por telefone (evita re-consulta).
+      const stickyByPhone: Record<string, string> = {};
+
+
       for (let batch = 0; batch < Math.ceil(recipients.length / BATCH_SIZE); batch++) {
         // Checa se o disparo foi cancelado pelo usuário
         const { data: statusCheck } = await adminClient
