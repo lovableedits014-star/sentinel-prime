@@ -1557,8 +1557,8 @@ export default function Disparos() {
                         {(d.status === "enviando" || d.status === "concluido") && d.total_destinatarios > 0 && (
                           <Progress value={progress} className="h-1.5" />
                           )}
-                          {d.status === "cancelado" && (d.total_destinatarios - d.enviados - d.falhas) > 0 && (
-                            <AlertDialog>
+                          {(["cancelado","pausado_timeout","pausado_janela","pausado_sem_instancia","falhou"].includes(d.status)) && (d.total_destinatarios - d.enviados - d.falhas) > 0 && (
+                            <AlertDialog onOpenChange={(open) => { if (!open) setResumeIgnoreCap(false); }}>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-emerald-600 hover:text-emerald-600">
                                   <Send className="h-3 w-3" /> Retomar
@@ -1567,20 +1567,47 @@ export default function Disparos() {
                               <AlertDialogContent>
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Retomar disparo?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    "{d.titulo}" continuará de onde parou. {Math.max(0, d.total_destinatarios - d.enviados - d.falhas)} envio(s) restante(s) serão enviados.
+                                  <AlertDialogDescription asChild>
+                                    <div className="space-y-3">
+                                      <p>
+                                        "{d.titulo}" continuará de onde parou. {Math.max(0, d.total_destinatarios - d.enviados - d.falhas)} envio(s) restante(s) serão enviados.
+                                      </p>
+                                      {d.pause_reason && (
+                                        <p className="rounded-md bg-amber-500/10 border border-amber-500/30 px-2 py-1.5 text-xs text-amber-800 dark:text-amber-300">
+                                          <span className="font-medium">Motivo da pausa:</span> {d.pause_reason}
+                                        </p>
+                                      )}
+                                      <label className="flex items-start gap-2 text-xs cursor-pointer">
+                                        <Checkbox
+                                          checked={resumeIgnoreCap}
+                                          onCheckedChange={(v) => setResumeIgnoreCap(!!v)}
+                                          className="mt-0.5"
+                                        />
+                                        <span>
+                                          Ignorar cap de aquecimento neste disparo
+                                          <span className="block text-[10px] text-muted-foreground">
+                                            Marque para continuar enviando mesmo se a instância estiver em fase "novo/aquecendo". Use só com chips maduros — pode acionar bloqueio da Meta.
+                                          </span>
+                                        </span>
+                                      </label>
+                                    </div>
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Voltar</AlertDialogCancel>
                                   <AlertDialogAction
-                                    onClick={() => handleResumeDispatch(d.id, d.titulo)}
+                                    onClick={() => handleResumeDispatch(d.id, d.titulo, { ignoreCap: resumeIgnoreCap })}
                                   >
                                     Sim, retomar
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
+                          )}
+                          {d.status?.startsWith("pausado_") && d.pause_reason && (
+                            <div className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1">
+                              ⚠️ {d.pause_reason}
+                            </div>
                           )}
 
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
