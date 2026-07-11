@@ -483,6 +483,7 @@ export default function Disparos() {
       }
       setTitulo("");
       setMensagem("");
+      setCtaConfig(DEFAULT_CTA_CONFIG);
       setMediaUrl(null);
       setTagFiltro("_all");
       setSelectedGroupJids([]);
