@@ -12,6 +12,7 @@ const DEFAULT_DELAY_MIN = 5;
 const DEFAULT_DELAY_MAX = 15;
 const DEFAULT_BATCH_PAUSE = 60;
 const MAX_RUNTIME_MS = 55000;
+const BRIDGE_SEND_TIMEOUT_MS = 18_000;
 const SAO_PAULO_OFFSET_HOURS = -3; // UTC-3 (sem horário de verão atualmente)
 
 function sleep(ms: number) {
@@ -90,14 +91,33 @@ async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string
 
   for (const body of attempts) {
     for (let attempt = 0; attempt <= 2; attempt++) {
-      const res = await fetch(bridgeUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": bridgeApiKey,
-        },
-        body: JSON.stringify(body),
-      });
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), BRIDGE_SEND_TIMEOUT_MS);
+      let res: Response;
+      try {
+        res = await fetch(bridgeUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Api-Key": bridgeApiKey,
+          },
+          body: JSON.stringify(body),
+          signal: ctrl.signal,
+        });
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (attempt < 2) {
+          console.warn(`Bridge send falhou/timeout; retrying attempt ${attempt + 2}/3`, (err as Error).message);
+          await sleep(1000 * (attempt + 1));
+          continue;
+        }
+        return {
+          res: new Response(null, { status: 504 }),
+          data: { error: `Timeout/falha ao comunicar com a ponte WhatsApp: ${(err as Error).message}` },
+        };
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const data = await res.json().catch(async () => ({ error: await res.text().catch(() => "Resposta inválida da ponte") }));
 
@@ -693,6 +713,11 @@ Deno.serve(async (req) => {
       .eq("status", "connected");
 
     const hasLegacyBridge = !!(clientData.whatsapp_bridge_url && clientData.whatsapp_bridge_api_key);
+    const { count: managedInstanceCount } = await adminClient
+      .from("whatsapp_instances")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", client_id)
+      .eq("is_active", true);
 
     if ((poolCount ?? 0) === 0 && !hasLegacyBridge) {
       return new Response(
@@ -1317,7 +1342,7 @@ Deno.serve(async (req) => {
                   currentStage = usable.ramp_up_stage || "maduro";
                 }
               }
-              if (!bridgeUrl && hasLegacyBridge && (poolCount ?? 0) === 0) {
+              if (!bridgeUrl && hasLegacyBridge && (poolCount ?? 0) === 0 && (managedInstanceCount ?? 0) === 0) {
                 bridgeUrl = clientData.whatsapp_bridge_url!;
                 bridgeApiKey = clientData.whatsapp_bridge_api_key!;
               }
