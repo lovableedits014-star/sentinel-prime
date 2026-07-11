@@ -86,6 +86,66 @@ export default function DispatchLogDialog({ dispatchId, titulo }: { dispatchId: 
     }
   };
 
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      // Busca até 20k itens para exportação — muito além dos 2k do preview.
+      const pageSize = 1000;
+      let all: LogItem[] = [];
+      for (let from = 0; from < 20000; from += pageSize) {
+        const { data, error } = await supabase
+          .from("whatsapp_dispatch_items" as any)
+          .select("*")
+          .eq("dispatch_id", dispatchId)
+          .order("created_at", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const chunk = (data as unknown as LogItem[]) || [];
+        all = all.concat(chunk);
+        if (chunk.length < pageSize) break;
+      }
+
+      const header = [
+        "nome", "telefone", "status", "enviado_em", "cta_used",
+        "variante_enviada", "replied_at", "reply_text", "erro",
+      ];
+      const lines = [header.join(",")];
+      for (const it of all) {
+        lines.push([
+          csvEscape(it.nome),
+          csvEscape(it.telefone),
+          csvEscape(it.status),
+          csvEscape(it.enviado_em || ""),
+          csvEscape(it.cta_used || ""),
+          csvEscape(it.variant_used || it.mensagem_personalizada || ""),
+          csvEscape(it.replied_at || ""),
+          csvEscape(it.reply_text || ""),
+          csvEscape(it.erro || ""),
+        ].join(","));
+      }
+      // BOM para Excel abrir com acentos corretos.
+      const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeTitle = (titulo || "disparo").replace(/[^\w\-]+/g, "_").slice(0, 40);
+      a.href = url;
+      a.download = `disparo_${safeTitle}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Exportação concluída", description: `${all.length} contatos exportados.` });
+    } catch (err: any) {
+      toast({
+        title: "Falha ao exportar",
+        description: err?.message || "Não foi possível gerar o CSV.",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
