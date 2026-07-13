@@ -637,6 +637,7 @@ Deno.serve(async (req) => {
       var eleicao_tipo = payload.eleicao_tipo || null;
       var eleicao_escopo = payload.eleicao_escopo || null;
       var eleicao_regiao = payload.eleicao_regiao || null;
+      var eleicao_cidade = payload.eleicao_cidade || null;
 
       // Verify ownership
       const { data: ownerCheck } = await adminClient
@@ -776,6 +777,7 @@ Deno.serve(async (req) => {
       if (eleicao_tipo) q = q.eq("tipo", eleicao_tipo);
       if (eleicao_escopo) q = q.eq("escopo", eleicao_escopo);
       if (eleicao_regiao) q = q.eq("regiao", eleicao_regiao);
+      if (eleicao_cidade) q = q.eq("cidade", eleicao_cidade);
       const { data } = await q;
       recipients = (data || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
     } else if (tipo === "funcionarios") {

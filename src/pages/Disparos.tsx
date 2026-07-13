@@ -251,6 +251,7 @@ export default function Disparos() {
   const [eleicaoTipo, setEleicaoTipo] = useState<"all" | "coordenador" | "lider" | "cabo">("all");
   const [eleicaoEscopo, setEleicaoEscopo] = useState<"all" | "campo_grande" | "interior">("all");
   const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
+  const [eleicaoCidade, setEleicaoCidade] = useState<string>("all");
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("furtivo");
   const [customPol, setCustomPol] = useState({ batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120 });
@@ -342,7 +343,7 @@ export default function Disparos() {
 
   // Count recipients based on filter
   const { data: recipientCount = 0 } = useQuery<number>({
-    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao, selectedGroupJids.length, adhocContacts.length],
+    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao, eleicaoCidade, selectedGroupJids.length, adhocContacts.length],
     queryFn: async () => {
       if (tipoDisparo === "grupos") return selectedGroupJids.length;
       if (tipoDisparo === "lista_adhoc") return adhocContacts.length;
@@ -354,6 +355,7 @@ export default function Disparos() {
         if (eleicaoTipo !== "all") q = q.eq("tipo", eleicaoTipo);
         if (eleicaoEscopo !== "all") q = q.eq("escopo", eleicaoEscopo);
         if (eleicaoRegiao !== "all") q = q.eq("regiao", eleicaoRegiao);
+        if (eleicaoCidade !== "all") q = q.eq("cidade", eleicaoCidade);
         const { count } = await q;
         return count || 0;
       }
@@ -390,6 +392,34 @@ export default function Disparos() {
       return count || 0;
     },
     enabled: !!clientId,
+  });
+
+  // Cidades disponíveis (interior) para filtro de disparo por cidade
+  const { data: cidadesInterior = [] } = useQuery<{ cidade: string; total: number }[]>({
+    queryKey: ["dispatch-eleicao-cidades", clientId, eleicaoTipo, eleicaoEscopo],
+    queryFn: async () => {
+      if (!clientId) return [];
+      let q = supabase.from("eleicao_pessoas" as any)
+        .select("cidade")
+        .eq("client_id", clientId)
+        .not("telefone", "is", null)
+        .not("cidade", "is", null);
+      if (eleicaoTipo !== "all") q = q.eq("tipo", eleicaoTipo);
+      // interior = todas as cidades fora de CG; se escopo=all mostramos todas mesmo assim
+      if (eleicaoEscopo === "interior") q = q.eq("escopo", "interior");
+      else if (eleicaoEscopo === "campo_grande") q = q.eq("escopo", "campo_grande");
+      const { data } = await q.limit(10000);
+      const counts = new Map<string, number>();
+      for (const r of (data || []) as any[]) {
+        const c = (r.cidade || "").trim();
+        if (!c) continue;
+        counts.set(c, (counts.get(c) || 0) + 1);
+      }
+      return Array.from(counts.entries())
+        .map(([cidade, total]) => ({ cidade, total }))
+        .sort((a, b) => a.cidade.localeCompare(b.cidade, "pt-BR"));
+    },
+    enabled: !!clientId && tipoDisparo === "eleicao",
   });
 
   const handleMediaUpload = async (file: File) => {
@@ -484,6 +514,7 @@ export default function Disparos() {
           eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
           eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
           eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
+          eleicao_cidade: eleicaoCidade === "all" ? null : eleicaoCidade,
           group_jids: tipoDisparo === "grupos" ? selectedGroupJids : undefined,
           recipients_list: tipoDisparo === "lista_adhoc" ? adhocContacts : undefined,
           batch_size: pol.batch_size,
@@ -764,7 +795,7 @@ export default function Disparos() {
                 </div>
                 <div className="space-y-2">
                   <Label>Escopo</Label>
-                  <Select value={eleicaoEscopo} onValueChange={(v) => { setEleicaoEscopo(v as any); setEleicaoRegiao("all"); }}>
+                  <Select value={eleicaoEscopo} onValueChange={(v) => { setEleicaoEscopo(v as any); setEleicaoRegiao("all"); setEleicaoCidade("all"); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">CG + Interior</SelectItem>
@@ -805,6 +836,25 @@ export default function Disparos() {
                         })()}
                       </SelectContent>
                     </Select>
+                  </div>
+                )}
+                {(eleicaoEscopo === "interior" || eleicaoEscopo === "all") && (
+                  <div className="space-y-2">
+                    <Label>Cidade {eleicaoEscopo === "all" ? "(interior + CG)" : "(interior)"}</Label>
+                    <Select value={eleicaoCidade} onValueChange={setEleicaoCidade}>
+                      <SelectTrigger><SelectValue placeholder="Todas as cidades" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as cidades</SelectItem>
+                        {cidadesInterior.map((c) => (
+                          <SelectItem key={c.cidade} value={c.cidade}>
+                            {c.cidade} <span className="text-xs text-muted-foreground">({c.total})</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {cidadesInterior.length === 0 && (
+                      <p className="text-xs text-muted-foreground">Nenhuma cidade cadastrada para esse filtro.</p>
+                    )}
                   </div>
                 )}
               </>
