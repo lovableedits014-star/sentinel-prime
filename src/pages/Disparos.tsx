@@ -394,6 +394,34 @@ export default function Disparos() {
     enabled: !!clientId,
   });
 
+  // Cidades disponíveis (interior) para filtro de disparo por cidade
+  const { data: cidadesInterior = [] } = useQuery<{ cidade: string; total: number }[]>({
+    queryKey: ["dispatch-eleicao-cidades", clientId, eleicaoTipo, eleicaoEscopo],
+    queryFn: async () => {
+      if (!clientId) return [];
+      let q = supabase.from("eleicao_pessoas" as any)
+        .select("cidade")
+        .eq("client_id", clientId)
+        .not("telefone", "is", null)
+        .not("cidade", "is", null);
+      if (eleicaoTipo !== "all") q = q.eq("tipo", eleicaoTipo);
+      // interior = todas as cidades fora de CG; se escopo=all mostramos todas mesmo assim
+      if (eleicaoEscopo === "interior") q = q.eq("escopo", "interior");
+      else if (eleicaoEscopo === "campo_grande") q = q.eq("escopo", "campo_grande");
+      const { data } = await q.limit(10000);
+      const counts = new Map<string, number>();
+      for (const r of (data || []) as any[]) {
+        const c = (r.cidade || "").trim();
+        if (!c) continue;
+        counts.set(c, (counts.get(c) || 0) + 1);
+      }
+      return Array.from(counts.entries())
+        .map(([cidade, total]) => ({ cidade, total }))
+        .sort((a, b) => a.cidade.localeCompare(b.cidade, "pt-BR"));
+    },
+    enabled: !!clientId && tipoDisparo === "eleicao",
+  });
+
   const handleMediaUpload = async (file: File) => {
     if (!clientId) return;
     if (!file.type.startsWith("image/")) {
