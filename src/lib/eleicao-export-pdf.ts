@@ -264,8 +264,9 @@ export function exportEleicaoCsv(opts: ExportOptions) {
   const a = document.createElement("a");
   a.href = url;
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  a.download = `cadastros-eleicao-${escopoSlug}-${ts}.csv`;
+  const escopoSlug = slugify(opts.escopoLabel);
+  const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
+  a.download = `cadastros-eleicao-${escopoSlug}${suf}-${ts}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
