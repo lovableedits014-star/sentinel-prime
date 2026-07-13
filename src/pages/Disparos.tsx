@@ -251,6 +251,7 @@ export default function Disparos() {
   const [eleicaoTipo, setEleicaoTipo] = useState<"all" | "coordenador" | "lider" | "cabo">("all");
   const [eleicaoEscopo, setEleicaoEscopo] = useState<"all" | "campo_grande" | "interior">("all");
   const [eleicaoRegiao, setEleicaoRegiao] = useState<string>("all");
+  const [eleicaoCidade, setEleicaoCidade] = useState<string>("all");
   const [sending, setSending] = useState(false);
   const [politica, setPolitica] = useState<PolicyKey>("furtivo");
   const [customPol, setCustomPol] = useState({ batch_size: 8, delay_min: 15, delay_max: 60, batch_pause: 120 });
