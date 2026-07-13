@@ -777,6 +777,7 @@ Deno.serve(async (req) => {
       if (eleicao_tipo) q = q.eq("tipo", eleicao_tipo);
       if (eleicao_escopo) q = q.eq("escopo", eleicao_escopo);
       if (eleicao_regiao) q = q.eq("regiao", eleicao_regiao);
+      if (eleicao_cidade) q = q.eq("cidade", eleicao_cidade);
       const { data } = await q;
       recipients = (data || []).map((r: any) => ({ telefone: r.telefone, nome: r.nome }));
     } else if (tipo === "funcionarios") {
