@@ -280,6 +280,7 @@ export interface RaizExportOptions {
   incluirAvulsos?: boolean;
   coordenadorFiltro?: { id: string; nome: string } | null;
   filtros?: { label: string; value: string }[];
+  fileNameSuffix?: string;
 }
 
 interface EquipeNode {
