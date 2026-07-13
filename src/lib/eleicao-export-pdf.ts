@@ -473,11 +473,12 @@ export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
   }
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const escopoSlug = slugify(opts.escopoLabel);
   const coordSlug = opts.coordenadorFiltro
-    ? "-equipe-" + opts.coordenadorFiltro.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    ? "-equipe-" + slugify(opts.coordenadorFiltro.nome)
     : "";
-  doc.save(`eleicao-raiz-${escopoSlug}${coordSlug}-${ts}.pdf`);
+  const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
+  doc.save(`eleicao-raiz-${escopoSlug}${coordSlug}${suf}-${ts}.pdf`);
 }
 
 export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
