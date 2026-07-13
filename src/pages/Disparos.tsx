@@ -838,6 +838,25 @@ export default function Disparos() {
                     </Select>
                   </div>
                 )}
+                {(eleicaoEscopo === "interior" || eleicaoEscopo === "all") && (
+                  <div className="space-y-2">
+                    <Label>Cidade {eleicaoEscopo === "all" ? "(interior + CG)" : "(interior)"}</Label>
+                    <Select value={eleicaoCidade} onValueChange={setEleicaoCidade}>
+                      <SelectTrigger><SelectValue placeholder="Todas as cidades" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as cidades</SelectItem>
+                        {cidadesInterior.map((c) => (
+                          <SelectItem key={c.cidade} value={c.cidade}>
+                            {c.cidade} <span className="text-xs text-muted-foreground">({c.total})</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {cidadesInterior.length === 0 && (
+                      <p className="text-xs text-muted-foreground">Nenhuma cidade cadastrada para esse filtro.</p>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
