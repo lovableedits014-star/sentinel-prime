@@ -637,6 +637,7 @@ Deno.serve(async (req) => {
       var eleicao_tipo = payload.eleicao_tipo || null;
       var eleicao_escopo = payload.eleicao_escopo || null;
       var eleicao_regiao = payload.eleicao_regiao || null;
+      var eleicao_cidade = payload.eleicao_cidade || null;
 
       // Verify ownership
       const { data: ownerCheck } = await adminClient
