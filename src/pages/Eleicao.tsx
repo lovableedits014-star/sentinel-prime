@@ -1591,6 +1591,7 @@ export default function Eleicao() {
         coordenadores={coordenadoresEscopo}
         regioes={regioesExport}
         escopoTipo={escopo === "interior" ? "cidade" : "regiao"}
+        parceiros={PARCEIROS.map(p => ({ id: p.id, nome: p.nome, cor: p.cor, cargo: p.cargo }))}
         onExport={handleExport}
       />
     </div>
