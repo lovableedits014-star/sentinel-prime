@@ -514,6 +514,7 @@ export default function Disparos() {
           eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
           eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
           eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
+          eleicao_cidade: eleicaoCidade === "all" ? null : eleicaoCidade,
           group_jids: tipoDisparo === "grupos" ? selectedGroupJids : undefined,
           recipients_list: tipoDisparo === "lista_adhoc" ? adhocContacts : undefined,
           batch_size: pol.batch_size,
