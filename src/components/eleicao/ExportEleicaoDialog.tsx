@@ -6,11 +6,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { FileText, Printer, Package, Network, List as ListIcon } from "lucide-react";
+import { FileText, Printer, Package, Network, List as ListIcon, Handshake } from "lucide-react";
 
 export type ExportTipo = "coordenador" | "lider" | "cabo";
 export type ExportFormato = "pdf" | "csv" | "print";
 export type ExportModo = "lista" | "raiz";
+
+// parceiroId semantics:
+//   null      → "todas as dobradinhas" (nenhum filtro)
+//   "__none"  → apenas raízes sem parceiro (100% estadual)
+//   <uuid>    → raízes com esse parceiro
+export const PARCEIRO_SEM = "__none";
 
 export interface ExportConfig {
   formato: ExportFormato;
@@ -19,10 +25,13 @@ export interface ExportConfig {
   coordenadorId: string | null; // null = todos
   regiao: string | null; // null = todas
   incluirAvulsos: boolean;
+  parceiroId: string | null; // null = todas as dobradinhas; "__none" = sem dobradinha
+  porParceiro: boolean; // gerar um arquivo por dobradinha
 }
 
 interface CoordOption { id: string; nome: string; regiao?: string | null }
 interface RegiaoOption { value: string; label: string }
+interface ParceiroOption { id: string; nome: string; cor?: string; cargo?: string }
 
 interface Props {
   open: boolean;
@@ -30,17 +39,20 @@ interface Props {
   coordenadores: CoordOption[]; // do escopo atual
   regioes: RegiaoOption[]; // regiões (CG) ou cidades (interior) disponíveis
   escopoTipo: "regiao" | "cidade";
+  parceiros?: ParceiroOption[];
   onExport: (cfg: ExportConfig) => void;
 }
 
 const TODOS: ExportTipo[] = ["coordenador", "lider", "cabo"];
 
-export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores, regioes, escopoTipo, onExport }: Props) {
+export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores, regioes, escopoTipo, parceiros = [], onExport }: Props) {
   const [modo, setModo] = useState<ExportModo>("lista");
   const [tipos, setTipos] = useState<ExportTipo[]>(TODOS);
   const [coordenadorId, setCoordenadorId] = useState<string>("__all");
   const [regiao, setRegiao] = useState<string>("__all");
   const [incluirAvulsos, setIncluirAvulsos] = useState(true);
+  const [parceiroSel, setParceiroSel] = useState<string>("__all"); // "__all" | "__none" | uuid
+  const [porParceiro, setPorParceiro] = useState(false);
 
   const toggleTipo = (t: ExportTipo) => {
     setTipos(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
@@ -48,6 +60,7 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
 
   const incluiLideresOuCabos = tipos.includes("lider") || tipos.includes("cabo");
   const podeAvulsos = tipos.includes("lider") && coordenadorId === "__all";
+  const podePorParceiro = parceiroSel === "__all" && parceiros.length > 0;
 
   // Coordenadores filtrados pela região escolhida
   const coordsOrdenados = useMemo(() => {
@@ -62,8 +75,15 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
     }
   }, [coordsOrdenados, coordenadorId]);
 
+  // Se filtrou por um parceiro específico, desliga "um arquivo por dobradinha"
+  useEffect(() => {
+    if (parceiroSel !== "__all" && porParceiro) setPorParceiro(false);
+  }, [parceiroSel, porParceiro]);
+
   function fire(formato: ExportFormato) {
     if (tipos.length === 0) return;
+    const parceiroId =
+      parceiroSel === "__all" ? null : parceiroSel; // "__none" ou uuid
     onExport({
       formato,
       modo,
@@ -71,13 +91,15 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
       coordenadorId: coordenadorId === "__all" ? null : coordenadorId,
       regiao: regiao === "__all" ? null : regiao,
       incluirAvulsos: podeAvulsos ? incluirAvulsos : false,
+      parceiroId,
+      porParceiro: podePorParceiro && porParceiro,
     });
     onOpenChange(false);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Exportar cadastros</DialogTitle>
           <DialogDescription>
@@ -145,6 +167,50 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
             </div>
           )}
 
+          {/* Dobradinha (parceiro) */}
+          {parceiros.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold flex items-center gap-1.5">
+                <Handshake className="w-3.5 h-3.5 text-primary" />
+                Dobradinha (candidato parceiro)
+              </Label>
+              <Select value={parceiroSel} onValueChange={setParceiroSel}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all">Todas as dobradinhas</SelectItem>
+                  <SelectItem value={PARCEIRO_SEM}>Sem dobradinha (100% estadual)</SelectItem>
+                  {parceiros.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block"
+                          style={{ backgroundColor: p.cor || "#3b82f6" }}
+                        />
+                        <span>{p.nome}</span>
+                        {p.cargo && <span className="text-xs text-muted-foreground">· {p.cargo}</span>}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Filtra pela dobradinha aplicada na raiz do coordenador. Líderes e cabos herdam a dobradinha do coordenador ancestral.
+              </p>
+
+              {podePorParceiro && (
+                <div className="flex items-center justify-between rounded-md border p-3 mt-2">
+                  <div className="pr-3">
+                    <div className="text-sm font-medium">Gerar um arquivo por dobradinha</div>
+                    <p className="text-xs text-muted-foreground">
+                      Cria um PDF/CSV separado para cada candidato parceiro (e um para "Sem dobradinha"), pronto para entregar ao parceiro.
+                    </p>
+                  </div>
+                  <Switch checked={porParceiro} onCheckedChange={setPorParceiro} />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Coordenador específico */}
           {(incluiLideresOuCabos || modo === "raiz") && coordsOrdenados.length > 0 && (
             <div className="space-y-2">
@@ -181,7 +247,7 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
           <Button variant="outline" disabled={tipos.length === 0} onClick={() => fire("csv")}>
             <Package className="w-4 h-4 mr-2" />CSV
           </Button>
-          <Button variant="outline" disabled={tipos.length === 0} onClick={() => fire("print")}>
+          <Button variant="outline" disabled={tipos.length === 0 || porParceiro} onClick={() => fire("print")} title={porParceiro ? "Desligue 'um arquivo por dobradinha' para imprimir" : undefined}>
             <Printer className="w-4 h-4 mr-2" />Imprimir
           </Button>
           <Button disabled={tipos.length === 0} onClick={() => fire("pdf")}>

@@ -722,6 +722,21 @@ export default function Eleicao() {
       );
     }
 
+    // Índice: pessoa → parceiro_id efetivo (herdado da raiz)
+    const pessoaById = new Map(pessoas.map(p => [p.id, p]));
+    const raizDe = (p: Pessoa): Pessoa => {
+      let cur: Pessoa | undefined = p;
+      const seen = new Set<string>();
+      while (cur && cur.parent_id && !seen.has(cur.id)) {
+        seen.add(cur.id);
+        const parent = pessoaById.get(cur.parent_id);
+        if (!parent) break;
+        cur = parent;
+      }
+      return cur || p;
+    };
+    const parceiroEfetivoDe = (p: Pessoa): string | null => raizDe(p).parceiro_id || null;
+
     // Para o modo "raiz", precisamos da equipe inteira; aplicamos filtro de tipo
     // só no momento do filtro pós-montagem. Aqui já filtramos por coordenador escolhido.
     let lista = base;
@@ -736,6 +751,12 @@ export default function Eleicao() {
       );
     }
 
+    // Filtro por dobradinha específica (parceiroId "__none" = sem dobradinha)
+    if (cfg.parceiroId) {
+      const alvo = cfg.parceiroId === "__none" ? null : cfg.parceiroId;
+      lista = lista.filter(p => parceiroEfetivoDe(p) === alvo);
+    }
+
     // Aplica filtro de tipos do dialog
     const tiposSet = new Set(cfg.tipos);
     const listaTipada = lista.filter(p => tiposSet.has(p.tipo));
@@ -747,26 +768,67 @@ export default function Eleicao() {
 
     const byId = new Map(pessoas.map(p => [p.id, p.nome]));
     const escopoLabel = escopo === "campo_grande" ? "Campo Grande" : "Interior";
-    const filtros: { label: string; value: string }[] = [];
-    if (search) filtros.push({ label: "Busca", value: search });
-    if (regiaoFilter && regiaoFilter !== "all") filtros.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
-    if (cfg.regiao) {
-      const label = escopo === "interior" ? "Cidade" : "Região";
-      const valor = escopo === "interior" ? cfg.regiao : (REGIOES.find(r => r.value === cfg.regiao)?.label || cfg.regiao);
-      filtros.push({ label, value: valor });
-    }
-    filtros.push({ label: "Tipos", value: cfg.tipos.map(t => t === "coordenador" ? "Coord" : t === "lider" ? "Líder" : "Cabo").join(", ") });
-    if (cfg.coordenadorId) {
-      const coordNome = byId.get(cfg.coordenadorId) || "";
-      filtros.push({ label: "Equipe", value: coordNome });
-    }
+    const parceiroById = new Map(PARCEIROS.map(p => [p.id, p]));
 
-    if (cfg.modo === "raiz") {
-      // Para raiz precisamos da lista bruta (com ids/parent_ids) para montar árvore;
-      // o filtro de tipos é respeitado ao decidir o que aparece na árvore:
-      // - se "coordenador" não selecionado, ainda mostramos o cabeçalho do coord
-      //   (porque é a raiz), mas omitimos quando só "cabo" foi pedido.
-      const itemsRaiz: ExportPessoa[] = lista.map(p => ({
+    const baseFiltros = (): { label: string; value: string }[] => {
+      const f: { label: string; value: string }[] = [];
+      if (search) f.push({ label: "Busca", value: search });
+      if (regiaoFilter && regiaoFilter !== "all") f.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
+      if (cfg.regiao) {
+        const label = escopo === "interior" ? "Cidade" : "Região";
+        const valor = escopo === "interior" ? cfg.regiao : (REGIOES.find(r => r.value === cfg.regiao)?.label || cfg.regiao);
+        f.push({ label, value: valor });
+      }
+      f.push({ label: "Tipos", value: cfg.tipos.map(t => t === "coordenador" ? "Coord" : t === "lider" ? "Líder" : "Cabo").join(", ") });
+      if (cfg.coordenadorId) {
+        const coordNome = byId.get(cfg.coordenadorId) || "";
+        f.push({ label: "Equipe", value: coordNome });
+      }
+      return f;
+    };
+
+    const rodarExport = (
+      pessoasFiltradas: Pessoa[],
+      listaBase: Pessoa[], // usada no modo "raiz" para montar a árvore
+      dobradinhaLabel: string | null,
+      fileNameSuffix: string | undefined,
+    ) => {
+      const filtros = baseFiltros();
+      if (dobradinhaLabel) filtros.push({ label: "Dobradinha", value: dobradinhaLabel });
+
+      if (cfg.modo === "raiz") {
+        const itemsRaiz: ExportPessoa[] = listaBase.map(p => ({
+          id: p.id,
+          parent_id: p.parent_id,
+          nome: p.nome,
+          tipo: p.tipo,
+          telefone: p.telefone,
+          regiao: p.regiao,
+          cidade: p.cidade,
+          bairro: p.bairro,
+          rua: p.rua,
+          numero: p.numero,
+          email: p.email,
+          observacoes: p.observacoes,
+          valor_contratacao: p.valor_contratacao,
+        }));
+        const coordFiltro = cfg.coordenadorId
+          ? { id: cfg.coordenadorId, nome: byId.get(cfg.coordenadorId) || "" }
+          : null;
+        const opts = {
+          escopoLabel,
+          pessoas: itemsRaiz,
+          incluirAvulsos: cfg.incluirAvulsos,
+          coordenadorFiltro: coordFiltro,
+          filtros,
+          fileNameSuffix,
+        };
+        if (cfg.formato === "csv") exportEleicaoCsvRaiz(opts);
+        else exportEleicaoPdfRaiz(opts);
+        return pessoasFiltradas.length;
+      }
+
+      const items: ExportPessoa[] = pessoasFiltradas.map(p => ({
         id: p.id,
         parent_id: p.parent_id,
         nome: p.nome,
@@ -780,60 +842,64 @@ export default function Eleicao() {
         email: p.email,
         observacoes: p.observacoes,
         valor_contratacao: p.valor_contratacao,
+        parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
       }));
-      const coordFiltro = cfg.coordenadorId
-        ? { id: cfg.coordenadorId, nome: byId.get(cfg.coordenadorId) || "" }
-        : null;
-      const opts = {
-        escopoLabel,
-        pessoas: itemsRaiz,
-        incluirAvulsos: cfg.incluirAvulsos,
-        coordenadorFiltro: coordFiltro,
-        filtros,
-      };
-      if (cfg.formato === "csv") {
-        exportEleicaoCsvRaiz(opts);
-        toast.success(`CSV raiz exportado (${listaTipada.length} registros)`);
-      } else {
-        exportEleicaoPdfRaiz(opts);
-        toast.success(
-          cfg.formato === "print"
-            ? "PDF raiz gerado — use Ctrl+P para imprimir."
-            : `PDF raiz exportado (${listaTipada.length} registros)`
-        );
+      const opts = { escopoLabel, pessoas: items, filtros, fileNameSuffix };
+      if (cfg.formato === "csv") exportEleicaoCsv(opts);
+      else exportEleicaoPdf(opts);
+      return items.length;
+    };
+
+    // Segmentado: um arquivo por dobradinha
+    if (cfg.porParceiro && !cfg.parceiroId) {
+      const grupos = new Map<string | null, { pessoasTipadas: Pessoa[]; pessoasBase: Pessoa[] }>();
+      for (const p of listaTipada) {
+        const k = parceiroEfetivoDe(p);
+        if (!grupos.has(k)) grupos.set(k, { pessoasTipadas: [], pessoasBase: [] });
+        grupos.get(k)!.pessoasTipadas.push(p);
       }
+      // Para o modo raiz também precisamos da lista bruta segmentada
+      for (const p of lista) {
+        const k = parceiroEfetivoDe(p);
+        if (!grupos.has(k)) continue; // só grupos que têm pelo menos 1 tipado
+        grupos.get(k)!.pessoasBase.push(p);
+      }
+
+      let totalArquivos = 0;
+      let totalRegistros = 0;
+      for (const [parceiroId, g] of grupos) {
+        if (g.pessoasTipadas.length === 0) continue;
+        const parc = parceiroId ? parceiroById.get(parceiroId) : null;
+        const nome = parc ? parc.nome : "Sem dobradinha";
+        const sufixo = parc ? parc.nome : "sem-dobradinha";
+        const qtd = rodarExport(g.pessoasTipadas, g.pessoasBase, nome, sufixo);
+        totalArquivos++;
+        totalRegistros += qtd;
+      }
+      toast.success(`${totalArquivos} arquivo(s) gerado(s) · ${totalRegistros} registro(s) no total`);
       return;
     }
 
-    // Modo "lista" (comportamento clássico, com filtros novos)
-    const items: ExportPessoa[] = listaTipada.map(p => ({
-      id: p.id,
-      parent_id: p.parent_id,
-      nome: p.nome,
-      tipo: p.tipo,
-      telefone: p.telefone,
-      regiao: p.regiao,
-      cidade: p.cidade,
-      bairro: p.bairro,
-      rua: p.rua,
-      numero: p.numero,
-      email: p.email,
-      observacoes: p.observacoes,
-      valor_contratacao: p.valor_contratacao,
-      parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
-    }));
-
-    const opts = { escopoLabel, pessoas: items, filtros };
+    // Fluxo simples (com ou sem filtro de dobradinha específica)
+    let dobradinhaLabel: string | null = null;
+    let sufixo: string | undefined = undefined;
+    if (cfg.parceiroId === "__none") {
+      dobradinhaLabel = "Sem dobradinha";
+      sufixo = "sem-dobradinha";
+    } else if (cfg.parceiroId) {
+      const parc = parceiroById.get(cfg.parceiroId);
+      if (parc) {
+        dobradinhaLabel = parc.nome + (parc.cargo ? ` (${parc.cargo})` : "");
+        sufixo = parc.nome;
+      }
+    }
+    const qtd = rodarExport(listaTipada, lista, dobradinhaLabel, sufixo);
     if (cfg.formato === "csv") {
-      exportEleicaoCsv(opts);
-      toast.success(`CSV exportado (${items.length} registros)`);
+      toast.success(`CSV exportado (${qtd} registros)`);
+    } else if (cfg.formato === "print") {
+      toast.success("PDF gerado — use Ctrl+P para imprimir.");
     } else {
-      exportEleicaoPdf(opts);
-      toast.success(
-        cfg.formato === "print"
-          ? "PDF gerado — use Ctrl+P para imprimir."
-          : `PDF exportado (${items.length} registros)`
-      );
+      toast.success(`PDF exportado (${qtd} registros)`);
     }
   }
 
@@ -1525,6 +1591,7 @@ export default function Eleicao() {
         coordenadores={coordenadoresEscopo}
         regioes={regioesExport}
         escopoTipo={escopo === "interior" ? "cidade" : "regiao"}
+        parceiros={PARCEIROS.map(p => ({ id: p.id, nome: p.nome, cor: p.cor, cargo: p.cargo }))}
         onExport={handleExport}
       />
     </div>

@@ -48,6 +48,16 @@ export interface ExportOptions {
   escopoLabel: string;
   pessoas: ExportPessoa[];
   filtros?: { label: string; value: string }[];
+  fileNameSuffix?: string;
+}
+
+function slugify(s: string) {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export function exportEleicaoPdf(opts: ExportOptions) {
@@ -203,8 +213,9 @@ export function exportEleicaoPdf(opts: ExportOptions) {
   }
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  doc.save(`cadastros-eleicao-${escopoSlug}-${ts}.pdf`);
+  const escopoSlug = slugify(opts.escopoLabel);
+  const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
+  doc.save(`cadastros-eleicao-${escopoSlug}${suf}-${ts}.pdf`);
 }
 
 export function exportEleicaoCsv(opts: ExportOptions) {
@@ -253,8 +264,9 @@ export function exportEleicaoCsv(opts: ExportOptions) {
   const a = document.createElement("a");
   a.href = url;
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  a.download = `cadastros-eleicao-${escopoSlug}-${ts}.csv`;
+  const escopoSlug = slugify(opts.escopoLabel);
+  const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
+  a.download = `cadastros-eleicao-${escopoSlug}${suf}-${ts}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -268,6 +280,7 @@ export interface RaizExportOptions {
   incluirAvulsos?: boolean;
   coordenadorFiltro?: { id: string; nome: string } | null;
   filtros?: { label: string; value: string }[];
+  fileNameSuffix?: string;
 }
 
 interface EquipeNode {
@@ -460,11 +473,12 @@ export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
   }
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const escopoSlug = slugify(opts.escopoLabel);
   const coordSlug = opts.coordenadorFiltro
-    ? "-equipe-" + opts.coordenadorFiltro.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    ? "-equipe-" + slugify(opts.coordenadorFiltro.nome)
     : "";
-  doc.save(`eleicao-raiz-${escopoSlug}${coordSlug}-${ts}.pdf`);
+  const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
+  doc.save(`eleicao-raiz-${escopoSlug}${coordSlug}${suf}-${ts}.pdf`);
 }
 
 export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
@@ -514,11 +528,12 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
   const a = document.createElement("a");
   a.href = url;
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const escopoSlug = slugify(opts.escopoLabel);
   const coordSlug = opts.coordenadorFiltro
-    ? "-equipe-" + opts.coordenadorFiltro.nome.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+    ? "-equipe-" + slugify(opts.coordenadorFiltro.nome)
     : "";
-  a.download = `eleicao-raiz-${escopoSlug}${coordSlug}-${ts}.csv`;
+  const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
+  a.download = `eleicao-raiz-${escopoSlug}${coordSlug}${suf}-${ts}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

@@ -1,63 +1,56 @@
-# Corrigir parada em 15 envios e adicionar retomada robusta
+## Objetivo
 
-## Diagnóstico
+Na página **Eleição → Exportar cadastros**, permitir filtrar/segmentar a exportação pela **dobradinha** (candidato parceiro federal — deputado, senador etc.), mantendo o layout atual dos PDFs/CSVs (lista simples e raiz hierárquica).
 
-O disparo parou em 15 porque a única instância conectada bateu o **cap diário do estágio de aquecimento** (`ramp_up_stage`). Hoje, quando não há outra instância viva, o loop marca o disparo como `pausado_sem_instancia` e sai — e o botão "Retomar" só aparece se o disparo estiver `cancelado`.
+## Contexto
 
-Além disso, não existe controle por disparo de **quantas instâncias** você quer usar. O motor sempre tenta distribuir entre todas as saudáveis; com só uma conectada, ele respeita o cap dela e para.
+- A dobradinha é armazenada na **raiz** (coordenador): campos `parceiro_id`, `rateio_estadual`, `rateio_parceiro` em `eleicao_pessoas`. Líderes/cabos herdam do coordenador ancestral.
+- Parceiros ativos já vêm do hook `useCandidatosParceiros` (`PARCEIROS` em `Eleicao.tsx`).
+- O diálogo atual (`ExportEleicaoDialog.tsx`) já filtra por escopo, região/cidade, tipo, coordenador e avulsos. Falta o eixo "dobradinha".
 
-## O que vai mudar
+## Mudanças
 
-### 1. Configuração de instâncias por disparo (Disparos.tsx / wizard de criação)
+### 1. `ExportEleicaoDialog.tsx` — novo filtro "Dobradinha"
 
-No card de criação de disparo, adicionar um bloco "Instâncias":
+- Nova prop `parceiros: { id: string; nome: string; cor?: string }[]`.
+- Novo `Select` "Dobradinha (candidato parceiro)" com opções:
+  - `Todas as dobradinhas` (default)
+  - `Sem dobradinha (100% estadual)`
+  - Um item por parceiro ativo (nome + bolinha colorida)
+- Novo `Switch` **"Gerar um arquivo por dobradinha"** (só habilitado quando "Todas as dobradinhas" está selecionado). Ao ligar, o export produz um PDF/CSV separado para cada parceiro presente na seleção + um "Sem dobradinha" quando aplicável — útil para entregar o corte pronto a cada candidato parceiro.
+- Adicionar `parceiroId: string | null` e `porParceiro: boolean` ao tipo `ExportConfig`.
+- Mostrar chip/aviso quando o filtro reduzir a zero.
 
-- **Modo de distribuição** (radio):
-  - `Automático` (padrão) — usa todas as instâncias conectadas saudáveis
-  - `Fixo` — você escolhe quantas instâncias no máximo (1–N das conectadas)
-- **Ignorar cap de aquecimento neste disparo** (checkbox, off por padrão, com aviso amarelo): "Envia até esgotar a fila mesmo se a instância estiver em fase 'novo/aquecendo'. Use só com instâncias maduras — pode acionar bloqueio da Meta."
+### 2. `Eleicao.tsx` — `handleExport`
 
-Persistir em duas colunas novas em `whatsapp_dispatches`:
-- `max_instances INT` (null = automático)
-- `ignore_stage_cap BOOLEAN DEFAULT false`
+- Construir um índice `raizPorId` (mapa `pessoaId → { parceiro_id, rateio_estadual, rateio_parceiro, nome }`) subindo `parent_id` até a raiz. Já existe lógica similar no render; extrair util `getRaizDobradinha(p, pessoas)`.
+- **Filtro simples**: quando `cfg.parceiroId` estiver definido, filtrar `base` pelas pessoas cuja raiz tem `parceiro_id === cfg.parceiroId` (ou `null` para "Sem dobradinha").
+- **Segmentado (`porParceiro=true`)**: agrupar `listaTipada` por `raiz.parceiro_id` (incluindo `null`) e chamar o exportador uma vez por grupo, com:
+  - `filtros` incluindo `{ label: "Dobradinha", value: <nome do parceiro | "Sem dobradinha"> }`
+  - nome de arquivo sufixado com o parceiro (ex.: `eleicao-CG-Fulano-Federal.pdf`)
+- Passar `parceiros` para o diálogo a partir de `PARCEIROS`.
 
-### 2. Motor `send-whatsapp-dispatch` respeitando a config
+### 3. Exportadores (`src/lib/eleicao-export-pdf.ts` e o CSV correspondente)
 
-- Ao selecionar instâncias saudáveis, aplicar `LIMIT max_instances` (ou usar todas se null).
-- Em `effectiveCap()`, se `ignore_stage_cap` do dispatch atual for true, retornar `Infinity` (ou seja, cap ignorado — o `daily_send_limit` global da instância continua valendo como teto de segurança).
-- Se sobrar apenas 1 instância viva e o cap dela já foi atingido **e** `ignore_stage_cap=false`, pausar como hoje (`pausado_sem_instancia`), mas registrar `pause_reason: "Cap diário atingido — retomar amanhã ou marcar 'ignorar cap'"` para dar contexto no card.
+- **Não alterar o layout do documento**. Apenas:
+  - Aceitar um campo opcional `tituloComplemento?: string` (ex.: `"Dobradinha: Fulano (60/40)"`) que entra no bloco de "Filtros aplicados" já existente — o formato do documento fica idêntico.
+  - Aceitar `fileNameSuffix?: string` para nomear os arquivos ao gerar em lote.
+- Nenhuma mudança em fontes, cabeçalhos, colunas, agrupamento raiz, etc.
 
-### 3. Botão "Retomar" universal
+### 4. Toasts / UX
 
-Trocar a condição atual (`status === "cancelado"`) por:
+- Um único toast final quando `porParceiro=true`: `"N arquivos gerados (X registros no total)"`.
+- Quando um grupo estiver vazio, pular silenciosamente.
 
-```
-status ∈ {cancelado, pausado_timeout, pausado_janela, pausado_sem_instancia}
-E (total_destinatarios - enviados - falhas) > 0
-```
+## Fora de escopo
 
-E ajustar `handleResumeDispatch`:
-- Reativar itens com `status IN ('cancelado', 'pendente')` que ainda não foram enviados (hoje só pega `cancelado`).
-- Se o disparo estava `pausado_sem_instancia` por cap, o resume só faz sentido se: (a) uma nova instância ficou saudável, **ou** (b) hoje é outro dia (contador zerou), **ou** (c) o usuário marcar "ignorar cap" ao retomar. Adicionar checkbox "Ignorar cap de aquecimento" no modal de retomar, que atualiza `ignore_stage_cap=true` no dispatch antes de invocar.
-- Toast de erro claro quando não houver instância viva: "Nenhuma instância conectada. Conecte um chip em Status WhatsApp antes de retomar."
+- Coluna nova nos PDFs/CSVs mostrando dobradinha em cada linha (o usuário pediu para manter o padrão do documento).
+- Rateio/valores por parceiro (custos): já existe a aba Custos; nada muda ali.
+- Mudanças no fluxo de cadastro/edição de dobradinha.
 
-### 4. UX — mostrar por que parou
+## Arquivos a tocar
 
-No card do histórico (`dispatches.map`), quando `status` começar com `pausado_`, exibir uma linha em amarelo com `pause_reason`. Já existe a coluna, só não está sendo mostrada.
-
-## Detalhes técnicos
-
-- Migration: adicionar `max_instances` e `ignore_stage_cap` em `whatsapp_dispatches` (nullable / default false). Sem RLS nova — herdam as políticas existentes.
-- Arquivos:
-  - `src/pages/Disparos.tsx` — bloco de config no wizard, insert do dispatch com os 2 campos novos, condição de resume ampliada, exibir `pause_reason`.
-  - `supabase/functions/send-whatsapp-dispatch/index.ts` — ler `max_instances`/`ignore_stage_cap` do dispatch atual em memória, aplicar em `effectiveCap()` e na query de seleção de instâncias.
-- Sem mudança no schema de itens; o motor continua puxando o próximo `pendente`.
-
-## Fora do escopo
-
-- Auto-promover ramp_up_stage após X envios sem falha (mecânica separada, não pedida).
-- Rebalancear disparos entre instâncias em tempo real além do que já existe.
-
----
-
-Confirma que posso implementar assim, ou quer ajustar o comportamento do "ignorar cap" (por exemplo, exigir confirmação em dois cliques)?
+- `src/components/eleicao/ExportEleicaoDialog.tsx` (novo filtro + switch, novos campos no `ExportConfig`)
+- `src/pages/Eleicao.tsx` (`handleExport`, passagem de `parceiros`)
+- `src/lib/eleicao-export-pdf.ts` (aceitar `tituloComplemento` e `fileNameSuffix`; layout inalterado)
+- CSV helper equivalente (mesma assinatura ampliada)
