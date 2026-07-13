@@ -795,7 +795,7 @@ export default function Disparos() {
                 </div>
                 <div className="space-y-2">
                   <Label>Escopo</Label>
-                  <Select value={eleicaoEscopo} onValueChange={(v) => { setEleicaoEscopo(v as any); setEleicaoRegiao("all"); }}>
+                  <Select value={eleicaoEscopo} onValueChange={(v) => { setEleicaoEscopo(v as any); setEleicaoRegiao("all"); setEleicaoCidade("all"); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">CG + Interior</SelectItem>
