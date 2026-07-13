@@ -343,7 +343,7 @@ export default function Disparos() {
 
   // Count recipients based on filter
   const { data: recipientCount = 0 } = useQuery<number>({
-    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao, selectedGroupJids.length, adhocContacts.length],
+    queryKey: ["dispatch-recipient-count", clientId, tagFiltro, tipoDisparo, eleicaoTipo, eleicaoEscopo, eleicaoRegiao, eleicaoCidade, selectedGroupJids.length, adhocContacts.length],
     queryFn: async () => {
       if (tipoDisparo === "grupos") return selectedGroupJids.length;
       if (tipoDisparo === "lista_adhoc") return adhocContacts.length;
@@ -355,6 +355,7 @@ export default function Disparos() {
         if (eleicaoTipo !== "all") q = q.eq("tipo", eleicaoTipo);
         if (eleicaoEscopo !== "all") q = q.eq("escopo", eleicaoEscopo);
         if (eleicaoRegiao !== "all") q = q.eq("regiao", eleicaoRegiao);
+        if (eleicaoCidade !== "all") q = q.eq("cidade", eleicaoCidade);
         const { count } = await q;
         return count || 0;
       }
