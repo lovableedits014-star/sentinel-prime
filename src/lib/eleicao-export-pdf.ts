@@ -213,8 +213,9 @@ export function exportEleicaoPdf(opts: ExportOptions) {
   }
 
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-  const escopoSlug = opts.escopoLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  doc.save(`cadastros-eleicao-${escopoSlug}-${ts}.pdf`);
+  const escopoSlug = slugify(opts.escopoLabel);
+  const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
+  doc.save(`cadastros-eleicao-${escopoSlug}${suf}-${ts}.pdf`);
 }
 
 export function exportEleicaoCsv(opts: ExportOptions) {
