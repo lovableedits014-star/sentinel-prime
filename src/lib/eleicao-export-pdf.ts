@@ -160,12 +160,7 @@ export function exportEleicaoPdf(opts: ExportOptions) {
     y += 8;
     doc.setTextColor(0);
 
-    const sorted = [...grupo].sort((a, b) => {
-      const ra = (a.cidade || a.regiao || "").toLowerCase();
-      const rb = (b.cidade || b.regiao || "").toLowerCase();
-      if (ra !== rb) return ra.localeCompare(rb);
-      return (a.nome || "").localeCompare(b.nome || "");
-    });
+    const sorted = [...grupo].sort(sortByRegiaoNome);
 
     const rows = sorted.map((p) => [
       p.nome,
