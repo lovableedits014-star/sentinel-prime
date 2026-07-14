@@ -248,7 +248,7 @@ export function exportEleicaoPdf(opts: ExportOptions) {
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
   const escopoSlug = slugify(opts.escopoLabel);
   const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
-  doc.save(`cadastros-eleicao-${escopoSlug}${suf}-${ts}.pdf`);
+  outputPdf(doc, `cadastros-eleicao-${escopoSlug}${suf}-${ts}.pdf`, opts.mode);
 }
 
 export function exportEleicaoCsv(opts: ExportOptions) {
