@@ -45,8 +45,10 @@ const enderecoOf = (p: ExportPessoa) => {
 
 // Ordena pessoas por região/cidade alfabética, depois por nome alfabético.
 const sortByRegiaoNome = (a: ExportPessoa, b: ExportPessoa) => {
-  const ra = (a.cidade || a.regiao || "").toLowerCase();
-  const rb = (b.cidade || b.regiao || "").toLowerCase();
+  // Em Campo Grande `regiao` guarda a região urbana (centro, moreninha...) e `cidade` = "Campo Grande".
+  // No interior `regiao` é nulo e `cidade` é o município. Preferir região urbana quando existir.
+  const ra = (a.regiao || a.cidade || "").toLowerCase();
+  const rb = (b.regiao || b.cidade || "").toLowerCase();
   if (ra !== rb) return ra.localeCompare(rb);
   return (a.nome || "").localeCompare(b.nome || "");
 };
