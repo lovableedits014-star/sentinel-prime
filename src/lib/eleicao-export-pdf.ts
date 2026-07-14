@@ -327,7 +327,7 @@ function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
     const lids = (lideresPorCoord.get(coord.id || "") || []).sort(sortByRegiaoNome);
     const arr = lids.map(lider => ({
       lider,
-      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortNome),
+      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortByRegiaoNome),
     }));
     const totalValor =
       (coord.valor_contratacao || 0) +
@@ -337,9 +337,9 @@ function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
   }
 
   if (incluirAvulsos && !coordenadorFiltro && avulsos.length > 0) {
-    const arr = avulsos.sort(sortNome).map(lider => ({
+    const arr = avulsos.sort(sortByRegiaoNome).map(lider => ({
       lider,
-      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortNome),
+      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortByRegiaoNome),
     }));
     const totalValor = arr.reduce((s, l) => s + (l.lider.valor_contratacao || 0) + l.cabos.reduce((ss, c) => ss + (c.valor_contratacao || 0), 0), 0);
     const qtdCabos = arr.reduce((s, l) => s + l.cabos.length, 0);
