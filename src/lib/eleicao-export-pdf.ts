@@ -241,7 +241,7 @@ export function exportEleicaoCsv(opts: ExportOptions) {
     return /[";,\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [headers.join(";")];
-  for (const p of opts.pessoas) {
+  for (const p of [...opts.pessoas].sort(sortByRegiaoNome)) {
     lines.push(
       [
         TIPO_LABEL[p.tipo] || p.tipo,
