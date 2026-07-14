@@ -45,8 +45,10 @@ const enderecoOf = (p: ExportPessoa) => {
 
 // Ordena pessoas por região/cidade alfabética, depois por nome alfabético.
 const sortByRegiaoNome = (a: ExportPessoa, b: ExportPessoa) => {
-  const ra = (a.cidade || a.regiao || "").toLowerCase();
-  const rb = (b.cidade || b.regiao || "").toLowerCase();
+  // Em Campo Grande `regiao` guarda a região urbana (centro, moreninha...) e `cidade` = "Campo Grande".
+  // No interior `regiao` é nulo e `cidade` é o município. Preferir região urbana quando existir.
+  const ra = (a.regiao || a.cidade || "").toLowerCase();
+  const rb = (b.regiao || b.cidade || "").toLowerCase();
   if (ra !== rb) return ra.localeCompare(rb);
   return (a.nome || "").localeCompare(b.nome || "");
 };
@@ -165,7 +167,7 @@ export function exportEleicaoPdf(opts: ExportOptions) {
     const rows = sorted.map((p) => [
       p.nome,
       fmtPhone(p.telefone),
-      cap(p.cidade || p.regiao),
+      p.regiao ? cap(p.regiao) : (p.cidade || "—"),
       enderecoOf(p),
       p.parent_nome || (p.tipo === "lider" ? "— AVULSO —" : "—"),
       p.valor_contratacao && p.valor_contratacao > 0 ? fmtBRL(p.valor_contratacao) : "—",
@@ -407,7 +409,7 @@ export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(255);
     const tituloCoord = isAvulso
       ? "LÍDERES AVULSOS (sem coordenador)"
-      : `${eq.coord!.nome}  —  ${cap(eq.coord!.cidade || eq.coord!.regiao)}`;
+      : `${eq.coord!.nome}  —  ${eq.coord!.regiao ? cap(eq.coord!.regiao) : (eq.coord!.cidade || "—")}`;
     doc.text(tituloCoord, margin + 10, y + 13);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8);
     const sub = isAvulso
