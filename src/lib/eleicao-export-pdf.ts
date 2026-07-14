@@ -43,6 +43,14 @@ const enderecoOf = (p: ExportPessoa) => {
   return (linha + bairro).trim() || "—";
 };
 
+// Ordena pessoas por região/cidade alfabética, depois por nome alfabético.
+const sortByRegiaoNome = (a: ExportPessoa, b: ExportPessoa) => {
+  const ra = (a.cidade || a.regiao || "").toLowerCase();
+  const rb = (b.cidade || b.regiao || "").toLowerCase();
+  if (ra !== rb) return ra.localeCompare(rb);
+  return (a.nome || "").localeCompare(b.nome || "");
+};
+
 export interface ExportOptions {
   clientName?: string;
   escopoLabel: string;
@@ -152,12 +160,7 @@ export function exportEleicaoPdf(opts: ExportOptions) {
     y += 8;
     doc.setTextColor(0);
 
-    const sorted = [...grupo].sort((a, b) => {
-      const ra = (a.cidade || a.regiao || "").toLowerCase();
-      const rb = (b.cidade || b.regiao || "").toLowerCase();
-      if (ra !== rb) return ra.localeCompare(rb);
-      return (a.nome || "").localeCompare(b.nome || "");
-    });
+    const sorted = [...grupo].sort(sortByRegiaoNome);
 
     const rows = sorted.map((p) => [
       p.nome,
@@ -238,7 +241,7 @@ export function exportEleicaoCsv(opts: ExportOptions) {
     return /[";,\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [headers.join(";")];
-  for (const p of opts.pessoas) {
+  for (const p of [...opts.pessoas].sort(sortByRegiaoNome)) {
     lines.push(
       [
         TIPO_LABEL[p.tipo] || p.tipo,
@@ -319,14 +322,12 @@ function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
     }
   }
 
-  const sortNome = (a: ExportPessoa, b: ExportPessoa) => (a.nome || "").localeCompare(b.nome || "");
-
   const nodes: EquipeNode[] = [];
-  for (const coord of coords.sort(sortNome)) {
-    const lids = (lideresPorCoord.get(coord.id || "") || []).sort(sortNome);
+  for (const coord of coords.sort(sortByRegiaoNome)) {
+    const lids = (lideresPorCoord.get(coord.id || "") || []).sort(sortByRegiaoNome);
     const arr = lids.map(lider => ({
       lider,
-      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortNome),
+      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortByRegiaoNome),
     }));
     const totalValor =
       (coord.valor_contratacao || 0) +
@@ -336,9 +337,9 @@ function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
   }
 
   if (incluirAvulsos && !coordenadorFiltro && avulsos.length > 0) {
-    const arr = avulsos.sort(sortNome).map(lider => ({
+    const arr = avulsos.sort(sortByRegiaoNome).map(lider => ({
       lider,
-      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortNome),
+      cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortByRegiaoNome),
     }));
     const totalValor = arr.reduce((s, l) => s + (l.lider.valor_contratacao || 0) + l.cabos.reduce((ss, c) => ss + (c.valor_contratacao || 0), 0), 0);
     const qtdCabos = arr.reduce((s, l) => s + l.cabos.length, 0);
