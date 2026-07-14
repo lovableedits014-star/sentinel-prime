@@ -815,6 +815,7 @@ export default function Eleicao() {
         const coordFiltro = cfg.coordenadorId
           ? { id: cfg.coordenadorId, nome: byId.get(cfg.coordenadorId) || "" }
           : null;
+        const mode: "save" | "print" = cfg.formato === "print" ? "print" : "save";
         const opts = {
           escopoLabel,
           pessoas: itemsRaiz,
@@ -822,6 +823,7 @@ export default function Eleicao() {
           coordenadorFiltro: coordFiltro,
           filtros,
           fileNameSuffix,
+          mode,
         };
         if (cfg.formato === "csv") exportEleicaoCsvRaiz(opts);
         else exportEleicaoPdfRaiz(opts);
@@ -844,7 +846,8 @@ export default function Eleicao() {
         valor_contratacao: p.valor_contratacao,
         parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
       }));
-      const opts = { escopoLabel, pessoas: items, filtros, fileNameSuffix };
+      const mode: "save" | "print" = cfg.formato === "print" ? "print" : "save";
+      const opts = { escopoLabel, pessoas: items, filtros, fileNameSuffix, mode };
       if (cfg.formato === "csv") exportEleicaoCsv(opts);
       else exportEleicaoPdf(opts);
       return items.length;
@@ -897,7 +900,7 @@ export default function Eleicao() {
     if (cfg.formato === "csv") {
       toast.success(`CSV exportado (${qtd} registros)`);
     } else if (cfg.formato === "print") {
-      toast.success("PDF gerado — use Ctrl+P para imprimir.");
+      toast.success("PDF aberto para impressão em nova aba.");
     } else {
       toast.success(`PDF exportado (${qtd} registros)`);
     }

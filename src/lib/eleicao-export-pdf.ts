@@ -59,7 +59,35 @@ export interface ExportOptions {
   pessoas: ExportPessoa[];
   filtros?: { label: string; value: string }[];
   fileNameSuffix?: string;
+  mode?: "save" | "print";
 }
+
+function outputPdf(doc: jsPDF, filename: string, mode: "save" | "print" = "save") {
+  if (mode === "print") {
+    try {
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, "_blank");
+      if (w) {
+        // Alguns navegadores requerem tempo para carregar o PDF antes do print
+        setTimeout(() => {
+          try { w.focus(); w.print(); } catch { /* ignore */ }
+        }, 600);
+      } else {
+        // Popup bloqueado — cai para download
+        doc.save(filename);
+      }
+      // Libera o object URL depois de um tempo (o viewer já leu o blob)
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return;
+    } catch {
+      doc.save(filename);
+    }
+    return;
+  }
+  doc.save(filename);
+}
+
 
 function slugify(s: string) {
   return (s || "")
@@ -220,7 +248,7 @@ export function exportEleicaoPdf(opts: ExportOptions) {
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
   const escopoSlug = slugify(opts.escopoLabel);
   const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
-  doc.save(`cadastros-eleicao-${escopoSlug}${suf}-${ts}.pdf`);
+  outputPdf(doc, `cadastros-eleicao-${escopoSlug}${suf}-${ts}.pdf`, opts.mode);
 }
 
 export function exportEleicaoCsv(opts: ExportOptions) {
@@ -286,6 +314,7 @@ export interface RaizExportOptions {
   coordenadorFiltro?: { id: string; nome: string } | null;
   filtros?: { label: string; value: string }[];
   fileNameSuffix?: string;
+  mode?: "save" | "print";
 }
 
 interface EquipeNode {
@@ -384,7 +413,7 @@ export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
   if (equipes.length === 0) {
     doc.setFontSize(11); doc.text("Nenhuma equipe encontrada com os filtros aplicados.", margin, y);
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-    doc.save(`eleicao-raiz-${ts}.pdf`); return;
+    outputPdf(doc, `eleicao-raiz-${ts}.pdf`, opts.mode); return;
   }
 
   // Totais gerais
@@ -481,7 +510,7 @@ export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
     ? "-equipe-" + slugify(opts.coordenadorFiltro.nome)
     : "";
   const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
-  doc.save(`eleicao-raiz-${escopoSlug}${coordSlug}${suf}-${ts}.pdf`);
+  outputPdf(doc, `eleicao-raiz-${escopoSlug}${coordSlug}${suf}-${ts}.pdf`, opts.mode);
 }
 
 export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
