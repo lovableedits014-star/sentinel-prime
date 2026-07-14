@@ -314,6 +314,7 @@ export interface RaizExportOptions {
   coordenadorFiltro?: { id: string; nome: string } | null;
   filtros?: { label: string; value: string }[];
   fileNameSuffix?: string;
+  mode?: "save" | "print";
 }
 
 interface EquipeNode {
