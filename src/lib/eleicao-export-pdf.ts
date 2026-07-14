@@ -167,7 +167,7 @@ export function exportEleicaoPdf(opts: ExportOptions) {
     const rows = sorted.map((p) => [
       p.nome,
       fmtPhone(p.telefone),
-      cap(p.cidade || p.regiao),
+      p.regiao ? cap(p.regiao) : (p.cidade || "—"),
       enderecoOf(p),
       p.parent_nome || (p.tipo === "lider" ? "— AVULSO —" : "—"),
       p.valor_contratacao && p.valor_contratacao > 0 ? fmtBRL(p.valor_contratacao) : "—",
