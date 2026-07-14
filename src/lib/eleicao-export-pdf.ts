@@ -59,7 +59,35 @@ export interface ExportOptions {
   pessoas: ExportPessoa[];
   filtros?: { label: string; value: string }[];
   fileNameSuffix?: string;
+  mode?: "save" | "print";
 }
+
+function outputPdf(doc: jsPDF, filename: string, mode: "save" | "print" = "save") {
+  if (mode === "print") {
+    try {
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, "_blank");
+      if (w) {
+        // Alguns navegadores requerem tempo para carregar o PDF antes do print
+        setTimeout(() => {
+          try { w.focus(); w.print(); } catch { /* ignore */ }
+        }, 600);
+      } else {
+        // Popup bloqueado — cai para download
+        doc.save(filename);
+      }
+      // Libera o object URL depois de um tempo (o viewer já leu o blob)
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return;
+    } catch {
+      doc.save(filename);
+    }
+    return;
+  }
+  doc.save(filename);
+}
+
 
 function slugify(s: string) {
   return (s || "")
