@@ -43,6 +43,14 @@ const enderecoOf = (p: ExportPessoa) => {
   return (linha + bairro).trim() || "—";
 };
 
+// Ordena pessoas por região/cidade alfabética, depois por nome alfabético.
+const sortByRegiaoNome = (a: ExportPessoa, b: ExportPessoa) => {
+  const ra = (a.regiao || a.cidade || "").toLowerCase();
+  const rb = (b.regiao || b.cidade || "").toLowerCase();
+  if (ra !== rb) return ra.localeCompare(rb);
+  return (a.nome || "").localeCompare(b.nome || "");
+};
+
 export interface ExportOptions {
   clientName?: string;
   escopoLabel: string;
