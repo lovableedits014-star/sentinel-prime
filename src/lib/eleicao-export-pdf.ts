@@ -409,7 +409,7 @@ export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(255);
     const tituloCoord = isAvulso
       ? "LÍDERES AVULSOS (sem coordenador)"
-      : `${eq.coord!.nome}  —  ${cap(eq.coord!.cidade || eq.coord!.regiao)}`;
+      : `${eq.coord!.nome}  —  ${eq.coord!.regiao ? cap(eq.coord!.regiao) : (eq.coord!.cidade || "—")}`;
     doc.text(tituloCoord, margin + 10, y + 13);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8);
     const sub = isAvulso
