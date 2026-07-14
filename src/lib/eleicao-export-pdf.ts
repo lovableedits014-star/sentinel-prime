@@ -413,7 +413,7 @@ export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
   if (equipes.length === 0) {
     doc.setFontSize(11); doc.text("Nenhuma equipe encontrada com os filtros aplicados.", margin, y);
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
-    doc.save(`eleicao-raiz-${ts}.pdf`); return;
+    outputPdf(doc, `eleicao-raiz-${ts}.pdf`, opts.mode); return;
   }
 
   // Totais gerais
