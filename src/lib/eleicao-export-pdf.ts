@@ -45,8 +45,8 @@ const enderecoOf = (p: ExportPessoa) => {
 
 // Ordena pessoas por região/cidade alfabética, depois por nome alfabético.
 const sortByRegiaoNome = (a: ExportPessoa, b: ExportPessoa) => {
-  const ra = (a.regiao || a.cidade || "").toLowerCase();
-  const rb = (b.regiao || b.cidade || "").toLowerCase();
+  const ra = (a.cidade || a.regiao || "").toLowerCase();
+  const rb = (b.cidade || b.regiao || "").toLowerCase();
   if (ra !== rb) return ra.localeCompare(rb);
   return (a.nome || "").localeCompare(b.nome || "");
 };
