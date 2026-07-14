@@ -1,38 +1,62 @@
 ## Problema
 
-Na exportação (PDF simples e CSV/PDF raiz), a coluna **Região/Cidade** exibe sempre "Campo Grande" para todos os cadastros da capital, porque o código faz `p.cidade || p.regiao` — e em CG `cidade = "Campo Grande"` sempre vence, mascarando a região urbana real (centro, moreninha, segredo, prosa, etc.) que está gravada em `regiao`.
+Hoje o dialog de edição em `src/pages/Eleicao.tsx` deixa trocar `tipo` (coordenador → líder → cabo) livremente, sem tratar os subordinados. Se um coordenador vira líder, os líderes/cabos abaixo continuam com `parent_id` apontando para ele — hierarquia quebrada, contatos "invisíveis" na árvore, e sem aviso pro usuário.
 
-Para o Interior, o campo `regiao` é nulo e a `cidade` é o município — o comportamento atual está correto.
+O que você quer: ao rebaixar um coordenador a líder, **soltar os subordinados** — líderes abaixo viram líderes avulsos (sem coordenador); cabos continuam ligados aos seus líderes. Nenhum contato é apagado.
 
-## Correção
+## Comportamento por transição
 
-Em `src/lib/eleicao-export-pdf.ts`, inverter a precedência: **usar `regiao` (região urbana de CG) quando existir; senão cair para `cidade`**. Aplicar em todos os pontos:
+Ao salvar edição com `tipo` mudado, e a pessoa tiver descendentes:
 
-1. `sortByRegiaoNome` — chave passa a ser `regiao || cidade` (garante ordenação por região urbana em CG).
-2. PDF simples (tabela por tipo) — coluna "Região/Cidade": `cap(p.regiao) || p.cidade`.
-3. Cabeçalho do bloco na exportação raiz (linha do coordenador) — mesmo critério.
-4. Coluna "Bairro/Cidade" da tabela raiz (líder/cabo) — manter `bairro || regiao || cidade` (prioriza bairro, que é mais fino que região urbana).
+| De → Para | Ação |
+|---|---|
+| coordenador → líder | Líderes filhos viram avulsos (`parent_id = null`). Cabos filhos diretos (raros) também soltam. O próprio vira líder avulso. |
+| coordenador → cabo | Idem acima + o próprio precisa de um líder OU vira "cabo avulso" (`parent_id = null`). Confirmar com aviso extra. |
+| líder → cabo | Cabos filhos viram órfãos (`parent_id = null`) — cabo avulso. |
+| líder → coordenador | Sobe: mantém subordinados; vira raiz. Sem risco. |
+| cabo → líder/coord | Sobe: sem descendentes esperados. Sem risco. |
 
-Renomear o cabeçalho da coluna de "Região/Cidade" para **"Região/Cidade"** (mantido) — o rótulo já cobre os dois casos; só o conteúdo estava errado.
+Em todos os casos: **nada é deletado**. Só `parent_id` é ajustado.
 
-## Dobradinha na exportação
+## Fluxo de UX
 
-Verificado: já funciona. `ExportEleicaoDialog` tem filtro por dobradinha (todas / sem dobradinha / parceiro específico) e a opção "Gerar um arquivo por dobradinha" segmenta a saída. Nenhuma mudança necessária — apenas confirmar no diálogo após o ajuste da coluna.
+1. Usuário abre edição, troca `tipo`, clica Salvar.
+2. Se houver descendentes que ficarão órfãos com a mudança, abrir dialog de confirmação `RebaixarConfirmDialog`:
+   - Mostra contagem: "X líder(es) e Y cabo(s) abaixo desta pessoa."
+   - Explica: "Ao rebaixar, esses contatos serão desvinculados (viram avulsos) mas **não serão apagados**. Você poderá reatribuí-los depois."
+   - Botões: `Cancelar` / `Confirmar rebaixamento`.
+3. Ao confirmar: `UPDATE eleicao_pessoas SET parent_id = NULL WHERE parent_id = <id_editado>` + update do próprio registro com novo `tipo` (e `parent_id = null` se for raiz agora).
+4. Toast: "Cadastro atualizado. N contatos foram desvinculados e agora aparecem como avulsos."
+
+## Onde ficam os "avulsos"
+
+Já existe suporte visual: líder com `parent_id = null` aparece como **líder avulso** (checkbox `liderAvulso` no form). Para cabos avulsos (`parent_id = null` + `tipo = cabo`), verificar se a listagem atual mostra — se não, adicionar uma seção "Cabos sem líder" na aba correspondente para o usuário conseguir reatribuir. Vou confirmar durante a implementação e ajustar se preciso.
 
 ## Arquivos
 
-- `src/lib/eleicao-export-pdf.ts` (única alteração)
+- `src/pages/Eleicao.tsx` — função `save()`: detectar mudança de tipo com descendentes órfãos; abrir novo dialog; após confirmação, executar update em massa dos filhos + update da própria pessoa.
+- `src/components/eleicao/RebaixarConfirmDialog.tsx` — novo componente de confirmação (contagem + aviso + botões).
+- Verificação de listagem de "cabos avulsos" — se estiver oculta hoje, ajuste mínimo na renderização da árvore para exibir seção separada.
+
+Sem migrations. Sem mudança de schema. Sem edge functions.
 
 ## Detalhes técnicos
 
 ```ts
-// antes
-cap(p.cidade || p.regiao)
-// depois
-p.regiao ? cap(p.regiao) : (p.cidade || "—")
-
-// sortByRegiaoNome
-const ra = (a.regiao || a.cidade || "").toLowerCase();
+// Em save(), antes do update:
+if (editing && editing.tipo !== form.tipo) {
+  const descendentes = pessoas.filter(p => p.parent_id === editing.id);
+  const perdeSubordinados =
+    (editing.tipo === "coordenador" && form.tipo !== "coordenador") ||
+    (editing.tipo === "lider" && form.tipo === "cabo");
+  if (perdeSubordinados && descendentes.length > 0) {
+    // abrir RebaixarConfirmDialog; on confirm:
+    await supabase.from("eleicao_pessoas")
+      .update({ parent_id: null })
+      .eq("parent_id", editing.id);
+    // então segue com o update normal do próprio registro
+  }
+}
 ```
 
-Sem mudanças em migrations, schema, ou lógica de negócio.
+Trigger `trg_heranca_dobradinha` roda em `parent_id` update — filhos que viram avulsos vão herdar do próprio (raiz agora), ou preservar dobradinha atual. Sem quebra.
