@@ -815,6 +815,7 @@ export default function Eleicao() {
         const coordFiltro = cfg.coordenadorId
           ? { id: cfg.coordenadorId, nome: byId.get(cfg.coordenadorId) || "" }
           : null;
+        const mode: "save" | "print" = cfg.formato === "print" ? "print" : "save";
         const opts = {
           escopoLabel,
           pessoas: itemsRaiz,
@@ -822,6 +823,7 @@ export default function Eleicao() {
           coordenadorFiltro: coordFiltro,
           filtros,
           fileNameSuffix,
+          mode,
         };
         if (cfg.formato === "csv") exportEleicaoCsvRaiz(opts);
         else exportEleicaoPdfRaiz(opts);
