@@ -322,11 +322,9 @@ function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
     }
   }
 
-  const sortNome = (a: ExportPessoa, b: ExportPessoa) => (a.nome || "").localeCompare(b.nome || "");
-
   const nodes: EquipeNode[] = [];
-  for (const coord of coords.sort(sortNome)) {
-    const lids = (lideresPorCoord.get(coord.id || "") || []).sort(sortNome);
+  for (const coord of coords.sort(sortByRegiaoNome)) {
+    const lids = (lideresPorCoord.get(coord.id || "") || []).sort(sortByRegiaoNome);
     const arr = lids.map(lider => ({
       lider,
       cabos: (cabosPorLider.get(lider.id || "") || []).sort(sortNome),
