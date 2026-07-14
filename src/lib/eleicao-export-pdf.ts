@@ -510,7 +510,7 @@ export function exportEleicaoPdfRaiz(opts: RaizExportOptions) {
     ? "-equipe-" + slugify(opts.coordenadorFiltro.nome)
     : "";
   const suf = opts.fileNameSuffix ? `-${slugify(opts.fileNameSuffix)}` : "";
-  doc.save(`eleicao-raiz-${escopoSlug}${coordSlug}${suf}-${ts}.pdf`);
+  outputPdf(doc, `eleicao-raiz-${escopoSlug}${coordSlug}${suf}-${ts}.pdf`, opts.mode);
 }
 
 export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
