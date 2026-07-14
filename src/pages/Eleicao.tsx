@@ -388,11 +388,48 @@ export default function Eleicao() {
       payload.rateio_parceiro = form.parceiro_id ? form.rateio_parceiro : 0;
     }
 
+    // Rebaixamento: se está mudando de tipo e vai perder subordinados diretos,
+    // pede confirmação e desvincula os filhos (parent_id = null) para virarem avulsos.
+    // NADA é apagado — só solta o vínculo.
+    let desvincularFilhosDe: string | null = null;
+    if (editing && editing.tipo !== form.tipo) {
+      const perdeSubordinados =
+        (editing.tipo === "coordenador" && form.tipo !== "coordenador") ||
+        (editing.tipo === "lider" && form.tipo === "cabo");
+      if (perdeSubordinados) {
+        const filhos = pessoas.filter(p => p.parent_id === editing.id);
+        const lideres = filhos.filter(f => f.tipo === "lider").length;
+        const cabos = filhos.filter(f => f.tipo === "cabo").length;
+        if (filhos.length > 0) {
+          const msg =
+            `Este cadastro tem ${lideres} líder(es) e ${cabos} cabo(s) abaixo.\n\n` +
+            `Ao rebaixar para ${TIPO_META[form.tipo].label}, esses contatos serão DESVINCULADOS ` +
+            `(viram avulsos, sem coordenador/líder). Nenhum contato será apagado — ` +
+            `você poderá reatribuí-los depois.\n\nConfirmar rebaixamento?`;
+          if (!confirm(msg)) return;
+          desvincularFilhosDe = editing.id;
+        }
+      }
+    }
+
     const q = editing
       ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
       : supabase.from("eleicao_pessoas" as any).insert(payload).select().single();
     const { data: savedPessoa, error } = await q;
     if (error) { toast.error(error.message); return; }
+
+    if (desvincularFilhosDe) {
+      const { error: errDesv } = await supabase
+        .from("eleicao_pessoas" as any)
+        .update({ parent_id: null })
+        .eq("parent_id", desvincularFilhosDe);
+      if (errDesv) {
+        toast.error("Cadastro atualizado, mas falhou ao desvincular subordinados: " + errDesv.message);
+      } else {
+        toast.success("Subordinados desvinculados — agora aparecem como avulsos.");
+      }
+    }
+
 
     // Se está editando uma raiz e a dobradinha mudou, dispara fluxo de propagação
     if (editing && isRaiz) {
