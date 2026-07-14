@@ -846,7 +846,8 @@ export default function Eleicao() {
         valor_contratacao: p.valor_contratacao,
         parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
       }));
-      const opts = { escopoLabel, pessoas: items, filtros, fileNameSuffix };
+      const mode: "save" | "print" = cfg.formato === "print" ? "print" : "save";
+      const opts = { escopoLabel, pessoas: items, filtros, fileNameSuffix, mode };
       if (cfg.formato === "csv") exportEleicaoCsv(opts);
       else exportEleicaoPdf(opts);
       return items.length;
