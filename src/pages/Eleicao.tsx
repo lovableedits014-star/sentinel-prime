@@ -412,6 +412,45 @@ export default function Eleicao() {
       }
     }
 
+    // Propagação de escopo/região/cidade: quando muda esses campos e existem descendentes,
+    // avisa o usuário que TODOS os subordinados vão junto (o trigger no banco propaga).
+    if (editing && (
+      form.regiao !== editing.regiao ||
+      form.escopo !== editing.escopo ||
+      form.cidade !== (editing.cidade || "")
+    )) {
+      // conta descendentes recursivamente
+      const filhosPorPai = new Map<string, string[]>();
+      pessoas.forEach(p => {
+        if (p.parent_id) {
+          const arr = filhosPorPai.get(p.parent_id) || [];
+          arr.push(p.id);
+          filhosPorPai.set(p.parent_id, arr);
+        }
+      });
+      const descIds: string[] = [];
+      const stack = [editing.id];
+      while (stack.length) {
+        const cur = stack.pop()!;
+        const fs = filhosPorPai.get(cur) || [];
+        fs.forEach(id => { descIds.push(id); stack.push(id); });
+      }
+      if (descIds.length > 0) {
+        const descSet = new Set(descIds);
+        const lideres = pessoas.filter(p => descSet.has(p.id) && p.tipo === "lider").length;
+        const cabos = pessoas.filter(p => descSet.has(p.id) && p.tipo === "cabo").length;
+        const destino =
+          form.escopo === "interior"
+            ? (form.cidade || "—")
+            : (REGIOES.find(r => r.value === form.regiao)?.label || form.regiao);
+        const msg =
+          `Este cadastro tem ${lideres} líder(es) e ${cabos} cabo(s) abaixo.\n\n` +
+          `Ao mudar o escopo/região, TODOS os subordinados serão movidos junto para "${destino}". ` +
+          `Nenhum contato será perdido — o vínculo continua igual.\n\nConfirmar?`;
+        if (!confirm(msg)) return;
+      }
+    }
+
     const q = editing
       ? supabase.from("eleicao_pessoas" as any).update(payload).eq("id", editing.id).select().single()
       : supabase.from("eleicao_pessoas" as any).insert(payload).select().single();
