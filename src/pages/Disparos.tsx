@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
   Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star, ImagePlus, X,
-  Paperclip, Video, FileText, FlaskConical,
+  Paperclip, Video, FileText, FlaskConical, Pause, RotateCcw,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -86,10 +86,30 @@ type DispatchRow = {
   error_message: string | null;
   pause_reason?: string | null;
   created_at: string;
+  updated_at?: string | null;
   completed_at: string | null;
 };
 
 type TagOption = { nome: string; count: number };
+
+const ACTIVE_DISPATCH_STATUSES = [
+  "pendente",
+  "enfileirado",
+  "enviando",
+  "pausado_timeout",
+  "pausado_janela",
+  "pausado_sem_instancia",
+  "pausado_manual",
+] as const;
+
+function hasPendingDispatchWork(d: Pick<DispatchRow, "total_destinatarios" | "enviados" | "falhas">) {
+  return Math.max(0, d.total_destinatarios - d.enviados - d.falhas) > 0;
+}
+
+function isStaleSending(d: DispatchRow) {
+  if (d.status !== "enviando" || !d.updated_at || !hasPendingDispatchWork(d)) return false;
+  return Date.now() - new Date(d.updated_at).getTime() > 90_000;
+}
 
 function getPauseDisplay(status: string, reason?: string | null) {
   if (!reason) return null;
@@ -108,6 +128,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   pausado_timeout: { label: "Continuando…", color: "bg-primary/10 text-primary", icon: Loader2 },
   pausado_janela: { label: "Aguardando janela", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Clock },
   pausado_sem_instancia: { label: "Sem instância", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: WifiOff },
+  pausado_manual: { label: "Pausado", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Pause },
   concluido: { label: "Concluído", color: "bg-emerald-500/15 text-emerald-600", icon: CheckCircle },
   falhou: { label: "Falhou", color: "bg-destructive/10 text-destructive", icon: XCircle },
   cancelado: { label: "Cancelado", color: "bg-muted text-muted-foreground", icon: XCircle },
