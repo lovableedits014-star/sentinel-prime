@@ -1515,29 +1515,51 @@ export default function Disparos() {
           </div>
 
           <div className="space-y-2">
-            <Label>Imagem (opcional)</Label>
+            <Label>Mídia (opcional)</Label>
             {mediaUrl ? (
               <div className="flex items-start gap-3 p-2 border rounded-md bg-muted/30">
-                <img src={mediaUrl} alt="anexo" className="w-20 h-20 object-cover rounded" />
-                <div className="flex-1 text-xs text-muted-foreground break-all">
-                  Imagem anexada — será enviada como mídia com a mensagem acima como legenda.
+                {mediaKind === "image" ? (
+                  <img src={mediaUrl} alt="anexo" className="w-20 h-20 object-cover rounded" />
+                ) : mediaKind === "video" ? (
+                  <video src={mediaUrl} className="w-32 h-20 rounded bg-black object-cover" controls />
+                ) : (
+                  <div className="w-20 h-20 rounded bg-muted flex items-center justify-center shrink-0">
+                    <FileText className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1 text-xs text-muted-foreground min-w-0">
+                  <div className="flex items-center gap-1.5 text-foreground font-medium">
+                    {mediaKind === "image" && <ImagePlus className="w-3.5 h-3.5" />}
+                    {mediaKind === "video" && <Video className="w-3.5 h-3.5" />}
+                    {mediaKind === "document" && <FileText className="w-3.5 h-3.5" />}
+                    <span className="truncate">{mediaFilename || (mediaKind === "image" ? "Imagem" : mediaKind === "video" ? "Vídeo" : "Documento")}</span>
+                  </div>
+                  <div className="mt-0.5">
+                    {mediaSize ? fmtBytes(mediaSize) + " · " : ""}
+                    {mediaKind === "image" && "Enviada como imagem com a mensagem acima como legenda."}
+                    {mediaKind === "video" && "Enviado como vídeo com a mensagem acima como legenda."}
+                    {mediaKind === "document" && "Enviado como documento — o destinatário verá o nome do arquivo."}
+                  </div>
+                  <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-primary underline text-[11px]">
+                    abrir anexo
+                  </a>
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setMediaUrl(null)}
+                  onClick={clearMedia}
                   disabled={sending}
                 >
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Input
                   id="dispatch-media-input"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
                   className="hidden"
                   disabled={sending || mediaUploading}
                   onChange={(e) => {
@@ -1556,10 +1578,12 @@ export default function Disparos() {
                   {mediaUploading ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
                   ) : (
-                    <><ImagePlus className="w-4 h-4 mr-2" /> Anexar imagem</>
+                    <><Paperclip className="w-4 h-4 mr-2" /> Anexar mídia</>
                   )}
                 </Button>
-                <span className="text-xs text-muted-foreground">JPG/PNG até 8MB. Enviada para contatos e grupos.</span>
+                <span className="text-xs text-muted-foreground">
+                  Imagem (8 MB) · Vídeo MP4 (25 MB) · PDF/documento (20 MB).
+                </span>
               </div>
             )}
           </div>
