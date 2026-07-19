@@ -12,6 +12,7 @@ const DEFAULT_DELAY_MIN = 5;
 const DEFAULT_DELAY_MAX = 15;
 const DEFAULT_BATCH_PAUSE = 60;
 const MAX_RUNTIME_MS = 55000;
+const RUNTIME_PAUSE_AT_MS = 42_000;
 const BRIDGE_SEND_TIMEOUT_MS = 18_000;
 const SAO_PAULO_OFFSET_HOURS = -3; // UTC-3 (sem horário de verão atualmente)
 
@@ -409,10 +410,10 @@ Deno.serve(async (req) => {
       try {
         // Só promove se NÃO houver outro disparo ativo agora
         const { data: active } = await adminClient
-          .from("whatsapp_dispatches")
-          .select("id")
+        .from("whatsapp_dispatches")
+        .select("id")
           .eq("client_id", cid)
-          .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+          .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia","pausado_manual"])
           .limit(1);
         if (active && active.length > 0) return null;
 
@@ -1063,7 +1064,7 @@ Deno.serve(async (req) => {
         .from("whatsapp_dispatches")
         .select("id")
         .eq("client_id", client_id)
-        .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia","enfileirado"])
+          .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia","pausado_manual","enfileirado"])
         .limit(1);
       shouldQueue = !!(activeOnes && activeOnes.length > 0);
     }
