@@ -438,32 +438,73 @@ export default function Disparos() {
     enabled: !!clientId && tipoDisparo === "eleicao",
   });
 
+  const clearMedia = () => {
+    setMediaUrl(null);
+    setMediaKind(null);
+    setMediaFilename(null);
+    setMediaMime(null);
+    setMediaSize(0);
+  };
+
+  const detectMediaKind = (file: File): { kind: "image" | "video" | "document" | null; label: string } => {
+    const mt = (file.type || "").toLowerCase();
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    if (mt.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
+      return { kind: "image", label: "imagem" };
+    }
+    if (mt === "video/mp4" || ext === "mp4") return { kind: "video", label: "vídeo" };
+    if (mt === "application/pdf" || ext === "pdf") return { kind: "document", label: "PDF" };
+    const docExts = ["docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt", "csv", "zip"];
+    if (docExts.includes(ext) || mt.startsWith("application/")) {
+      return { kind: "document", label: "documento" };
+    }
+    return { kind: null, label: "" };
+  };
+
   const handleMediaUpload = async (file: File) => {
     if (!clientId) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Selecione um arquivo de imagem.");
+    const { kind, label } = detectMediaKind(file);
+    if (!kind) {
+      toast.error("Tipo de arquivo não suportado. Use imagem, MP4, PDF ou documento.");
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Imagem muito grande (máx 8MB).");
+    const limits: Record<"image" | "video" | "document", number> = {
+      image: 8 * 1024 * 1024,
+      video: 25 * 1024 * 1024,
+      document: 20 * 1024 * 1024,
+    };
+    if (file.size > limits[kind]) {
+      const mb = Math.round(limits[kind] / 1024 / 1024);
+      toast.error(`${label} muito grande (máx ${mb}MB).`);
       return;
     }
     setMediaUploading(true);
     try {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const ext = (file.name.split(".").pop() || "bin").toLowerCase();
       const path = `dispatches/${clientId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error: upErr } = await supabase.storage.from("whatsapp-media").upload(path, file, {
-        cacheControl: "3600", upsert: false, contentType: file.type,
+        cacheControl: "3600", upsert: false, contentType: file.type || "application/octet-stream",
       });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("whatsapp-media").getPublicUrl(path);
       setMediaUrl(pub.publicUrl);
-      toast.success("Imagem anexada.");
+      setMediaKind(kind);
+      setMediaFilename(file.name);
+      setMediaMime(file.type || null);
+      setMediaSize(file.size);
+      toast.success(`${label.charAt(0).toUpperCase() + label.slice(1)} anexad${kind === "image" || kind === "document" ? "o" : "o"}.`);
     } catch (err: any) {
-      toast.error("Falha ao enviar imagem: " + (err.message || ""));
+      toast.error(`Falha ao enviar ${label}: ` + (err.message || ""));
     } finally {
       setMediaUploading(false);
     }
+  };
+
+  const fmtBytes = (b: number) => {
+    if (!b) return "";
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const handleSend = async () => {
