@@ -244,7 +244,16 @@ export default function Disparos() {
   const [mensagem, setMensagem] = useState("");
   const [ctaConfig, setCtaConfig] = useState<CtaConfig>(DEFAULT_CTA_CONFIG);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaKind, setMediaKind] = useState<"image" | "video" | "document" | null>(null);
+  const [mediaFilename, setMediaFilename] = useState<string | null>(null);
+  const [mediaMime, setMediaMime] = useState<string | null>(null);
+  const [mediaSize, setMediaSize] = useState<number>(0);
   const [mediaUploading, setMediaUploading] = useState(false);
+  // Envio de teste
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
+  const [testPhone, setTestPhone] = useState("");
+  const [testName, setTestName] = useState("Teste");
+  const [testSending, setTestSending] = useState(false);
   const [tipoDisparo, setTipoDisparo] = useState("manual");
   const [adhocContacts, setAdhocContacts] = useState<{ nome: string; telefone: string }[]>([]);
   const [tagFiltro, setTagFiltro] = useState("_all");
