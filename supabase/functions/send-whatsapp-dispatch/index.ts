@@ -601,6 +601,9 @@ Deno.serve(async (req) => {
     let batch_pause: number | undefined;
     let existingDispatchId: string | null = null;
     let media_url: string | null = null;
+    let media_kind: "image" | "video" | "document" | null = null;
+    let media_filename: string | null = null;
+    let media_mime: string | null = null;
     // Anti-ban: configuração de humanização e CTA carregada por disparo.
     let humanizationConfig: Record<string, any> = {};
     let ctaConfig: { auto_append?: boolean; categories?: CtaCategory[] } = {};
@@ -631,6 +634,12 @@ Deno.serve(async (req) => {
       batch_pause = d.batch_pause_seconds;
       humanizationConfig = (d.humanization_config as any) || {};
       ctaConfig = (d.cta_config as any) || {};
+      // Metadados de mídia (kind/filename/mime) ficam em humanization_config.media_meta
+      // para não exigir migração — retrocompat: undefined = image.
+      const mediaMeta = (humanizationConfig?.media_meta as any) || {};
+      media_kind = (mediaMeta.kind as any) || null;
+      media_filename = (mediaMeta.filename as string | null) || null;
+      media_mime = (mediaMeta.mime as string | null) || null;
       existingDispatchId = d.id;
       // Overrides opcionais do disparo (Entrega 4): quantas instâncias usar e se ignora cap de aquecimento.
       var dispatchMaxInstances: number | null = (d.max_instances as number | null) ?? null;
@@ -657,8 +666,26 @@ Deno.serve(async (req) => {
       }
       ({ client_id, titulo, mensagem, tipo, tag_filtro, batch_size, delay_min, delay_max, batch_pause } = payload);
       media_url = (payload.media_url as string | null) || null;
+      media_kind = (payload.media_kind as any) || null;
+      media_filename = (payload.media_filename as string | null) || null;
+      media_mime = (payload.media_mime as string | null) || null;
       humanizationConfig = (payload.humanization_config as any) || {};
       ctaConfig = (payload.cta_config as any) || {};
+      // Guarda meta de mídia dentro de humanization_config (sem coluna nova).
+      if (media_url && (media_kind || media_filename || media_mime)) {
+        humanizationConfig = {
+          ...humanizationConfig,
+          media_meta: {
+            kind: media_kind || "image",
+            filename: media_filename || null,
+            mime: media_mime || null,
+          },
+        };
+      }
+      // Marca teste (não afeta motor — só rastreia no log).
+      if (payload.is_test === true) {
+        humanizationConfig = { ...humanizationConfig, is_test: true };
+      }
       var dispatchMaxInstances: number | null = (payload.max_instances as number | null) ?? null;
       var dispatchIgnoreStageCap: boolean = !!payload.ignore_stage_cap;
       var eleicao_tipo = payload.eleicao_tipo || null;
