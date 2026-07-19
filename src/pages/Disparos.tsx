@@ -741,6 +741,26 @@ export default function Disparos() {
     }
   };
 
+  const handlePauseDispatch = async (dispatchId: string, titulo: string) => {
+    try {
+      const { error } = await supabase
+        .from("whatsapp_dispatches" as any)
+        .update({
+          status: "pausado_manual",
+          pause_reason: "Pausado pelo usuário — use Retomar/Reenviar para continuar de onde parou.",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", dispatchId);
+      if (error) throw error;
+
+      toast.success(`Disparo "${titulo}" pausado.`);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-dispatch-queue", clientId] });
+    } catch (err: any) {
+      toast.error("Erro ao pausar: " + (err.message || "tente novamente"));
+    }
+  };
+
   const handleResumeDispatch = async (dispatchId: string, titulo: string, opts?: { ignoreCap?: boolean }) => {
     try {
       // Reativa itens que foram marcados como cancelados ao parar o disparo.
@@ -767,7 +787,7 @@ export default function Disparos() {
 
       // Atualiza o disparo — inclui opcionalmente o override de "ignorar cap".
       const updatePayload: any = {
-        status: "em_andamento",
+        status: "enviando",
         pause_reason: null,
         completed_at: null,
         updated_at: new Date().toISOString(),
@@ -794,7 +814,7 @@ export default function Disparos() {
   };
 
   const isConnected = !!bridgeConfigured;
-  const activeDispatch = activeQueueDispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
+  const activeDispatch = activeQueueDispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia","pausado_manual"].includes(d.status));
   const queuedDispatches = activeQueueDispatches.filter((d) => d.status === "enfileirado");
 
   return (
