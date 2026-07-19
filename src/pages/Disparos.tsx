@@ -559,13 +559,17 @@ export default function Disparos() {
           return;
         }
       }
-      const tituloFinal = titulo.trim() || (hasMedia && !hasText ? "Imagem" : (mensagem.trim().slice(0, 60) || "Disparo"));
+      const kindLabel = mediaKind === "video" ? "Vídeo" : mediaKind === "document" ? "Documento" : "Imagem";
+      const tituloFinal = titulo.trim() || (hasMedia && !hasText ? kindLabel : (mensagem.trim().slice(0, 60) || "Disparo"));
       const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
         body: {
           client_id: clientId,
           titulo: tituloFinal,
           mensagem: mensagem.trim(),
           media_url: mediaUrl,
+          media_kind: mediaKind,
+          media_filename: mediaFilename,
+          media_mime: mediaMime,
           tipo: tipoDisparo,
           tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
           eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
