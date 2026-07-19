@@ -224,7 +224,7 @@ export default function Disparos() {
     refetchInterval: (data: any) => {
       const rows = (data?.state?.data?.rows as DispatchRow[] | undefined) || [];
       const hasActive = rows.some(
-        (d) => ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status)
+        (d) => ACTIVE_DISPATCH_STATUSES.includes(d.status as any)
       );
       return hasActive ? 3000 : false;
     },
@@ -241,7 +241,7 @@ export default function Disparos() {
         .from("whatsapp_dispatches" as any)
         .select("*")
         .eq("client_id", clientId)
-        .in("status", ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+        .in("status", [...ACTIVE_DISPATCH_STATUSES])
         .order("created_at", { ascending: true });
       return (data as unknown as DispatchRow[]) || [];
     },
