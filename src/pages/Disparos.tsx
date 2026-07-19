@@ -598,7 +598,7 @@ export default function Disparos() {
       setTitulo("");
       setMensagem("");
       setCtaConfig(DEFAULT_CTA_CONFIG);
-      setMediaUrl(null);
+      clearMedia();
       setTagFiltro("_all");
       setSelectedGroupJids([]);
       setAdhocContacts([]);
