@@ -1596,18 +1596,28 @@ export default function Disparos() {
               </span>
             </div>
 
-            <Button
-              onClick={handleSend}
-              disabled={sending || !isConnected || recipientCount === 0}
-            >
-              {sending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Iniciando...</>
-              ) : activeDispatch ? (
-                <><Clock className="h-4 w-4 mr-2" /> Adicionar à fila</>
-              ) : (
-                <><Send className="h-4 w-4 mr-2" /> Enviar</>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setTestDialogOpen(true)}
+                disabled={sending || testSending || (!mensagem.trim() && !mediaUrl)}
+                title="Enviar uma prévia para um número seu antes do disparo real"
+              >
+                <FlaskConical className="h-4 w-4 mr-2" /> Enviar teste
+              </Button>
+              <Button
+                onClick={handleSend}
+                disabled={sending || !isConnected || recipientCount === 0}
+              >
+                {sending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Iniciando...</>
+                ) : activeDispatch ? (
+                  <><Clock className="h-4 w-4 mr-2" /> Adicionar à fila</>
+                ) : (
+                  <><Send className="h-4 w-4 mr-2" /> Enviar</>
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
