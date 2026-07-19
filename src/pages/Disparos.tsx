@@ -610,6 +610,83 @@ export default function Disparos() {
     }
   };
 
+  // Preview do teste — amostra da mensagem final com spintax resolvida + CTA sorteado.
+  const testPreview = useMemo(() => {
+    const template = mensagem.trim();
+    if (!template && !mediaUrl) return "";
+    const clientCtas = ((client as any)?.response_ctas as any[]) || [];
+    const pool = mergeCtas(clientCtas, DEFAULT_CTAS);
+    const cats = ctaConfig?.categories && ctaConfig.categories.length > 0 ? ctaConfig.categories : undefined;
+    const cta = ctaConfig?.auto_append || template.includes("{cta_resposta}")
+      ? pickCta(pool, cats)?.text ?? null
+      : null;
+    const rendered = renderMessage(template, { nome: testName || "Teste" }, { cta, autoAppendCta: !!ctaConfig?.auto_append });
+    return rendered.text;
+  }, [mensagem, testName, ctaConfig, client, mediaUrl]);
+
+  const handleSendTest = async () => {
+    const digits = normalizeBRPhone(testPhone);
+    if (!isValidBRPhone(digits)) {
+      toast.error("Número inválido. Use DDD + número (ex.: 67 99123-4567).");
+      return;
+    }
+    const hasText = !!mensagem.trim();
+    const hasMedia = !!mediaUrl;
+    if (!hasText && !hasMedia) {
+      toast.error("Escreva uma mensagem ou anexe uma mídia.");
+      return;
+    }
+    if (hasText) {
+      const check = isTemplateReady(mensagem);
+      if (!check.ok) {
+        toast.error(`Corrija a spintax: ${check.error}`);
+        return;
+      }
+    }
+    const fresh = await refetchReadiness();
+    if ((fresh.data as any)?.overall !== "ready") {
+      toast.error("Nenhuma instância WhatsApp pronta agora. Reconecte antes de enviar o teste.");
+      return;
+    }
+    setTestSending(true);
+    try {
+      const kindLabel = mediaKind === "video" ? "Vídeo" : mediaKind === "document" ? "Documento" : "Imagem";
+      const baseTitulo = titulo.trim() || (hasMedia && !hasText ? kindLabel : (mensagem.trim().slice(0, 40) || "Disparo"));
+      const { error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+        body: {
+          client_id: clientId,
+          titulo: `🧪 TESTE — ${baseTitulo}`,
+          mensagem: mensagem.trim(),
+          media_url: mediaUrl,
+          media_kind: mediaKind,
+          media_filename: mediaFilename,
+          media_mime: mediaMime,
+          tipo: "lista_adhoc",
+          recipients_list: [{ nome: testName || "Teste", telefone: digits }],
+          batch_size: 1,
+          delay_min: 1,
+          delay_max: 2,
+          batch_pause: 0,
+          humanization_config: {},
+          cta_config: ctaConfig,
+          max_instances: 1,
+          ignore_stage_cap: false,
+          is_test: true,
+        },
+      });
+      if (error) throw error;
+      toast.success(`🧪 Teste enviado para ${fmtPhoneBR(digits)} — verifique seu WhatsApp em alguns segundos.`);
+      setTestDialogOpen(false);
+      refetch();
+    } catch (err: any) {
+      toast.error("Erro no teste: " + (err.message || "tente novamente"));
+    } finally {
+      setTestSending(false);
+    }
+  };
+
+
+
   const handleCancelDispatch = async (dispatchId: string, titulo: string) => {
     try {
       // Marca o disparo como cancelado e zera os pendentes para parar a fila e o cron de resume.
