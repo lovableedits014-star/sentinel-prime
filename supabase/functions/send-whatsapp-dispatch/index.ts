@@ -1131,6 +1131,49 @@ Deno.serve(async (req) => {
         .eq("dispatch_id", dispatch.id);
       let sent = (prevStats || []).filter((s: any) => s.status === "enviado").length;
       let failed = (prevStats || []).filter((s: any) => s.status === "falha").length;
+      const totalItems = (prevStats || []).length || recipients.length + sent + failed;
+      const refreshProgress = async () => {
+        const { data: stats } = await adminClient
+          .from("whatsapp_dispatch_items")
+          .select("status")
+          .eq("dispatch_id", dispatch.id);
+        sent = (stats || []).filter((s: any) => s.status === "enviado").length;
+        failed = (stats || []).filter((s: any) => s.status === "falha").length;
+        await adminClient.from("whatsapp_dispatches").update({
+          enviados: sent,
+          falhas: failed,
+          updated_at: new Date().toISOString(),
+        }).eq("id", dispatch.id);
+        return { sent, failed };
+      };
+
+      const pauseForRuntime = async () => {
+        await refreshProgress();
+        if (await guardResumeLimit(adminClient, dispatch.id, sent, failed)) return true;
+        await adminClient.from("whatsapp_dispatches").update({
+          enviados: sent,
+          falhas: failed,
+          status: "pausado_timeout",
+          pause_reason: `Ciclo automático concluído (${sent}/${totalItems} enviados). Continuando em ~30s…`,
+          paused_until: new Date(Date.now() + 30_000).toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq("id", dispatch.id);
+        const edgeRuntime = (globalThis as any).EdgeRuntime;
+        if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 30_000));
+        else void invokeResumeDispatch(dispatch.id, 30_000);
+        return true;
+      };
+
+      const shouldPauseBeforeWork = (nextDelayMs = 0) => {
+        return Date.now() - startTime + nextDelayMs + 5_000 > RUNTIME_PAUSE_AT_MS;
+      };
+
+      const sleepOrPause = async (delayMs: number) => {
+        if (delayMs <= 0) return false;
+        if (shouldPauseBeforeWork(delayMs)) return await pauseForRuntime();
+        await sleep(delayMs);
+        return false;
+      };
       let lastInstanceId: string | null = null;
       // Cache do último preflight por instância (resetado se trocar de chip).
       let preflightByInstance: Record<string, PreflightResult> = {};
