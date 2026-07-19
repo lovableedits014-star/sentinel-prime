@@ -57,11 +57,38 @@ function cleanPhoneForBridge(raw: string): string {
 
 const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
 
-async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string; phone: string; message: string; mediaUrl?: string | null }) {
-  const { bridgeUrl, bridgeApiKey, phone, message, mediaUrl } = params;
+async function fetchBridgeSend(params: {
+  bridgeUrl: string;
+  bridgeApiKey: string;
+  phone: string;
+  message: string;
+  mediaUrl?: string | null;
+  mediaKind?: "image" | "video" | "document" | null;
+  mediaFilename?: string | null;
+  mediaMime?: string | null;
+}) {
+  const { bridgeUrl, bridgeApiKey, phone, message, mediaUrl, mediaKind, mediaFilename, mediaMime } = params;
   const isGroup = typeof phone === "string" && phone.endsWith("@g.us");
   const hasMedia = !!mediaUrl;
   const caption = message || "";
+
+  // Campos redundantes para maximizar compatibilidade com diferentes bridges (UAZ/Evolution/etc.).
+  // Se mediaKind não vier, assume "image" (retrocompat).
+  const kind: "image" | "video" | "document" = (mediaKind === "video" || mediaKind === "document")
+    ? mediaKind
+    : "image";
+  const mediaExtras: Record<string, unknown> = hasMedia
+    ? {
+        media_type: kind,
+        mediaType: kind,
+        type: kind,
+        mimetype: mediaMime || undefined,
+        mime_type: mediaMime || undefined,
+        filename: mediaFilename || undefined,
+        file_name: mediaFilename || undefined,
+        document_name: kind === "document" ? (mediaFilename || undefined) : undefined,
+      }
+    : {};
 
   // Para grupos, montamos uma cadeia de tentativas com formatos diferentes
   // pois bridges variam: algumas aceitam `action:"send_group"` com `group_jid`,
@@ -70,11 +97,11 @@ async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string
   const attempts: Array<Record<string, unknown>> = hasMedia
     ? (isGroup
         ? [
-            { action: "send_media", phone, media_url: mediaUrl, caption, is_group: true, isGroup: true },
-            { action: "send_media", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, media_url: mediaUrl, caption },
-            { action: "send_media", to: phone, media_url: mediaUrl, caption, is_group: true },
+            { action: "send_media", phone, media_url: mediaUrl, caption, is_group: true, isGroup: true, ...mediaExtras },
+            { action: "send_media", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, media_url: mediaUrl, caption, ...mediaExtras },
+            { action: "send_media", to: phone, media_url: mediaUrl, caption, is_group: true, ...mediaExtras },
           ]
-        : [{ action: "send_media", phone, media_url: mediaUrl, caption }])
+        : [{ action: "send_media", phone, media_url: mediaUrl, caption, ...mediaExtras }])
     : isGroup
     ? [
         { action: "send_group", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, message },
