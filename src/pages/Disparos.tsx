@@ -1910,11 +1910,11 @@ export default function Disparos() {
                         {(d.status === "enviando" || d.status === "concluido") && d.total_destinatarios > 0 && (
                           <Progress value={progress} className="h-1.5" />
                           )}
-                          {(["cancelado","pausado_timeout","pausado_janela","pausado_sem_instancia","falhou"].includes(d.status)) && (d.total_destinatarios - d.enviados - d.falhas) > 0 && (
+                          {(["cancelado","pausado_timeout","pausado_janela","pausado_sem_instancia","pausado_manual","falhou"].includes(d.status) || isStaleSending(d)) && hasPendingDispatchWork(d) && (
                             <AlertDialog onOpenChange={(open) => { if (!open) setResumeIgnoreCap(false); }}>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-emerald-600 hover:text-emerald-600">
-                                  <Send className="h-3 w-3" /> Retomar
+                                  <RotateCcw className="h-3 w-3" /> {isStaleSending(d) ? "Reenviar" : "Retomar"}
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
@@ -1962,6 +1962,11 @@ export default function Disparos() {
                               {d.status === "pausado_timeout" ? "↻" : "⚠️"} {pauseDisplay}
                             </div>
                           )}
+                          {isStaleSending(d) && (
+                            <div className="text-[11px] border rounded px-2 py-1 text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/20">
+                              ⚠️ Sem atualização recente — use Reenviar para continuar apenas os pendentes.
+                            </div>
+                          )}
 
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>👥 {d.total_destinatarios}</span>
@@ -1973,7 +1978,17 @@ export default function Disparos() {
                             </Badge>
                           )}
                           <DispatchLogDialog dispatchId={d.id} titulo={d.titulo} />
-                          {["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status) && (
+                          {d.status === "enviando" && hasPendingDispatchWork(d) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs gap-1 text-amber-600 hover:text-amber-600"
+                              onClick={() => handlePauseDispatch(d.id, d.titulo)}
+                            >
+                              <Pause className="h-3 w-3" /> Pausar
+                            </Button>
+                          )}
+                          {ACTIVE_DISPATCH_STATUSES.includes(d.status as any) && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-destructive hover:text-destructive">
