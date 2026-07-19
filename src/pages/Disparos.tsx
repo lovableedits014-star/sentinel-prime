@@ -511,7 +511,7 @@ export default function Disparos() {
     const hasText = !!mensagem.trim();
     const hasMedia = !!mediaUrl;
     if (!hasText && !hasMedia) {
-      toast.error("Escreva uma mensagem ou anexe uma imagem");
+      toast.error("Escreva uma mensagem ou anexe uma mídia");
       return;
     }
     if (hasText) {
