@@ -1,0 +1,1 @@
+SELECT public.resume_stuck_whatsapp_dispatches();
