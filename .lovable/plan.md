@@ -1,51 +1,93 @@
-## Diagnóstico do caso Jaime
 
-Verifiquei no banco:
+# Envio de vídeo/PDF/documentos + envio de teste
 
-- **Jaime Sidnei** (`01756eb0…`) hoje: `tipo=coordenador`, `regiao=bandeira`.
-- Existem **11 líderes** com `parent_id = Jaime` mas ainda com `regiao='lagoa'` (Adeide, Sebastião, Almiro, Mario, Maria Regina, Lucinda, Josiane, Claudio, Pedro Henrique, Ison, e outros).
-- Há também ~10 líderes em `regiao='lagoa'` com `parent_id = null` (avulsos). Não dá pra saber pelo banco se eram do Jaime — vou tratar esses como decisão manual sua.
+Duas melhorias no sistema de disparo, entregues juntas porque compartilham o mesmo state e a mesma edge function.
 
-**Causa raiz:** ao editar um coordenador e mudar `regiao` (ou `escopo`/`cidade`), o `save()` em `src/pages/Eleicao.tsx` só atualiza a linha do próprio coordenador. Não existe trigger no Postgres nem lógica no front que propague `regiao/escopo/cidade` para os descendentes (líderes e cabos). O vínculo `parent_id` continuou intacto, só o campo `regiao` ficou defasado — por isso os líderes "sumiram" ao filtrar por região Bandeira.
+---
 
-## Plano de correção
+## Parte 1 — Suportar vídeo, PDF e documentos
 
-### 1. Correção do caso do Jaime (data fix pontual)
-Migration única, transacional, que só toca descendentes ainda ligados a ele:
+Hoje o botão só aceita imagem (`file.type.startsWith("image/")`, 8 MB). O motor de envio (`send_media` na ponte) já aceita `media_url` genérica — só precisamos aceitar mais tipos no upload e informar à ponte que tipo de mídia é.
 
-```sql
--- Reatribui todos os descendentes (recursivo) do Jaime pra região Bandeira
-WITH RECURSIVE desc AS (
-  SELECT id FROM eleicao_pessoas WHERE parent_id = '01756eb0-0691-4359-be68-73b2cc135ab4'
-  UNION ALL
-  SELECT p.id FROM eleicao_pessoas p JOIN desc d ON p.parent_id = d.id
-)
-UPDATE eleicao_pessoas
-SET regiao = 'bandeira', escopo = 'campo_grande'
-WHERE id IN (SELECT id FROM desc);
-```
+**1. Upload (`src/pages/Disparos.tsx` — `handleMediaUpload`)**
+- Aceitar: imagem (jpg/png/webp), vídeo (mp4), PDF, e documentos (docx, xlsx, pptx, doc, xls, ppt, txt, csv, zip).
+- Limites por tipo: imagem 8 MB · vídeo 25 MB · PDF/doc 20 MB.
+- Detectar `mediaKind` (`image` | `video` | `document`) por MIME + extensão.
+- State: `mediaUrl`, `mediaKind`, `mediaFilename`, `mediaMime`.
 
-Os líderes `lagoa` com `parent_id=null` **não serão tocados** — vou te listar num toast/aba pra você decidir manualmente se algum era do Jaime e reatribuir pelo dialog de edição.
+**2. UI do anexo**
+- Botão "Anexar imagem" vira "Anexar mídia" com `accept` amplo.
+- Preview:
+  - imagem → thumbnail (como hoje)
+  - vídeo → `<video controls>` compacto
+  - documento/PDF → ícone + nome + tamanho + link "abrir"
+- Título padrão vira "Vídeo"/"Documento" conforme o kind quando não houver título.
 
-### 2. Prevenir o problema no futuro (propagação automática)
+**3. Payload → edge function**
+- Envia também: `media_kind`, `media_filename`, `media_mime`.
 
-Duas camadas, para ser à prova de bug:
+**4. Edge function (`supabase/functions/send-whatsapp-dispatch/index.ts`)**
+- `fetchBridgeSend` recebe `mediaKind`, `mediaFilename`, `mediaMime`.
+- No corpo para a ponte (UAZ), incluir campos redundantes que as bridges reconhecem: `media_type`, `mimetype`, `filename`, `file_name`, `document_name`.
+- Persiste `media_kind`/`media_filename` no `payload` do `whatsapp_dispatches` e nos itens (JSON existente — sem coluna nova).
+- Retrocompatível: se `media_kind` não vier, assume `image` (disparos antigos continuam retomando).
 
-**a) Trigger no Postgres** — nova migration criando `eleicao_pessoas_propagate_scope()` que roda `AFTER UPDATE OF regiao, escopo, cidade`. Quando um coordenador (ou líder) muda esses campos, o trigger atualiza recursivamente todos os descendentes pra manter o mesmo escopo geográfico. Barato: só dispara quando um desses 3 campos muda de valor.
+**5. Log (`DispatchLogDialog.tsx`)**
+- Mostra ícone do tipo + nome do arquivo quando houver.
 
-**b) Aviso no front** em `src/pages/Eleicao.tsx` `save()`: quando estiver editando alguém que tem descendentes e a `regiao/escopo/cidade` mudou, mostrar `confirm()`:
+**Sem migração SQL.** Bucket `whatsapp-media` já aceita qualquer MIME.
 
-> "Este coordenador tem N líder(es) e M cabo(s). Todos serão movidos junto para a região Bandeira. Confirmar?"
+---
 
-Assim você fica ciente da propagação e não é surpreendido.
+## Parte 2 — Enviar teste para número específico
 
-### Detalhes técnicos
+Botão "Enviar teste" ao lado do "Disparar", para você testar em um número seu antes do disparo real, usando exatamente a mesma mensagem, anexo, spintax e CTA.
 
-- **Migration 1** (data fix Jaime): update recursivo mostrado acima.
-- **Migration 2** (trigger): função `SECURITY DEFINER`, `SET search_path = public`, recursiva via CTE ou loop. Trigger `AFTER UPDATE OF regiao, escopo, cidade ON eleicao_pessoas`. Guardar `pg_trigger_depth() = 0` no início do corpo (ou usar `WHEN`) pra não recursar quando a própria propagação disparar UPDATE nos filhos.
-- **Front** (`src/pages/Eleicao.tsx`, função `save`, perto do bloco linhas 391-413): antes do UPDATE, se `editing` e (`form.regiao !== editing.regiao || form.escopo !== editing.escopo || form.cidade !== editing.cidade`), contar descendentes recursivos em `pessoas` e pedir confirmação.
-- Sem mudanças em edge functions, sem mudanças de RLS, sem mudanças em tipos gerados.
+**1. UI (`src/pages/Disparos.tsx`)**
+- Botão secundário "Enviar teste".
+- Abre um `Dialog` pequeno:
+  - Input de telefone (máscara BR, aceita DDD + número ou já com 55).
+  - Input opcional "Nome" (default: "Teste") — preenche `{{nome}}` no preview.
+  - Preview da mensagem final (spintax resolvida + CTA anexado, uma amostra).
+  - Aviso: "Cada teste consome 1 do limite diário da instância."
+  - Botão "Enviar agora".
+- Reaproveita todo o state atual: mensagem, mídia (imagem/vídeo/PDF/doc), `humanizationConfig`, `ctaConfig`.
+- Valida: mensagem OU anexo obrigatório, número válido, instância pronta (mesma checagem do `handleSend`).
 
-### Arquivos afetados
-- 2 migrations novas (Supabase)
-- `src/pages/Eleicao.tsx` (adicionar bloco de confirmação de propagação no `save()`)
+**2. Backend — sem função nova**
+- Chama a mesma `send-whatsapp-dispatch` com:
+  - `tipo: "lista_adhoc"`
+  - `recipients_list: [{ nome, telefone }]`
+  - `titulo: "🧪 TESTE — " + <título original ou primeiras palavras>`
+  - `is_test: true` (flag opcional para marcar o registro no log)
+  - Mesma `humanization_config`, `cta_config`, `media_url`, `media_kind`, `media_filename`, `media_mime`.
+- Edge function apenas guarda `is_test: true` no `payload` — nada mais muda no motor.
+
+**3. Feedback**
+- Toast "Teste enviado — verifique seu WhatsApp em alguns segundos."
+
+---
+
+## Não-escopo (ambas as partes)
+
+- Áudio/voice notes.
+- Múltiplos anexos por mensagem.
+- Sandbox separado (o teste usa o motor real, é essa a graça).
+- Editar variação manualmente antes de disparar (preview mostra amostra; motor gera outra na hora, como faria com destinatário real).
+
+## Riscos e mitigação
+
+- Ponte pode rejeitar vídeo grande → limite 25 MB no client, erro por item já é logado.
+- PDF sem `filename` chega sem nome → mandamos `filename` explícito.
+- Clicar "Enviar teste" várias vezes gasta cap → aviso no dialog.
+- Retomar disparos antigos (só imagem) → retrocompatível.
+
+## Testes manuais após implementar
+
+1. Anexar `.mp4` e disparar para 1 contato → chega como vídeo com legenda.
+2. Anexar `.pdf` → chega como documento com nome original.
+3. Anexar `.docx` → chega como documento.
+4. "Enviar teste" com texto + spintax + CTA no seu número → chega variação com CTA.
+5. "Enviar teste" com vídeo/PDF → chega o anexo.
+6. Número inválido no teste → toast de erro, nada dispara.
+7. Retomar disparo em andamento com anexo de vídeo mantém o mesmo anexo.

@@ -57,11 +57,38 @@ function cleanPhoneForBridge(raw: string): string {
 
 const TRANSIENT_BRIDGE_STATUSES = new Set([502, 503, 504]);
 
-async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string; phone: string; message: string; mediaUrl?: string | null }) {
-  const { bridgeUrl, bridgeApiKey, phone, message, mediaUrl } = params;
+async function fetchBridgeSend(params: {
+  bridgeUrl: string;
+  bridgeApiKey: string;
+  phone: string;
+  message: string;
+  mediaUrl?: string | null;
+  mediaKind?: "image" | "video" | "document" | null;
+  mediaFilename?: string | null;
+  mediaMime?: string | null;
+}) {
+  const { bridgeUrl, bridgeApiKey, phone, message, mediaUrl, mediaKind, mediaFilename, mediaMime } = params;
   const isGroup = typeof phone === "string" && phone.endsWith("@g.us");
   const hasMedia = !!mediaUrl;
   const caption = message || "";
+
+  // Campos redundantes para maximizar compatibilidade com diferentes bridges (UAZ/Evolution/etc.).
+  // Se mediaKind não vier, assume "image" (retrocompat).
+  const kind: "image" | "video" | "document" = (mediaKind === "video" || mediaKind === "document")
+    ? mediaKind
+    : "image";
+  const mediaExtras: Record<string, unknown> = hasMedia
+    ? {
+        media_type: kind,
+        mediaType: kind,
+        type: kind,
+        mimetype: mediaMime || undefined,
+        mime_type: mediaMime || undefined,
+        filename: mediaFilename || undefined,
+        file_name: mediaFilename || undefined,
+        document_name: kind === "document" ? (mediaFilename || undefined) : undefined,
+      }
+    : {};
 
   // Para grupos, montamos uma cadeia de tentativas com formatos diferentes
   // pois bridges variam: algumas aceitam `action:"send_group"` com `group_jid`,
@@ -70,11 +97,11 @@ async function fetchBridgeSend(params: { bridgeUrl: string; bridgeApiKey: string
   const attempts: Array<Record<string, unknown>> = hasMedia
     ? (isGroup
         ? [
-            { action: "send_media", phone, media_url: mediaUrl, caption, is_group: true, isGroup: true },
-            { action: "send_media", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, media_url: mediaUrl, caption },
-            { action: "send_media", to: phone, media_url: mediaUrl, caption, is_group: true },
+            { action: "send_media", phone, media_url: mediaUrl, caption, is_group: true, isGroup: true, ...mediaExtras },
+            { action: "send_media", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, media_url: mediaUrl, caption, ...mediaExtras },
+            { action: "send_media", to: phone, media_url: mediaUrl, caption, is_group: true, ...mediaExtras },
           ]
-        : [{ action: "send_media", phone, media_url: mediaUrl, caption }])
+        : [{ action: "send_media", phone, media_url: mediaUrl, caption, ...mediaExtras }])
     : isGroup
     ? [
         { action: "send_group", group_jid: phone, jid: phone, remoteJid: phone, chatId: phone, message },
@@ -439,6 +466,9 @@ Deno.serve(async (req) => {
       const queueClientId = payload.client_id as string;
       const queueMsg = String(payload.mensagem || "");
       const queueMediaUrl = (payload.media_url as string | null) || null;
+      const queueMediaKind = (payload.media_kind as "image" | "video" | "document" | null) || null;
+      const queueMediaFilename = (payload.media_filename as string | null) || null;
+      const queueMediaMime = (payload.media_mime as string | null) || null;
       const queueRecipient = (payload.recipients?.[0] || {}) as { telefone?: string; nome?: string };
 
       if (!queueClientId || !queueRecipient.telefone || !queueMsg) {
@@ -512,6 +542,7 @@ Deno.serve(async (req) => {
         const { res: sendRes, data: sendData } = await fetchBridgeSend({
           bridgeUrl: inst.bridge_url, bridgeApiKey: inst.bridge_api_key,
           phone: phoneClean, message: personalizedMsg, mediaUrl: queueMediaUrl,
+          mediaKind: queueMediaKind, mediaFilename: queueMediaFilename, mediaMime: queueMediaMime,
         });
         const failure = getSendFailure(sendRes, sendData);
 
@@ -574,6 +605,9 @@ Deno.serve(async (req) => {
     let batch_pause: number | undefined;
     let existingDispatchId: string | null = null;
     let media_url: string | null = null;
+    let media_kind: "image" | "video" | "document" | null = null;
+    let media_filename: string | null = null;
+    let media_mime: string | null = null;
     // Anti-ban: configuração de humanização e CTA carregada por disparo.
     let humanizationConfig: Record<string, any> = {};
     let ctaConfig: { auto_append?: boolean; categories?: CtaCategory[] } = {};
@@ -604,6 +638,12 @@ Deno.serve(async (req) => {
       batch_pause = d.batch_pause_seconds;
       humanizationConfig = (d.humanization_config as any) || {};
       ctaConfig = (d.cta_config as any) || {};
+      // Metadados de mídia (kind/filename/mime) ficam em humanization_config.media_meta
+      // para não exigir migração — retrocompat: undefined = image.
+      const mediaMeta = (humanizationConfig?.media_meta as any) || {};
+      media_kind = (mediaMeta.kind as any) || null;
+      media_filename = (mediaMeta.filename as string | null) || null;
+      media_mime = (mediaMeta.mime as string | null) || null;
       existingDispatchId = d.id;
       // Overrides opcionais do disparo (Entrega 4): quantas instâncias usar e se ignora cap de aquecimento.
       var dispatchMaxInstances: number | null = (d.max_instances as number | null) ?? null;
@@ -630,8 +670,26 @@ Deno.serve(async (req) => {
       }
       ({ client_id, titulo, mensagem, tipo, tag_filtro, batch_size, delay_min, delay_max, batch_pause } = payload);
       media_url = (payload.media_url as string | null) || null;
+      media_kind = (payload.media_kind as any) || null;
+      media_filename = (payload.media_filename as string | null) || null;
+      media_mime = (payload.media_mime as string | null) || null;
       humanizationConfig = (payload.humanization_config as any) || {};
       ctaConfig = (payload.cta_config as any) || {};
+      // Guarda meta de mídia dentro de humanization_config (sem coluna nova).
+      if (media_url && (media_kind || media_filename || media_mime)) {
+        humanizationConfig = {
+          ...humanizationConfig,
+          media_meta: {
+            kind: media_kind || "image",
+            filename: media_filename || null,
+            mime: media_mime || null,
+          },
+        };
+      }
+      // Marca teste (não afeta motor — só rastreia no log).
+      if (payload.is_test === true) {
+        humanizationConfig = { ...humanizationConfig, is_test: true };
+      }
       var dispatchMaxInstances: number | null = (payload.max_instances as number | null) ?? null;
       var dispatchIgnoreStageCap: boolean = !!payload.ignore_stage_cap;
       var eleicao_tipo = payload.eleicao_tipo || null;
@@ -1495,6 +1553,9 @@ Deno.serve(async (req) => {
                 phone: destination,
                 message: personalizedMsg,
                 mediaUrl: media_url,
+                mediaKind: media_kind,
+                mediaFilename: media_filename,
+                mediaMime: media_mime,
               });
 
               const failure = getSendFailure(sendRes, sendData);

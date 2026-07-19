@@ -20,7 +20,14 @@ import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
   Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star, ImagePlus, X,
+  Paperclip, Video, FileText, FlaskConical,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { renderMessage } from "@/lib/message-variation";
+import { pickCta, mergeCtas, DEFAULT_CTAS } from "@/lib/response-ctas";
+import { normalizeBRPhone, isValidBRPhone, fmtPhoneBR } from "@/lib/phone-utils";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -244,7 +251,16 @@ export default function Disparos() {
   const [mensagem, setMensagem] = useState("");
   const [ctaConfig, setCtaConfig] = useState<CtaConfig>(DEFAULT_CTA_CONFIG);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaKind, setMediaKind] = useState<"image" | "video" | "document" | null>(null);
+  const [mediaFilename, setMediaFilename] = useState<string | null>(null);
+  const [mediaMime, setMediaMime] = useState<string | null>(null);
+  const [mediaSize, setMediaSize] = useState<number>(0);
   const [mediaUploading, setMediaUploading] = useState(false);
+  // Envio de teste
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
+  const [testPhone, setTestPhone] = useState("");
+  const [testName, setTestName] = useState("Teste");
+  const [testSending, setTestSending] = useState(false);
   const [tipoDisparo, setTipoDisparo] = useState("manual");
   const [adhocContacts, setAdhocContacts] = useState<{ nome: string; telefone: string }[]>([]);
   const [tagFiltro, setTagFiltro] = useState("_all");
@@ -422,39 +438,80 @@ export default function Disparos() {
     enabled: !!clientId && tipoDisparo === "eleicao",
   });
 
+  const clearMedia = () => {
+    setMediaUrl(null);
+    setMediaKind(null);
+    setMediaFilename(null);
+    setMediaMime(null);
+    setMediaSize(0);
+  };
+
+  const detectMediaKind = (file: File): { kind: "image" | "video" | "document" | null; label: string } => {
+    const mt = (file.type || "").toLowerCase();
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    if (mt.startsWith("image/") || ["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
+      return { kind: "image", label: "imagem" };
+    }
+    if (mt === "video/mp4" || ext === "mp4") return { kind: "video", label: "vídeo" };
+    if (mt === "application/pdf" || ext === "pdf") return { kind: "document", label: "PDF" };
+    const docExts = ["docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt", "csv", "zip"];
+    if (docExts.includes(ext) || mt.startsWith("application/")) {
+      return { kind: "document", label: "documento" };
+    }
+    return { kind: null, label: "" };
+  };
+
   const handleMediaUpload = async (file: File) => {
     if (!clientId) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Selecione um arquivo de imagem.");
+    const { kind, label } = detectMediaKind(file);
+    if (!kind) {
+      toast.error("Tipo de arquivo não suportado. Use imagem, MP4, PDF ou documento.");
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("Imagem muito grande (máx 8MB).");
+    const limits: Record<"image" | "video" | "document", number> = {
+      image: 8 * 1024 * 1024,
+      video: 25 * 1024 * 1024,
+      document: 20 * 1024 * 1024,
+    };
+    if (file.size > limits[kind]) {
+      const mb = Math.round(limits[kind] / 1024 / 1024);
+      toast.error(`${label} muito grande (máx ${mb}MB).`);
       return;
     }
     setMediaUploading(true);
     try {
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const ext = (file.name.split(".").pop() || "bin").toLowerCase();
       const path = `dispatches/${clientId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error: upErr } = await supabase.storage.from("whatsapp-media").upload(path, file, {
-        cacheControl: "3600", upsert: false, contentType: file.type,
+        cacheControl: "3600", upsert: false, contentType: file.type || "application/octet-stream",
       });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from("whatsapp-media").getPublicUrl(path);
       setMediaUrl(pub.publicUrl);
-      toast.success("Imagem anexada.");
+      setMediaKind(kind);
+      setMediaFilename(file.name);
+      setMediaMime(file.type || null);
+      setMediaSize(file.size);
+      toast.success(`${label.charAt(0).toUpperCase() + label.slice(1)} anexad${kind === "image" || kind === "document" ? "o" : "o"}.`);
     } catch (err: any) {
-      toast.error("Falha ao enviar imagem: " + (err.message || ""));
+      toast.error(`Falha ao enviar ${label}: ` + (err.message || ""));
     } finally {
       setMediaUploading(false);
     }
+  };
+
+  const fmtBytes = (b: number) => {
+    if (!b) return "";
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const handleSend = async () => {
     const hasText = !!mensagem.trim();
     const hasMedia = !!mediaUrl;
     if (!hasText && !hasMedia) {
-      toast.error("Escreva uma mensagem ou anexe uma imagem");
+      toast.error("Escreva uma mensagem ou anexe uma mídia");
       return;
     }
     if (hasText) {
@@ -502,13 +559,17 @@ export default function Disparos() {
           return;
         }
       }
-      const tituloFinal = titulo.trim() || (hasMedia && !hasText ? "Imagem" : (mensagem.trim().slice(0, 60) || "Disparo"));
+      const kindLabel = mediaKind === "video" ? "Vídeo" : mediaKind === "document" ? "Documento" : "Imagem";
+      const tituloFinal = titulo.trim() || (hasMedia && !hasText ? kindLabel : (mensagem.trim().slice(0, 60) || "Disparo"));
       const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
         body: {
           client_id: clientId,
           titulo: tituloFinal,
           mensagem: mensagem.trim(),
           media_url: mediaUrl,
+          media_kind: mediaKind,
+          media_filename: mediaFilename,
+          media_mime: mediaMime,
           tipo: tipoDisparo,
           tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
           eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
@@ -537,7 +598,7 @@ export default function Disparos() {
       setTitulo("");
       setMensagem("");
       setCtaConfig(DEFAULT_CTA_CONFIG);
-      setMediaUrl(null);
+      clearMedia();
       setTagFiltro("_all");
       setSelectedGroupJids([]);
       setAdhocContacts([]);
@@ -548,6 +609,82 @@ export default function Disparos() {
       setSending(false);
     }
   };
+
+  // Preview do teste — amostra da mensagem final com spintax resolvida + CTA sorteado.
+  const testPreview = useMemo(() => {
+    const template = mensagem.trim();
+    if (!template && !mediaUrl) return "";
+    const clientCtas = ((client as any)?.response_ctas as any[]) || [];
+    const cats = ctaConfig?.categories && ctaConfig.categories.length > 0 ? ctaConfig.categories : undefined;
+    const cta = (ctaConfig?.auto_append || template.includes("{cta_resposta}"))
+      ? (pickCta(clientCtas, cats)?.text ?? null)
+      : null;
+    const rendered = renderMessage(template, { nome: testName || "Teste" }, { cta, autoAppendCta: !!ctaConfig?.auto_append });
+    return rendered.text;
+  }, [mensagem, testName, ctaConfig, client, mediaUrl]);
+
+  const handleSendTest = async () => {
+    const digits = normalizeBRPhone(testPhone);
+    if (!isValidBRPhone(digits)) {
+      toast.error("Número inválido. Use DDD + número (ex.: 67 99123-4567).");
+      return;
+    }
+    const hasText = !!mensagem.trim();
+    const hasMedia = !!mediaUrl;
+    if (!hasText && !hasMedia) {
+      toast.error("Escreva uma mensagem ou anexe uma mídia.");
+      return;
+    }
+    if (hasText) {
+      const check = isTemplateReady(mensagem);
+      if (!check.ok) {
+        toast.error(`Corrija a spintax: ${check.error}`);
+        return;
+      }
+    }
+    const fresh = await refetchReadiness();
+    if ((fresh.data as any)?.overall !== "ready") {
+      toast.error("Nenhuma instância WhatsApp pronta agora. Reconecte antes de enviar o teste.");
+      return;
+    }
+    setTestSending(true);
+    try {
+      const kindLabel = mediaKind === "video" ? "Vídeo" : mediaKind === "document" ? "Documento" : "Imagem";
+      const baseTitulo = titulo.trim() || (hasMedia && !hasText ? kindLabel : (mensagem.trim().slice(0, 40) || "Disparo"));
+      const { error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+        body: {
+          client_id: clientId,
+          titulo: `🧪 TESTE — ${baseTitulo}`,
+          mensagem: mensagem.trim(),
+          media_url: mediaUrl,
+          media_kind: mediaKind,
+          media_filename: mediaFilename,
+          media_mime: mediaMime,
+          tipo: "lista_adhoc",
+          recipients_list: [{ nome: testName || "Teste", telefone: digits }],
+          batch_size: 1,
+          delay_min: 1,
+          delay_max: 2,
+          batch_pause: 0,
+          humanization_config: {},
+          cta_config: ctaConfig,
+          max_instances: 1,
+          ignore_stage_cap: false,
+          is_test: true,
+        },
+      });
+      if (error) throw error;
+      toast.success(`🧪 Teste enviado para ${fmtPhoneBR(digits)} — verifique seu WhatsApp em alguns segundos.`);
+      setTestDialogOpen(false);
+      refetch();
+    } catch (err: any) {
+      toast.error("Erro no teste: " + (err.message || "tente novamente"));
+    } finally {
+      setTestSending(false);
+    }
+  };
+
+
 
   const handleCancelDispatch = async (dispatchId: string, titulo: string) => {
     try {
@@ -1454,29 +1591,51 @@ export default function Disparos() {
           </div>
 
           <div className="space-y-2">
-            <Label>Imagem (opcional)</Label>
+            <Label>Mídia (opcional)</Label>
             {mediaUrl ? (
               <div className="flex items-start gap-3 p-2 border rounded-md bg-muted/30">
-                <img src={mediaUrl} alt="anexo" className="w-20 h-20 object-cover rounded" />
-                <div className="flex-1 text-xs text-muted-foreground break-all">
-                  Imagem anexada — será enviada como mídia com a mensagem acima como legenda.
+                {mediaKind === "image" ? (
+                  <img src={mediaUrl} alt="anexo" className="w-20 h-20 object-cover rounded" />
+                ) : mediaKind === "video" ? (
+                  <video src={mediaUrl} className="w-32 h-20 rounded bg-black object-cover" controls />
+                ) : (
+                  <div className="w-20 h-20 rounded bg-muted flex items-center justify-center shrink-0">
+                    <FileText className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1 text-xs text-muted-foreground min-w-0">
+                  <div className="flex items-center gap-1.5 text-foreground font-medium">
+                    {mediaKind === "image" && <ImagePlus className="w-3.5 h-3.5" />}
+                    {mediaKind === "video" && <Video className="w-3.5 h-3.5" />}
+                    {mediaKind === "document" && <FileText className="w-3.5 h-3.5" />}
+                    <span className="truncate">{mediaFilename || (mediaKind === "image" ? "Imagem" : mediaKind === "video" ? "Vídeo" : "Documento")}</span>
+                  </div>
+                  <div className="mt-0.5">
+                    {mediaSize ? fmtBytes(mediaSize) + " · " : ""}
+                    {mediaKind === "image" && "Enviada como imagem com a mensagem acima como legenda."}
+                    {mediaKind === "video" && "Enviado como vídeo com a mensagem acima como legenda."}
+                    {mediaKind === "document" && "Enviado como documento — o destinatário verá o nome do arquivo."}
+                  </div>
+                  <a href={mediaUrl} target="_blank" rel="noreferrer" className="text-primary underline text-[11px]">
+                    abrir anexo
+                  </a>
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setMediaUrl(null)}
+                  onClick={clearMedia}
                   disabled={sending}
                 >
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Input
                   id="dispatch-media-input"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/mp4,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
                   className="hidden"
                   disabled={sending || mediaUploading}
                   onChange={(e) => {
@@ -1495,10 +1654,12 @@ export default function Disparos() {
                   {mediaUploading ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
                   ) : (
-                    <><ImagePlus className="w-4 h-4 mr-2" /> Anexar imagem</>
+                    <><Paperclip className="w-4 h-4 mr-2" /> Anexar mídia</>
                   )}
                 </Button>
-                <span className="text-xs text-muted-foreground">JPG/PNG até 8MB. Enviada para contatos e grupos.</span>
+                <span className="text-xs text-muted-foreground">
+                  Imagem (8 MB) · Vídeo MP4 (25 MB) · PDF/documento (20 MB).
+                </span>
               </div>
             )}
           </div>
@@ -1511,18 +1672,28 @@ export default function Disparos() {
               </span>
             </div>
 
-            <Button
-              onClick={handleSend}
-              disabled={sending || !isConnected || recipientCount === 0}
-            >
-              {sending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Iniciando...</>
-              ) : activeDispatch ? (
-                <><Clock className="h-4 w-4 mr-2" /> Adicionar à fila</>
-              ) : (
-                <><Send className="h-4 w-4 mr-2" /> Enviar</>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setTestDialogOpen(true)}
+                disabled={sending || testSending || (!mensagem.trim() && !mediaUrl)}
+                title="Enviar uma prévia para um número seu antes do disparo real"
+              >
+                <FlaskConical className="h-4 w-4 mr-2" /> Enviar teste
+              </Button>
+              <Button
+                onClick={handleSend}
+                disabled={sending || !isConnected || recipientCount === 0}
+              >
+                {sending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Iniciando...</>
+                ) : activeDispatch ? (
+                  <><Clock className="h-4 w-4 mr-2" /> Adicionar à fila</>
+                ) : (
+                  <><Send className="h-4 w-4 mr-2" /> Enviar</>
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1819,6 +1990,72 @@ export default function Disparos() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={testDialogOpen} onOpenChange={(o) => !testSending && setTestDialogOpen(o)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FlaskConical className="w-4 h-4" /> Enviar teste
+            </DialogTitle>
+            <DialogDescription>
+              Envie uma prévia da mensagem para um número seu (ex.: seu próprio WhatsApp) antes de disparar para a lista real.
+              O teste conta como 1 envio na cota da instância.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Número (com DDD)</Label>
+              <Input
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="67 99123-4567"
+                disabled={testSending}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nome para o teste (opcional)</Label>
+              <Input
+                value={testName}
+                onChange={(e) => setTestName(e.target.value)}
+                placeholder="Ex.: Meu nome"
+                disabled={testSending}
+              />
+              <p className="text-[11px] text-muted-foreground">Usado no placeholder {"{nome}"} da mensagem.</p>
+            </div>
+            {testPreview && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Prévia da mensagem</Label>
+                <div className="text-sm border rounded-md p-2 bg-muted/40 whitespace-pre-wrap max-h-40 overflow-auto">
+                  {testPreview}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  A cada teste a spintax é sorteada novamente — o destinatário real receberá uma variação diferente.
+                </p>
+              </div>
+            )}
+            {mediaUrl && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                {mediaKind === "image" && <ImagePlus className="w-3.5 h-3.5" />}
+                {mediaKind === "video" && <Video className="w-3.5 h-3.5" />}
+                {mediaKind === "document" && <FileText className="w-3.5 h-3.5" />}
+                Mídia anexada será enviada junto: {mediaFilename || mediaKind}.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestDialogOpen(false)} disabled={testSending}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendTest} disabled={testSending || !testPhone.trim()}>
+              {testSending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
+              ) : (
+                <><Send className="w-4 h-4 mr-2" /> Enviar teste</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
