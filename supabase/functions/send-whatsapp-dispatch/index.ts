@@ -1553,6 +1553,9 @@ Deno.serve(async (req) => {
                 phone: destination,
                 message: personalizedMsg,
                 mediaUrl: media_url,
+                mediaKind: media_kind,
+                mediaFilename: media_filename,
+                mediaMime: media_mime,
               });
 
               const failure = getSendFailure(sendRes, sendData);
