@@ -1990,6 +1990,72 @@ export default function Disparos() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={testDialogOpen} onOpenChange={(o) => !testSending && setTestDialogOpen(o)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FlaskConical className="w-4 h-4" /> Enviar teste
+            </DialogTitle>
+            <DialogDescription>
+              Envie uma prévia da mensagem para um número seu (ex.: seu próprio WhatsApp) antes de disparar para a lista real.
+              O teste conta como 1 envio na cota da instância.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Número (com DDD)</Label>
+              <Input
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="67 99123-4567"
+                disabled={testSending}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nome para o teste (opcional)</Label>
+              <Input
+                value={testName}
+                onChange={(e) => setTestName(e.target.value)}
+                placeholder="Ex.: Meu nome"
+                disabled={testSending}
+              />
+              <p className="text-[11px] text-muted-foreground">Usado no placeholder {"{nome}"} da mensagem.</p>
+            </div>
+            {testPreview && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Prévia da mensagem</Label>
+                <div className="text-sm border rounded-md p-2 bg-muted/40 whitespace-pre-wrap max-h-40 overflow-auto">
+                  {testPreview}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  A cada teste a spintax é sorteada novamente — o destinatário real receberá uma variação diferente.
+                </p>
+              </div>
+            )}
+            {mediaUrl && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                {mediaKind === "image" && <ImagePlus className="w-3.5 h-3.5" />}
+                {mediaKind === "video" && <Video className="w-3.5 h-3.5" />}
+                {mediaKind === "document" && <FileText className="w-3.5 h-3.5" />}
+                Mídia anexada será enviada junto: {mediaFilename || mediaKind}.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestDialogOpen(false)} disabled={testSending}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendTest} disabled={testSending || !testPhone.trim()}>
+              {testSending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Enviando...</>
+              ) : (
+                <><Send className="w-4 h-4 mr-2" /> Enviar teste</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
