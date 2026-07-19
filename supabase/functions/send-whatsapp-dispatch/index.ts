@@ -542,6 +542,7 @@ Deno.serve(async (req) => {
         const { res: sendRes, data: sendData } = await fetchBridgeSend({
           bridgeUrl: inst.bridge_url, bridgeApiKey: inst.bridge_api_key,
           phone: phoneClean, message: personalizedMsg, mediaUrl: queueMediaUrl,
+          mediaKind: queueMediaKind, mediaFilename: queueMediaFilename, mediaMime: queueMediaMime,
         });
         const failure = getSendFailure(sendRes, sendData);
 
