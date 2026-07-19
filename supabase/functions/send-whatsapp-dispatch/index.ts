@@ -1165,7 +1165,7 @@ Deno.serve(async (req) => {
       };
 
       const shouldPauseBeforeWork = (nextDelayMs = 0) => {
-        return Date.now() - startTime + nextDelayMs + 5_000 > RUNTIME_PAUSE_AT_MS;
+        return Date.now() - startTime + nextDelayMs + BRIDGE_SEND_TIMEOUT_MS + 5_000 >= RUNTIME_PAUSE_AT_MS;
       };
 
       const sleepOrPause = async (delayMs: number) => {
