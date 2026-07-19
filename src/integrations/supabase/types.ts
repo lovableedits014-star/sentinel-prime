@@ -9714,6 +9714,7 @@ export type Database = {
         }
         Returns: string
       }
+      resume_stuck_whatsapp_dispatches: { Args: never; Returns: undefined }
       snapshot_monthly_scores: {
         Args: { p_client_id: string }
         Returns: number
