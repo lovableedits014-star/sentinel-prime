@@ -20,7 +20,14 @@ import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
   Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star, ImagePlus, X,
+  Paperclip, Video, FileText, FlaskConical,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { renderMessage } from "@/lib/message-variation";
+import { pickCta, mergeCtas, DEFAULT_CTAS } from "@/lib/response-ctas";
+import { normalizeBRPhone, isValidBRPhone, fmtPhoneBR } from "@/lib/phone-utils";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
