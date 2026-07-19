@@ -1752,6 +1752,27 @@ export default function Disparos() {
                 <span className="text-xs text-muted-foreground">
                   {activeDispatch.enviados} / {activeDispatch.total_destinatarios}
                 </span>
+                {activeDispatch.status === "enviando" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1"
+                    onClick={() => handlePauseDispatch(activeDispatch.id, activeDispatch.titulo)}
+                  >
+                    <Pause className="h-3.5 w-3.5" /> Pausar
+                  </Button>
+                )}
+                {(activeDispatch.status !== "enviando" || isStaleSending(activeDispatch)) && hasPendingDispatchWork(activeDispatch) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-emerald-600 hover:text-emerald-600"
+                    onClick={() => handleResumeDispatch(activeDispatch.id, activeDispatch.titulo, { ignoreCap: resumeIgnoreCap })}
+                    title={isStaleSending(activeDispatch) ? "Reenviar/retomar pendentes porque o envio parece travado" : "Retomar envio de onde parou"}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> {isStaleSending(activeDispatch) ? "Reenviar" : "Retomar"}
+                  </Button>
+                )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" className="h-7 gap-1">
@@ -1790,6 +1811,9 @@ export default function Disparos() {
               {activeDispatch.falhas > 0 && <span className="text-destructive">❌ {activeDispatch.falhas} falhas</span>}
               {activeDispatch.status !== "enviando" && (
                 <span className="text-amber-600">⏸ {statusConfig[activeDispatch.status]?.label || activeDispatch.status}</span>
+              )}
+              {isStaleSending(activeDispatch) && (
+                <span className="text-amber-600">⚠️ Sem atualização recente — clique em Reenviar para continuar os pendentes.</span>
               )}
             </div>
           </CardContent>
