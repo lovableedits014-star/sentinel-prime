@@ -615,10 +615,9 @@ export default function Disparos() {
     const template = mensagem.trim();
     if (!template && !mediaUrl) return "";
     const clientCtas = ((client as any)?.response_ctas as any[]) || [];
-    const pool = mergeCtas(clientCtas, DEFAULT_CTAS);
     const cats = ctaConfig?.categories && ctaConfig.categories.length > 0 ? ctaConfig.categories : undefined;
-    const cta = ctaConfig?.auto_append || template.includes("{cta_resposta}")
-      ? pickCta(pool, cats)?.text ?? null
+    const cta = (ctaConfig?.auto_append || template.includes("{cta_resposta}"))
+      ? (pickCta(clientCtas, cats)?.text ?? null)
       : null;
     const rendered = renderMessage(template, { nome: testName || "Teste" }, { cta, autoAppendCta: !!ctaConfig?.auto_append });
     return rendered.text;
