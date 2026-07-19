@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
   Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star, ImagePlus, X,
-  Paperclip, Video, FileText, FlaskConical,
+  Paperclip, Video, FileText, FlaskConical, Pause, RotateCcw,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -86,10 +86,30 @@ type DispatchRow = {
   error_message: string | null;
   pause_reason?: string | null;
   created_at: string;
+  updated_at?: string | null;
   completed_at: string | null;
 };
 
 type TagOption = { nome: string; count: number };
+
+const ACTIVE_DISPATCH_STATUSES = [
+  "pendente",
+  "enfileirado",
+  "enviando",
+  "pausado_timeout",
+  "pausado_janela",
+  "pausado_sem_instancia",
+  "pausado_manual",
+] as const;
+
+function hasPendingDispatchWork(d: Pick<DispatchRow, "total_destinatarios" | "enviados" | "falhas">) {
+  return Math.max(0, d.total_destinatarios - d.enviados - d.falhas) > 0;
+}
+
+function isStaleSending(d: DispatchRow) {
+  if (d.status !== "enviando" || !d.updated_at || !hasPendingDispatchWork(d)) return false;
+  return Date.now() - new Date(d.updated_at).getTime() > 90_000;
+}
 
 function getPauseDisplay(status: string, reason?: string | null) {
   if (!reason) return null;
@@ -108,6 +128,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   pausado_timeout: { label: "Continuando…", color: "bg-primary/10 text-primary", icon: Loader2 },
   pausado_janela: { label: "Aguardando janela", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Clock },
   pausado_sem_instancia: { label: "Sem instância", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: WifiOff },
+  pausado_manual: { label: "Pausado", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", icon: Pause },
   concluido: { label: "Concluído", color: "bg-emerald-500/15 text-emerald-600", icon: CheckCircle },
   falhou: { label: "Falhou", color: "bg-destructive/10 text-destructive", icon: XCircle },
   cancelado: { label: "Cancelado", color: "bg-muted text-muted-foreground", icon: XCircle },
@@ -203,7 +224,7 @@ export default function Disparos() {
     refetchInterval: (data: any) => {
       const rows = (data?.state?.data?.rows as DispatchRow[] | undefined) || [];
       const hasActive = rows.some(
-        (d) => ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status)
+        (d) => ACTIVE_DISPATCH_STATUSES.includes(d.status as any)
       );
       return hasActive ? 3000 : false;
     },
@@ -220,7 +241,7 @@ export default function Disparos() {
         .from("whatsapp_dispatches" as any)
         .select("*")
         .eq("client_id", clientId)
-        .in("status", ["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+        .in("status", [...ACTIVE_DISPATCH_STATUSES])
         .order("created_at", { ascending: true });
       return (data as unknown as DispatchRow[]) || [];
     },
@@ -720,6 +741,26 @@ export default function Disparos() {
     }
   };
 
+  const handlePauseDispatch = async (dispatchId: string, titulo: string) => {
+    try {
+      const { error } = await supabase
+        .from("whatsapp_dispatches" as any)
+        .update({
+          status: "pausado_manual",
+          pause_reason: "Pausado pelo usuário — use Retomar/Reenviar para continuar de onde parou.",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", dispatchId);
+      if (error) throw error;
+
+      toast.success(`Disparo "${titulo}" pausado.`);
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-dispatch-queue", clientId] });
+    } catch (err: any) {
+      toast.error("Erro ao pausar: " + (err.message || "tente novamente"));
+    }
+  };
+
   const handleResumeDispatch = async (dispatchId: string, titulo: string, opts?: { ignoreCap?: boolean }) => {
     try {
       // Reativa itens que foram marcados como cancelados ao parar o disparo.
@@ -746,7 +787,7 @@ export default function Disparos() {
 
       // Atualiza o disparo — inclui opcionalmente o override de "ignorar cap".
       const updatePayload: any = {
-        status: "em_andamento",
+        status: "enviando",
         pause_reason: null,
         completed_at: null,
         updated_at: new Date().toISOString(),
@@ -773,7 +814,7 @@ export default function Disparos() {
   };
 
   const isConnected = !!bridgeConfigured;
-  const activeDispatch = activeQueueDispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status));
+  const activeDispatch = activeQueueDispatches.find((d) => ["pendente","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia","pausado_manual"].includes(d.status));
   const queuedDispatches = activeQueueDispatches.filter((d) => d.status === "enfileirado");
 
   return (
@@ -1711,6 +1752,27 @@ export default function Disparos() {
                 <span className="text-xs text-muted-foreground">
                   {activeDispatch.enviados} / {activeDispatch.total_destinatarios}
                 </span>
+                {activeDispatch.status === "enviando" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1"
+                    onClick={() => handlePauseDispatch(activeDispatch.id, activeDispatch.titulo)}
+                  >
+                    <Pause className="h-3.5 w-3.5" /> Pausar
+                  </Button>
+                )}
+                {(activeDispatch.status !== "enviando" || isStaleSending(activeDispatch)) && hasPendingDispatchWork(activeDispatch) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-emerald-600 hover:text-emerald-600"
+                    onClick={() => handleResumeDispatch(activeDispatch.id, activeDispatch.titulo, { ignoreCap: resumeIgnoreCap })}
+                    title={isStaleSending(activeDispatch) ? "Reenviar/retomar pendentes porque o envio parece travado" : "Retomar envio de onde parou"}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> {isStaleSending(activeDispatch) ? "Reenviar" : "Retomar"}
+                  </Button>
+                )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" className="h-7 gap-1">
@@ -1749,6 +1811,9 @@ export default function Disparos() {
               {activeDispatch.falhas > 0 && <span className="text-destructive">❌ {activeDispatch.falhas} falhas</span>}
               {activeDispatch.status !== "enviando" && (
                 <span className="text-amber-600">⏸ {statusConfig[activeDispatch.status]?.label || activeDispatch.status}</span>
+              )}
+              {isStaleSending(activeDispatch) && (
+                <span className="text-amber-600">⚠️ Sem atualização recente — clique em Reenviar para continuar os pendentes.</span>
               )}
             </div>
           </CardContent>
@@ -1845,11 +1910,11 @@ export default function Disparos() {
                         {(d.status === "enviando" || d.status === "concluido") && d.total_destinatarios > 0 && (
                           <Progress value={progress} className="h-1.5" />
                           )}
-                          {(["cancelado","pausado_timeout","pausado_janela","pausado_sem_instancia","falhou"].includes(d.status)) && (d.total_destinatarios - d.enviados - d.falhas) > 0 && (
+                          {(["cancelado","pausado_timeout","pausado_janela","pausado_sem_instancia","pausado_manual","falhou"].includes(d.status) || isStaleSending(d)) && hasPendingDispatchWork(d) && (
                             <AlertDialog onOpenChange={(open) => { if (!open) setResumeIgnoreCap(false); }}>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-emerald-600 hover:text-emerald-600">
-                                  <Send className="h-3 w-3" /> Retomar
+                                  <RotateCcw className="h-3 w-3" /> {isStaleSending(d) ? "Reenviar" : "Retomar"}
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
@@ -1897,6 +1962,11 @@ export default function Disparos() {
                               {d.status === "pausado_timeout" ? "↻" : "⚠️"} {pauseDisplay}
                             </div>
                           )}
+                          {isStaleSending(d) && (
+                            <div className="text-[11px] border rounded px-2 py-1 text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/20">
+                              ⚠️ Sem atualização recente — use Reenviar para continuar apenas os pendentes.
+                            </div>
+                          )}
 
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>👥 {d.total_destinatarios}</span>
@@ -1908,7 +1978,17 @@ export default function Disparos() {
                             </Badge>
                           )}
                           <DispatchLogDialog dispatchId={d.id} titulo={d.titulo} />
-                          {["pendente","enfileirado","enviando","pausado_timeout","pausado_janela","pausado_sem_instancia"].includes(d.status) && (
+                          {d.status === "enviando" && hasPendingDispatchWork(d) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs gap-1 text-amber-600 hover:text-amber-600"
+                              onClick={() => handlePauseDispatch(d.id, d.titulo)}
+                            >
+                              <Pause className="h-3 w-3" /> Pausar
+                            </Button>
+                          )}
+                          {ACTIVE_DISPATCH_STATUSES.includes(d.status as any) && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1 text-destructive hover:text-destructive">

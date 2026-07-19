@@ -12,6 +12,7 @@ const DEFAULT_DELAY_MIN = 5;
 const DEFAULT_DELAY_MAX = 15;
 const DEFAULT_BATCH_PAUSE = 60;
 const MAX_RUNTIME_MS = 55000;
+const RUNTIME_PAUSE_AT_MS = 42_000;
 const BRIDGE_SEND_TIMEOUT_MS = 18_000;
 const SAO_PAULO_OFFSET_HOURS = -3; // UTC-3 (sem horário de verão atualmente)
 
@@ -334,9 +335,9 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // Recoloca dispatch como em_andamento e reaproveita fluxo resume
+      // Recoloca dispatch como enviando e reaproveita fluxo resume
       await adminClient.from("whatsapp_dispatches")
-        .update({ status: "em_andamento" }).eq("id", dispatchId);
+        .update({ status: "enviando", pause_reason: null, paused_until: null, updated_at: new Date().toISOString() }).eq("id", dispatchId);
       payload.resume_dispatch_id = dispatchId;
       payload.retry_failed_dispatch_id = undefined;
       console.log(`[retry-failed] dispatch=${dispatchId} reset=${resetCount}`);
@@ -409,10 +410,10 @@ Deno.serve(async (req) => {
       try {
         // Só promove se NÃO houver outro disparo ativo agora
         const { data: active } = await adminClient
-          .from("whatsapp_dispatches")
-          .select("id")
+        .from("whatsapp_dispatches")
+        .select("id")
           .eq("client_id", cid)
-          .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia"])
+          .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia","pausado_manual"])
           .limit(1);
         if (active && active.length > 0) return null;
 
@@ -1063,7 +1064,7 @@ Deno.serve(async (req) => {
         .from("whatsapp_dispatches")
         .select("id")
         .eq("client_id", client_id)
-        .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia","enfileirado"])
+          .in("status", ["enviando","pendente","pausado_timeout","pausado_janela","pausado_sem_instancia","pausado_manual","enfileirado"])
         .limit(1);
       shouldQueue = !!(activeOnes && activeOnes.length > 0);
     }
@@ -1130,6 +1131,49 @@ Deno.serve(async (req) => {
         .eq("dispatch_id", dispatch.id);
       let sent = (prevStats || []).filter((s: any) => s.status === "enviado").length;
       let failed = (prevStats || []).filter((s: any) => s.status === "falha").length;
+      const totalItems = (prevStats || []).length || recipients.length + sent + failed;
+      const refreshProgress = async () => {
+        const { data: stats } = await adminClient
+          .from("whatsapp_dispatch_items")
+          .select("status")
+          .eq("dispatch_id", dispatch.id);
+        sent = (stats || []).filter((s: any) => s.status === "enviado").length;
+        failed = (stats || []).filter((s: any) => s.status === "falha").length;
+        await adminClient.from("whatsapp_dispatches").update({
+          enviados: sent,
+          falhas: failed,
+          updated_at: new Date().toISOString(),
+        }).eq("id", dispatch.id);
+        return { sent, failed };
+      };
+
+      const pauseForRuntime = async () => {
+        await refreshProgress();
+        if (await guardResumeLimit(adminClient, dispatch.id, sent, failed)) return true;
+        await adminClient.from("whatsapp_dispatches").update({
+          enviados: sent,
+          falhas: failed,
+          status: "pausado_timeout",
+          pause_reason: `Ciclo automático concluído (${sent}/${totalItems} enviados). Continuando em ~30s…`,
+          paused_until: new Date(Date.now() + 30_000).toISOString(),
+          updated_at: new Date().toISOString(),
+        }).eq("id", dispatch.id);
+        const edgeRuntime = (globalThis as any).EdgeRuntime;
+        if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 30_000));
+        else void invokeResumeDispatch(dispatch.id, 30_000);
+        return true;
+      };
+
+      const shouldPauseBeforeWork = (nextDelayMs = 0) => {
+        return Date.now() - startTime + nextDelayMs + BRIDGE_SEND_TIMEOUT_MS + 5_000 >= RUNTIME_PAUSE_AT_MS;
+      };
+
+      const sleepOrPause = async (delayMs: number) => {
+        if (delayMs <= 0) return false;
+        if (shouldPauseBeforeWork(delayMs)) return await pauseForRuntime();
+        await sleep(delayMs);
+        return false;
+      };
       let lastInstanceId: string | null = null;
       // Cache do último preflight por instância (resetado se trocar de chip).
       let preflightByInstance: Record<string, PreflightResult> = {};
@@ -1188,24 +1232,12 @@ Deno.serve(async (req) => {
         // Checa se o disparo foi cancelado pelo usuário
         const { data: statusCheck } = await adminClient
           .from("whatsapp_dispatches").select("status").eq("id", dispatch.id).maybeSingle();
-        if (statusCheck?.status === "cancelado") {
-          console.log(`[dispatch] ${dispatch.id} cancelado pelo usuário — interrompendo loop`);
+        if (statusCheck?.status === "cancelado" || statusCheck?.status === "pausado_manual") {
+          console.log(`[dispatch] ${dispatch.id} ${statusCheck.status} pelo usuário — interrompendo loop`);
           return;
         }
-        if (Date.now() - startTime > MAX_RUNTIME_MS) {
-          if (await guardResumeLimit(adminClient, dispatch.id, sent, failed)) return;
-          const totalKnown = recipients.length + sent + failed;
-          await adminClient.from("whatsapp_dispatches").update({
-            enviados: sent,
-            falhas: failed,
-            status: "pausado_timeout",
-            pause_reason: `Ciclo automático concluído (${sent}/${totalKnown} enviados). Continuando em ~30s…`,
-            paused_until: new Date(Date.now() + 30_000).toISOString(),
-            updated_at: new Date().toISOString(),
-          }).eq("id", dispatch.id);
-          const edgeRuntime = (globalThis as any).EdgeRuntime;
-          if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 30_000));
-          else void invokeResumeDispatch(dispatch.id, 30_000);
+        if (Date.now() - startTime > MAX_RUNTIME_MS || shouldPauseBeforeWork()) {
+          await pauseForRuntime();
           return;
         }
 
@@ -1213,29 +1245,17 @@ Deno.serve(async (req) => {
         const batchItems = recipients.slice(batchStart, batchStart + BATCH_SIZE);
 
         for (const recipient of batchItems) {
-          // Checa cancelamento a cada N envios para responder rápido
-          if ((sent + failed) % 5 === 0) {
+          // Checa cancelamento/pausa manual a cada destinatário para responder rápido
+          {
             const { data: sc } = await adminClient
               .from("whatsapp_dispatches").select("status").eq("id", dispatch.id).maybeSingle();
-            if (sc?.status === "cancelado") {
-              console.log(`[dispatch] ${dispatch.id} cancelado pelo usuário — interrompendo`);
+            if (sc?.status === "cancelado" || sc?.status === "pausado_manual") {
+              console.log(`[dispatch] ${dispatch.id} ${sc.status} pelo usuário — interrompendo`);
               return;
             }
           }
-          if (Date.now() - startTime > MAX_RUNTIME_MS) {
-            if (await guardResumeLimit(adminClient, dispatch.id, sent, failed)) return;
-            const totalKnown2 = recipients.length + sent + failed;
-            await adminClient.from("whatsapp_dispatches").update({
-              enviados: sent,
-              falhas: failed,
-              status: "pausado_timeout",
-              pause_reason: `Ciclo automático concluído (${sent}/${totalKnown2} enviados). Continuando em ~30s…`,
-              paused_until: new Date(Date.now() + 30_000).toISOString(),
-              updated_at: new Date().toISOString(),
-            }).eq("id", dispatch.id);
-            const edgeRuntime = (globalThis as any).EdgeRuntime;
-            if (edgeRuntime?.waitUntil) edgeRuntime.waitUntil(invokeResumeDispatch(dispatch.id, 30_000));
-            else void invokeResumeDispatch(dispatch.id, 30_000);
+          if (Date.now() - startTime > MAX_RUNTIME_MS || shouldPauseBeforeWork()) {
+            await pauseForRuntime();
             return;
           }
 
@@ -1452,7 +1472,7 @@ Deno.serve(async (req) => {
 
             // Delay extra ao trocar de chip (humaniza)
             if (lastInstanceId && instanceId && lastInstanceId !== instanceId) {
-              await sleep(randomDelay(interMin, interMax));
+              if (await sleepOrPause(randomDelay(interMin, interMax))) return;
             }
             lastInstanceId = instanceId;
 
@@ -1588,7 +1608,7 @@ Deno.serve(async (req) => {
                 if (Math.random() < 0.05) {
                   const microPause = randomDelay(30_000, 120_000);
                   console.log(`[micro-pause] ${Math.round(microPause / 1000)}s`);
-                  await sleep(microPause);
+                  if (await sleepOrPause(microPause)) return;
                 }
                 // Registra cobrança de indicador (se aplicável)
                 if (tipo === "indicadores_cobranca" && (recipient as any).indicador_id) {
@@ -1643,7 +1663,7 @@ Deno.serve(async (req) => {
               if (isGroup && instanceId) {
                 // Failover dentro do mesmo grupo: exclui essa instância e tenta a próxima
                 (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
-                await sleep(randomDelay(800, 1800));
+                if (await sleepOrPause(randomDelay(800, 1800))) return;
                 continue;
               }
               if (!isGroup && disconnectErr) {
@@ -1668,7 +1688,7 @@ Deno.serve(async (req) => {
               }
               if (isGroup && instanceId) {
                 (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
-                await sleep(randomDelay(800, 1800));
+                if (await sleepOrPause(randomDelay(800, 1800))) return;
                 continue;
               }
               failed++;
@@ -1689,24 +1709,42 @@ Deno.serve(async (req) => {
               }));
           }
 
-          if ((sent + failed) % 5 === 0) {
+          if (!recipientResolved && !isGroup) {
+            await refreshProgress();
             await adminClient.from("whatsapp_dispatches").update({
+              status: "pausado_sem_instancia",
+              pause_reason: "Envio interrompido antes de confirmar o destinatário atual. Verifique a instância e clique em Retomar/Reenviar para continuar os pendentes.",
               enviados: sent,
               falhas: failed,
               updated_at: new Date().toISOString(),
             }).eq("id", dispatch.id);
+            return;
           }
+
+          await refreshProgress();
+
+          if (sent + failed >= totalItems) break;
 
           const baseDelay = randomDelay(DELAY_MIN_MS, DELAY_MAX_MS);
           const minByStage = stageMinDelayMs(currentStage);
-          await sleep(Math.max(baseDelay, minByStage));
+          if (await sleepOrPause(Math.max(baseDelay, minByStage))) return;
         }
 
         if (batch < Math.ceil(recipients.length / BATCH_SIZE) - 1) {
-          await sleep(BATCH_PAUSE_MS);
+          if (await sleepOrPause(BATCH_PAUSE_MS)) return;
         }
       }
 
+      await refreshProgress();
+      const { count: finalPending } = await adminClient
+        .from("whatsapp_dispatch_items")
+        .select("id", { count: "exact", head: true })
+        .eq("dispatch_id", dispatch.id)
+        .eq("status", "pendente");
+      if ((finalPending || 0) > 0) {
+        if (await pauseForRuntime()) return;
+        return;
+      }
       await adminClient.from("whatsapp_dispatches").update({
         enviados: sent,
         falhas: failed,
