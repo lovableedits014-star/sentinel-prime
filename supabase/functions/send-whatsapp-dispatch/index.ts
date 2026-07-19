@@ -466,6 +466,9 @@ Deno.serve(async (req) => {
       const queueClientId = payload.client_id as string;
       const queueMsg = String(payload.mensagem || "");
       const queueMediaUrl = (payload.media_url as string | null) || null;
+      const queueMediaKind = (payload.media_kind as "image" | "video" | "document" | null) || null;
+      const queueMediaFilename = (payload.media_filename as string | null) || null;
+      const queueMediaMime = (payload.media_mime as string | null) || null;
       const queueRecipient = (payload.recipients?.[0] || {}) as { telefone?: string; nome?: string };
 
       if (!queueClientId || !queueRecipient.telefone || !queueMsg) {
