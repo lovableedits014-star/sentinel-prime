@@ -335,7 +335,7 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // Recoloca dispatch como em_andamento e reaproveita fluxo resume
+      // Recoloca dispatch como enviando e reaproveita fluxo resume
       await adminClient.from("whatsapp_dispatches")
         .update({ status: "enviando", pause_reason: null, paused_until: null, updated_at: new Date().toISOString() }).eq("id", dispatchId);
       payload.resume_dispatch_id = dispatchId;
@@ -1709,7 +1709,21 @@ Deno.serve(async (req) => {
               }));
           }
 
+          if (!recipientResolved && !isGroup) {
+            await refreshProgress();
+            await adminClient.from("whatsapp_dispatches").update({
+              status: "pausado_sem_instancia",
+              pause_reason: "Envio interrompido antes de confirmar o destinatário atual. Verifique a instância e clique em Retomar/Reenviar para continuar os pendentes.",
+              enviados: sent,
+              falhas: failed,
+              updated_at: new Date().toISOString(),
+            }).eq("id", dispatch.id);
+            return;
+          }
+
           await refreshProgress();
+
+          if (sent + failed >= totalItems) break;
 
           const baseDelay = randomDelay(DELAY_MIN_MS, DELAY_MAX_MS);
           const minByStage = stageMinDelayMs(currentStage);
@@ -1722,6 +1736,15 @@ Deno.serve(async (req) => {
       }
 
       await refreshProgress();
+      const { count: finalPending } = await adminClient
+        .from("whatsapp_dispatch_items")
+        .select("id", { count: "exact", head: true })
+        .eq("dispatch_id", dispatch.id)
+        .eq("status", "pendente");
+      if ((finalPending || 0) > 0) {
+        if (await pauseForRuntime()) return;
+        return;
+      }
       await adminClient.from("whatsapp_dispatches").update({
         enviados: sent,
         falhas: failed,
