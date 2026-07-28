@@ -617,6 +617,11 @@ export default function Telemarketing() {
           </p>
         </div>
         <div className="flex gap-2 items-center">
+          {!campanhaIdParam && scripts.length > 1 && (
+            <Button size="sm" variant="outline" onClick={() => setPickingCampanha(true)}>
+              Trocar campanha
+            </Button>
+          )}
           <Button size="sm" variant="default" onClick={jumpToProximoDisponivel}>
             <ArrowRight className="w-3.5 h-3.5 mr-1" />
             Próximo disponível
