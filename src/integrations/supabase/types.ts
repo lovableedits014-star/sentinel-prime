@@ -5572,6 +5572,194 @@ export type Database = {
         }
         Relationships: []
       }
+      mission_distributions: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          dispatch_id: string | null
+          group_jid: string | null
+          group_name_snapshot: string | null
+          id: string
+          mission_id: string
+          short_code: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          dispatch_id?: string | null
+          group_jid?: string | null
+          group_name_snapshot?: string | null
+          id?: string
+          mission_id: string
+          short_code: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          dispatch_id?: string | null
+          group_jid?: string | null
+          group_name_snapshot?: string | null
+          id?: string
+          mission_id?: string
+          short_code?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_distributions_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "portal_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_events: {
+        Row: {
+          client_id: string
+          created_at: string
+          device_category: string | null
+          distribution_id: string | null
+          event_type: Database["public"]["Enums"]["mission_event_type"]
+          id: string
+          ip_hash: string | null
+          is_bot: boolean
+          mission_id: string
+          participant_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          device_category?: string | null
+          distribution_id?: string | null
+          event_type: Database["public"]["Enums"]["mission_event_type"]
+          id?: string
+          ip_hash?: string | null
+          is_bot?: boolean
+          mission_id: string
+          participant_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          device_category?: string | null
+          distribution_id?: string | null
+          event_type?: Database["public"]["Enums"]["mission_event_type"]
+          id?: string
+          ip_hash?: string | null
+          is_bot?: boolean
+          mission_id?: string
+          participant_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_events_distribution_id_fkey"
+            columns: ["distribution_id"]
+            isOneToOne: false
+            referencedRelation: "mission_distributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mission_events_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "portal_missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mission_events_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "mission_participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_participants: {
+        Row: {
+          client_id: string
+          created_at: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          nome: string
+          pessoa_id: string | null
+          phone_e164: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          nome: string
+          pessoa_id?: string | null
+          phone_e164: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          nome?: string
+          pessoa_id?: string | null
+          phone_e164?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mission_visitor_tokens: {
+        Row: {
+          client_id: string
+          created_at: string
+          device_hint: string | null
+          last_used_at: string
+          participant_id: string
+          revoked_at: string | null
+          token: string
+          user_agent: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          device_hint?: string | null
+          last_used_at?: string
+          participant_id: string
+          revoked_at?: string | null
+          token: string
+          user_agent?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          device_hint?: string | null
+          last_used_at?: string
+          participant_id?: string
+          revoked_at?: string | null
+          token?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_visitor_tokens_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "mission_participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       municipios_indicadores: {
         Row: {
           cobertura_sus_pct: number | null
@@ -6382,10 +6570,15 @@ export type Database = {
           description: string | null
           display_order: number
           id: string
+          instructions: string | null
           is_active: boolean
+          link_avulso: string | null
+          link_facebook: string | null
+          link_instagram: string | null
           platform: string
           post_url: string
           title: string | null
+          tracking_enabled: boolean
           updated_at: string
         }
         Insert: {
@@ -6394,10 +6587,15 @@ export type Database = {
           description?: string | null
           display_order?: number
           id?: string
+          instructions?: string | null
           is_active?: boolean
+          link_avulso?: string | null
+          link_facebook?: string | null
+          link_instagram?: string | null
           platform: string
           post_url: string
           title?: string | null
+          tracking_enabled?: boolean
           updated_at?: string
         }
         Update: {
@@ -6406,10 +6604,15 @@ export type Database = {
           description?: string | null
           display_order?: number
           id?: string
+          instructions?: string | null
           is_active?: boolean
+          link_avulso?: string | null
+          link_facebook?: string | null
+          link_instagram?: string | null
           platform?: string
           post_url?: string
           title?: string | null
+          tracking_enabled?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -9621,6 +9824,7 @@ export type Database = {
           titulo: string
         }[]
       }
+      mission_generate_short_code: { Args: never; Returns: string }
       municipio_ranking: {
         Args: { p_codigo_ibge: number }
         Returns: {
@@ -10109,6 +10313,12 @@ export type Database = {
         | "gemini"
         | "mistral"
         | "cohere"
+      mission_event_type:
+        | "open"
+        | "click_facebook"
+        | "click_instagram"
+        | "click_avulso"
+        | "declared_done"
       nivel_apoio:
         | "desconhecido"
         | "simpatizante"
@@ -10289,6 +10499,13 @@ export const Constants = {
         "gemini",
         "mistral",
         "cohere",
+      ],
+      mission_event_type: [
+        "open",
+        "click_facebook",
+        "click_instagram",
+        "click_avulso",
+        "declared_done",
       ],
       nivel_apoio: [
         "desconhecido",
