@@ -608,7 +608,7 @@ export default function Disparos() {
         selectedGroupJids.length > 0 &&
         trackedIdsInMsg.length > 0;
 
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const origin = publicBase.url;
 
       const commonBody = {
         client_id: clientId,
