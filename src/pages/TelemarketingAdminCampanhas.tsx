@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, Upload, Power, Megaphone, ShieldAlert, FileText, Pencil } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Power, Megaphone, ShieldAlert, FileText, Pencil, UserCog, FileSpreadsheet } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import DesignarEleicaoPanel from "@/components/telemarketing/DesignarEleicaoPanel";
+import ImportContatosAvulsosDialog from "@/components/telemarketing/ImportContatosAvulsosDialog";
+import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
 
 interface Campanha {
   id: string;
@@ -38,12 +40,15 @@ export default function TelemarketingAdminCampanhas() {
   const { clientId, isLoading: ctxLoading, needsClientSelection } = useActiveClientId();
   const [campanhas, setCampanhas] = useState<Campanha[]>([]);
   const [contatos, setContatos] = useState<ContatoAvulso[]>([]);
+  const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [csv, setCsv] = useState("");
   const [importingTo, setImportingTo] = useState<string>("");
   const [importing, setImporting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [atribuindo, setAtribuindo] = useState<Campanha | null>(null);
 
   // Script edit dialog
   const [editing, setEditing] = useState<Campanha | null>(null);
@@ -76,12 +81,14 @@ export default function TelemarketingAdminCampanhas() {
   const load = async () => {
     if (!clientId) return;
     setLoading(true);
-    const [c, a] = await Promise.all([
+    const [c, a, ops] = await Promise.all([
       supabase.from("telemarketing_campanhas" as any).select("*").eq("client_id", clientId).order("created_at", { ascending: false }),
       supabase.from("telemarketing_contatos_avulsos" as any).select("id,nome,telefone,cidade,bairro,ligacao_status,campanha_id").eq("client_id", clientId).order("created_at", { ascending: false }).limit(500),
+      supabase.from("telemarketing_operadores" as any).select("id,nome,ativo").eq("client_id", clientId).order("nome"),
     ]);
     setCampanhas((c.data as any[]) || []);
     setContatos((a.data as any[]) || []);
+    setOperadores((ops.data as any[]) || []);
     setLoading(false);
   };
 
@@ -186,33 +193,44 @@ export default function TelemarketingAdminCampanhas() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><Upload className="w-4 h-4" /> Importar mailing CSV</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><Upload className="w-4 h-4" /> Importar mailing</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <label className="text-xs font-medium mb-1 block">Campanha (opcional)</label>
-                <Select value={importingTo || "__none__"} onValueChange={(v) => setImportingTo(v === "__none__" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Sem campanha" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— Sem campanha —</SelectItem>
-                    {campanhas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium mb-1 block">CSV (cabeçalho: nome, telefone, cidade, bairro)</label>
-                <Textarea
-                  rows={6}
-                  value={csv}
-                  onChange={(e) => setCsv(e.target.value)}
-                  placeholder={"nome,telefone,cidade,bairro\nMaria Silva,11999990000,São Paulo,Centro"}
-                  className="font-mono text-xs"
-                />
-                <p className="text-[11px] text-muted-foreground mt-1">Aceita vírgula, ponto-e-vírgula ou tab. Sem cabeçalho, usa colunas 1 (nome) e 2 (telefone).</p>
-              </div>
-              <Button onClick={handleImport} disabled={importing || !csv.trim()} className="w-full">
-                {importing ? "Importando…" : "Importar"}
+              <Button
+                onClick={() => setImportDialogOpen(true)}
+                disabled={campanhas.length === 0}
+                className="w-full"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Importar arquivo (Excel/CSV)
               </Button>
+              <p className="text-[11px] text-muted-foreground">
+                Envie <code>.xlsx</code>, <code>.xls</code> ou <code>.csv</code> com mapeamento de colunas e opção de já designar a um operador.
+                {campanhas.length === 0 && <><br /><strong>Crie uma campanha primeiro.</strong></>}
+              </p>
+
+              <details className="pt-2 border-t">
+                <summary className="text-xs text-muted-foreground cursor-pointer">Colar CSV direto (atalho)</summary>
+                <div className="space-y-2 pt-2">
+                  <Select value={importingTo || "__none__"} onValueChange={(v) => setImportingTo(v === "__none__" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Sem campanha" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Sem campanha —</SelectItem>
+                      {campanhas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    rows={5}
+                    value={csv}
+                    onChange={(e) => setCsv(e.target.value)}
+                    placeholder={"nome,telefone,cidade,bairro\nMaria Silva,11999990000,São Paulo,Centro"}
+                    className="font-mono text-xs"
+                  />
+                  <Button onClick={handleImport} disabled={importing || !csv.trim()} size="sm" variant="outline" className="w-full">
+                    {importing ? "Importando…" : "Importar CSV colado"}
+                  </Button>
+                </div>
+              </details>
             </CardContent>
           </Card>
 
@@ -249,6 +267,9 @@ export default function TelemarketingAdminCampanhas() {
                         <p className="text-[11px] text-muted-foreground mt-0.5">{ligados}/{total} contatos ligados</p>
                       </div>
                       <div className="flex gap-1 shrink-0">
+                        <Button size="sm" variant="outline" onClick={() => setAtribuindo(c)} title="Designar contatos a operadores">
+                          <UserCog className="w-3.5 h-3.5" />
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => openEdit(c)} title="Editar script & tags">
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
@@ -317,6 +338,29 @@ export default function TelemarketingAdminCampanhas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {clientId && (
+        <ImportContatosAvulsosDialog
+          open={importDialogOpen}
+          onClose={() => setImportDialogOpen(false)}
+          clientId={clientId}
+          campanhas={campanhas.map(c => ({ id: c.id, nome: c.nome }))}
+          operadores={operadores}
+          onImported={load}
+        />
+      )}
+
+      {atribuindo && clientId && (
+        <AtribuicoesDialog
+          open={!!atribuindo}
+          onOpenChange={(o) => { if (!o) setAtribuindo(null); }}
+          clientId={clientId}
+          campanhaId={atribuindo.id}
+          campanhaNome={atribuindo.nome}
+          operadores={operadores}
+          onChanged={load}
+        />
+      )}
     </div>
   );
 }

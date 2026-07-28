@@ -53,6 +53,8 @@ export default function Telemarketing() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [clientName, setClientName] = useState("");
   const [campanhaNome, setCampanhaNome] = useState<string | null>(null);
+  const [selectedCampanhaId, setSelectedCampanhaId] = useState<string | null>(campanhaIdParam);
+  const [pickingCampanha, setPickingCampanha] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura">("todos");
   const autoLoginAttempted = useRef(false);
 
@@ -140,7 +142,7 @@ export default function Telemarketing() {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: campanhaIdParam || null,
+      _campanha_id: selectedCampanhaId,
     });
     if (rpcErr) {
       toast.error("Erro ao carregar contatos: " + rpcErr.message);
@@ -192,12 +194,20 @@ export default function Telemarketing() {
     setLoggedIn(true);
     setLoading(false);
 
+    // Se o operador tem múltiplas campanhas atribuídas e nenhuma foi passada por URL,
+    // abre a tela de escolha em vez de já saltar para um contato.
+    const campanhasComContato = new Set(lista.map(c => c.campanha_id).filter(Boolean));
+    if (!campanhaIdParam && campanhasComContato.size > 1) {
+      setPickingCampanha(true);
+      return;
+    }
+
     // Picker atômico no servidor: cada operador começa em um contato diferente.
     const { data: pick } = await supabase.rpc("tele_proximo_contato" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: campanhaIdParam || null,
+      _campanha_id: selectedCampanhaId,
       _ttl_seconds: 300,
     });
     const res = pick as { found: boolean; tabela?: string; contato_id?: string } | null;
@@ -208,6 +218,63 @@ export default function Telemarketing() {
       setCurrentIndex(0);
     }
   };
+
+  const pickCampanha = async (campanhaId: string | null) => {
+    setSelectedCampanhaId(campanhaId);
+    setPickingCampanha(false);
+    setCurrentIndex(0);
+    setFiltroTipo("todos");
+    resetForm();
+    const script = scripts.find(s => s.id === campanhaId);
+    setCampanhaNome(script?.nome || null);
+    await reloadContatosWithCampanha(campanhaId);
+    // salta para o próximo disponível dentro da campanha escolhida
+    if (!clientId) return;
+    const { data } = await supabase.rpc("tele_proximo_contato" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: campanhaId,
+      _ttl_seconds: 300,
+    });
+    const res = data as { found: boolean; tabela?: string; contato_id?: string } | null;
+    if (res?.found) {
+      setContatos(prev => {
+        const idx = prev.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+        if (idx >= 0) setCurrentIndex(idx);
+        return prev;
+      });
+    }
+  };
+
+  const reloadContatosWithCampanha = async (campanhaId: string | null) => {
+    if (!clientId) return;
+    const { data: rpcRows } = await supabase.rpc("tele_list_contatos" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: campanhaId,
+    });
+    const lista: ContatoTele[] = ((rpcRows as any[]) || [])
+      .map((r) => ({
+        id: r.id, nome: r.nome, telefone: r.telefone,
+        cidade: r.cidade, bairro: r.bairro,
+        ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
+        candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
+        ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
+        tabela: r.tabela as ContatoTele["tabela"],
+        proxima_tentativa_em: r.proxima_tentativa_em ?? null,
+        tentativas_count: r.tentativas_count ?? 0,
+        observacao_tele: r.observacao_tele ?? null,
+        locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
+        campanha_id: r.campanha_id ?? null,
+        indicador_nome: r.indicador_nome ?? null,
+        indicador_tipo: r.indicador_tipo ?? null,
+      }))
+      .filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
+    setContatos(lista);
+  };
+
 
   const filteredContatos = filtroTipo === "todos"
     ? contatos
@@ -239,7 +306,7 @@ export default function Telemarketing() {
       _client_id: clientId,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: campanhaIdParam || null,
+      _campanha_id: selectedCampanhaId,
     });
     const lista: ContatoTele[] = ((rpcRows as any[]) || [])
       .map((r) => ({
@@ -274,7 +341,7 @@ export default function Telemarketing() {
       _client_id: clientId,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: campanhaIdParam || null,
+      _campanha_id: selectedCampanhaId,
       _ttl_seconds: 300,
     });
     if (error) { toast.error("Erro: " + error.message); return; }
@@ -477,6 +544,61 @@ export default function Telemarketing() {
     );
   }
 
+  // Campaign picker — shown after login when the operator has more than one assigned campaign
+  if (pickingCampanha) {
+    const contagens = new Map<string | null, number>();
+    for (const c of contatos) contagens.set(c.campanha_id, (contagens.get(c.campanha_id) || 0) + 1);
+    const opcoes = scripts
+      .map(s => ({ id: s.id, nome: s.nome, count: contagens.get(s.id) || 0 }))
+      .filter(o => o.count > 0)
+      .sort((a, b) => b.count - a.count);
+    const semCampanha = contagens.get(null) || 0;
+
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Phone className="w-5 h-5 text-primary" />
+              Escolha a campanha
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Olá, <strong>{operadorNome}</strong>. Você tem contatos em mais de uma campanha — selecione por qual quer começar. Você pode trocar a qualquer momento.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {opcoes.map(o => (
+              <Button
+                key={o.id}
+                variant="outline"
+                className="w-full justify-between h-auto py-3"
+                onClick={() => pickCampanha(o.id)}
+              >
+                <span className="font-medium truncate">{o.nome}</span>
+                <Badge variant="secondary">{o.count} pendentes</Badge>
+              </Button>
+            ))}
+            {semCampanha > 0 && (
+              <Button
+                variant="outline"
+                className="w-full justify-between h-auto py-3"
+                onClick={() => pickCampanha(null)}
+              >
+                <span className="font-medium">Contatos gerais (sem campanha)</span>
+                <Badge variant="secondary">{semCampanha} pendentes</Badge>
+              </Button>
+            )}
+            {opcoes.length === 0 && semCampanha === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Nenhum contato disponível no momento.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-muted/30 p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
       {/* Header */}
@@ -495,6 +617,11 @@ export default function Telemarketing() {
           </p>
         </div>
         <div className="flex gap-2 items-center">
+          {!campanhaIdParam && scripts.length > 1 && (
+            <Button size="sm" variant="outline" onClick={() => setPickingCampanha(true)}>
+              Trocar campanha
+            </Button>
+          )}
           <Button size="sm" variant="default" onClick={jumpToProximoDisponivel}>
             <ArrowRight className="w-3.5 h-3.5 mr-1" />
             Próximo disponível
