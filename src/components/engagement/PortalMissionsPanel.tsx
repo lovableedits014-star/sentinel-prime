@@ -269,6 +269,11 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
         post_url: values.post_url.trim(),
         title: values.title.trim() || null,
         description: values.description.trim() || null,
+        tracking_enabled: !!values.tracking_enabled,
+        link_facebook: values.link_facebook.trim() || null,
+        link_instagram: values.link_instagram.trim() || null,
+        link_avulso: values.link_avulso.trim() || null,
+        instructions: values.instructions.trim() || null,
       };
       const { error } = await (supabase as any)
         .from("portal_missions").update(payload).eq("id", values.id);
@@ -316,10 +321,16 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       post_url: m.post_url,
       title: m.title || "",
       description: m.description || "",
+      tracking_enabled: !!m.tracking_enabled,
+      link_facebook: m.link_facebook || "",
+      link_instagram: m.link_instagram || "",
+      link_avulso: m.link_avulso || "",
+      instructions: m.instructions || "",
     });
     setEditSelectedPostId(null);
     setEditOpen(true);
   };
+
 
   const handleEditSelectPost = (post: PostOption) => {
     const platform = (post.platform === "instagram" ? "instagram" : "facebook") as "facebook" | "instagram";
