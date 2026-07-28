@@ -907,7 +907,7 @@ function MissionCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           {mission.title ? (
             <p className="text-sm font-medium truncate">{mission.title}</p>
           ) : (
@@ -916,6 +916,20 @@ function MissionCard({
           <Badge variant="outline" className="text-xs shrink-0 capitalize">
             {mission.platform}
           </Badge>
+          {mission.tracking_enabled ? (
+            <Badge className="text-xs shrink-0 gap-1 bg-primary/10 text-primary hover:bg-primary/15 border-primary/30" variant="outline">
+              <Radar className="w-3 h-3" /> Rastreada
+            </Badge>
+          ) : (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="text-[11px] shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-dashed border-muted-foreground/40 text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
+              title="Abrir edição com rastreamento pré-ativado"
+            >
+              <Radar className="w-3 h-3" /> Ativar rastreamento
+            </button>
+          )}
         </div>
         {mission.description && (
           <p className="text-xs text-muted-foreground line-clamp-2">{mission.description}</p>
