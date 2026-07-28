@@ -43,7 +43,7 @@ export const Route = createFileRoute("/api/public/missao/event")({
             return Response.json({ error: "Dados inválidos" }, { status: 400, headers: corsHeaders });
           }
 
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const mod = await import("@/integrations/supabase/client.server"); const supabaseAdmin = mod.supabaseAdmin as any;
 
           const { data: mission } = await supabaseAdmin
             .from("portal_missions")

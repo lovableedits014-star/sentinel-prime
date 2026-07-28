@@ -15,11 +15,13 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import {
   Target, Plus, Pencil, Trash2, Facebook, Instagram,
-  ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X,
+  ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X, BarChart3, Radar,
 } from "lucide-react";
 import { toast } from "sonner";
+import MissionReport from "./MissionReport";
 // sync-throttle removido: atualização de missões não tem mais cooldown
 
 interface Mission {
@@ -32,6 +34,11 @@ interface Mission {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  tracking_enabled?: boolean;
+  link_facebook?: string | null;
+  link_instagram?: string | null;
+  link_avulso?: string | null;
+  instructions?: string | null;
 }
 
 interface PostOption {
@@ -60,6 +67,11 @@ const EMPTY_EDIT = {
   post_url: "",
   title: "",
   description: "",
+  tracking_enabled: false,
+  link_facebook: "",
+  link_instagram: "",
+  link_avulso: "",
+  instructions: "",
 };
 
 export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
@@ -78,6 +90,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
   const [editSelectedPostId, setEditSelectedPostId] = useState<string | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [reportMissionId, setReportMissionId] = useState<string | null>(null);
 
   const { data: missions = [], isLoading } = useQuery({
     queryKey: ["portal-missions", clientId],
@@ -256,6 +269,11 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
         post_url: values.post_url.trim(),
         title: values.title.trim() || null,
         description: values.description.trim() || null,
+        tracking_enabled: !!values.tracking_enabled,
+        link_facebook: values.link_facebook.trim() || null,
+        link_instagram: values.link_instagram.trim() || null,
+        link_avulso: values.link_avulso.trim() || null,
+        instructions: values.instructions.trim() || null,
       };
       const { error } = await (supabase as any)
         .from("portal_missions").update(payload).eq("id", values.id);
@@ -303,10 +321,16 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       post_url: m.post_url,
       title: m.title || "",
       description: m.description || "",
+      tracking_enabled: !!m.tracking_enabled,
+      link_facebook: m.link_facebook || "",
+      link_instagram: m.link_instagram || "",
+      link_avulso: m.link_avulso || "",
+      instructions: m.instructions || "",
     });
     setEditSelectedPostId(null);
     setEditOpen(true);
   };
+
 
   const handleEditSelectPost = (post: PostOption) => {
     const platform = (post.platform === "instagram" ? "instagram" : "facebook") as "facebook" | "instagram";
@@ -420,6 +444,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                 onEdit={() => openEdit(m)}
                 onDelete={() => setDeleteId(m.id)}
                 onToggle={() => toggleMutation.mutate({ id: m.id, is_active: false })}
+                onReport={() => setReportMissionId(m.id)}
               />
             ))
           )}
@@ -440,6 +465,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                 onEdit={() => openEdit(m)}
                 onDelete={() => setDeleteId(m.id)}
                 onToggle={() => toggleMutation.mutate({ id: m.id, is_active: true })}
+                onReport={() => setReportMissionId(m.id)}
                 inactive
               />
             ))}
@@ -636,6 +662,50 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               <Textarea value={editForm.description} onChange={(e) => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: Curta, comente e compartilhe esta publicação!" rows={3} maxLength={200} />
             </div>
 
+            {/* ── Rastreamento (opt-in) ── */}
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <Radar className="w-4 h-4 text-primary" />
+                    Ativar identificação e rastreamento
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Substitui o link direto por uma página intermediária que registra quem abriu, qual grupo veio e o que clicou.
+                  </p>
+                </div>
+                <Switch
+                  checked={editForm.tracking_enabled}
+                  onCheckedChange={(v) => setEditForm(f => ({ ...f, tracking_enabled: !!v }))}
+                />
+              </div>
+
+              {editForm.tracking_enabled && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1"><Facebook className="w-3 h-3 text-blue-600" /> Link do Facebook</Label>
+                    <Input value={editForm.link_facebook} onChange={(e) => setEditForm(f => ({ ...f, link_facebook: e.target.value }))} placeholder="https://www.facebook.com/..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1"><Instagram className="w-3 h-3 text-pink-500" /> Link do Instagram</Label>
+                    <Input value={editForm.link_instagram} onChange={(e) => setEditForm(f => ({ ...f, link_instagram: e.target.value }))} placeholder="https://www.instagram.com/p/..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1"><Link className="w-3 h-3" /> Link avulso <span className="text-muted-foreground">(opcional)</span></Label>
+                    <Input value={editForm.link_avulso} onChange={(e) => setEditForm(f => ({ ...f, link_avulso: e.target.value }))} placeholder="https://..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Instruções para o participante <span className="text-muted-foreground">(opcional)</span></Label>
+                    <Textarea value={editForm.instructions} onChange={(e) => setEditForm(f => ({ ...f, instructions: e.target.value }))} rows={3} maxLength={500} placeholder="Ex: Curta, comente e compartilhe as publicações abaixo." />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Se algum link ficar em branco, usamos o link atual da publicação como fallback na plataforma correspondente.
+                  </p>
+                </div>
+              )}
+            </div>
+
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={editMutation.isPending}>
@@ -667,6 +737,11 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Mission report */}
+      {reportMissionId && (
+        <MissionReport missionId={reportMissionId} onClose={() => setReportMissionId(null)} />
+      )}
     </div>
   );
 }
@@ -750,12 +825,14 @@ function MissionCard({
   onEdit,
   onDelete,
   onToggle,
+  onReport,
   inactive = false,
 }: {
   mission: Mission;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: () => void;
+  onReport?: () => void;
   inactive?: boolean;
 }) {
   return (
@@ -796,6 +873,11 @@ function MissionCard({
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
+        {mission.tracking_enabled && onReport && (
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onReport} title="Ver relatório de rastreamento">
+            <BarChart3 className="w-3.5 h-3.5 text-primary" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle} title={inactive ? "Ativar" : "Pausar"}>
           {inactive
             ? <ToggleLeft className="w-4 h-4 text-muted-foreground" />

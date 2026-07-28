@@ -360,9 +360,14 @@ export default function Disparos() {
   }, [groupsSyncing]);
   const latestSyncLog = groupsSyncLogs[0];
   const handleUseMissions = () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const anyTracked = activeMissions.some((m: any) => m.tracking_enabled);
     const links = activeMissions.map((m: any, i: number) => {
       const platformLabel = m.platform === "instagram" ? "📸 Instagram" : "📘 Facebook";
-      return `${i + 1}. ${platformLabel} — ${m.title || "Publicação"}\n👉 ${m.post_url}`;
+      const url = m.tracking_enabled && origin
+        ? `${origin}/missao/${m.id}`
+        : m.post_url;
+      return `${i + 1}. ${platformLabel} — ${m.title || "Publicação"}\n👉 ${url}`;
     }).join("\n\n");
 
     setTitulo("Missão: Interaja nas publicações");
@@ -373,10 +378,14 @@ export default function Disparos() {
     const cta = tipoDisparo === "grupos"
       ? "A participação de cada um faz toda a diferença! 💪"
       : "Sua participação faz toda a diferença! 💪";
+    const trackedHint = anyTracked
+      ? "\n\n📌 Ao abrir o link, informe seu nome e telefone para registrar sua participação."
+      : "";
     setMensagem(
-      `${saudacao}\n\nTemos missões importantes${tipoDisparo === "grupos" ? " para o grupo" : " para você"}!\n\nAcesse as publicações abaixo e interaja (curta, comente e compartilhe):\n\n${links}\n\n${cta}`
+      `${saudacao}\n\nTemos missões importantes${tipoDisparo === "grupos" ? " para o grupo" : " para você"}!\n\nAcesse as publicações abaixo e interaja (curta, comente e compartilhe):\n\n${links}${trackedHint}\n\n${cta}`
     );
   };
+
 
   // Count recipients based on filter
   const { data: recipientCount = 0 } = useQuery<number>({
