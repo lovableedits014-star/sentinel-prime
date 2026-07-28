@@ -29,6 +29,8 @@ type Distribution = { id: string; group_name_snapshot: string | null };
 
 export default function MissionReport({ missionId, onClose }: Props) {
   const open = !!missionId;
+  const [period, setPeriod] = useState<"7" | "30" | "all">("all");
+
 
   const { data: mission } = useQuery({
     queryKey: ["mission-report-header", missionId],
