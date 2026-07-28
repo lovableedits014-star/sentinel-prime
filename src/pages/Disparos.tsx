@@ -42,6 +42,7 @@ import { SugestoesPanel } from "@/components/disparos/SugestoesPanel";
 import DispatchLogDialog from "@/components/disparos/DispatchLogDialog";
 import BirthdayConfigPanel from "@/components/disparos/BirthdayConfigPanel";
 import ImportContactsDialog from "@/components/disparos/ImportContactsDialog";
+import { resolvePublicBaseUrl } from "@/lib/public-base-url";
 
 const POLICIES = {
   conservador: {
