@@ -338,6 +338,28 @@ export default function TelemarketingAdminCampanhas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {clientId && (
+        <ImportContatosAvulsosDialog
+          open={importDialogOpen}
+          onClose={() => setImportDialogOpen(false)}
+          clientId={clientId}
+          campanhas={campanhas.map(c => ({ id: c.id, nome: c.nome }))}
+          operadores={operadores}
+          onImported={load}
+        />
+      )}
+
+      {atribuindo && clientId && (
+        <AtribuicoesDialog
+          open={!!atribuindo}
+          onClose={() => setAtribuindo(null)}
+          clientId={clientId}
+          campanha={{ id: atribuindo.id, nome: atribuindo.nome }}
+          operadores={operadores}
+          onChanged={load}
+        />
+      )}
     </div>
   );
 }
