@@ -1,90 +1,73 @@
+# Refino do Telemarketing — import de listas, atribuição e multi-campanha
 
-## Objetivo
+Hoje o sistema já tem campanhas, mailing avulso e link do operador por fila. Falta 3 coisas: **subir arquivo de verdade** (XLSX/CSV com mapeamento de colunas), **designar contatos a operadores específicos** e o **operador enxergar/alternar entre várias campanhas** no portal dele. Nada do envio existente é quebrado.
 
-Refinar 3 pontos do fluxo público de Missões:
+## O que muda para o usuário
 
-1. **Login único por cliente** — a pessoa se identifica UMA vez e vale para todas as missões daquele candidato (hoje precisa se cadastrar de novo a cada missão).
-2. **Dashboard separado** — mover o relatório para uma aba independente ("Relatórios de Missões") em Central WhatsApp, que sobrevive à exclusão/troca da missão.
-3. **Atribuição de grupo confiável** — garantir que o grupo do WhatsApp de onde a pessoa veio seja sempre identificado no relatório.
+### 1. Importar lista externa (arquivo)
+Dentro de **Telemarketing → Campanhas** (e no wizard "Nova fila"), substitui o "cole CSV" por um botão **"Importar arquivo"** que:
+- aceita `.xlsx`, `.xls`, `.csv` (mesmo motor do `ConverterListaExternaDialog`);
+- detecta colunas automaticamente e deixa mapear (Nome*, Telefone*, Cidade, Bairro, TAG opcional);
+- mostra preview + quantos válidos/ignorados antes de confirmar;
+- vincula a lista importada a **uma campanha** (nova ou existente), então cada campanha continua sendo "uma lista de ligação" independente;
+- o "colar CSV" continua funcionando como atalho, mas fica secundário.
 
----
+### 2. Designar contatos por operador
+Nova aba **"Designações"** na Campanha:
+- Lista os contatos daquela campanha com filtros (pendentes, ligados, cidade/bairro, sem operador designado).
+- Ações em lote: selecionar N contatos → **"Atribuir a…"** operador X, ou **"Distribuir igualmente"** entre operadores marcados (round-robin server-side).
+- Botão **"Liberar"** volta o contato pro pool livre (sem dono).
+- Cada operador vê no card da campanha "X pendentes atribuídos a mim / Y no pool livre".
 
-## 1. Login único por cliente (não por missão)
+Regra de acesso na fila do operador:
+- Se o contato tem `assigned_operador_id`, só aquele operador puxa.
+- Se está sem dono, qualquer operador da campanha pode puxar (mantém compatível com o comportamento atual).
+- Nada trava chamadas em andamento — a designação só afeta quem consegue reservar o próximo.
 
-### Frontend (`src/pages/MissaoPublica.tsx`)
-- Trocar a chave do localStorage de `sm_missao_token_<missionId>` para `sm_client_token_<clientId>`.
-- Buscar `clientId` no primeiro `GET /config` (já retornado no payload).
-- Ao carregar a página, tentar o token do cliente; se válido, pular o formulário.
+### 3. Operador com várias campanhas
+Ao logar em `/telemarketing/:clientId`, se o link não trouxer `?campanha=...`, o operador cai numa **tela de seleção de campanha** listando só as campanhas com contatos disponíveis pra ele (atribuídos + livres). Cada card mostra: nome da campanha, pendentes meus, pendentes no pool, próximo contato. Ele escolhe e entra na fila daquela campanha. Botão "Trocar de campanha" fica sempre visível no header.
 
-### Backend (RPC `public_mission_identify` e `public_mission_config`)
-- `mission_visitor_tokens` passa a ter escopo por **cliente** (não por missão): adicionar `client_id uuid` e índice único `(client_id, phone_e164)`.
-- Na função identify: `UPSERT` por `(client_id, phone_e164)` — reutiliza o token e o participante existente entre missões do mesmo cliente.
-- `mission_participants` também precisa ser desacoplado da missão: renomear/refatorar para `client_participants` (id, client_id, nome, phone_e164, first_seen_at). Manter tabela antiga como view/compat ou migrar dados existentes.
-- `mission_events` mantém FK para o participante (agora global do cliente) — todos os eventos existentes continuam funcionando.
+Isso permite um mesmo operador atender várias campanhas com o mesmo login, sem precisar de link diferente pra cada uma (o link direto continua funcionando quando o admin quer forçar).
 
-### Migração de dados
-- Copiar `mission_participants` distintos por (client_id, phone) para a nova tabela unificada.
-- Atualizar `mission_events.participant_id` para o id unificado.
-
----
-
-## 2. Dashboard separado (persistente)
-
-### Nova aba "Relatórios" em Central WhatsApp
-- Adicionar tab ao lado de "Missões do Portal" e "Disparos".
-- Lista TODAS as missões (ativas + arquivadas + excluídas) com: título, status, período, aberturas únicas, cliques, concluíram, grupos.
-- Botões: "Abrir relatório detalhado" (reusa `MissionReport`), "Exportar CSV consolidado".
-
-### Preservar dados históricos
-- Adicionar coluna `archived_at` em `portal_missions` e trocar exclusão "hard" pelo arquivamento (soft delete). O botão de excluir passa a arquivar.
-- Adicionar em `mission_events` snapshot do `mission_title` no momento do evento (coluna `mission_title_snapshot`) — assim mesmo que a missão suma, o histórico permanece legível.
-- Trigger em `mission_events` para preencher o snapshot automaticamente no insert.
-
-### Visão consolidada por participante
-- Nova sub-aba "Pessoas" no dashboard: lista todos os `client_participants` do cliente com quantas missões abriu/concluiu, último acesso, grupos.
-- Ajuda a gerenciar a base independentemente da missão vigente.
-
----
-
-## 3. Atribuição de grupo confiável
-
-**Sintoma:** ao entrar por um grupo específico o relatório não mostrou o grupo de origem.
-
-**Causas possíveis identificadas:**
-- Em `src/pages/Disparos.tsx` a substituição do link só acontece quando a string `${origin}/missao/${id}` bate exatamente. Se o texto tem outra base (ex.: URL pública configurada diferente do origin atual) ou variantes com `https://`/sem `https://`, a substituição falha e o destinatário recebe o link direto `/missao/<id>` sem `?d=<code>`.
-- Se o link chegar sem `d=`, o servidor não sabe de qual grupo veio — nenhum evento carrega `distribution_id`.
-
-**Correções:**
-1. **Substituição robusta no Disparos**: normalizar o texto — trocar QUALQUER ocorrência de `/missao/<uuid>` (regex, independente de origin/protocolo) pelo short link `/api/public/m/<uuid>/d/<code>` do grupo em questão.
-2. **Fallback server-side**: quando a página `/missao/<id>` é aberta sem `?d=`, tentar recuperar a última `distribution` daquele participante (por telefone reconhecido) ou marcar como "origem desconhecida" explicitamente no relatório em vez de silenciosamente perder.
-3. **Stamp permanente no participante**: no identify, gravar `mission_participants.first_distribution_id` (já existe) e propagar para eventos futuros da mesma sessão via token (RPC event lê `distribution_id` do token se o request não trouxer `code`).
-4. **Log de diagnóstico**: em `mission_events`, se `distribution_id IS NULL` mas o token tem distribuição associada, preencher automaticamente.
-
----
+### 4. Ajustes menores
+- Card da campanha na tela de admin mostra: total, pendentes livres, pendentes atribuídos, operadores com trabalho pendente.
+- Log de designação (quem atribuiu, quando, quantos) num painel simples de auditoria por campanha.
+- Ao remover um operador, os contatos dele voltam automaticamente pro pool livre.
 
 ## Detalhes técnicos
 
-**Migração (uma só):**
-- `ALTER TABLE mission_visitor_tokens ADD COLUMN client_id uuid`; backfill; índice único `(client_id, phone_e164)`.
-- Criar `client_participants` (ou renomear `mission_participants` e remover `mission_id`).
-- `ALTER TABLE portal_missions ADD COLUMN archived_at timestamptz`.
-- `ALTER TABLE mission_events ADD COLUMN mission_title_snapshot text`; trigger `BEFORE INSERT` que copia `portal_missions.title`.
-- Reescrever RPCs `public_mission_config`, `public_mission_identify`, `public_mission_event`, `public_mission_switch` para o novo escopo por cliente.
+**Migração (schema):**
+- `telemarketing_contatos_avulsos`: nova coluna `assigned_operador_id uuid NULL` (FK → `telemarketing_operadores.id ON DELETE SET NULL`) + índice `(client_id, campanha_id, assigned_operador_id, ligacao_status)`.
+- Nova tabela `telemarketing_assignment_log(id, client_id, campanha_id, operador_id, contatos_count, criado_por, criado_em)` com RLS por `client_id` + `has_role`, GRANTs padrão.
+- Trigger `AFTER DELETE` em `telemarketing_operadores` limpando `assigned_operador_id` dos contatos daquele operador (backup do ON DELETE SET NULL para o caso de deletes via RPC).
+
+**RPCs novas (SECURITY DEFINER, checam papel admin do client via `has_role`):**
+- `tele_assign_contatos(_client_id, _campanha_id, _contato_ids uuid[], _operador_id uuid)` — atualiza em lote, registra log.
+- `tele_distribute_contatos(_client_id, _campanha_id, _contato_ids uuid[], _operador_ids uuid[])` — round-robin server-side entre operadores dados.
+- `tele_release_contatos(_client_id, _campanha_id, _contato_ids uuid[])` — zera `assigned_operador_id`.
+- `tele_operador_campanhas(_operador_id)` — retorna campanhas ativas do client com counts (pendentes_meus, pendentes_livres, total) para a tela de seleção.
+- `tele_import_contato_avulso_batch` (existente) ganha aceitação de `_assigned_operador_id` opcional pra já atribuir na hora do import.
+
+**RPCs alteradas:**
+- Função que serve o "próximo contato" da fila (a que usa `telemarketing_call_assignments`) passa a filtrar `assigned_operador_id IS NULL OR assigned_operador_id = _operador_id`.
+- `tele_fila_summary` devolve também `atribuidos` e `livres` além de pendentes.
 
 **Frontend:**
-- `MissaoPublica.tsx` — nova chave localStorage + fluxo de reconhecimento por cliente.
-- `Disparos.tsx` — regex robusta para substituir links + garantir short link sempre.
-- Novo componente `MissionsDashboard.tsx` (aba em Central WhatsApp) — lista consolidada + drill-down.
-- Ajustar botão excluir de `PortalMissionsPanel.tsx` para arquivar em vez de deletar.
+- Novo `ImportContatosAvulsosDialog.tsx` reaproveitando parser XLSX/CSV do `ConverterListaExternaDialog` (só a leitura + mapeamento; grava via RPC de import existente).
+- `TelemarketingAdminCampanhas.tsx`: aba "Designações" com tabela + seleção múltipla + menu "Atribuir/Distribuir/Liberar" (usa shadcn `DataTable`-like já disponível no projeto).
+- `NovaFilaWizard.tsx`: passo CSV vira "Importar arquivo" (mesmo componente) com fallback pra colar texto.
+- `Telemarketing.tsx` (portal do operador): quando não há `?campanha=` no link, renderiza `CampanhaPickerScreen` (nova) que chama `tele_operador_campanhas`. Botão "Trocar de campanha" no header preserva sessão do operador (localStorage do nome/senha atual já existe).
+- `TelemarketingSettingsCard.tsx`: ao deletar operador, mostra aviso "X contatos designados vão voltar pro pool" (backend já cuida disso).
 
 **Compatibilidade:**
-- Tokens antigos (`sm_missao_token_*`) ficam órfãos no localStorage — inofensivo; opcionalmente fazer cleanup no primeiro carregamento.
-- Participantes já existentes são migrados via UPSERT por `(client_id, phone)`.
+- Contatos existentes ficam com `assigned_operador_id = NULL` → aparecem como pool livre pra todos os operadores da campanha (comportamento atual).
+- Link direto `/telemarketing/:clientId?campanha=...` continua entrando direto na campanha, sem picker.
+- Nada muda no fluxo de ligar/registrar resultado.
 
----
-
-## Não incluído
-
-- Não mexer no motor de disparo (spintax/cadence/sticky routing).
-- Não mudar visual das páginas existentes além da nova aba.
-- Não alterar edge functions de WhatsApp.
+## Passos de implementação
+1. Migração (schema + RPCs + índice + trigger).
+2. Dialog de import por arquivo + integração no `TelemarketingAdminCampanhas` e no wizard.
+3. Aba "Designações" com atribuir/distribuir/liberar + card resumido com counts.
+4. Picker de campanha no portal do operador + botão "Trocar de campanha".
+5. Ajuste do "próximo contato" pra respeitar `assigned_operador_id`.
+6. Smoke test manual: importa XLSX → distribui entre 2 operadores → cada operador loga, vê só o que é dele + pool livre → confirma que operador sem atribuição ainda pega do pool.
