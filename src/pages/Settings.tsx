@@ -12,6 +12,7 @@ import CampaignFramesCard from "@/components/settings/CampaignFramesCard";
 import PresenceSettingsCard from "@/components/settings/PresenceSettingsCard";
 import CampaignIdentityCard from "@/components/settings/CampaignIdentityCard";
 import CandidateAssetsCard from "@/components/settings/CandidateAssetsCard";
+import PublicBaseUrlCard from "@/components/settings/PublicBaseUrlCard";
 import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 const Settings = () => {
