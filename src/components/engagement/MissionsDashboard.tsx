@@ -25,7 +25,7 @@ type Row = {
 };
 
 export default function MissionsDashboard() {
-  const clientId = useActiveClientId();
+  const { clientId } = useActiveClientId();
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [reportMissionId, setReportMissionId] = useState<string | null>(null);
