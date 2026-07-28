@@ -598,6 +598,53 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                 </p>
               )}
             </div>
+
+            {/* ── Rastreamento em lote (opt-in) ── */}
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <Radar className="w-4 h-4 text-primary" />
+                    Ativar identificação e rastreamento
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Substitui o link direto pela página intermediária <code>/missao/&lt;id&gt;</code>, que registra quem abriu, de qual grupo veio e o que clicou. Vale para todas as missões adicionadas agora.
+                  </p>
+                </div>
+                <Switch
+                  checked={bulkTracking}
+                  onCheckedChange={(v) => setBulkTracking(!!v)}
+                />
+              </div>
+
+              {bulkTracking && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1">
+                      <Link className="w-3 h-3" /> Link avulso <span className="text-muted-foreground">(opcional — botão extra na página)</span>
+                    </Label>
+                    <Input
+                      value={bulkLinkAvulso}
+                      onChange={(e) => setBulkLinkAvulso(e.target.value)}
+                      placeholder="https://... (ex.: um site, um WhatsApp, etc.)"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Instruções para o participante <span className="text-muted-foreground">(opcional)</span></Label>
+                    <Textarea
+                      value={bulkInstructions}
+                      onChange={(e) => setBulkInstructions(e.target.value)}
+                      rows={3}
+                      maxLength={500}
+                      placeholder="Ex: Curta, comente e compartilhe as publicações abaixo."
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    O link da publicação escolhida é usado automaticamente na plataforma correspondente (Facebook/Instagram). Você pode editar cada missão depois se precisar de links diferentes.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter className="mt-4">
