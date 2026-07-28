@@ -591,40 +591,100 @@ export default function Disparos() {
       }
       const kindLabel = mediaKind === "video" ? "Vídeo" : mediaKind === "document" ? "Documento" : "Imagem";
       const tituloFinal = titulo.trim() || (hasMedia && !hasText ? kindLabel : (mensagem.trim().slice(0, 60) || "Disparo"));
-      const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
-        body: {
-          client_id: clientId,
-          titulo: tituloFinal,
-          mensagem: mensagem.trim(),
-          media_url: mediaUrl,
-          media_kind: mediaKind,
-          media_filename: mediaFilename,
-          media_mime: mediaMime,
-          tipo: tipoDisparo,
-          tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
-          eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
-          eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
-          eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
-          eleicao_cidade: eleicaoCidade === "all" ? null : eleicaoCidade,
-          group_jids: tipoDisparo === "grupos" ? selectedGroupJids : undefined,
-          recipients_list: tipoDisparo === "lista_adhoc" ? adhocContacts : undefined,
-          batch_size: pol.batch_size,
-          delay_min: pol.delay_min,
-          delay_max: pol.delay_max,
-          batch_pause: pol.batch_pause,
-          humanization_config: {},
-          cta_config: ctaConfig,
-          max_instances: instanceMode === "fixed" ? Math.max(1, Math.floor(maxInstances)) : null,
-          ignore_stage_cap: ignoreStageCap,
-        },
-      });
-      if (error) throw error;
 
-      if ((resp as any)?.queued) {
-        toast.success("📥 Adicionado à fila! Será enviado assim que o disparo atual terminar.");
+      // ── Rastreamento por grupo ──
+      // Se estamos disparando para grupos e a mensagem contém links /missao/<uuid>,
+      // criamos um short_code único por (missão × grupo) e dividimos em N chamadas —
+      // uma por grupo — para que cada mensagem carregue o link atribuído ao grupo.
+      const trackedIdsInMsg = Array.from(mensagem.matchAll(/\/missao\/([0-9a-f-]{36})/gi)).map(m => m[1]);
+      const shouldSplitForGroupTracking =
+        tipoDisparo === "grupos" &&
+        selectedGroupJids.length > 0 &&
+        trackedIdsInMsg.length > 0;
+
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+      const commonBody = {
+        client_id: clientId,
+        media_url: mediaUrl,
+        media_kind: mediaKind,
+        media_filename: mediaFilename,
+        media_mime: mediaMime,
+        tipo: tipoDisparo,
+        tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
+        eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
+        eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
+        eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
+        eleicao_cidade: eleicaoCidade === "all" ? null : eleicaoCidade,
+        recipients_list: tipoDisparo === "lista_adhoc" ? adhocContacts : undefined,
+        batch_size: pol.batch_size,
+        delay_min: pol.delay_min,
+        delay_max: pol.delay_max,
+        batch_pause: pol.batch_pause,
+        humanization_config: {},
+        cta_config: ctaConfig,
+        max_instances: instanceMode === "fixed" ? Math.max(1, Math.floor(maxInstances)) : null,
+        ignore_stage_cap: ignoreStageCap,
+      };
+
+      let respFirst: any = null;
+      if (shouldSplitForGroupTracking) {
+        // Cria uma distribuição por (missão × grupo) e substitui os links no texto.
+        let sentCount = 0;
+        for (const jid of selectedGroupJids) {
+          let msgForGroup = mensagem.trim();
+          for (const missionId of trackedIdsInMsg) {
+            try {
+              const { data: distRow, error: distErr } = await (supabase as any)
+                .from("mission_distributions")
+                .upsert(
+                  { mission_id: missionId, group_jid: jid, client_id: clientId },
+                  { onConflict: "mission_id,group_jid" }
+                )
+                .select("short_code")
+                .single();
+              if (distErr) throw distErr;
+              const code = (distRow as any)?.short_code;
+              if (code) {
+                const publicUrl = `${origin}/api/public/m/${missionId}/d/${code}`;
+                msgForGroup = msgForGroup.replaceAll(`${origin}/missao/${missionId}`, publicUrl);
+              }
+            } catch (e) {
+              console.error("[mission-tracking] falha ao criar distribuição", missionId, jid, e);
+              // Se falhar, mantém o link /missao/<id> — ainda rastreia, só sem atribuição de grupo.
+            }
+          }
+          const { data: resp, error: errG } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+            body: {
+              ...commonBody,
+              titulo: tituloFinal,
+              mensagem: msgForGroup,
+              group_jids: [jid],
+            },
+          });
+          if (errG) throw errG;
+          if (!respFirst) respFirst = resp;
+          sentCount++;
+        }
+        toast.success(`📤 Disparo iniciado em ${sentCount} grupo(s) com rastreamento individual.`);
       } else {
-        toast.success("📤 Disparo iniciado! Acompanhe o progresso abaixo.");
+        const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+          body: {
+            ...commonBody,
+            titulo: tituloFinal,
+            mensagem: mensagem.trim(),
+            group_jids: tipoDisparo === "grupos" ? selectedGroupJids : undefined,
+          },
+        });
+        if (error) throw error;
+        respFirst = resp;
+        if ((resp as any)?.queued) {
+          toast.success("📥 Adicionado à fila! Será enviado assim que o disparo atual terminar.");
+        } else {
+          toast.success("📤 Disparo iniciado! Acompanhe o progresso abaixo.");
+        }
       }
+
       setTitulo("");
       setMensagem("");
       setCtaConfig(DEFAULT_CTA_CONFIG);
