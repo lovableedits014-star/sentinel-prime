@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, Upload, Power, Megaphone, ShieldAlert, FileText, Pencil } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Power, Megaphone, ShieldAlert, FileText, Pencil, UserCog, FileSpreadsheet } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import DesignarEleicaoPanel from "@/components/telemarketing/DesignarEleicaoPanel";
+import ImportContatosAvulsosDialog from "@/components/telemarketing/ImportContatosAvulsosDialog";
+import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
 
 interface Campanha {
   id: string;
