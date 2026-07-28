@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
   Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star, ImagePlus, X,
-  Paperclip, Video, FileText, FlaskConical, Pause, RotateCcw,
+  Paperclip, Video, FileText, FlaskConical, Pause, RotateCcw, Radar,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
