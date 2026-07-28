@@ -26,10 +26,11 @@ type MissionConfig = {
   participant: { id: string; nome: string } | null;
 };
 
-const TOKEN_KEY_PREFIX = "sm_missao_token_";
+const TOKEN_KEY_PREFIX = "sm_client_token_";
+const LEGACY_MISSION_TOKEN_PREFIX = "sm_missao_token_";
 
-function tokenKey(missionClientHint: string) {
-  return `${TOKEN_KEY_PREFIX}${missionClientHint}`;
+function clientTokenKey(clientId: string) {
+  return `${TOKEN_KEY_PREFIX}${clientId}`;
 }
 
 // Usa a origem atual (localhost em dev, domínio publicado em produção).
@@ -46,8 +47,7 @@ export default function MissaoPublica() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // token global por missionId (poderíamos por client, mas missionId serve).
-  const storageKey = missionId ? tokenKey(missionId) : "";
+  const [clientId, setClientId] = useState<string>("");
   const [token, setToken] = useState<string>("");
 
   const [nome, setNome] = useState("");
@@ -61,32 +61,69 @@ export default function MissaoPublica() {
     document.title = "Missão da Campanha";
   }, []);
 
-  // Bootstrap: lê token do localStorage e chama /config
+  // Bootstrap: primeiro carrega a config para descobrir o clientId,
+  // depois lê o token unificado do candidato e revalida.
   useEffect(() => {
     if (!missionId) return;
-    const t = localStorage.getItem(storageKey) || "";
-    setToken(t);
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(api(`/api/public/missao/config/${encodeURIComponent(missionId)}?code=${encodeURIComponent(code)}&token=${encodeURIComponent(t)}`))
-      .then(async (r) => {
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({ error: "erro" }));
-          throw new Error(err.error || `HTTP ${r.status}`);
+
+    (async () => {
+      try {
+        // 1) descobre o cliente da missão (sem token)
+        const boot = await fetch(
+          api(`/api/public/missao/config/${encodeURIComponent(missionId)}?code=${encodeURIComponent(code)}`)
+        );
+        if (!boot.ok) {
+          const err = await boot.json().catch(() => ({ error: "erro" }));
+          throw new Error(err.error || `HTTP ${boot.status}`);
         }
-        return r.json() as Promise<MissionConfig>;
-      })
-      .then((data) => {
-        setConfig(data);
-        // se o servidor não reconheceu, limpa token local
-        if (t && !data.participant) {
-          localStorage.removeItem(storageKey);
-          setToken("");
+        const bootData = (await boot.json()) as MissionConfig & { client_id?: string };
+        if (cancelled) return;
+
+        const cid = bootData.client_id || "";
+        setClientId(cid);
+
+        // 2) procura o token do candidato (por cliente) — com fallback para chave antiga por missão
+        let existing = cid ? localStorage.getItem(clientTokenKey(cid)) || "" : "";
+        if (!existing) {
+          const legacy = localStorage.getItem(`${LEGACY_MISSION_TOKEN_PREFIX}${missionId}`);
+          if (legacy) {
+            existing = legacy;
+            if (cid) localStorage.setItem(clientTokenKey(cid), legacy);
+            localStorage.removeItem(`${LEGACY_MISSION_TOKEN_PREFIX}${missionId}`);
+          }
         }
-      })
-      .catch((e) => setError(e.message || "Erro ao carregar missão"))
-      .finally(() => setLoading(false));
-  }, [missionId, code, storageKey]);
+        setToken(existing);
+
+        // 3) se tem token, revalida chamando config novamente com token
+        if (existing) {
+          const withTok = await fetch(
+            api(`/api/public/missao/config/${encodeURIComponent(missionId)}?code=${encodeURIComponent(code)}&token=${encodeURIComponent(existing)}`)
+          );
+          const finalData = (await withTok.json()) as MissionConfig & { client_id?: string };
+          if (cancelled) return;
+          setConfig(finalData);
+          // token não reconhecido pelo servidor → limpa
+          if (existing && !finalData.participant && cid) {
+            localStorage.removeItem(clientTokenKey(cid));
+            setToken("");
+          }
+        } else {
+          setConfig(bootData);
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(e.message || "Erro ao carregar missão");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [missionId, code]);
 
   const registerEvent = useCallback(
     async (type: "open" | "click_facebook" | "click_instagram" | "click_avulso" | "declared_done") => {
