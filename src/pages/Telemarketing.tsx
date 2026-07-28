@@ -219,6 +219,63 @@ export default function Telemarketing() {
     }
   };
 
+  const pickCampanha = async (campanhaId: string | null) => {
+    setSelectedCampanhaId(campanhaId);
+    setPickingCampanha(false);
+    setCurrentIndex(0);
+    setFiltroTipo("todos");
+    resetForm();
+    const script = scripts.find(s => s.id === campanhaId);
+    setCampanhaNome(script?.nome || null);
+    await reloadContatosWithCampanha(campanhaId);
+    // salta para o próximo disponível dentro da campanha escolhida
+    if (!clientId) return;
+    const { data } = await supabase.rpc("tele_proximo_contato" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: campanhaId,
+      _ttl_seconds: 300,
+    });
+    const res = data as { found: boolean; tabela?: string; contato_id?: string } | null;
+    if (res?.found) {
+      setContatos(prev => {
+        const idx = prev.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+        if (idx >= 0) setCurrentIndex(idx);
+        return prev;
+      });
+    }
+  };
+
+  const reloadContatosWithCampanha = async (campanhaId: string | null) => {
+    if (!clientId) return;
+    const { data: rpcRows } = await supabase.rpc("tele_list_contatos" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: campanhaId,
+    });
+    const lista: ContatoTele[] = ((rpcRows as any[]) || [])
+      .map((r) => ({
+        id: r.id, nome: r.nome, telefone: r.telefone,
+        cidade: r.cidade, bairro: r.bairro,
+        ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
+        candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
+        ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
+        tabela: r.tabela as ContatoTele["tabela"],
+        proxima_tentativa_em: r.proxima_tentativa_em ?? null,
+        tentativas_count: r.tentativas_count ?? 0,
+        observacao_tele: r.observacao_tele ?? null,
+        locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
+        campanha_id: r.campanha_id ?? null,
+        indicador_nome: r.indicador_nome ?? null,
+        indicador_tipo: r.indicador_tipo ?? null,
+      }))
+      .filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
+    setContatos(lista);
+  };
+
+
   const filteredContatos = filtroTipo === "todos"
     ? contatos
     : contatos.filter((c) => c.tipo === filtroTipo);
