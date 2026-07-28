@@ -194,6 +194,14 @@ export default function Telemarketing() {
     setLoggedIn(true);
     setLoading(false);
 
+    // Se o operador tem múltiplas campanhas atribuídas e nenhuma foi passada por URL,
+    // abre a tela de escolha em vez de já saltar para um contato.
+    const campanhasComContato = new Set(lista.map(c => c.campanha_id).filter(Boolean));
+    if (!campanhaIdParam && campanhasComContato.size > 1) {
+      setPickingCampanha(true);
+      return;
+    }
+
     // Picker atômico no servidor: cada operador começa em um contato diferente.
     const { data: pick } = await supabase.rpc("tele_proximo_contato" as any, {
       _client_id: clientId!,
