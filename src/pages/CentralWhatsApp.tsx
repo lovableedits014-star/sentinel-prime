@@ -1,13 +1,14 @@
 import { lazy, Suspense, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, Sparkles, Activity, Loader2 } from "lucide-react";
+import { Send, Sparkles, Activity, Loader2, BarChart3 } from "lucide-react";
 
 const Disparos = lazy(() => import("./Disparos"));
 const MissoesIA = lazy(() => import("./MissoesIA"));
 const StatusWhatsApp = lazy(() => import("./StatusWhatsApp"));
+const MissionsDashboard = lazy(() => import("@/components/engagement/MissionsDashboard"));
 
-const VALID_TABS = ["disparos", "missoes", "status"] as const;
+const VALID_TABS = ["disparos", "missoes", "relatorios", "status"] as const;
 type TabKey = (typeof VALID_TABS)[number];
 
 function Fallback() {
@@ -42,7 +43,7 @@ export default function CentralWhatsApp() {
         <div className="space-y-1">
           <h1 className="text-2xl font-bold">Central WhatsApp</h1>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            Disparos, missões inteligentes e status das instâncias em um único lugar.
+            Disparos, missões inteligentes, relatórios e status das instâncias em um único lugar.
           </p>
         </div>
       </div>
@@ -56,6 +57,10 @@ export default function CentralWhatsApp() {
           <TabsTrigger value="missoes" className="gap-1.5">
             <Sparkles className="w-4 h-4" />
             Missões IA
+          </TabsTrigger>
+          <TabsTrigger value="relatorios" className="gap-1.5">
+            <BarChart3 className="w-4 h-4" />
+            Relatórios
           </TabsTrigger>
           <TabsTrigger value="status" className="gap-1.5">
             <Activity className="w-4 h-4" />
@@ -71,6 +76,11 @@ export default function CentralWhatsApp() {
         <TabsContent value="missoes" className="-mx-4 md:-mx-6">
           <Suspense fallback={<Fallback />}>
             <MissoesIA />
+          </Suspense>
+        </TabsContent>
+        <TabsContent value="relatorios" className="-mx-4 md:-mx-6">
+          <Suspense fallback={<Fallback />}>
+            <MissionsDashboard />
           </Suspense>
         </TabsContent>
         <TabsContent value="status" className="-mx-4 md:-mx-6">
