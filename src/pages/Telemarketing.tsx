@@ -53,6 +53,8 @@ export default function Telemarketing() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [clientName, setClientName] = useState("");
   const [campanhaNome, setCampanhaNome] = useState<string | null>(null);
+  const [selectedCampanhaId, setSelectedCampanhaId] = useState<string | null>(campanhaIdParam);
+  const [pickingCampanha, setPickingCampanha] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura">("todos");
   const autoLoginAttempted = useRef(false);
 
