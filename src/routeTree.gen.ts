@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicMissaoIdentifyRouteImport } from './routes/api/public/missao/identify'
 import { Route as ApiPublicHooksEleicaoCobrancaAutoRouteImport } from './routes/api/public/hooks/eleicao-cobranca-auto'
 import { Route as ApiPublicMMissionIdDCodeRouteImport } from './routes/api/public/m.$missionId.d.$code'
 
@@ -22,6 +23,11 @@ const SplatRoute = SplatRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicMissaoIdentifyRoute = ApiPublicMissaoIdentifyRouteImport.update({
+  id: '/api/public/missao/identify',
+  path: '/api/public/missao/identify',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHooksEleicaoCobrancaAutoRoute =
@@ -41,12 +47,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
+  '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
   '/api/public/m/$missionId/d/$code': typeof ApiPublicMMissionIdDCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
+  '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
   '/api/public/m/$missionId/d/$code': typeof ApiPublicMMissionIdDCodeRoute
 }
 export interface FileRoutesById {
@@ -54,6 +62,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
+  '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
   '/api/public/m/$missionId/d/$code': typeof ApiPublicMMissionIdDCodeRoute
 }
 export interface FileRouteTypes {
@@ -62,18 +71,21 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/api/public/hooks/eleicao-cobranca-auto'
+    | '/api/public/missao/identify'
     | '/api/public/m/$missionId/d/$code'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$'
     | '/api/public/hooks/eleicao-cobranca-auto'
+    | '/api/public/missao/identify'
     | '/api/public/m/$missionId/d/$code'
   id:
     | '__root__'
     | '/'
     | '/$'
     | '/api/public/hooks/eleicao-cobranca-auto'
+    | '/api/public/missao/identify'
     | '/api/public/m/$missionId/d/$code'
   fileRoutesById: FileRoutesById
 }
@@ -81,6 +93,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   ApiPublicHooksEleicaoCobrancaAutoRoute: typeof ApiPublicHooksEleicaoCobrancaAutoRoute
+  ApiPublicMissaoIdentifyRoute: typeof ApiPublicMissaoIdentifyRoute
   ApiPublicMMissionIdDCodeRoute: typeof ApiPublicMMissionIdDCodeRoute
 }
 
@@ -98,6 +111,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/missao/identify': {
+      id: '/api/public/missao/identify'
+      path: '/api/public/missao/identify'
+      fullPath: '/api/public/missao/identify'
+      preLoaderRoute: typeof ApiPublicMissaoIdentifyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/eleicao-cobranca-auto': {
@@ -122,6 +142,7 @@ const rootRouteChildren: RootRouteChildren = {
   SplatRoute: SplatRoute,
   ApiPublicHooksEleicaoCobrancaAutoRoute:
     ApiPublicHooksEleicaoCobrancaAutoRoute,
+  ApiPublicMissaoIdentifyRoute: ApiPublicMissaoIdentifyRoute,
   ApiPublicMMissionIdDCodeRoute: ApiPublicMMissionIdDCodeRoute,
 }
 export const routeTree = rootRouteImport
