@@ -1726,6 +1726,19 @@ export default function Disparos() {
                 </div>
               );
             })()}
+            {(() => {
+              const hasTracked = /\/missao\/[0-9a-f-]{36}/i.test(mensagem);
+              if (!hasTracked || !publicBase.isPreview) return null;
+              return (
+                <div className="rounded-md border border-amber-400/50 bg-amber-50 dark:bg-amber-950/30 p-2.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                  <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium">Links de missão apontam para o preview do Lovable — os destinatários vão cair na tela de login.</p>
+                    <p className="mt-0.5">Publique o projeto <em>ou</em> configure a <strong>URL pública</strong> do cliente em <strong>Configurações</strong> antes de enviar.</p>
+                  </div>
+                </div>
+              );
+            })()}
             <MessageEditor
               value={mensagem}
               onChange={setMensagem}
