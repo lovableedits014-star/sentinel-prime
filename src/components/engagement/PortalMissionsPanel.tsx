@@ -102,6 +102,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
         .from("portal_missions")
         .select("*")
         .eq("client_id", clientId)
+        .is("archived_at", null)
         .order("display_order", { ascending: true });
       if (error) throw error;
       return (data || []) as Mission[];
@@ -314,16 +315,19 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Soft-delete: archive to preserve historical tracking events
       const { error } = await (supabase as any)
-        .from("portal_missions").delete().eq("id", id);
+        .from("portal_missions")
+        .update({ archived_at: new Date().toISOString(), is_active: false })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
       setDeleteId(null);
-      toast.success("Missão removida!");
+      toast.success("Missão arquivada — o histórico continua disponível em Relatórios.");
     },
-    onError: () => toast.error("Erro ao remover missão"),
+    onError: () => toast.error("Erro ao arquivar missão"),
   });
 
   const openEdit = (m: Mission) => {
@@ -780,18 +784,17 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       <AlertDialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover missão?</AlertDialogTitle>
-            <AlertDialogDescription>Esta missão será removida permanentemente do portal dos apoiadores.</AlertDialogDescription>
+            <AlertDialogTitle>Arquivar missão?</AlertDialogTitle>
+            <AlertDialogDescription>A missão sai do portal dos apoiadores, mas todo o histórico de acessos, cliques e participantes fica preservado na aba <strong>Relatórios</strong>.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteId && deleteMutation.mutate(deleteId)}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Remover
+              Arquivar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

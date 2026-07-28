@@ -666,7 +666,13 @@ export default function Disparos() {
               }
               if (code) {
                 const publicUrl = `${origin}/api/public/m/${missionId}/d/${code}`;
-                msgForGroup = msgForGroup.replaceAll(`${origin}/missao/${missionId}`, publicUrl);
+                // Substitui QUALQUER origem + /missao/<missionId>(?...) — cobre casos em que o link
+                // foi gerado num preview antigo, num domínio diferente, ou com querystring já anexada.
+                const missionUrlRe = new RegExp(
+                  `https?://[^\\s)]+/missao/${missionId}(?:\\?[^\\s)]*)?`,
+                  "gi",
+                );
+                msgForGroup = msgForGroup.replace(missionUrlRe, publicUrl);
               }
             } catch (e) {
               console.error("[mission-tracking] falha ao criar distribuição", missionId, jid, e);
