@@ -1550,6 +1550,7 @@ export type Database = {
           name: string
           presence_absence_days_threshold: number
           presence_absence_message_template: string
+          public_base_url: string | null
           public_slug: string | null
           response_ctas: Json
           updated_at: string | null
@@ -1572,6 +1573,7 @@ export type Database = {
           name: string
           presence_absence_days_threshold?: number
           presence_absence_message_template?: string
+          public_base_url?: string | null
           public_slug?: string | null
           response_ctas?: Json
           updated_at?: string | null
@@ -1594,6 +1596,7 @@ export type Database = {
           name?: string
           presence_absence_days_threshold?: number
           presence_absence_message_template?: string
+          public_base_url?: string | null
           public_slug?: string | null
           response_ctas?: Json
           updated_at?: string | null

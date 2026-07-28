@@ -12,6 +12,7 @@ import CampaignFramesCard from "@/components/settings/CampaignFramesCard";
 import PresenceSettingsCard from "@/components/settings/PresenceSettingsCard";
 import CampaignIdentityCard from "@/components/settings/CampaignIdentityCard";
 import CandidateAssetsCard from "@/components/settings/CandidateAssetsCard";
+import PublicBaseUrlCard from "@/components/settings/PublicBaseUrlCard";
 import { useIsSuperAdmin } from "@/hooks/useIsSuperAdmin";
 
 const Settings = () => {
@@ -63,6 +64,7 @@ const Settings = () => {
 
       {/* Pool de Instâncias WhatsApp (anti-banimento) */}
       {clientId && <CampaignIdentityCard clientId={clientId} />}
+      {clientId && <PublicBaseUrlCard clientId={clientId} />}
 
       {/* Logo + galeria de fotos para o gerador de artes IA */}
       {clientId && <CandidateAssetsCard clientId={clientId} />}

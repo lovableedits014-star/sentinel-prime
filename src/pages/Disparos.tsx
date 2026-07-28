@@ -42,6 +42,7 @@ import { SugestoesPanel } from "@/components/disparos/SugestoesPanel";
 import DispatchLogDialog from "@/components/disparos/DispatchLogDialog";
 import BirthdayConfigPanel from "@/components/disparos/BirthdayConfigPanel";
 import ImportContactsDialog from "@/components/disparos/ImportContactsDialog";
+import { resolvePublicBaseUrl } from "@/lib/public-base-url";
 
 const POLICIES = {
   conservador: {
@@ -359,9 +360,14 @@ export default function Disparos() {
     setSyncStartedAt(null);
   }, [groupsSyncing]);
   const latestSyncLog = groupsSyncLogs[0];
+  const publicBase = resolvePublicBaseUrl(client);
   const handleUseMissions = () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
     const anyTracked = activeMissions.some((m: any) => m.tracking_enabled);
+    if (anyTracked && publicBase.isPreview) {
+      toast.error("Configure a URL pública do cliente (ou publique o projeto) antes de usar links de missão rastreados — o link do preview não abre para os destinatários.");
+      return;
+    }
+    const origin = publicBase.url;
     const links = activeMissions.map((m: any, i: number) => {
       const platformLabel = m.platform === "instagram" ? "📸 Instagram" : "📘 Facebook";
       const url = m.tracking_enabled && origin
@@ -602,7 +608,13 @@ export default function Disparos() {
         selectedGroupJids.length > 0 &&
         trackedIdsInMsg.length > 0;
 
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      if ((trackedIdsInMsg.length > 0) && publicBase.isPreview) {
+        toast.error("Os links de missão estão apontando para o preview do Lovable, que exige login. Configure a URL pública em Configurações → Cliente ou publique o projeto antes de enviar.");
+        setSending(false);
+        return;
+      }
+
+      const origin = publicBase.url;
 
       const commonBody = {
         client_id: clientId,
@@ -1660,12 +1672,22 @@ export default function Disparos() {
             </div>
           )}
           <div className="flex flex-wrap gap-2">
-            {activeMissions.length > 0 && (
-              <Button variant="outline" size="sm" className="gap-2 border-primary/30 text-primary hover:bg-primary/5" onClick={handleUseMissions}>
-                <Target className="h-4 w-4" />
-                Preencher com Missões Ativas ({activeMissions.length})
-              </Button>
-            )}
+            {activeMissions.length > 0 && (() => {
+              const anyTracked = activeMissions.some((m: any) => m.tracking_enabled);
+              const blocked = anyTracked && publicBase.isPreview;
+              return (
+                <Button
+                  variant="outline" size="sm"
+                  className="gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={handleUseMissions}
+                  disabled={blocked}
+                  title={blocked ? "Configure a URL pública do cliente ou publique o projeto para usar missões rastreadas." : undefined}
+                >
+                  <Target className="h-4 w-4" />
+                  Preencher com Missões Ativas ({activeMissions.length})
+                </Button>
+              );
+            })()}
             {clientId && (
               <Button
                 variant="outline"
@@ -1710,6 +1732,19 @@ export default function Disparos() {
                     ) : (
                       <p className="text-primary/80 mt-0.5">Cliques e participantes identificados aparecem no relatório da missão em <strong>Missões IA → Missões Ativas → 📊</strong>.</p>
                     )}
+                  </div>
+                </div>
+              );
+            })()}
+            {(() => {
+              const hasTracked = /\/missao\/[0-9a-f-]{36}/i.test(mensagem);
+              if (!hasTracked || !publicBase.isPreview) return null;
+              return (
+                <div className="rounded-md border border-amber-400/50 bg-amber-50 dark:bg-amber-950/30 p-2.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                  <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium">Links de missão apontam para o preview do Lovable — os destinatários vão cair na tela de login.</p>
+                    <p className="mt-0.5">Publique o projeto <em>ou</em> configure a <strong>URL pública</strong> do cliente em <strong>Configurações</strong> antes de enviar.</p>
                   </div>
                 </div>
               );
