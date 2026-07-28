@@ -496,7 +496,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       </Card>
 
       {/* ── ADD MULTIPLE DIALOG ── */}
-      <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) { setSelectedFb(null); setSelectedIg(null); setManualUrl(""); } }}>
+      <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) { setSelectedFb(null); setSelectedIg(null); setManualUrl(""); setBulkTracking(false); setBulkLinkAvulso(""); setBulkInstructions(""); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Adicionar Missões de Engajamento</DialogTitle>
