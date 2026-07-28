@@ -193,33 +193,44 @@ export default function TelemarketingAdminCampanhas() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><Upload className="w-4 h-4" /> Importar mailing CSV</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><Upload className="w-4 h-4" /> Importar mailing</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <label className="text-xs font-medium mb-1 block">Campanha (opcional)</label>
-                <Select value={importingTo || "__none__"} onValueChange={(v) => setImportingTo(v === "__none__" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Sem campanha" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— Sem campanha —</SelectItem>
-                    {campanhas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium mb-1 block">CSV (cabeçalho: nome, telefone, cidade, bairro)</label>
-                <Textarea
-                  rows={6}
-                  value={csv}
-                  onChange={(e) => setCsv(e.target.value)}
-                  placeholder={"nome,telefone,cidade,bairro\nMaria Silva,11999990000,São Paulo,Centro"}
-                  className="font-mono text-xs"
-                />
-                <p className="text-[11px] text-muted-foreground mt-1">Aceita vírgula, ponto-e-vírgula ou tab. Sem cabeçalho, usa colunas 1 (nome) e 2 (telefone).</p>
-              </div>
-              <Button onClick={handleImport} disabled={importing || !csv.trim()} className="w-full">
-                {importing ? "Importando…" : "Importar"}
+              <Button
+                onClick={() => setImportDialogOpen(true)}
+                disabled={campanhas.length === 0}
+                className="w-full"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Importar arquivo (Excel/CSV)
               </Button>
+              <p className="text-[11px] text-muted-foreground">
+                Envie <code>.xlsx</code>, <code>.xls</code> ou <code>.csv</code> com mapeamento de colunas e opção de já designar a um operador.
+                {campanhas.length === 0 && <><br /><strong>Crie uma campanha primeiro.</strong></>}
+              </p>
+
+              <details className="pt-2 border-t">
+                <summary className="text-xs text-muted-foreground cursor-pointer">Colar CSV direto (atalho)</summary>
+                <div className="space-y-2 pt-2">
+                  <Select value={importingTo || "__none__"} onValueChange={(v) => setImportingTo(v === "__none__" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Sem campanha" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Sem campanha —</SelectItem>
+                      {campanhas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    rows={5}
+                    value={csv}
+                    onChange={(e) => setCsv(e.target.value)}
+                    placeholder={"nome,telefone,cidade,bairro\nMaria Silva,11999990000,São Paulo,Centro"}
+                    className="font-mono text-xs"
+                  />
+                  <Button onClick={handleImport} disabled={importing || !csv.trim()} size="sm" variant="outline" className="w-full">
+                    {importing ? "Importando…" : "Importar CSV colado"}
+                  </Button>
+                </div>
+              </details>
             </CardContent>
           </Card>
 
