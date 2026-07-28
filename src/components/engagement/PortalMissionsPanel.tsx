@@ -660,6 +660,50 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               <Textarea value={editForm.description} onChange={(e) => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Ex: Curta, comente e compartilhe esta publicação!" rows={3} maxLength={200} />
             </div>
 
+            {/* ── Rastreamento (opt-in) ── */}
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <Radar className="w-4 h-4 text-primary" />
+                    Ativar identificação e rastreamento
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Substitui o link direto por uma página intermediária que registra quem abriu, qual grupo veio e o que clicou.
+                  </p>
+                </div>
+                <Switch
+                  checked={editForm.tracking_enabled}
+                  onCheckedChange={(v) => setEditForm(f => ({ ...f, tracking_enabled: !!v }))}
+                />
+              </div>
+
+              {editForm.tracking_enabled && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1"><Facebook className="w-3 h-3 text-blue-600" /> Link do Facebook</Label>
+                    <Input value={editForm.link_facebook} onChange={(e) => setEditForm(f => ({ ...f, link_facebook: e.target.value }))} placeholder="https://www.facebook.com/..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1"><Instagram className="w-3 h-3 text-pink-500" /> Link do Instagram</Label>
+                    <Input value={editForm.link_instagram} onChange={(e) => setEditForm(f => ({ ...f, link_instagram: e.target.value }))} placeholder="https://www.instagram.com/p/..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1"><Link className="w-3 h-3" /> Link avulso <span className="text-muted-foreground">(opcional)</span></Label>
+                    <Input value={editForm.link_avulso} onChange={(e) => setEditForm(f => ({ ...f, link_avulso: e.target.value }))} placeholder="https://..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Instruções para o participante <span className="text-muted-foreground">(opcional)</span></Label>
+                    <Textarea value={editForm.instructions} onChange={(e) => setEditForm(f => ({ ...f, instructions: e.target.value }))} rows={3} maxLength={500} placeholder="Ex: Curta, comente e compartilhe as publicações abaixo." />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Se algum link ficar em branco, usamos o link atual da publicação como fallback na plataforma correspondente.
+                  </p>
+                </div>
+              )}
+            </div>
+
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={editMutation.isPending}>
