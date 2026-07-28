@@ -186,8 +186,12 @@ export default function MissaoPublica() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
-            <CardTitle>Missão indisponível</CardTitle>
-            <CardDescription>Este link pode ter expirado ou não é válido.</CardDescription>
+            <CardTitle>{codeInvalid ? "Link expirado ou digitado errado" : "Missão indisponível"}</CardTitle>
+            <CardDescription>
+              {codeInvalid
+                ? "Peça um link novo para quem enviou a mensagem — o código anexado à URL não confere mais."
+                : "Este link pode ter expirado ou não é válido."}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>
