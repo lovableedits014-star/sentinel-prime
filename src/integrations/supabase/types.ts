@@ -9895,6 +9895,35 @@ export type Database = {
         Returns: string
       }
       promote_whatsapp_ramp_stages: { Args: never; Returns: number }
+      public_mission_config: {
+        Args: { p_code: string; p_mission_id: string; p_token: string }
+        Returns: Json
+      }
+      public_mission_event: {
+        Args: {
+          p_code: string
+          p_device: string
+          p_is_bot: boolean
+          p_mission_id: string
+          p_token: string
+          p_type: string
+          p_user_agent: string
+        }
+        Returns: Json
+      }
+      public_mission_identify: {
+        Args: {
+          p_code: string
+          p_device: string
+          p_is_bot: boolean
+          p_mission_id: string
+          p_nome: string
+          p_phone: string
+          p_user_agent: string
+        }
+        Returns: Json
+      }
+      public_mission_switch: { Args: { p_token: string }; Returns: Json }
       purge_llm_usage_log: { Args: { p_days?: number }; Returns: number }
       recompute_militant: {
         Args: {

@@ -1,10 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createClient } from "@supabase/supabase-js";
 import { normalizeBRPhone } from "@/lib/phone-utils";
 
 // POST /api/public/missao/identify
-// body: { missionId, code, nome, phone, existingToken? }
-// Faz upsert do participante por (client_id, phone_e164), gera token de visitante,
-// registra evento 'open' já associado ao participante e devolve { token, participant }.
+// Chama RPC SECURITY DEFINER (public_mission_identify) para operar sem service role.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +26,22 @@ function detectDevice(ua: string | null): string {
   return "other";
 }
 
+function makeClient() {
+  const url = process.env.SUPABASE_URL!;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY!;
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, storage: undefined as any },
+    global: {
+      fetch: (input, init) => {
+        const h = new Headers(init?.headers);
+        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
+        h.set("apikey", key);
+        return fetch(input as any, { ...init, headers: h });
+      },
+    },
+  });
+}
+
 export const Route = createFileRoute("/api/public/missao/identify")({
   server: {
     handlers: {
@@ -43,96 +58,24 @@ export const Route = createFileRoute("/api/public/missao/identify")({
             return Response.json({ error: "Dados inválidos" }, { status: 400, headers: corsHeaders });
           }
 
-          const mod = await import("@/integrations/supabase/client.server"); const supabaseAdmin = mod.supabaseAdmin as any;
-
-          // Resolve missão + distribuição
-          const { data: mission } = await supabaseAdmin
-            .from("portal_missions")
-            .select("id, client_id, tracking_enabled")
-            .eq("id", missionId)
-            .maybeSingle();
-          if (!mission) {
-            return Response.json({ error: "Missão não encontrada" }, { status: 404, headers: corsHeaders });
-          }
-
-          let distId: string | null = null;
-          if (code && code !== "invalid") {
-            const { data: dist } = await supabaseAdmin
-              .from("mission_distributions")
-              .select("id")
-              .eq("short_code", code)
-              .eq("mission_id", missionId)
-              .maybeSingle();
-            distId = dist?.id ?? null;
-          }
-
-          // Upsert participante
-          const nowIso = new Date().toISOString();
-          const { data: existing } = await supabaseAdmin
-            .from("mission_participants")
-            .select("id, nome")
-            .eq("client_id", mission.client_id)
-            .eq("phone_e164", phone)
-            .maybeSingle();
-
-          let participantId: string;
-          if (existing) {
-            participantId = existing.id;
-            await supabaseAdmin
-              .from("mission_participants")
-              .update({ nome, last_seen_at: nowIso })
-              .eq("id", participantId);
-          } else {
-            const { data: inserted, error: insErr } = await supabaseAdmin
-              .from("mission_participants")
-              .insert({
-                client_id: mission.client_id,
-                phone_e164: phone,
-                nome,
-                first_seen_at: nowIso,
-                last_seen_at: nowIso,
-              })
-              .select("id")
-              .single();
-            if (insErr || !inserted) {
-              return Response.json({ error: "Falha ao cadastrar" }, { status: 500, headers: corsHeaders });
-            }
-            participantId = inserted.id;
-          }
-
           const ua = request.headers.get("user-agent");
-          const isBot = detectBot(ua);
-          const deviceCat = detectDevice(ua);
-
-          // Gera token opaco
-          const bytes = new Uint8Array(24);
-          crypto.getRandomValues(bytes);
-          const token = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-
-          await supabaseAdmin.from("mission_visitor_tokens").insert({
-            token,
-            participant_id: participantId,
-            client_id: mission.client_id,
-            user_agent: ua,
-            device_hint: deviceCat,
+          const sb = makeClient();
+          const { data, error } = await sb.rpc("public_mission_identify", {
+            p_mission_id: missionId,
+            p_code: code || null,
+            p_nome: nome,
+            p_phone: phone,
+            p_user_agent: ua,
+            p_device: detectDevice(ua),
+            p_is_bot: detectBot(ua),
           });
-
-          // Registra 'open' já vinculado ao participante
-          await supabaseAdmin.from("mission_events").insert({
-            mission_id: missionId,
-            distribution_id: distId,
-            participant_id: participantId,
-            client_id: mission.client_id,
-            event_type: "open",
-            user_agent: ua,
-            device_category: deviceCat,
-            is_bot: isBot,
-          });
-
-          return Response.json(
-            { token, participant: { id: participantId, nome } },
-            { headers: corsHeaders }
-          );
+          if (error) return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
+          const payload: any = data || {};
+          if (payload.error) {
+            const status = payload.error === "Missão não encontrada" ? 404 : 400;
+            return Response.json({ error: payload.error }, { status, headers: corsHeaders });
+          }
+          return Response.json(payload, { headers: corsHeaders });
         } catch (e: any) {
           return Response.json({ error: e?.message || "Erro" }, { status: 500, headers: corsHeaders });
         }
