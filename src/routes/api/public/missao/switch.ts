@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/public/missao/switch")({
           const body = await request.json().catch(() => ({}));
           const token = String(body.token || "").trim();
           if (!token) return Response.json({ ok: true }, { headers: corsHeaders });
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const mod = await import("@/integrations/supabase/client.server"); const supabaseAdmin = mod.supabaseAdmin as any;
           await supabaseAdmin
             .from("mission_visitor_tokens")
             .update({ revoked_at: new Date().toISOString() })

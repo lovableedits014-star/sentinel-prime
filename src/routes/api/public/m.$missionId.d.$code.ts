@@ -9,7 +9,7 @@ export const Route = createFileRoute("/api/public/m/$missionId/d/$code")({
   server: {
     handlers: {
       GET: async ({ params, request }) => {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const mod = await import("@/integrations/supabase/client.server"); const supabaseAdmin = mod.supabaseAdmin as any;
 
         const url = new URL(request.url);
         const origin = `${url.protocol}//${url.host}`;

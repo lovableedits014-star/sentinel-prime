@@ -15,7 +15,7 @@ export const Route = createFileRoute("/api/public/missao/config/$missionId")({
       OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders }),
       GET: async ({ params, request }) => {
         try {
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const mod = await import("@/integrations/supabase/client.server"); const supabaseAdmin = mod.supabaseAdmin as any;
           const url = new URL(request.url);
           const code = (url.searchParams.get("code") || "").trim();
           const token = (url.searchParams.get("token") || "").trim();
