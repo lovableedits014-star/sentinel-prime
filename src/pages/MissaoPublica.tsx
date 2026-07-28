@@ -55,6 +55,11 @@ export default function MissaoPublica() {
   const [identifying, setIdentifying] = useState(false);
   const [declaring, setDeclaring] = useState(false);
   const [declared, setDeclared] = useState(false);
+  const codeInvalid = code === "invalid";
+
+  useEffect(() => {
+    document.title = "Missão da Campanha";
+  }, []);
 
   // Bootstrap: lê token do localStorage e chama /config
   useEffect(() => {
