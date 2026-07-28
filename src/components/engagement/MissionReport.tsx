@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Facebook, Instagram, ExternalLink, CheckCircle2, Eye, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Facebook, Instagram, ExternalLink, CheckCircle2, Eye, Users, Download } from "lucide-react";
 import { fmtPhoneBR } from "@/lib/phone-utils";
 
 type Props = {
