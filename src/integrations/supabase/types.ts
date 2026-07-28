@@ -7941,6 +7941,61 @@ export type Database = {
           },
         ]
       }
+      telemarketing_assignment_log: {
+        Row: {
+          acao: string
+          campanha_id: string | null
+          client_id: string
+          contatos_count: number
+          criado_em: string
+          criado_por: string | null
+          id: string
+          operador_id: string | null
+        }
+        Insert: {
+          acao: string
+          campanha_id?: string | null
+          client_id: string
+          contatos_count?: number
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          operador_id?: string | null
+        }
+        Update: {
+          acao?: string
+          campanha_id?: string | null
+          client_id?: string
+          contatos_count?: number
+          criado_em?: string
+          criado_por?: string | null
+          id?: string
+          operador_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemarketing_assignment_log_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemarketing_assignment_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemarketing_assignment_log_operador_id_fkey"
+            columns: ["operador_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_operadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telemarketing_call_assignments: {
         Row: {
           client_id: string
@@ -8063,6 +8118,7 @@ export type Database = {
       }
       telemarketing_contatos_avulsos: {
         Row: {
+          assigned_operador_id: string | null
           ativo: boolean
           bairro: string | null
           campanha_id: string | null
@@ -8082,6 +8138,7 @@ export type Database = {
           vota_candidato: string | null
         }
         Insert: {
+          assigned_operador_id?: string | null
           ativo?: boolean
           bairro?: string | null
           campanha_id?: string | null
@@ -8101,6 +8158,7 @@ export type Database = {
           vota_candidato?: string | null
         }
         Update: {
+          assigned_operador_id?: string | null
           ativo?: boolean
           bairro?: string | null
           campanha_id?: string | null
@@ -8120,6 +8178,13 @@ export type Database = {
           vota_candidato?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "telemarketing_contatos_avulsos_assigned_operador_id_fkey"
+            columns: ["assigned_operador_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_operadores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "telemarketing_contatos_avulsos_campanha_id_fkey"
             columns: ["campanha_id"]
@@ -9292,9 +9357,13 @@ export type Database = {
       }
     }
     Functions: {
+      _tele_assert_client_admin: {
+        Args: { _client_id: string }
+        Returns: undefined
+      }
       _tele_assert_operador: {
         Args: { _client_id: string; _nome: string; _senha: string }
-        Returns: undefined
+        Returns: string
       }
       calculate_engagement_score: {
         Args: { p_days?: number; p_supporter_id: string }
@@ -9994,6 +10063,22 @@ export type Database = {
         Returns: undefined
       }
       tea_ranking_ms: { Args: { p_codigo_ibge: number }; Returns: Json }
+      tele_admin_listar_avulsos: {
+        Args: { _campanha_id: string; _client_id: string }
+        Returns: {
+          assigned_operador_id: string
+          assigned_operador_nome: string
+          bairro: string
+          cidade: string
+          id: string
+          ligacao_em: string
+          ligacao_status: string
+          nome: string
+          operador_nome: string
+          telefone: string
+          tentativas_count: number
+        }[]
+      }
       tele_admin_listar_contatos_full: {
         Args: { _client_id: string }
         Returns: {
@@ -10015,6 +10100,15 @@ export type Database = {
           tipo: string
           vota_candidato: string
         }[]
+      }
+      tele_assign_contatos: {
+        Args: {
+          _campanha_id: string
+          _client_id: string
+          _contato_ids: string[]
+          _operador_id: string
+        }
+        Returns: Json
       }
       tele_capture_snapshot: {
         Args: { _campanha_id?: string; _client_id: string; _rotulo: string }
@@ -10055,6 +10149,15 @@ export type Database = {
           _client_id: string
           _filtros: Json
           _substituir?: boolean
+        }
+        Returns: Json
+      }
+      tele_distribute_contatos: {
+        Args: {
+          _campanha_id: string
+          _client_id: string
+          _contato_ids: string[]
+          _operador_ids: string[]
         }
         Returns: Json
       }
@@ -10108,10 +10211,20 @@ export type Database = {
         }
         Returns: Json
       }
-      tele_import_contato_avulso_batch: {
-        Args: { _campanha_id: string; _client_id: string; _rows: Json }
-        Returns: Json
-      }
+      tele_import_contato_avulso_batch:
+        | {
+            Args: { _campanha_id: string; _client_id: string; _rows: Json }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _assigned_operador_id?: string
+              _campanha_id: string
+              _client_id: string
+              _rows: Json
+            }
+            Returns: Json
+          }
       tele_indicador_drill: {
         Args: {
           _campanha_id?: string
@@ -10205,6 +10318,17 @@ export type Database = {
           id: string
           nome: string
           tipo: string
+        }[]
+      }
+      tele_operador_campanhas: {
+        Args: { _client_id: string; _nome: string; _senha: string }
+        Returns: {
+          campanha_id: string
+          descricao: string
+          nome: string
+          pendentes_livres: number
+          pendentes_meus: number
+          total_meus: number
         }[]
       }
       tele_operadores_ao_vivo: {
@@ -10314,6 +10438,14 @@ export type Database = {
           _nome: string
           _senha: string
           _tabela: string
+        }
+        Returns: Json
+      }
+      tele_release_contatos: {
+        Args: {
+          _campanha_id: string
+          _client_id: string
+          _contato_ids: string[]
         }
         Returns: Json
       }
