@@ -64,6 +64,7 @@ const Settings = () => {
 
       {/* Pool de Instâncias WhatsApp (anti-banimento) */}
       {clientId && <CampaignIdentityCard clientId={clientId} />}
+      {clientId && <PublicBaseUrlCard clientId={clientId} />}
 
       {/* Logo + galeria de fotos para o gerador de artes IA */}
       {clientId && <CandidateAssetsCard clientId={clientId} />}
