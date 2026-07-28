@@ -5584,7 +5584,7 @@ export type Database = {
           group_jid: string | null
           group_name_snapshot: string | null
           id: string
-          mission_id: string
+          mission_id: string | null
           short_code: string
           updated_at: string
         }
@@ -5596,7 +5596,7 @@ export type Database = {
           group_jid?: string | null
           group_name_snapshot?: string | null
           id?: string
-          mission_id: string
+          mission_id?: string | null
           short_code: string
           updated_at?: string
         }
@@ -5608,7 +5608,7 @@ export type Database = {
           group_jid?: string | null
           group_name_snapshot?: string | null
           id?: string
-          mission_id?: string
+          mission_id?: string | null
           short_code?: string
           updated_at?: string
         }
@@ -5627,12 +5627,14 @@ export type Database = {
           client_id: string
           created_at: string
           device_category: string | null
+          distribution_group_snapshot: string | null
           distribution_id: string | null
           event_type: Database["public"]["Enums"]["mission_event_type"]
           id: string
           ip_hash: string | null
           is_bot: boolean
-          mission_id: string
+          mission_id: string | null
+          mission_title_snapshot: string | null
           participant_id: string | null
           user_agent: string | null
         }
@@ -5640,12 +5642,14 @@ export type Database = {
           client_id: string
           created_at?: string
           device_category?: string | null
+          distribution_group_snapshot?: string | null
           distribution_id?: string | null
           event_type: Database["public"]["Enums"]["mission_event_type"]
           id?: string
           ip_hash?: string | null
           is_bot?: boolean
-          mission_id: string
+          mission_id?: string | null
+          mission_title_snapshot?: string | null
           participant_id?: string | null
           user_agent?: string | null
         }
@@ -5653,12 +5657,14 @@ export type Database = {
           client_id?: string
           created_at?: string
           device_category?: string | null
+          distribution_group_snapshot?: string | null
           distribution_id?: string | null
           event_type?: Database["public"]["Enums"]["mission_event_type"]
           id?: string
           ip_hash?: string | null
           is_bot?: boolean
-          mission_id?: string
+          mission_id?: string | null
+          mission_title_snapshot?: string | null
           participant_id?: string | null
           user_agent?: string | null
         }
@@ -5727,6 +5733,7 @@ export type Database = {
           client_id: string
           created_at: string
           device_hint: string | null
+          last_distribution_id: string | null
           last_used_at: string
           participant_id: string
           revoked_at: string | null
@@ -5737,6 +5744,7 @@ export type Database = {
           client_id: string
           created_at?: string
           device_hint?: string | null
+          last_distribution_id?: string | null
           last_used_at?: string
           participant_id: string
           revoked_at?: string | null
@@ -5747,6 +5755,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           device_hint?: string | null
+          last_distribution_id?: string | null
           last_used_at?: string
           participant_id?: string
           revoked_at?: string | null
@@ -6568,6 +6577,7 @@ export type Database = {
       }
       portal_missions: {
         Row: {
+          archived_at: string | null
           client_id: string
           created_at: string
           description: string | null
@@ -6585,6 +6595,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           client_id: string
           created_at?: string
           description?: string | null
@@ -6602,6 +6613,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           client_id?: string
           created_at?: string
           description?: string | null
@@ -9289,6 +9301,23 @@ export type Database = {
         Returns: number
       }
       claim_invite_token: { Args: { _token: string }; Returns: string }
+      client_missions_dashboard: {
+        Args: { p_client_id: string }
+        Returns: {
+          archived_at: string
+          click_avulso: number
+          click_facebook: number
+          click_instagram: number
+          created_at: string
+          declared_done: number
+          last_event_at: string
+          mission_id: string
+          title: string
+          total_opens: number
+          tracking_enabled: boolean
+          unique_participants: number
+        }[]
+      }
       compute_militant_badge: {
         Args: {
           p_30d_neg: number
