@@ -15,11 +15,13 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import {
   Target, Plus, Pencil, Trash2, Facebook, Instagram,
-  ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X,
+  ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X, BarChart3, Radar,
 } from "lucide-react";
 import { toast } from "sonner";
+import MissionReport from "./MissionReport";
 // sync-throttle removido: atualização de missões não tem mais cooldown
 
 interface Mission {
@@ -32,6 +34,11 @@ interface Mission {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  tracking_enabled?: boolean;
+  link_facebook?: string | null;
+  link_instagram?: string | null;
+  link_avulso?: string | null;
+  instructions?: string | null;
 }
 
 interface PostOption {
@@ -60,6 +67,11 @@ const EMPTY_EDIT = {
   post_url: "",
   title: "",
   description: "",
+  tracking_enabled: false,
+  link_facebook: "",
+  link_instagram: "",
+  link_avulso: "",
+  instructions: "",
 };
 
 export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
@@ -78,6 +90,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
   const [editSelectedPostId, setEditSelectedPostId] = useState<string | null>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [reportMissionId, setReportMissionId] = useState<string | null>(null);
 
   const { data: missions = [], isLoading } = useQuery({
     queryKey: ["portal-missions", clientId],
