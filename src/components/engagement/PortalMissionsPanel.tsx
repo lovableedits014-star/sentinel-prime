@@ -444,6 +444,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                 onEdit={() => openEdit(m)}
                 onDelete={() => setDeleteId(m.id)}
                 onToggle={() => toggleMutation.mutate({ id: m.id, is_active: false })}
+                onReport={() => setReportMissionId(m.id)}
               />
             ))
           )}
@@ -464,6 +465,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                 onEdit={() => openEdit(m)}
                 onDelete={() => setDeleteId(m.id)}
                 onToggle={() => toggleMutation.mutate({ id: m.id, is_active: true })}
+                onReport={() => setReportMissionId(m.id)}
                 inactive
               />
             ))}
