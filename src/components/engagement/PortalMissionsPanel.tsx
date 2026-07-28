@@ -868,6 +868,11 @@ function MissionCard({
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
+        {mission.tracking_enabled && onReport && (
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onReport} title="Ver relatório de rastreamento">
+            <BarChart3 className="w-3.5 h-3.5 text-primary" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggle} title={inactive ? "Ativar" : "Pausar"}>
           {inactive
             ? <ToggleLeft className="w-4 h-4 text-muted-foreground" />
