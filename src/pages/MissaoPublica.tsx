@@ -166,7 +166,7 @@ export default function MissaoPublica() {
         throw new Error(err.error || "Falha no cadastro");
       }
       const data = await res.json();
-      localStorage.setItem(storageKey, data.token);
+      if (clientId) localStorage.setItem(clientTokenKey(clientId), data.token);
       setToken(data.token);
       setConfig((prev) => (prev ? { ...prev, participant: data.participant } : prev));
       toast.success("Prontinho, obrigado por participar!");
@@ -187,7 +187,7 @@ export default function MissaoPublica() {
     } catch {
       // silencioso
     }
-    localStorage.removeItem(storageKey);
+    if (clientId) localStorage.removeItem(clientTokenKey(clientId));
     setToken("");
     setConfig((prev) => (prev ? { ...prev, participant: null } : prev));
     setNome("");
