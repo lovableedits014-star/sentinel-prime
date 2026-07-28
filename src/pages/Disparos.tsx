@@ -608,6 +608,12 @@ export default function Disparos() {
         selectedGroupJids.length > 0 &&
         trackedIdsInMsg.length > 0;
 
+      if ((trackedIdsInMsg.length > 0) && publicBase.isPreview) {
+        toast.error("Os links de missão estão apontando para o preview do Lovable, que exige login. Configure a URL pública em Configurações → Cliente ou publique o projeto antes de enviar.");
+        setSending(false);
+        return;
+      }
+
       const origin = publicBase.url;
 
       const commonBody = {
