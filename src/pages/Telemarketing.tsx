@@ -544,6 +544,61 @@ export default function Telemarketing() {
     );
   }
 
+  // Campaign picker — shown after login when the operator has more than one assigned campaign
+  if (pickingCampanha) {
+    const contagens = new Map<string | null, number>();
+    for (const c of contatos) contagens.set(c.campanha_id, (contagens.get(c.campanha_id) || 0) + 1);
+    const opcoes = scripts
+      .map(s => ({ id: s.id, nome: s.nome, count: contagens.get(s.id) || 0 }))
+      .filter(o => o.count > 0)
+      .sort((a, b) => b.count - a.count);
+    const semCampanha = contagens.get(null) || 0;
+
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Phone className="w-5 h-5 text-primary" />
+              Escolha a campanha
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Olá, <strong>{operadorNome}</strong>. Você tem contatos em mais de uma campanha — selecione por qual quer começar. Você pode trocar a qualquer momento.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {opcoes.map(o => (
+              <Button
+                key={o.id}
+                variant="outline"
+                className="w-full justify-between h-auto py-3"
+                onClick={() => pickCampanha(o.id)}
+              >
+                <span className="font-medium truncate">{o.nome}</span>
+                <Badge variant="secondary">{o.count} pendentes</Badge>
+              </Button>
+            ))}
+            {semCampanha > 0 && (
+              <Button
+                variant="outline"
+                className="w-full justify-between h-auto py-3"
+                onClick={() => pickCampanha(null)}
+              >
+                <span className="font-medium">Contatos gerais (sem campanha)</span>
+                <Badge variant="secondary">{semCampanha} pendentes</Badge>
+              </Button>
+            )}
+            {opcoes.length === 0 && semCampanha === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Nenhum contato disponível no momento.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-muted/30 p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
       {/* Header */}
