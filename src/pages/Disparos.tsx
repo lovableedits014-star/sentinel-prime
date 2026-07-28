@@ -635,16 +635,23 @@ export default function Disparos() {
           let msgForGroup = mensagem.trim();
           for (const missionId of trackedIdsInMsg) {
             try {
-              const { data: distRow, error: distErr } = await (supabase as any)
+              // Sem unique(mission_id, group_jid): SELECT primeiro, cria só se não houver.
+              const { data: existing } = await (supabase as any)
                 .from("mission_distributions")
-                .upsert(
-                  { mission_id: missionId, group_jid: jid, client_id: clientId },
-                  { onConflict: "mission_id,group_jid" }
-                )
                 .select("short_code")
-                .single();
-              if (distErr) throw distErr;
-              const code = (distRow as any)?.short_code;
+                .eq("mission_id", missionId)
+                .eq("group_jid", jid)
+                .maybeSingle();
+              let code = (existing as any)?.short_code as string | undefined;
+              if (!code) {
+                const { data: inserted, error: insErr } = await (supabase as any)
+                  .from("mission_distributions")
+                  .insert({ mission_id: missionId, group_jid: jid, client_id: clientId })
+                  .select("short_code")
+                  .single();
+                if (insErr) throw insErr;
+                code = (inserted as any)?.short_code;
+              }
               if (code) {
                 const publicUrl = `${origin}/api/public/m/${missionId}/d/${code}`;
                 msgForGroup = msgForGroup.replaceAll(`${origin}/missao/${missionId}`, publicUrl);
