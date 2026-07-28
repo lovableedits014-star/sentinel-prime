@@ -263,6 +263,9 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       setSelectedFb(null);
       setSelectedIg(null);
       setManualUrl("");
+      setBulkTracking(false);
+      setBulkLinkAvulso("");
+      setBulkInstructions("");
     } catch (err: any) {
       toast.error("Erro ao salvar: " + (err?.message || "tente novamente"));
     } finally {
