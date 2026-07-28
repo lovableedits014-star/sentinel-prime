@@ -81,12 +81,14 @@ export default function TelemarketingAdminCampanhas() {
   const load = async () => {
     if (!clientId) return;
     setLoading(true);
-    const [c, a] = await Promise.all([
+    const [c, a, ops] = await Promise.all([
       supabase.from("telemarketing_campanhas" as any).select("*").eq("client_id", clientId).order("created_at", { ascending: false }),
       supabase.from("telemarketing_contatos_avulsos" as any).select("id,nome,telefone,cidade,bairro,ligacao_status,campanha_id").eq("client_id", clientId).order("created_at", { ascending: false }).limit(500),
+      supabase.from("telemarketing_operadores" as any).select("id,nome,ativo").eq("client_id", clientId).order("nome"),
     ]);
     setCampanhas((c.data as any[]) || []);
     setContatos((a.data as any[]) || []);
+    setOperadores((ops.data as any[]) || []);
     setLoading(false);
   };
 
