@@ -82,6 +82,9 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
   const [selectedFb, setSelectedFb] = useState<PostOption | null>(null);
   const [selectedIg, setSelectedIg] = useState<PostOption | null>(null);
   const [manualUrl, setManualUrl] = useState("");
+  const [bulkTracking, setBulkTracking] = useState(false);
+  const [bulkLinkAvulso, setBulkLinkAvulso] = useState("");
+  const [bulkInstructions, setBulkInstructions] = useState("");
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
