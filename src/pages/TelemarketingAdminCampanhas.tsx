@@ -353,9 +353,10 @@ export default function TelemarketingAdminCampanhas() {
       {atribuindo && clientId && (
         <AtribuicoesDialog
           open={!!atribuindo}
-          onClose={() => setAtribuindo(null)}
+          onOpenChange={(o) => { if (!o) setAtribuindo(null); }}
           clientId={clientId}
-          campanha={{ id: atribuindo.id, nome: atribuindo.nome }}
+          campanhaId={atribuindo.id}
+          campanhaNome={atribuindo.nome}
           operadores={operadores}
           onChanged={load}
         />
