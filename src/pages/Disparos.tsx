@@ -360,9 +360,14 @@ export default function Disparos() {
     setSyncStartedAt(null);
   }, [groupsSyncing]);
   const latestSyncLog = groupsSyncLogs[0];
+  const publicBase = resolvePublicBaseUrl(client);
   const handleUseMissions = () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
     const anyTracked = activeMissions.some((m: any) => m.tracking_enabled);
+    if (anyTracked && publicBase.isPreview) {
+      toast.error("Configure a URL pública do cliente (ou publique o projeto) antes de usar links de missão rastreados — o link do preview não abre para os destinatários.");
+      return;
+    }
+    const origin = publicBase.url;
     const links = activeMissions.map((m: any, i: number) => {
       const platformLabel = m.platform === "instagram" ? "📸 Instagram" : "📘 Facebook";
       const url = m.tracking_enabled && origin
