@@ -82,6 +82,9 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
   const [selectedFb, setSelectedFb] = useState<PostOption | null>(null);
   const [selectedIg, setSelectedIg] = useState<PostOption | null>(null);
   const [manualUrl, setManualUrl] = useState("");
+  const [bulkTracking, setBulkTracking] = useState(false);
+  const [bulkLinkAvulso, setBulkLinkAvulso] = useState("");
+  const [bulkInstructions, setBulkInstructions] = useState("");
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
@@ -239,6 +242,12 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
         description: null,
         display_order: baseOrder + idx,
         is_active: true,
+        tracking_enabled: bulkTracking,
+        // Preencher automaticamente o link da própria plataforma quando rastreamento está ligado
+        link_facebook: bulkTracking && item.platform === "facebook" ? item.post_url : null,
+        link_instagram: bulkTracking && item.platform === "instagram" ? item.post_url : null,
+        link_avulso: bulkTracking ? (bulkLinkAvulso.trim() || null) : null,
+        instructions: bulkTracking ? (bulkInstructions.trim() || null) : null,
       }));
 
       const { error } = await (supabase as any).from("portal_missions").insert(payloads);
@@ -254,6 +263,9 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       setSelectedFb(null);
       setSelectedIg(null);
       setManualUrl("");
+      setBulkTracking(false);
+      setBulkLinkAvulso("");
+      setBulkInstructions("");
     } catch (err: any) {
       toast.error("Erro ao salvar: " + (err?.message || "tente novamente"));
     } finally {
@@ -484,7 +496,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       </Card>
 
       {/* ── ADD MULTIPLE DIALOG ── */}
-      <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) { setSelectedFb(null); setSelectedIg(null); setManualUrl(""); } }}>
+      <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) { setSelectedFb(null); setSelectedIg(null); setManualUrl(""); setBulkTracking(false); setBulkLinkAvulso(""); setBulkInstructions(""); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Adicionar Missões de Engajamento</DialogTitle>
@@ -584,6 +596,53 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                   {parsePlatformFromUrl(manualUrl) === "instagram" && <><Instagram className="w-3 h-3 text-pink-500" /> Instagram detectado</>}
                   {!parsePlatformFromUrl(manualUrl) && "⚠️ Plataforma não reconhecida"}
                 </p>
+              )}
+            </div>
+
+            {/* ── Rastreamento em lote (opt-in) ── */}
+            <div className="rounded-lg border p-3 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-1.5">
+                    <Radar className="w-4 h-4 text-primary" />
+                    Ativar identificação e rastreamento
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Substitui o link direto pela página intermediária <code>/missao/&lt;id&gt;</code>, que registra quem abriu, de qual grupo veio e o que clicou. Vale para todas as missões adicionadas agora.
+                  </p>
+                </div>
+                <Switch
+                  checked={bulkTracking}
+                  onCheckedChange={(v) => setBulkTracking(!!v)}
+                />
+              </div>
+
+              {bulkTracking && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1">
+                      <Link className="w-3 h-3" /> Link avulso <span className="text-muted-foreground">(opcional — botão extra na página)</span>
+                    </Label>
+                    <Input
+                      value={bulkLinkAvulso}
+                      onChange={(e) => setBulkLinkAvulso(e.target.value)}
+                      placeholder="https://... (ex.: um site, um WhatsApp, etc.)"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Instruções para o participante <span className="text-muted-foreground">(opcional)</span></Label>
+                    <Textarea
+                      value={bulkInstructions}
+                      onChange={(e) => setBulkInstructions(e.target.value)}
+                      rows={3}
+                      maxLength={500}
+                      placeholder="Ex: Curta, comente e compartilhe as publicações abaixo."
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    O link da publicação escolhida é usado automaticamente na plataforma correspondente (Facebook/Instagram). Você pode editar cada missão depois se precisar de links diferentes.
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -848,7 +907,7 @@ function MissionCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           {mission.title ? (
             <p className="text-sm font-medium truncate">{mission.title}</p>
           ) : (
@@ -857,6 +916,20 @@ function MissionCard({
           <Badge variant="outline" className="text-xs shrink-0 capitalize">
             {mission.platform}
           </Badge>
+          {mission.tracking_enabled ? (
+            <Badge className="text-xs shrink-0 gap-1 bg-primary/10 text-primary hover:bg-primary/15 border-primary/30" variant="outline">
+              <Radar className="w-3 h-3" /> Rastreada
+            </Badge>
+          ) : (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="text-[11px] shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-dashed border-muted-foreground/40 text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
+              title="Abrir edição com rastreamento pré-ativado"
+            >
+              <Radar className="w-3 h-3" /> Ativar rastreamento
+            </button>
+          )}
         </div>
         {mission.description && (
           <p className="text-xs text-muted-foreground line-clamp-2">{mission.description}</p>

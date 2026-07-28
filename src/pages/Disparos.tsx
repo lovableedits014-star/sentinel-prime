@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import {
   Send, Loader2, CheckCircle, XCircle, Clock,
   Users, MessageSquare, Wifi, WifiOff, Zap, Target, Settings2, Cake, Ban, Sparkles, Star, ImagePlus, X,
-  Paperclip, Video, FileText, FlaskConical, Pause, RotateCcw,
+  Paperclip, Video, FileText, FlaskConical, Pause, RotateCcw, Radar,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -591,40 +591,107 @@ export default function Disparos() {
       }
       const kindLabel = mediaKind === "video" ? "Vídeo" : mediaKind === "document" ? "Documento" : "Imagem";
       const tituloFinal = titulo.trim() || (hasMedia && !hasText ? kindLabel : (mensagem.trim().slice(0, 60) || "Disparo"));
-      const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
-        body: {
-          client_id: clientId,
-          titulo: tituloFinal,
-          mensagem: mensagem.trim(),
-          media_url: mediaUrl,
-          media_kind: mediaKind,
-          media_filename: mediaFilename,
-          media_mime: mediaMime,
-          tipo: tipoDisparo,
-          tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
-          eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
-          eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
-          eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
-          eleicao_cidade: eleicaoCidade === "all" ? null : eleicaoCidade,
-          group_jids: tipoDisparo === "grupos" ? selectedGroupJids : undefined,
-          recipients_list: tipoDisparo === "lista_adhoc" ? adhocContacts : undefined,
-          batch_size: pol.batch_size,
-          delay_min: pol.delay_min,
-          delay_max: pol.delay_max,
-          batch_pause: pol.batch_pause,
-          humanization_config: {},
-          cta_config: ctaConfig,
-          max_instances: instanceMode === "fixed" ? Math.max(1, Math.floor(maxInstances)) : null,
-          ignore_stage_cap: ignoreStageCap,
-        },
-      });
-      if (error) throw error;
 
-      if ((resp as any)?.queued) {
-        toast.success("📥 Adicionado à fila! Será enviado assim que o disparo atual terminar.");
+      // ── Rastreamento por grupo ──
+      // Se estamos disparando para grupos e a mensagem contém links /missao/<uuid>,
+      // criamos um short_code único por (missão × grupo) e dividimos em N chamadas —
+      // uma por grupo — para que cada mensagem carregue o link atribuído ao grupo.
+      const trackedIdsInMsg = Array.from(mensagem.matchAll(/\/missao\/([0-9a-f-]{36})/gi)).map(m => m[1]);
+      const shouldSplitForGroupTracking =
+        tipoDisparo === "grupos" &&
+        selectedGroupJids.length > 0 &&
+        trackedIdsInMsg.length > 0;
+
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+      const commonBody = {
+        client_id: clientId,
+        media_url: mediaUrl,
+        media_kind: mediaKind,
+        media_filename: mediaFilename,
+        media_mime: mediaMime,
+        tipo: tipoDisparo,
+        tag_filtro: tagFiltro === "_all" ? null : tagFiltro,
+        eleicao_tipo: eleicaoTipo === "all" ? null : eleicaoTipo,
+        eleicao_escopo: eleicaoEscopo === "all" ? null : eleicaoEscopo,
+        eleicao_regiao: eleicaoRegiao === "all" ? null : eleicaoRegiao,
+        eleicao_cidade: eleicaoCidade === "all" ? null : eleicaoCidade,
+        recipients_list: tipoDisparo === "lista_adhoc" ? adhocContacts : undefined,
+        batch_size: pol.batch_size,
+        delay_min: pol.delay_min,
+        delay_max: pol.delay_max,
+        batch_pause: pol.batch_pause,
+        humanization_config: {},
+        cta_config: ctaConfig,
+        max_instances: instanceMode === "fixed" ? Math.max(1, Math.floor(maxInstances)) : null,
+        ignore_stage_cap: ignoreStageCap,
+      };
+
+      let respFirst: any = null;
+      if (shouldSplitForGroupTracking) {
+        // Cria uma distribuição por (missão × grupo) e substitui os links no texto.
+        let sentCount = 0;
+        for (const jid of selectedGroupJids) {
+          let msgForGroup = mensagem.trim();
+          for (const missionId of trackedIdsInMsg) {
+            try {
+              // Sem unique(mission_id, group_jid): SELECT primeiro, cria só se não houver.
+              const { data: existing } = await (supabase as any)
+                .from("mission_distributions")
+                .select("short_code")
+                .eq("mission_id", missionId)
+                .eq("group_jid", jid)
+                .maybeSingle();
+              let code = (existing as any)?.short_code as string | undefined;
+              if (!code) {
+                const { data: inserted, error: insErr } = await (supabase as any)
+                  .from("mission_distributions")
+                  .insert({ mission_id: missionId, group_jid: jid, client_id: clientId })
+                  .select("short_code")
+                  .single();
+                if (insErr) throw insErr;
+                code = (inserted as any)?.short_code;
+              }
+              if (code) {
+                const publicUrl = `${origin}/api/public/m/${missionId}/d/${code}`;
+                msgForGroup = msgForGroup.replaceAll(`${origin}/missao/${missionId}`, publicUrl);
+              }
+            } catch (e) {
+              console.error("[mission-tracking] falha ao criar distribuição", missionId, jid, e);
+              // Se falhar, mantém o link /missao/<id> — ainda rastreia, só sem atribuição de grupo.
+            }
+          }
+          const { data: resp, error: errG } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+            body: {
+              ...commonBody,
+              titulo: tituloFinal,
+              mensagem: msgForGroup,
+              group_jids: [jid],
+            },
+          });
+          if (errG) throw errG;
+          if (!respFirst) respFirst = resp;
+          sentCount++;
+        }
+        toast.success(`📤 Disparo iniciado em ${sentCount} grupo(s) com rastreamento individual.`);
       } else {
-        toast.success("📤 Disparo iniciado! Acompanhe o progresso abaixo.");
+        const { data: resp, error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
+          body: {
+            ...commonBody,
+            titulo: tituloFinal,
+            mensagem: mensagem.trim(),
+            group_jids: tipoDisparo === "grupos" ? selectedGroupJids : undefined,
+          },
+        });
+        if (error) throw error;
+        respFirst = resp;
+        if ((resp as any)?.queued) {
+          toast.success("📥 Adicionado à fila! Será enviado assim que o disparo atual terminar.");
+        } else {
+          toast.success("📤 Disparo iniciado! Acompanhe o progresso abaixo.");
+        }
       }
+
       setTitulo("");
       setMensagem("");
       setCtaConfig(DEFAULT_CTA_CONFIG);
@@ -1630,6 +1697,23 @@ export default function Disparos() {
 
           <div className="space-y-2">
             <Label>Mensagem</Label>
+            {(() => {
+              const trackedIdsInMsg = Array.from(mensagem.matchAll(/\/missao\/([0-9a-f-]{36})/gi)).map(m => m[1]);
+              if (trackedIdsInMsg.length === 0) return null;
+              return (
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5 text-xs text-primary flex items-start gap-2">
+                  <Radar className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium">🎯 Rastreamento ativo — {trackedIdsInMsg.length} link{trackedIdsInMsg.length > 1 ? "s" : ""} de missão substituído{trackedIdsInMsg.length > 1 ? "s" : ""} pela página intermediária.</p>
+                    {tipoDisparo === "grupos" && selectedGroupJids.length > 0 ? (
+                      <p className="text-primary/80 mt-0.5">Cada grupo receberá um código único, então o relatório mostra quantos cliques vieram de cada grupo. Veja em <strong>Missões IA → Missões Ativas → 📊</strong>.</p>
+                    ) : (
+                      <p className="text-primary/80 mt-0.5">Cliques e participantes identificados aparecem no relatório da missão em <strong>Missões IA → Missões Ativas → 📊</strong>.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
             <MessageEditor
               value={mensagem}
               onChange={setMensagem}
