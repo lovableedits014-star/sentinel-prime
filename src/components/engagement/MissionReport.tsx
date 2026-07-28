@@ -165,6 +165,43 @@ export default function MissionReport({ missionId, onClose }: Props) {
       .sort((a, b) => b.open - a.open);
   }, [realEvents, distMap]);
 
+  // ── CSV export ──
+  function toCsv(rows: (string | number)[][]): string {
+    return rows.map(r => r.map(cell => {
+      const s = String(cell ?? "");
+      return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    }).join(";")).join("\n");
+  }
+  function downloadCsv(filename: string, csv: string) {
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  const handleExportCsv = () => {
+    const rows: (string | number)[][] = [
+      ["Nome", "Telefone", "Grupos", "Aberturas", "Clique Facebook", "Clique Instagram", "Clique Avulso", "Concluiu", "Primeiro registro", "Último registro"],
+    ];
+    for (const r of byParticipant) {
+      rows.push([
+        r.nome, r.phone, r.groups.join(" | "),
+        r.open, r.click_facebook, r.click_instagram, r.click_avulso,
+        r.declared_done > 0 ? "Sim" : "Não",
+        r.first, r.last,
+      ]);
+    }
+    rows.push([]);
+    rows.push(["--- Por grupo ---"]);
+    rows.push(["Grupo", "Únicos", "Aberturas", "Facebook", "Instagram", "Avulso", "Concluíram"]);
+    for (const g of byGroup) {
+      rows.push([g.name, g.participants, g.open, g.click_facebook, g.click_instagram, g.click_avulso, g.declared_done]);
+    }
+    const safeTitle = (mission?.title || "missao").replace(/[^\w\-]+/g, "_").slice(0, 40);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`relatorio_${safeTitle}_${stamp}.csv`, toCsv(rows));
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -179,6 +216,26 @@ export default function MissionReport({ missionId, onClose }: Props) {
           <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
         ) : (
           <div className="space-y-4">
+            {/* Filtros + export */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Período:</span>
+                <Select value={period} onValueChange={(v: any) => setPeriod(v)}>
+                  <SelectTrigger className="h-8 w-[140px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Últimos 7 dias</SelectItem>
+                    <SelectItem value="30">Últimos 30 dias</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={handleExportCsv} disabled={realEvents.length === 0}>
+                <Download className="w-3.5 h-3.5" /> Exportar CSV
+              </Button>
+            </div>
+
             {/* Stat cards */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
               <StatCard icon={<Eye className="w-4 h-4" />} label="Aberturas" value={stats.open} />
