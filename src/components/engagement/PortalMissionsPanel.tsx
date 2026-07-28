@@ -820,12 +820,14 @@ function MissionCard({
   onEdit,
   onDelete,
   onToggle,
+  onReport,
   inactive = false,
 }: {
   mission: Mission;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: () => void;
+  onReport?: () => void;
   inactive?: boolean;
 }) {
   return (
