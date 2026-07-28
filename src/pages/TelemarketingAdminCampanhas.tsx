@@ -40,12 +40,15 @@ export default function TelemarketingAdminCampanhas() {
   const { clientId, isLoading: ctxLoading, needsClientSelection } = useActiveClientId();
   const [campanhas, setCampanhas] = useState<Campanha[]>([]);
   const [contatos, setContatos] = useState<ContatoAvulso[]>([]);
+  const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
   const [loading, setLoading] = useState(false);
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [csv, setCsv] = useState("");
   const [importingTo, setImportingTo] = useState<string>("");
   const [importing, setImporting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [atribuindo, setAtribuindo] = useState<Campanha | null>(null);
 
   // Script edit dialog
   const [editing, setEditing] = useState<Campanha | null>(null);
