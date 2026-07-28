@@ -1,63 +1,90 @@
-## Diagnóstico (verificado)
 
-Testei `HEAD` nos dois links da última campanha:
+## Objetivo
 
-- `https://f504a57a-…lovableproject.com/missao/<id>` → **302 → `lovable.dev/auth-bridge?…`**
-- `https://id-preview--…lovable.app/missao/<id>` → **302 → `lovable.dev/auth-bridge?…`**
+Refinar 3 pontos do fluxo público de Missões:
 
-Ou seja: os links de missão apontam para o **preview do Lovable, que é bloqueado por auth**. Qualquer pessoa que recebe no WhatsApp cai na tela de login do Lovable — daí a percepção de "link inválido" e, dependendo do fluxo do auth-bridge, o navegador acaba caindo em outra rota pública (ex.: `/g/<slug>` da galeria) ou numa tela genérica.
+1. **Login único por cliente** — a pessoa se identifica UMA vez e vale para todas as missões daquele candidato (hoje precisa se cadastrar de novo a cada missão).
+2. **Dashboard separado** — mover o relatório para uma aba independente ("Relatórios de Missões") em Central WhatsApp, que sobrevive à exclusão/troca da missão.
+3. **Atribuição de grupo confiável** — garantir que o grupo do WhatsApp de onde a pessoa veio seja sempre identificado no relatório.
 
-Causa raiz:
-1. `handleUseMissions` / `handleSend` em `src/pages/Disparos.tsx` montam a URL com `window.location.origin`, que hoje é o preview.
-2. `project_urls` confirma que este projeto **ainda não está publicado**, então não existe domínio público para servir a rota `/missao/:missionId`.
-3. Só as rotas `/api/public/*` do TanStack Start ficam livres de auth. A página `/missao/:missionId` mora em `src/App.tsx` (SPA React Router) — portanto herda o gate do preview.
+---
 
-## O que vamos fazer (mínimo para destravar)
+## 1. Login único por cliente (não por missão)
 
-### Passo 1 — Publicar o projeto (ação sua)
-É o único caminho que expõe `<slug>.lovable.app` publicamente e faz `/missao/:missionId` responder sem auth-bridge. Vou lembrar disso na UI (passo 3) e no botão de "Usar missões".
+### Frontend (`src/pages/MissaoPublica.tsx`)
+- Trocar a chave do localStorage de `sm_missao_token_<missionId>` para `sm_client_token_<clientId>`.
+- Buscar `clientId` no primeiro `GET /config` (já retornado no payload).
+- Ao carregar a página, tentar o token do cliente; se válido, pular o formulário.
 
-### Passo 2 — Base URL pública configurável por cliente
-Adicionar um campo `public_base_url` em `clients` (fallback opcional para casos com domínio próprio). Regra de escolha da URL usada nos disparos, em ordem:
+### Backend (RPC `public_mission_identify` e `public_mission_config`)
+- `mission_visitor_tokens` passa a ter escopo por **cliente** (não por missão): adicionar `client_id uuid` e índice único `(client_id, phone_e164)`.
+- Na função identify: `UPSERT` por `(client_id, phone_e164)` — reutiliza o token e o participante existente entre missões do mesmo cliente.
+- `mission_participants` também precisa ser desacoplado da missão: renomear/refatorar para `client_participants` (id, client_id, nome, phone_e164, first_seen_at). Manter tabela antiga como view/compat ou migrar dados existentes.
+- `mission_events` mantém FK para o participante (agora global do cliente) — todos os eventos existentes continuam funcionando.
 
-1. `client.public_base_url` (se preenchido e https)
-2. URL publicada do projeto (`<slug>.lovable.app`) quando detectada
-3. `window.location.origin` (fallback com aviso)
+### Migração de dados
+- Copiar `mission_participants` distintos por (client_id, phone) para a nova tabela unificada.
+- Atualizar `mission_events.participant_id` para o id unificado.
 
-Ajustar:
-- `src/pages/Disparos.tsx` → `handleUseMissions` e o bloco de split por grupo em `handleSend` passam a usar `resolvePublicBaseUrl(client)` em vez de `window.location.origin`.
-- Novo helper `src/lib/public-base-url.ts` centraliza a lógica.
+---
 
-### Passo 3 — Aviso visível quando a base é preview
-Na aba **Missões IA** e no editor de mensagem em **Disparos**, mostrar um alerta amarelo quando a base resolvida ainda for `*.lovableproject.com` / `id-preview--*.lovable.app`, com texto claro: "Publique o projeto ou configure a URL pública para que os destinatários consigam abrir o link." Bloquear o botão "Usar missões" nesse estado (com tooltip explicativo) para não gerar mais campanha com link quebrado.
+## 2. Dashboard separado (persistente)
 
-### Passo 4 — Campo de configuração
-Em `Settings` (card do cliente), adicionar input "URL pública" com validação https e teste "Abrir" que faz `HEAD` e mostra status. Persiste em `clients.public_base_url`.
+### Nova aba "Relatórios" em Central WhatsApp
+- Adicionar tab ao lado de "Missões do Portal" e "Disparos".
+- Lista TODAS as missões (ativas + arquivadas + excluídas) com: título, status, período, aberturas únicas, cliques, concluíram, grupos.
+- Botões: "Abrir relatório detalhado" (reusa `MissionReport`), "Exportar CSV consolidado".
 
-### Passo 5 — Higiene de meta e fallback
-- `MissaoPublica.tsx`: garantir `<title>` e `og:*` próprios (aparece bonito na prévia do WhatsApp quando publicado).
-- Se `code=invalid` chegar via query, mostrar mensagem amigável "Este link expirou ou foi digitado errado" em vez de deixar o estado padrão.
+### Preservar dados históricos
+- Adicionar coluna `archived_at` em `portal_missions` e trocar exclusão "hard" pelo arquivamento (soft delete). O botão de excluir passa a arquivar.
+- Adicionar em `mission_events` snapshot do `mission_title` no momento do evento (coluna `mission_title_snapshot`) — assim mesmo que a missão suma, o histórico permanece legível.
+- Trigger em `mission_events` para preencher o snapshot automaticamente no insert.
 
-## Fora de escopo
-- Não vou mexer no fluxo de rastreamento em si (`/api/public/m/...` continua igual — já é público).
-- Não vou trocar a rota `/missao/:missionId` para TanStack Start; o gate é do preview, não da rota — publicar resolve.
+### Visão consolidada por participante
+- Nova sub-aba "Pessoas" no dashboard: lista todos os `client_participants` do cliente com quantas missões abriu/concluiu, último acesso, grupos.
+- Ajuda a gerenciar a base independentemente da missão vigente.
+
+---
+
+## 3. Atribuição de grupo confiável
+
+**Sintoma:** ao entrar por um grupo específico o relatório não mostrou o grupo de origem.
+
+**Causas possíveis identificadas:**
+- Em `src/pages/Disparos.tsx` a substituição do link só acontece quando a string `${origin}/missao/${id}` bate exatamente. Se o texto tem outra base (ex.: URL pública configurada diferente do origin atual) ou variantes com `https://`/sem `https://`, a substituição falha e o destinatário recebe o link direto `/missao/<id>` sem `?d=<code>`.
+- Se o link chegar sem `d=`, o servidor não sabe de qual grupo veio — nenhum evento carrega `distribution_id`.
+
+**Correções:**
+1. **Substituição robusta no Disparos**: normalizar o texto — trocar QUALQUER ocorrência de `/missao/<uuid>` (regex, independente de origin/protocolo) pelo short link `/api/public/m/<uuid>/d/<code>` do grupo em questão.
+2. **Fallback server-side**: quando a página `/missao/<id>` é aberta sem `?d=`, tentar recuperar a última `distribution` daquele participante (por telefone reconhecido) ou marcar como "origem desconhecida" explicitamente no relatório em vez de silenciosamente perder.
+3. **Stamp permanente no participante**: no identify, gravar `mission_participants.first_distribution_id` (já existe) e propagar para eventos futuros da mesma sessão via token (RPC event lê `distribution_id` do token se o request não trouxer `code`).
+4. **Log de diagnóstico**: em `mission_events`, se `distribution_id IS NULL` mas o token tem distribuição associada, preencher automaticamente.
+
+---
 
 ## Detalhes técnicos
 
-- Migration:
-  ```sql
-  alter table public.clients
-    add column if not exists public_base_url text;
-  ```
-  Sem grants/policies adicionais — já lidos pelo mesmo perfil autenticado.
+**Migração (uma só):**
+- `ALTER TABLE mission_visitor_tokens ADD COLUMN client_id uuid`; backfill; índice único `(client_id, phone_e164)`.
+- Criar `client_participants` (ou renomear `mission_participants` e remover `mission_id`).
+- `ALTER TABLE portal_missions ADD COLUMN archived_at timestamptz`.
+- `ALTER TABLE mission_events ADD COLUMN mission_title_snapshot text`; trigger `BEFORE INSERT` que copia `portal_missions.title`.
+- Reescrever RPCs `public_mission_config`, `public_mission_identify`, `public_mission_event`, `public_mission_switch` para o novo escopo por cliente.
 
-- `resolvePublicBaseUrl(client)`:
-  - Normaliza (remove barra final, força https).
-  - Detecta preview por regex `/(lovableproject\.com|id-preview--.*\.lovable\.app)$/i` → sinaliza `isPreview: true`.
-  - Retorna `{ url, isPreview }`.
+**Frontend:**
+- `MissaoPublica.tsx` — nova chave localStorage + fluxo de reconhecimento por cliente.
+- `Disparos.tsx` — regex robusta para substituir links + garantir short link sempre.
+- Novo componente `MissionsDashboard.tsx` (aba em Central WhatsApp) — lista consolidada + drill-down.
+- Ajustar botão excluir de `PortalMissionsPanel.tsx` para arquivar em vez de deletar.
 
-- Onde já usamos hoje `window.location.origin` (grep confirma dois pontos): `handleUseMissions` e o bloco `shouldSplitForGroupTracking` em `handleSend`. Ambos passam a chamar o helper.
+**Compatibilidade:**
+- Tokens antigos (`sm_missao_token_*`) ficam órfãos no localStorage — inofensivo; opcionalmente fazer cleanup no primeiro carregamento.
+- Participantes já existentes são migrados via UPSERT por `(client_id, phone)`.
 
-## Riscos
-- Se o usuário configurar uma URL pública errada, os links quebram silenciosamente. Mitigação: teste "Abrir" no Settings + aviso quando `HEAD` retornar 3xx para `auth-bridge`.
-- Publicar troca o domínio; disparos antigos que já saíram continuam apontando para preview. Não há como consertar mensagens já entregues — só as próximas.
+---
+
+## Não incluído
+
+- Não mexer no motor de disparo (spintax/cadence/sticky routing).
+- Não mudar visual das páginas existentes além da nova aba.
+- Não alterar edge functions de WhatsApp.
