@@ -737,6 +737,11 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Mission report */}
+      {reportMissionId && (
+        <MissionReport missionId={reportMissionId} onClose={() => setReportMissionId(null)} />
+      )}
     </div>
   );
 }
