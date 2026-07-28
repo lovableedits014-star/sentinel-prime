@@ -1630,6 +1630,23 @@ export default function Disparos() {
 
           <div className="space-y-2">
             <Label>Mensagem</Label>
+            {(() => {
+              const trackedIdsInMsg = Array.from(mensagem.matchAll(/\/missao\/([0-9a-f-]{36})/gi)).map(m => m[1]);
+              if (trackedIdsInMsg.length === 0) return null;
+              return (
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5 text-xs text-primary flex items-start gap-2">
+                  <Radar className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium">🎯 Rastreamento ativo — {trackedIdsInMsg.length} link{trackedIdsInMsg.length > 1 ? "s" : ""} de missão substituído{trackedIdsInMsg.length > 1 ? "s" : ""} pela página intermediária.</p>
+                    {tipoDisparo === "grupos" && selectedGroupJids.length > 0 ? (
+                      <p className="text-primary/80 mt-0.5">Cada grupo receberá um código único, então o relatório mostra quantos cliques vieram de cada grupo. Veja em <strong>Missões IA → Missões Ativas → 📊</strong>.</p>
+                    ) : (
+                      <p className="text-primary/80 mt-0.5">Cliques e participantes identificados aparecem no relatório da missão em <strong>Missões IA → Missões Ativas → 📊</strong>.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
             <MessageEditor
               value={mensagem}
               onChange={setMensagem}
