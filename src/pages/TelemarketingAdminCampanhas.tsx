@@ -267,6 +267,9 @@ export default function TelemarketingAdminCampanhas() {
                         <p className="text-[11px] text-muted-foreground mt-0.5">{ligados}/{total} contatos ligados</p>
                       </div>
                       <div className="flex gap-1 shrink-0">
+                        <Button size="sm" variant="outline" onClick={() => setAtribuindo(c)} title="Designar contatos a operadores">
+                          <UserCog className="w-3.5 h-3.5" />
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => openEdit(c)} title="Editar script & tags">
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
