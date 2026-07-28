@@ -242,6 +242,12 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
         description: null,
         display_order: baseOrder + idx,
         is_active: true,
+        tracking_enabled: bulkTracking,
+        // Preencher automaticamente o link da própria plataforma quando rastreamento está ligado
+        link_facebook: bulkTracking && item.platform === "facebook" ? item.post_url : null,
+        link_instagram: bulkTracking && item.platform === "instagram" ? item.post_url : null,
+        link_avulso: bulkTracking ? (bulkLinkAvulso.trim() || null) : null,
+        instructions: bulkTracking ? (bulkInstructions.trim() || null) : null,
       }));
 
       const { error } = await (supabase as any).from("portal_missions").insert(payloads);
