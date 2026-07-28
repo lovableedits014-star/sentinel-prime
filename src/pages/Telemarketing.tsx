@@ -142,7 +142,7 @@ export default function Telemarketing() {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: campanhaIdParam || null,
+      _campanha_id: selectedCampanhaId,
     });
     if (rpcErr) {
       toast.error("Erro ao carregar contatos: " + rpcErr.message);
@@ -199,7 +199,7 @@ export default function Telemarketing() {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: campanhaIdParam || null,
+      _campanha_id: selectedCampanhaId,
       _ttl_seconds: 300,
     });
     const res = pick as { found: boolean; tabela?: string; contato_id?: string } | null;
@@ -241,7 +241,7 @@ export default function Telemarketing() {
       _client_id: clientId,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: campanhaIdParam || null,
+      _campanha_id: selectedCampanhaId,
     });
     const lista: ContatoTele[] = ((rpcRows as any[]) || [])
       .map((r) => ({
@@ -276,7 +276,7 @@ export default function Telemarketing() {
       _client_id: clientId,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: campanhaIdParam || null,
+      _campanha_id: selectedCampanhaId,
       _ttl_seconds: 300,
     });
     if (error) { toast.error("Erro: " + error.message); return; }
