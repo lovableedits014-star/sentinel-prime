@@ -97,7 +97,13 @@ export default function MissionReport({ missionId, onClose }: Props) {
   const partMap = useMemo(() => new Map(participants.map((p) => [p.id, p])), [participants]);
   const distMap = useMemo(() => new Map(distributions.map((d) => [d.id, d])), [distributions]);
 
-  const realEvents = useMemo(() => events.filter((e) => !e.is_bot), [events]);
+  const realEvents = useMemo(() => {
+    const all = events.filter((e) => !e.is_bot);
+    if (period === "all") return all;
+    const days = period === "7" ? 7 : 30;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return all.filter((e) => new Date(e.created_at).getTime() >= cutoff);
+  }, [events, period]);
 
   const stats = useMemo(() => {
     const s = { open: 0, click_facebook: 0, click_instagram: 0, click_avulso: 0, declared_done: 0 };
