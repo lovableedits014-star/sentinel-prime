@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createClient } from "@supabase/supabase-js";
 
 // POST /api/public/missao/event
-// body: { missionId, code?, token?, type: 'click_facebook'|'click_instagram'|'click_avulso'|'declared_done'|'open' }
-// Registra evento. Se o token for válido, associa ao participante.
+// Registra evento via RPC SECURITY DEFINER (public_mission_event).
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +27,22 @@ function detectDevice(ua: string | null): string {
   return "other";
 }
 
+function makeClient() {
+  const url = process.env.SUPABASE_URL!;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY!;
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, storage: undefined as any },
+    global: {
+      fetch: (input, init) => {
+        const h = new Headers(init?.headers);
+        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
+        h.set("apikey", key);
+        return fetch(input as any, { ...init, headers: h });
+      },
+    },
+  });
+}
+
 export const Route = createFileRoute("/api/public/missao/event")({
   server: {
     handlers: {
@@ -43,62 +59,23 @@ export const Route = createFileRoute("/api/public/missao/event")({
             return Response.json({ error: "Dados inválidos" }, { status: 400, headers: corsHeaders });
           }
 
-          const mod = await import("@/integrations/supabase/client.server"); const supabaseAdmin = mod.supabaseAdmin as any;
-
-          const { data: mission } = await supabaseAdmin
-            .from("portal_missions")
-            .select("id, client_id")
-            .eq("id", missionId)
-            .maybeSingle();
-          if (!mission) {
-            return Response.json({ error: "Missão não encontrada" }, { status: 404, headers: corsHeaders });
-          }
-
-          let distId: string | null = null;
-          if (code && code !== "invalid") {
-            const { data: dist } = await supabaseAdmin
-              .from("mission_distributions")
-              .select("id")
-              .eq("short_code", code)
-              .eq("mission_id", missionId)
-              .maybeSingle();
-            distId = dist?.id ?? null;
-          }
-
-          let participantId: string | null = null;
-          if (token) {
-            const { data: tok } = await supabaseAdmin
-              .from("mission_visitor_tokens")
-              .select("participant_id, client_id, revoked_at")
-              .eq("token", token)
-              .maybeSingle();
-            if (tok && !tok.revoked_at && tok.client_id === mission.client_id) {
-              participantId = tok.participant_id;
-              await supabaseAdmin
-                .from("mission_visitor_tokens")
-                .update({ last_used_at: new Date().toISOString() })
-                .eq("token", token);
-              await supabaseAdmin
-                .from("mission_participants")
-                .update({ last_seen_at: new Date().toISOString() })
-                .eq("id", participantId);
-            }
-          }
-
           const ua = request.headers.get("user-agent");
-          const isBot = detectBot(ua);
-
-          await supabaseAdmin.from("mission_events").insert({
-            mission_id: missionId,
-            distribution_id: distId,
-            participant_id: participantId,
-            client_id: mission.client_id,
-            event_type: type,
-            user_agent: ua,
-            device_category: detectDevice(ua),
-            is_bot: isBot,
+          const sb = makeClient();
+          const { data, error } = await sb.rpc("public_mission_event", {
+            p_mission_id: missionId,
+            p_code: code || null,
+            p_token: token || null,
+            p_type: type,
+            p_user_agent: ua,
+            p_device: detectDevice(ua),
+            p_is_bot: detectBot(ua),
           });
-
+          if (error) return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
+          const payload: any = data || {};
+          if (payload.error) {
+            const status = payload.error === "Missão não encontrada" ? 404 : 400;
+            return Response.json({ error: payload.error }, { status, headers: corsHeaders });
+          }
           return Response.json({ ok: true }, { headers: corsHeaders });
         } catch (e: any) {
           return Response.json({ error: e?.message || "Erro" }, { status: 500, headers: corsHeaders });
