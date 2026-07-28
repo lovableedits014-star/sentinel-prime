@@ -1672,12 +1672,22 @@ export default function Disparos() {
             </div>
           )}
           <div className="flex flex-wrap gap-2">
-            {activeMissions.length > 0 && (
-              <Button variant="outline" size="sm" className="gap-2 border-primary/30 text-primary hover:bg-primary/5" onClick={handleUseMissions}>
-                <Target className="h-4 w-4" />
-                Preencher com Missões Ativas ({activeMissions.length})
-              </Button>
-            )}
+            {activeMissions.length > 0 && (() => {
+              const anyTracked = activeMissions.some((m: any) => m.tracking_enabled);
+              const blocked = anyTracked && publicBase.isPreview;
+              return (
+                <Button
+                  variant="outline" size="sm"
+                  className="gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={handleUseMissions}
+                  disabled={blocked}
+                  title={blocked ? "Configure a URL pública do cliente ou publique o projeto para usar missões rastreadas." : undefined}
+                >
+                  <Target className="h-4 w-4" />
+                  Preencher com Missões Ativas ({activeMissions.length})
+                </Button>
+              );
+            })()}
             {clientId && (
               <Button
                 variant="outline"
