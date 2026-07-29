@@ -68,10 +68,38 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Remover este operador?")) return;
-    await supabase.from("telemarketing_operadores").delete().eq("id", id);
+    if (!confirm("Remover este operador? Se ele tiver contatos designados, você poderá reatribuí-los na próxima etapa.")) return;
+    // Verifica se há contatos designados
+    const { count } = await supabase
+      .from("telemarketing_contatos_avulsos")
+      .select("id", { count: "exact", head: true })
+      .eq("assigned_operador_id", id);
+    if ((count || 0) > 0) {
+      const reassign = confirm(`Este operador tem ${count} contato(s) designado(s). Clique em OK para redistribuir automaticamente entre os operadores ativos restantes, ou Cancelar para liberar (deixar sem operador designado).`);
+      if (reassign) {
+        const ativos = operadores.filter(o => o.ativo && o.id !== id).map(o => o.id);
+        if (ativos.length === 0) {
+          toast.error("Nenhum outro operador ativo. Ative um operador antes de remover este.");
+          return;
+        }
+        const { error: rerr } = await supabase.rpc("tele_reassign_from_operador" as any, {
+          _client_id: clientId, _from_operador_id: id, _to_operador_ids: ativos,
+        });
+        if (rerr) { toast.error("Erro ao redistribuir: " + rerr.message); return; }
+        toast.success("Contatos redistribuídos");
+      } else {
+        // Libera (assigned_operador_id = null)
+        await supabase.from("telemarketing_contatos_avulsos")
+          .update({ assigned_operador_id: null } as any)
+          .eq("assigned_operador_id", id);
+      }
+    }
+    const { error } = await supabase.from("telemarketing_operadores").delete().eq("id", id);
+    if (error) { toast.error("Erro ao remover: " + error.message); return; }
+    toast.success("Operador removido");
     fetchOps();
   };
+
 
   const copyLink = () => {
     navigator.clipboard.writeText(teleUrl);
