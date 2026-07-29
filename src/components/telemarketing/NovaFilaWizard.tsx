@@ -248,7 +248,13 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
       _filtros: filtros,
       _csv_rows: [],
     });
-    if (error) { setBusy(false); toast.error(error.message); return; }
+    if (error) {
+      setBusy(false);
+      toast.error("Não foi possível criar a fila.", {
+        description: error.message || "Tente novamente; se persistir, me chame com o print.",
+      });
+      return;
+    }
     const campanhaId = (data as any)?.campanha_id;
     let total = Number((data as any)?.total || 0);
 
