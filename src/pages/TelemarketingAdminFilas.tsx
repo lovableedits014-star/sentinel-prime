@@ -178,9 +178,24 @@ export default function TelemarketingAdminFilas() {
                       <Progress value={pct} className="h-1.5" />
                     </div>
 
+                    {(countsMap[f.campanha_id]?.length ?? 0) > 0 && (
+                      <div className="flex flex-wrap gap-1 text-[10px]">
+                        {countsMap[f.campanha_id].map(oc => (
+                          <span key={oc.operador_id || "livre"} className="border rounded px-1.5 py-0.5 bg-muted/40">
+                            <Users className="w-2.5 h-2.5 inline-block mr-0.5 -mt-0.5" />
+                            <strong>{oc.operador_nome}</strong>: {oc.pendentes} pend
+                            {oc.ligados > 0 && ` · ${oc.ligados} ok`}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex gap-2 flex-wrap pt-1">
                       <Button size="sm" variant="default" onClick={() => abrirComoTeste(f.campanha_id)}>
                         <FlaskConical className="w-3.5 h-3.5 mr-1" /> Testar fila
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAtribDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
+                        <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
                       <Button size="sm" variant="outline" asChild>
                         <a href={linkOperador(f.campanha_id)} target="_blank" rel="noopener noreferrer">
@@ -191,6 +206,7 @@ export default function TelemarketingAdminFilas() {
                         <Copy className="w-3.5 h-3.5 mr-1" /> Copiar link
                       </Button>
                     </div>
+
                   </CardContent>
                 </Card>
               );
