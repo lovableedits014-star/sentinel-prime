@@ -1,73 +1,73 @@
-# Refino do Telemarketing — import de listas, atribuição e multi-campanha
 
-Hoje o sistema já tem campanhas, mailing avulso e link do operador por fila. Falta 3 coisas: **subir arquivo de verdade** (XLSX/CSV com mapeamento de colunas), **designar contatos a operadores específicos** e o **operador enxergar/alternar entre várias campanhas** no portal dele. Nada do envio existente é quebrado.
+# Plano — Telemarketing: listas, designação e WhatsApp
 
-## O que muda para o usuário
+Objetivo: deixar a criação de fila com upload real de Excel, dividir contatos por operador sem repetição, permitir redistribuir quando alguém sai, e trocar o botão de ligar para abrir conversa no WhatsApp.
 
-### 1. Importar lista externa (arquivo)
-Dentro de **Telemarketing → Campanhas** (e no wizard "Nova fila"), substitui o "cole CSV" por um botão **"Importar arquivo"** que:
-- aceita `.xlsx`, `.xls`, `.csv` (mesmo motor do `ConverterListaExternaDialog`);
-- detecta colunas automaticamente e deixa mapear (Nome*, Telefone*, Cidade, Bairro, TAG opcional);
-- mostra preview + quantos válidos/ignorados antes de confirmar;
-- vincula a lista importada a **uma campanha** (nova ou existente), então cada campanha continua sendo "uma lista de ligação" independente;
-- o "colar CSV" continua funcionando como atalho, mas fica secundário.
+O que já existe hoje (aproveitar):
+- `ImportContatosAvulsosDialog.tsx` já lê `.xlsx/.xls/.csv` com mapeamento de colunas.
+- Coluna `telemarketing_contatos_avulsos.assigned_operador_id` e RPCs `tele_assign_contatos`, `tele_distribute_contatos` (round-robin), `tele_release_contatos`, `tele_admin_listar_avulsos`.
+- Fila de admin em `TelemarketingAdminFilas.tsx` e portal do operador em `Telemarketing.tsx`.
 
-### 2. Designar contatos por operador
-Nova aba **"Designações"** na Campanha:
-- Lista os contatos daquela campanha com filtros (pendentes, ligados, cidade/bairro, sem operador designado).
-- Ações em lote: selecionar N contatos → **"Atribuir a…"** operador X, ou **"Distribuir igualmente"** entre operadores marcados (round-robin server-side).
-- Botão **"Liberar"** volta o contato pro pool livre (sem dono).
-- Cada operador vê no card da campanha "X pendentes atribuídos a mim / Y no pool livre".
+---
 
-Regra de acesso na fila do operador:
-- Se o contato tem `assigned_operador_id`, só aquele operador puxa.
-- Se está sem dono, qualquer operador da campanha pode puxar (mantém compatível com o comportamento atual).
-- Nada trava chamadas em andamento — a designação só afeta quem consegue reservar o próximo.
+## 1. Upload de Excel no fluxo da fila (fim da confusão)
 
-### 3. Operador com várias campanhas
-Ao logar em `/telemarketing/:clientId`, se o link não trouxer `?campanha=...`, o operador cai numa **tela de seleção de campanha** listando só as campanhas com contatos disponíveis pra ele (atribuídos + livres). Cada card mostra: nome da campanha, pendentes meus, pendentes no pool, próximo contato. Ele escolhe e entra na fila daquela campanha. Botão "Trocar de campanha" fica sempre visível no header.
+- No `NovaFilaWizard`, na origem **CSV / colar lista**, renomear para **"Lista externa (Excel/CSV)"** e substituir o `<Textarea>` por um uploader idêntico ao `ImportContatosAvulsosDialog` (arraste ou clique, aceita `.xlsx/.xls/.csv`, mapeamento de colunas Nome/Telefone/Cidade/Bairro, contagem de válidos/inválidos). Manter "colar texto" como *fallback* recolhível ("Prefiro colar").
+- Adicionar no passo 3 um seletor opcional **"Designar contatos a…"** com três modos:
+  - *Pool livre* (todos os operadores da fila podem pegar) — comportamento atual.
+  - *Um operador específico* (dropdown).
+  - *Dividir igualmente entre operadores selecionados* (multi-check) — usa `tele_distribute_contatos` após criar a fila.
+- Na tela de filas (`TelemarketingAdminFilas.tsx`), em cada card mostrar contagem por operador (ex: "Ana 120 · Bruno 118 · Livre 30") e botão **"Gerenciar designações"** que abre o `AtribuicoesDialog` já pronto.
 
-Isso permite um mesmo operador atender várias campanhas com o mesmo login, sem precisar de link diferente pra cada uma (o link direto continua funcionando quando o admin quer forçar).
+## 2. Anti-duplicidade e divisão justa
 
-### 4. Ajustes menores
-- Card da campanha na tela de admin mostra: total, pendentes livres, pendentes atribuídos, operadores com trabalho pendente.
-- Log de designação (quem atribuiu, quando, quantos) num painel simples de auditoria por campanha.
-- Ao remover um operador, os contatos dele voltam automaticamente pro pool livre.
+- **Deduplicar na importação**: no `tele_import_contato_avulso_batch`, antes de inserir, comparar `telefone` normalizado (só dígitos, com DDI 55) contra:
+  1. contatos já existentes na mesma campanha → ignorar,
+  2. contatos existentes em outras campanhas do mesmo cliente → retornar contador "já existe em outra fila" e permitir importar mesmo assim (checkbox "Ignorar duplicados globais", padrão ligado).
+- Retornar `{inserted, skipped_same_campaign, skipped_other_campaign}` e mostrar no toast.
+- **Trava por operador**: quando `assigned_operador_id` está preenchido, o `tele_proximo_contato` já filtra; garantir que a trava de 5 min (`telemarketing_call_assignments`) mais o `assigned_operador_id` impedem duas pessoas de pegar o mesmo registro. Adicionar índice `(client_id, campanha_id, assigned_operador_id, ligacao_status)` para performance.
+- **Divisão justa**: criar RPC `tele_redistribute_campanha(_campanha_id, _operador_ids[], _only_pending bool)` que:
+  1. libera (`assigned_operador_id = NULL`) os pendentes dos operadores atuais fora da lista nova,
+  2. redistribui pendentes em round-robin entre os operadores da lista,
+  3. preserva contatos já ligados (não mexe em quem `ligacao_status IS NOT NULL`).
+- **Saída de operador**: no `TelemarketingAdminOperadores`, ao **desativar** ou **remover** um operador, disparar um diálogo "Este operador tinha X contatos pendentes. Redistribuir entre: [checkboxes de operadores ativos]" chamando o RPC acima. Sem redistribuição, os contatos voltam ao pool livre automaticamente.
 
-## Detalhes técnicos
+## 3. Ligação via WhatsApp
 
-**Migração (schema):**
-- `telemarketing_contatos_avulsos`: nova coluna `assigned_operador_id uuid NULL` (FK → `telemarketing_operadores.id ON DELETE SET NULL`) + índice `(client_id, campanha_id, assigned_operador_id, ligacao_status)`.
-- Nova tabela `telemarketing_assignment_log(id, client_id, campanha_id, operador_id, contatos_count, criado_por, criado_em)` com RLS por `client_id` + `has_role`, GRANTs padrão.
-- Trigger `AFTER DELETE` em `telemarketing_operadores` limpando `assigned_operador_id` dos contatos daquele operador (backup do ON DELETE SET NULL para o caso de deletes via RPC).
+- No portal do operador (`Telemarketing.tsx`), o bloco atual `<a href="tel:...">` vira dois botões lado a lado:
+  - **Abrir WhatsApp** (padrão, verde) → `https://wa.me/<E.164 sem +>?text=<template opcional da campanha>`. Usa `normalizeBRPhone` de `src/lib/phone-utils.ts` (já existe).
+  - **Ligar (telefone)** (secundário) → mantém `tel:` para quem prefere.
+- Nas campanhas, adicionar campo `whatsapp_template` (texto opcional com placeholders `{{nome}}`, `{{operador}}`) usado como mensagem inicial pré-preenchida. Guardar em `telemarketing_campanhas.whatsapp_template TEXT NULL` e expor no wizard passo 4 (junto com o script).
+- Ao clicar em "Abrir WhatsApp", já registrar automaticamente um `heartbeat` (contato em atendimento) — sem gravar resultado. O operador ainda precisa marcar Atendeu/Não atendeu/Recusou/Reagendar.
 
-**RPCs novas (SECURITY DEFINER, checam papel admin do client via `has_role`):**
-- `tele_assign_contatos(_client_id, _campanha_id, _contato_ids uuid[], _operador_id uuid)` — atualiza em lote, registra log.
-- `tele_distribute_contatos(_client_id, _campanha_id, _contato_ids uuid[], _operador_ids uuid[])` — round-robin server-side entre operadores dados.
-- `tele_release_contatos(_client_id, _campanha_id, _contato_ids uuid[])` — zera `assigned_operador_id`.
-- `tele_operador_campanhas(_operador_id)` — retorna campanhas ativas do client com counts (pendentes_meus, pendentes_livres, total) para a tela de seleção.
-- `tele_import_contato_avulso_batch` (existente) ganha aceitação de `_assigned_operador_id` opcional pra já atribuir na hora do import.
+## 4. Detalhes técnicos
 
-**RPCs alteradas:**
-- Função que serve o "próximo contato" da fila (a que usa `telemarketing_call_assignments`) passa a filtrar `assigned_operador_id IS NULL OR assigned_operador_id = _operador_id`.
-- `tele_fila_summary` devolve também `atribuidos` e `livres` além de pendentes.
+```text
+Migração SQL
+├── ALTER telemarketing_campanhas ADD COLUMN whatsapp_template TEXT
+├── CREATE INDEX idx_tele_avulsos_assigned ON telemarketing_contatos_avulsos
+│     (client_id, campanha_id, assigned_operador_id, ligacao_status)
+├── REPLACE FUNCTION tele_import_contato_avulso_batch (retornar skipped counts + dedup)
+└── CREATE FUNCTION tele_redistribute_campanha(_campanha, _op_ids[], _only_pending)
 
-**Frontend:**
-- Novo `ImportContatosAvulsosDialog.tsx` reaproveitando parser XLSX/CSV do `ConverterListaExternaDialog` (só a leitura + mapeamento; grava via RPC de import existente).
-- `TelemarketingAdminCampanhas.tsx`: aba "Designações" com tabela + seleção múltipla + menu "Atribuir/Distribuir/Liberar" (usa shadcn `DataTable`-like já disponível no projeto).
-- `NovaFilaWizard.tsx`: passo CSV vira "Importar arquivo" (mesmo componente) com fallback pra colar texto.
-- `Telemarketing.tsx` (portal do operador): quando não há `?campanha=` no link, renderiza `CampanhaPickerScreen` (nova) que chama `tele_operador_campanhas`. Botão "Trocar de campanha" no header preserva sessão do operador (localStorage do nome/senha atual já existe).
-- `TelemarketingSettingsCard.tsx`: ao deletar operador, mostra aviso "X contatos designados vão voltar pro pool" (backend já cuida disso).
+Frontend
+├── NovaFilaWizard.tsx        → uploader Excel + designação inicial
+├── TelemarketingAdminFilas   → contagem por operador + botão "Gerenciar designações"
+├── AtribuicoesDialog         → botão "Redistribuir" chamando novo RPC
+├── TelemarketingAdminOperadores → prompt de redistribuição ao desativar/remover
+└── Telemarketing.tsx         → botão WhatsApp (wa.me) com template resolvido
+```
 
-**Compatibilidade:**
-- Contatos existentes ficam com `assigned_operador_id = NULL` → aparecem como pool livre pra todos os operadores da campanha (comportamento atual).
-- Link direto `/telemarketing/:clientId?campanha=...` continua entrando direto na campanha, sem picker.
-- Nada muda no fluxo de ligar/registrar resultado.
+## Riscos e mitigação
 
-## Passos de implementação
-1. Migração (schema + RPCs + índice + trigger).
-2. Dialog de import por arquivo + integração no `TelemarketingAdminCampanhas` e no wizard.
-3. Aba "Designações" com atribuir/distribuir/liberar + card resumido com counts.
-4. Picker de campanha no portal do operador + botão "Trocar de campanha".
-5. Ajuste do "próximo contato" pra respeitar `assigned_operador_id`.
-6. Smoke test manual: importa XLSX → distribui entre 2 operadores → cada operador loga, vê só o que é dele + pool livre → confirma que operador sem atribuição ainda pega do pool.
+- **Excel com telefone como número** (ex: `6.7999e10`): já tratado pelo `raw:false` no `xlsx.sheet_to_json` + `onlyDigits`; garantir teste com célula numérica.
+- **wa.me exige número sem `+` e com DDI**: usar `normalizeBRPhone` (já retorna `5567…`).
+- **Redistribuição durante ligação em andamento**: só mexer em contatos sem `locked_until` futuro; contatos travados são pulados e reprocessados no próximo ciclo.
+- **Dedup entre campanhas**: usuário pode querer o mesmo contato em duas filas (ex: 1ª e 2ª rodada); por isso o skip global vira opção, não obrigação.
+- **Volume alto de contatos numa distribuição**: o RPC roda em lote com `UPDATE … FROM (SELECT … row_number() % N)`, sem loop app-side.
+
+## Fora deste plano
+
+- Discador automático / integração com PABX.
+- Templates de WhatsApp com mídia (só texto agora).
+- Relatório de reciprocidade das mensagens de WhatsApp (isso vive no módulo de disparos).
