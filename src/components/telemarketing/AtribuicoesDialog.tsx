@@ -193,7 +193,11 @@ export default function AtribuicoesDialog({
               {operadores.map(o => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Button size="sm" variant="outline" onClick={redistribuirFila} disabled={busy}>
+            <Shuffle className="w-3.5 h-3.5 mr-1" />Redistribuir fila
+          </Button>
         </div>
+
 
         {selected.size > 0 && !modoDistribuicao && (
           <div className="flex gap-2 flex-wrap items-center bg-primary/5 border rounded-md p-2">
