@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,7 +11,7 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
-import { createBrowserHistory, type BrowserHistory } from "history";
+import { createBrowserHistory } from "history";
 import DashboardLayout from "./components/DashboardLayout";
 import RequireRole from "./components/RequireRole";
 import RouteErrorBoundary from "./components/RouteErrorBoundary";
@@ -184,13 +184,7 @@ const RoutesWithBoundary = () => {
 };
 
 const AppRouter = () => {
-  const [history, setHistory] = useState<BrowserHistory | null>(null);
-
-  useEffect(() => {
-    setHistory(createBrowserHistory({ window }));
-  }, []);
-
-  if (!history) return <PageFallback />;
+  const history = useMemo(() => createBrowserHistory({ window }), []);
 
   return (
     <HistoryRouter history={history as any} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

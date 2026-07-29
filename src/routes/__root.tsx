@@ -1,8 +1,9 @@
 import { ClientOnly, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import App from "@/App";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+
+const App = lazy(() => import("@/App"));
 
 function NotFoundComponent() {
   return (
@@ -73,7 +74,9 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   return (
     <ClientOnly fallback={<div />}>
-      <App />
+      <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Carregando…</div>}>
+        <App />
+      </Suspense>
     </ClientOnly>
   );
 }
