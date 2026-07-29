@@ -133,6 +133,26 @@ export default function AtribuicoesDialog({
     load();
   };
 
+  const redistribuirFila = async () => {
+    const ativos = operadores.filter(o => o.ativo !== false);
+    if (ativos.length < 1) { toast.error("Cadastre operadores ativos antes de redistribuir"); return; }
+    const escolhidos = opsSelecionados.size > 0
+      ? Array.from(opsSelecionados)
+      : ativos.map(o => o.id);
+    if (!confirm(`Redistribuir todos os contatos pendentes desta fila entre ${escolhidos.length} operador(es)? Contatos já ligados não são afetados.`)) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("tele_redistribute_campanha" as any, {
+      _client_id: clientId, _campanha_id: campanhaId,
+      _operador_ids: escolhidos, _only_pending: true,
+    });
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${(data as any)?.updated ?? 0} contatos redistribuídos entre ${(data as any)?.operadores ?? escolhidos.length} operadores`);
+    onChanged?.();
+    load();
+  };
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col">
