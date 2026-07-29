@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks } from "lucide-react";
+import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,10 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
 import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
+import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
+
+interface OpCount { operador_id: string | null; operador_nome: string; pendentes: number; ligados: number }
+
 
 interface FilaResumo {
   campanha_id: string;
@@ -28,21 +32,46 @@ export default function TelemarketingAdminFilas() {
   const [filas, setFilas] = useState<FilaResumo[]>([]);
   const [loading, setLoading] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [countsMap, setCountsMap] = useState<Record<string, OpCount[]>>({});
+  const [atribDialog, setAtribDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
+  const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
+
 
   const load = async () => {
     if (!clientId) return;
     setLoading(true);
     const { data, error } = await supabase.rpc("tele_fila_summary" as any, { _client_id: clientId });
-    setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setFilas(((data as any[]) || []).map(r => ({
+    if (error) { setLoading(false); toast.error(error.message); return; }
+    const list = ((data as any[]) || []).map(r => ({
       campanha_id: r.campanha_id, nome: r.nome, descricao: r.descricao, ativo: r.ativo,
       created_at: r.created_at, total: Number(r.total || 0), ligados: Number(r.ligados || 0),
       pendentes: Number(r.pendentes || 0), confirmados: Number(r.confirmados || 0),
-    })));
+    }));
+    setFilas(list);
+    // Carrega contagem por operador em cada fila
+    const map: Record<string, OpCount[]> = {};
+    await Promise.all(list.map(async (f) => {
+      const { data: rows } = await supabase.rpc("tele_operador_counts_por_campanha" as any, {
+        _client_id: clientId, _campanha_id: f.campanha_id,
+      });
+      map[f.campanha_id] = ((rows as any[]) || []).map(x => ({
+        operador_id: x.operador_id, operador_nome: x.operador_nome,
+        pendentes: Number(x.pendentes || 0), ligados: Number(x.ligados || 0),
+      }));
+    }));
+    setCountsMap(map);
+    setLoading(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
+  const loadOperadores = async () => {
+    if (!clientId) return;
+    const { data } = await supabase.from("telemarketing_operadores")
+      .select("id, nome, ativo").eq("client_id", clientId).order("nome");
+    setOperadores(((data as any[]) || []).map(o => ({ id: o.id, nome: o.nome, ativo: !!o.ativo })));
+  };
+
+  useEffect(() => { load(); loadOperadores(); /* eslint-disable-next-line */ }, [clientId]);
+
 
   const linkOperador = (campanhaId: string) =>
     `${window.location.origin}/telemarketing/${clientId}?campanha=${campanhaId}`;
@@ -149,9 +178,24 @@ export default function TelemarketingAdminFilas() {
                       <Progress value={pct} className="h-1.5" />
                     </div>
 
+                    {(countsMap[f.campanha_id]?.length ?? 0) > 0 && (
+                      <div className="flex flex-wrap gap-1 text-[10px]">
+                        {countsMap[f.campanha_id].map(oc => (
+                          <span key={oc.operador_id || "livre"} className="border rounded px-1.5 py-0.5 bg-muted/40">
+                            <Users className="w-2.5 h-2.5 inline-block mr-0.5 -mt-0.5" />
+                            <strong>{oc.operador_nome}</strong>: {oc.pendentes} pend
+                            {oc.ligados > 0 && ` · ${oc.ligados} ok`}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex gap-2 flex-wrap pt-1">
                       <Button size="sm" variant="default" onClick={() => abrirComoTeste(f.campanha_id)}>
                         <FlaskConical className="w-3.5 h-3.5 mr-1" /> Testar fila
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAtribDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
+                        <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
                       <Button size="sm" variant="outline" asChild>
                         <a href={linkOperador(f.campanha_id)} target="_blank" rel="noopener noreferrer">
@@ -162,6 +206,7 @@ export default function TelemarketingAdminFilas() {
                         <Copy className="w-3.5 h-3.5 mr-1" /> Copiar link
                       </Button>
                     </div>
+
                   </CardContent>
                 </Card>
               );
@@ -178,6 +223,19 @@ export default function TelemarketingAdminFilas() {
           onCreated={() => load()}
         />
       )}
+
+      {clientId && atribDialog.open && (
+        <AtribuicoesDialog
+          open={atribDialog.open}
+          onOpenChange={(o) => setAtribDialog(s => ({ ...s, open: o }))}
+          clientId={clientId}
+          campanhaId={atribDialog.campanhaId}
+          campanhaNome={atribDialog.nome}
+          operadores={operadores}
+          onChanged={() => load()}
+        />
+      )}
     </div>
   );
 }
+

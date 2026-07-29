@@ -47,8 +47,10 @@ export default function ImportContatosAvulsosDialog({
   const [colBairro, setColBairro] = useState(NONE);
   const [campanhaId, setCampanhaId] = useState<string>(defaultCampanhaId || "");
   const [operadorId, setOperadorId] = useState<string>(NONE);
+  const [skipGlobalDupes, setSkipGlobalDupes] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+
 
   useEffect(() => {
     if (open) {
@@ -137,13 +139,21 @@ export default function ImportContatosAvulsosDialog({
       _campanha_id: campanhaId,
       _rows: contatosValidos as any,
       _assigned_operador_id: operadorId !== NONE ? operadorId : null,
+      _skip_global_dupes: skipGlobalDupes,
     });
     setImporting(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(`${(data as any)?.inserted ?? 0} contatos importados`);
+    const r = (data as any) || {};
+    const parts: string[] = [];
+    if (r.skipped_same_campaign) parts.push(`${r.skipped_same_campaign} já estavam nesta fila`);
+    if (r.skipped_other_campaign) parts.push(`${r.skipped_other_campaign} já em outra fila`);
+    toast.success(`${r.inserted ?? 0} contatos importados`, {
+      description: parts.length ? parts.join(" · ") : undefined,
+    });
     onImported();
     onClose();
   };
+
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -253,8 +263,21 @@ export default function ImportContatosAvulsosDialog({
                 </Select>
               </div>
             </div>
+
+            <label className="flex items-center gap-2 text-xs text-muted-foreground border rounded-md p-2">
+              <input
+                type="checkbox"
+                checked={skipGlobalDupes}
+                onChange={(e) => setSkipGlobalDupes(e.target.checked)}
+              />
+              <span>
+                <strong>Ignorar contatos que já estão em outra fila</strong> deste cliente
+                (recomendado para evitar ligações duplicadas por operadores diferentes).
+              </span>
+            </label>
           </div>
         )}
+
 
         <DialogFooter className="gap-2">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
