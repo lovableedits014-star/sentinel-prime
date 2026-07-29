@@ -39,7 +39,9 @@ interface CampanhaScript {
   script_intro: string | null;
   script_perguntas: string[] | null;
   tags_rapidas: string[] | null;
+  whatsapp_template?: string | null;
 }
+
 
 export default function Telemarketing() {
   const { clientId } = useParams<{ clientId: string }>();
