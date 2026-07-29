@@ -175,47 +175,13 @@ type CooldownCheck =
   | { allowed: false; remainingMs: number; reason: string; remainingAttempts?: number };
 
 function checkReconnectCooldown(
-  row: any,
-  kind: "create" | "reconnect",
+  _row: any,
+  _kind: "create" | "reconnect",
 ): CooldownCheck {
-  // Exceção segura: se a sessão está claramente morta ou nunca conectou,
-  // liberamos SEM cooldown para o usuário conseguir reagir. Isso cobre:
-  //  - status disconnected/offline/logged_out/banned (sessão real caiu)
-  //  - status connecting sem phone_number (nunca pareou de fato)
-  const status = String(row?.status || "").toLowerCase();
-  const hasPhone = Boolean(row?.phone_number);
-  const isDeadSession = isExplicitOfflineStatus(status);
-  const neverPaired = (status === "connecting" || status === "awaiting_qr" || status === "qr") && !hasPhone;
-  if (isDeadSession || neverPaired) return { allowed: true };
-
-  const now = Date.now();
-  const cooldownMs = kind === "create" ? CREATE_COOLDOWN_MS : RECONNECT_COOLDOWN_MS;
-  const lastAttempt = row?.last_reconnect_attempt_at
-    ? new Date(row.last_reconnect_attempt_at).getTime() : 0;
-  const sinceLastMs = now - lastAttempt;
-  if (lastAttempt > 0 && sinceLastMs < cooldownMs) {
-    const remainingMs = cooldownMs - sinceLastMs;
-    const remainingMin = Math.ceil(remainingMs / 60000);
-    return {
-      allowed: false,
-      remainingMs,
-      reason: `Aguarde ${remainingMin} min antes de ${kind === "create" ? "recriar" : "reconectar"} para não queimar o número.`,
-    };
-  }
-
-  const today = todayDateStr();
-  const sameDay = row?.reconnect_attempts_date === today;
-  const used = sameDay ? Number(row?.reconnect_attempts_today || 0) : 0;
-  if (used >= MAX_RECONNECTS_PER_DAY) {
-    return {
-      allowed: false,
-      remainingMs: 0,
-      reason: `Limite de ${MAX_RECONNECTS_PER_DAY} reconexões manuais por dia atingido. Aguarde 24h para não banir o número.`,
-      remainingAttempts: 0,
-    };
-  }
+  // Travas anti-ban DESATIVADAS a pedido do usuário: reconectar/recriar sempre liberado.
   return { allowed: true };
 }
+
 
 async function recordReconnectAttempt(adminClient: any, instanceId: string, row: any, kind: "create" | "reconnect") {
   const today = todayDateStr();
@@ -626,27 +592,12 @@ async function logDirectSend(adminClient: any, params: { instanceId: string; cli
 // WhatsApp. Limitamos a no máximo 1 auto-reconnect a cada 15 minutos por
 // instância. Reconexões manuais (action="reconnect" disparada pelo usuário) NÃO
 // passam por aqui — esta função é só para tentativas automáticas em send/health.
-const AUTO_RECONNECT_COOLDOWN_MS = 15 * 60 * 1000;
+const AUTO_RECONNECT_COOLDOWN_MS = 0; // desativado a pedido do usuário
 
 async function tryReconnectInstance(adminClient: any, inst: any) {
   if (!inst?.bridge_api_key) return { id: inst?.id, reconnected: false, reason: "missing_api_key" };
 
-  // Cooldown check: evita loop de reconnect que faz o WhatsApp banir o número.
-  const lastAttempt = inst.last_reconnect_attempt_at ? new Date(inst.last_reconnect_attempt_at).getTime() : 0;
-  const sinceLast = Date.now() - lastAttempt;
-  if (lastAttempt > 0 && sinceLast < AUTO_RECONNECT_COOLDOWN_MS) {
-    const waitMs = AUTO_RECONNECT_COOLDOWN_MS - sinceLast;
-    return {
-      id: inst.id,
-      reconnected: false,
-      reason: "cooldown",
-      status: inst.status || "disconnected",
-      ok: false,
-      details: {
-        error: `Reconexão automática em cooldown. Aguarde ${Math.ceil(waitMs / 60000)} min ou peça ao usuário para reconectar manualmente.`,
-      },
-    };
-  }
+
 
   // Marca a tentativa ANTES de chamar a bridge, para que falhas/timeouts também contem para o cooldown.
   await adminClient

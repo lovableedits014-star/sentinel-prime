@@ -1192,12 +1192,11 @@ Deno.serve(async (req) => {
       const maxInstancesForDispatch: number | null =
         typeof dispatchMaxInstances !== "undefined" && dispatchMaxInstances && dispatchMaxInstances > 0
           ? dispatchMaxInstances : null;
-      const effectiveCap = (inst: { ramp_up_stage?: string | null; stage_daily_cap?: number | null; daily_send_limit?: number | null }) => {
-        if (ignoreStageCap) return Number.POSITIVE_INFINITY;
-        if (inst.stage_daily_cap && inst.stage_daily_cap > 0) return inst.stage_daily_cap;
-        const stage = (inst.ramp_up_stage as string) || "maduro";
-        return STAGE_DEFAULT_CAP[stage] ?? (inst.daily_send_limit || 400);
+      const effectiveCap = (_inst: { ramp_up_stage?: string | null; stage_daily_cap?: number | null; daily_send_limit?: number | null }) => {
+        // Caps diários DESATIVADOS a pedido do usuário — sem limite por instância.
+        return Number.POSITIVE_INFINITY;
       };
+
       // Instâncias que atingiram o cap NESTE disparo — não são escolhidas de novo.
       const cappedInstances = new Set<string>();
       // Circuit breaker: contagem de falhas de rede/ponte consecutivas por instância.
