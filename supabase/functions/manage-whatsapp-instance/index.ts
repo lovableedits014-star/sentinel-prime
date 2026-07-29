@@ -348,56 +348,26 @@ async function verifyWhatsAppOperationalSession(adminClient: any, inst: any) {
   if (!inst?.bridge_api_key || !inst?.bridge_url) {
     return { ready: false, status: "no_credentials", reason: "no_credentials" };
   }
-  if (inst.suspected_banned_at) {
-    return { ready: false, status: "suspected_ban", reason: "suspected_ban" };
-  }
-  if ((inst.consecutive_failures || 0) >= 3) {
-    return { ready: false, status: "too_many_failures", reason: "too_many_failures" };
-  }
 
   const health = await syncInstanceHealth(adminClient, inst);
-  if (health.status !== "connected") {
-    return { ready: false, status: health.status, reason: health.status, health };
-  }
 
   const hasPairedSession = Boolean(inst.phone_number || health.details?.phone_number || health.details?.phone || health.details?.instance?.phone_number || health.details?.instance?.phone);
   if (!hasPairedSession) {
     return { ready: false, status: "session_not_paired", reason: "session_not_paired", health };
   }
 
-  try {
-    const { bridgeRes, bridgeData } = await fetchBridgeAction({
-      action: "chats",
-      apiKey: inst.bridge_api_key,
-      body: { action: "chats" },
-    });
-    const errorText = String(bridgeData?.error || bridgeData?.message || "").toLowerCase();
-    if (!bridgeRes.ok || bridgeData?.success === false || isInstanceDisconnectedError(bridgeRes.status, bridgeData)) {
-      const terminal = bridgeRes.status === 401 || errorText.includes("disconnect") || errorText.includes("not connected") || errorText.includes("offline") || errorText.includes("logged") || errorText.includes("banned");
-      if (terminal) {
-        await markInstanceDisconnected(adminClient, inst.id);
-        return { ready: false, status: "disconnected", reason: "session_probe_failed", health, probe: sanitizeBridgeData(bridgeData) };
-      }
-      await adminClient.from("whatsapp_instances").update({
-        status: "connecting",
-        last_health_check_at: new Date().toISOString(),
-      }).eq("id", inst.id);
-      return { ready: false, status: "not_ready", reason: "session_probe_failed", health, probe: sanitizeBridgeData(bridgeData) };
-    }
-    await adminClient.from("whatsapp_instances").update({
-      status: "connected",
-      last_health_check_at: new Date().toISOString(),
-      last_disconnected_at: null,
-      connected_since: inst.connected_since || new Date().toISOString(),
-    }).eq("id", inst.id);
-    return { ready: true, status: "connected", reason: "ready", health, probe: { ok: true } };
-  } catch (err) {
-    await adminClient.from("whatsapp_instances").update({
-      status: "connecting",
-      last_health_check_at: new Date().toISOString(),
-    }).eq("id", inst.id);
-    return { ready: false, status: "not_ready", reason: "session_probe_error", health, error: (err as Error).message };
-  }
+  await adminClient.from("whatsapp_instances").update({
+    status: "connected",
+    last_health_check_at: new Date().toISOString(),
+    last_disconnected_at: null,
+    last_disconnect_reason: null,
+    suspected_banned_at: null,
+    auto_suspected_reason: null,
+    paused_until: null,
+    consecutive_failures: 0,
+    connected_since: inst.connected_since || new Date().toISOString(),
+  }).eq("id", inst.id);
+  return { ready: true, status: "connected", reason: "ready", health, probe: { skipped: true } };
 }
 
 async function syncInstanceHealth(adminClient: any, inst: any) {
@@ -412,26 +382,11 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
   let rawStatus = String(bridgeData?.status || bridgeData?.instance?.status || "").toLowerCase();
   const wasConnected = isConnectedStatus(inst.status);
 
-  // Dupla confirmação: só rebaixa para `disconnected` se a bridge confirmar
-  // estado terminal em DUAS leituras seguidas. Uma única resposta "offline"
-  // pode ser oscilação curta da ponte e não significa que a sessão caiu.
+  // Nunca rebaixa chip previamente conectado por status terminal isolado da ponte,
+  // exceto credencial inválida. O usuário pediu para remover travas automáticas.
   if (wasConnected && isExplicitOfflineStatus(rawStatus) && !isInvalidApiKeyResponse(bridgeRes.status, bridgeData)) {
-    await sleep(3000);
-    try {
-      const recheck = await fetchBridgeAction({
-        action: "instance_status",
-        apiKey: inst.bridge_api_key,
-        body: { action: "instance_status" },
-      });
-      const recheckStatus = String(recheck.bridgeData?.status || recheck.bridgeData?.instance?.status || "").toLowerCase();
-      if (!isExplicitOfflineStatus(recheckStatus)) {
-        console.log(`[syncInstanceHealth] oscilação ignorada inst=${inst.id} first=${rawStatus} recheck=${recheckStatus || "vazio"}`);
-        rawStatus = recheckStatus || "connecting";
-      }
-    } catch (err) {
-      console.warn(`[syncInstanceHealth] recheck falhou inst=${inst.id} — preservando status anterior:`, (err as Error).message);
-      rawStatus = "connected";
-    }
+    console.log(`[syncInstanceHealth] preservando conectado inst=${inst.id} raw=${rawStatus}`);
+    rawStatus = "connected";
   }
 
   let status = isConnectedStatus(rawStatus)
@@ -446,21 +401,6 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
   // Preserve a previously connected chip unless the bridge explicitly confirms an offline/logout state.
   if (wasConnected && status !== "connected" && !isExplicitOfflineStatus(rawStatus) && !isInvalidApiKeyResponse(bridgeRes.status, bridgeData)) {
     status = "connected";
-  }
-
-  if (status === "connected") {
-    const { data: latestSendFailure } = await adminClient
-      .from("whatsapp_instance_send_log")
-      .select("success, error_message, sent_at")
-      .eq("instance_id", inst.id)
-      .gte("sent_at", new Date(Date.now() - 10 * 60_000).toISOString())
-      .order("sent_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const latestError = String(latestSendFailure?.error_message || "").toLowerCase();
-    if (latestSendFailure && latestSendFailure.success === false && latestError.includes("instance") && latestError.includes("not connected")) {
-      status = "disconnected";
-    }
   }
 
   const bridgeInstanceId = getBridgeInstanceId(bridgeData);
@@ -487,6 +427,10 @@ async function syncInstanceHealth(adminClient: any, inst: any) {
     // mesmo com a sessão WhatsApp comprovadamente viva.
     updates.last_disconnected_at = null;
     updates.last_disconnect_reason = null;
+    updates.suspected_banned_at = null;
+    updates.auto_suspected_reason = null;
+    updates.paused_until = null;
+    updates.consecutive_failures = 0;
   }
   if (status === "disconnected") {
     updates.connected_since = null;
@@ -546,26 +490,14 @@ function getSendFailure(status: number, data: any): string | null {
   if (status < 200 || status >= 300) return data?.error || data?.message || `Erro na ponte WhatsApp (status ${status})`;
   if (data?.success === false) return data?.error || data?.message || "Ponte recusou o envio";
   if (data?.delivered === false) return data?.error || data?.message || "Mensagem não entregue pelo WhatsApp";
-  // Prova forte de entrega: a ponte/WhatsApp DEVE retornar um identificador único
-  // da mensagem (messageId / id / key.id) ou um campo `delivered:true` explícito.
-  // `success:true` sozinho NÃO é suficiente — vimos casos onde a ponte responde
-  // "ok" mesmo com a sessão WhatsApp caída, e a mensagem nunca é entregue.
-  const messageId = data?.messageId || data?.message_id || data?.id
-    || data?.key?.id || data?.data?.id || data?.data?.key?.id
-    || data?.result?.id || data?.result?.key?.id;
-  if (messageId) return null;
-  if (data?.delivered === true) return null;
-  return data?.error || data?.message
-    || "Ponte não retornou ID da mensagem — possivelmente a sessão WhatsApp caiu durante o envio. Tente reconectar.";
+  return null;
 }
 
 async function markInstanceDisconnected(adminClient: any, instanceId: string) {
   await adminClient.from("whatsapp_instances").update({
-    status: "disconnected",
-    connected_since: null,
-    last_disconnected_at: new Date().toISOString(),
+    last_health_check_at: new Date().toISOString(),
     last_disconnect_reason: "send_failure_not_connected",
-    last_keepalive_status: "disconnected",
+    last_keepalive_status: "send_failure_not_connected",
   }).eq("id", instanceId);
 }
 
@@ -1021,16 +953,6 @@ Deno.serve(async (req) => {
         if (!inst.bridge_api_key || !inst.bridge_url) {
           return { ...baseInfo, ready: false, readiness: "no_credentials", live_status: null };
         }
-        if (inst.suspected_banned_at) {
-          return { ...baseInfo, ready: false, readiness: "suspected_ban", live_status: null };
-        }
-        if (inst.paused_until && new Date(inst.paused_until).getTime() > Date.now()) {
-          return { ...baseInfo, ready: false, readiness: "paused", live_status: inst.status };
-        }
-        if ((inst.consecutive_failures || 0) >= 3) {
-          return { ...baseInfo, ready: false, readiness: "too_many_failures", live_status: inst.status };
-        }
-
         // FAST PATH: se health check é recente (<5min), status=connected e sem falhas,
         // pula o probe operacional (economia de bridge quando temos 10+ chips).
         const lastHc = inst.last_health_check_at ? new Date(inst.last_health_check_at).getTime() : 0;

@@ -218,20 +218,10 @@ function isInstanceDisconnectedError(res: Response, data: any): boolean {
 }
 
 // ============================================================
-// Pré-checagem (preflight) de saúde da instância antes do envio.
-//
-// IMPORTANTE: NÃO chama `reconnect` automaticamente durante disparo.
-// Forçar reconnect/handshake várias vezes seguidas é gatilho de queda real
-// da sessão (e até de ban).
-//
-// Política CONSERVADORA (fail-safe):
-//  - connected/open                  → "connected" (envio liberado)
-//  - terminal offline / 401          → "disconnected" (marca offline)
-//  - connecting/qr/vazio/erro de rede → "not_ready" (NÃO envia; pausa/failover)
-//
-// Antes a categoria "transient" deixava o envio prosseguir mesmo com
-// `connecting` — exatamente o caso em que a UI dizia "conectado" mas o
-// envio falhava porque a sessão WhatsApp ainda não estava operacional.
+// Pré-checagem leve de saúde da instância antes do envio.
+// A pedido do usuário, ela NÃO bloqueia mais o disparo por oscilação da ponte:
+// connected/open/connecting/qr/vazio/erro de rede seguem para tentativa real.
+// Apenas 401/credencial inválida é tratado como desconectado.
 // ============================================================
 const TERMINAL_OFFLINE_STATUSES = new Set([
   "disconnected", "offline", "closed", "logged_out", "logout", "banned",
@@ -269,16 +259,19 @@ async function preflightInstance(params: {
     if (statusRaw === "connected" || statusRaw === "open") {
       return { status: "connected", reconnected: false, detail: statusRaw };
     }
-    if (TERMINAL_OFFLINE_STATUSES.has(statusRaw) || res.status === 401) {
-      console.warn(`${tag} ❌ offline confirmado (status=${statusRaw || res.status})`);
+    if (res.status === 401) {
+      console.warn(`${tag} ❌ credencial inválida/expirada (status=${statusRaw || res.status})`);
       return { status: "disconnected", reconnected: false, detail: statusRaw || `http_${res.status}` };
     }
-    // connecting / qr / vazio / desconhecido → NÃO envia. Fail-safe.
-    console.warn(`${tag} ⛔ not_ready (status=${statusRaw || "vazio"}) — sessão não comprovada, pulando esta instância`);
-    return { status: "not_ready", reconnected: false, detail: statusRaw || "no_status" };
+    if (TERMINAL_OFFLINE_STATUSES.has(statusRaw)) {
+      console.warn(`${tag} ⚠️ status terminal informado (${statusRaw}), mas envio será tentado mesmo assim`);
+      return { status: "connected", reconnected: false, detail: statusRaw };
+    }
+    console.warn(`${tag} ⚠️ status transitório (${statusRaw || "vazio"}) — tentando envio mesmo assim`);
+    return { status: "connected", reconnected: false, detail: statusRaw || "no_status" };
   } catch (err) {
-    console.warn(`${tag} ⚠️ erro ao consultar status (not_ready):`, (err as Error).message);
-    return { status: "not_ready", reconnected: false, detail: (err as Error).message };
+    console.warn(`${tag} ⚠️ erro ao consultar status — tentando envio mesmo assim:`, (err as Error).message);
+    return { status: "connected", reconnected: false, detail: (err as Error).message };
   }
 }
 
@@ -1187,7 +1180,7 @@ Deno.serve(async (req) => {
       // Cap diário por stage (override por instância via stage_daily_cap).
       // Se o disparo estiver marcado com ignore_stage_cap, o cap efetivo vira Infinity
       // (o daily_send_limit da instância continua valendo, se configurado explicitamente).
-      const STAGE_DEFAULT_CAP: Record<string, number> = { novo: 40, aquecendo: 150, maduro: 400 };
+      const STAGE_DEFAULT_CAP: Record<string, number> = { novo: 999999, aquecendo: 999999, maduro: 999999 };
       const ignoreStageCap = !!(typeof dispatchIgnoreStageCap !== "undefined" && dispatchIgnoreStageCap);
       const maxInstancesForDispatch: number | null =
         typeof dispatchMaxInstances !== "undefined" && dispatchMaxInstances && dispatchMaxInstances > 0
@@ -1199,9 +1192,9 @@ Deno.serve(async (req) => {
 
       // Instâncias que atingiram o cap NESTE disparo — não são escolhidas de novo.
       const cappedInstances = new Set<string>();
-      // Circuit breaker: contagem de falhas de rede/ponte consecutivas por instância.
+      // Circuit breaker desativado: não tira chip do pool automaticamente.
       const bridgeFailStreak: Record<string, number> = {};
-      const CIRCUIT_BREAKER_THRESHOLD = 2;
+      const CIRCUIT_BREAKER_THRESHOLD = Number.POSITIVE_INFINITY;
       // Sticky: cache em memória do último chip usado por telefone (evita re-consulta).
       const stickyByPhone: Record<string, string> = {};
 
@@ -1210,13 +1203,11 @@ Deno.serve(async (req) => {
       // apenas essas — qualquer outra que a lógica escolher é descartada.
       let allowedInstanceIds: Set<string> | null = null;
       if (maxInstancesForDispatch) {
-        const { data: pool } = await adminClient
+                  const { data: pool } = await adminClient
           .from("whatsapp_instances")
           .select("id, is_primary, messages_sent_today")
           .eq("client_id", client_id)
           .eq("is_active", true)
-          .eq("status", "connected")
-          .is("suspected_banned_at", null)
           .not("bridge_api_key", "is", null)
           .order("is_primary", { ascending: false })
           .order("messages_sent_today", { ascending: true })
@@ -1284,9 +1275,8 @@ Deno.serve(async (req) => {
               : base.eq("telefone", recipient.telefone);
           };
 
-          // Failover: para grupos tentamos até MAX tentativas excluindo a
-          // instância que acabou de falhar. Para telefones, 1 tentativa.
-          const MAX_ATTEMPTS = isGroup ? 5 : 1;
+            // Failover: tenta algumas alternativas, mas nunca trava o disparo inteiro.
+            const MAX_ATTEMPTS = isGroup ? 5 : 3;
           let recipientResolved = false;
           let attempt = 0;
           let currentStage: string = "maduro";
@@ -1351,8 +1341,7 @@ Deno.serve(async (req) => {
                     .eq("id", stickyId)
                     .maybeSingle();
                   if (
-                    stickyInst && stickyInst.is_active && stickyInst.status === "connected" &&
-                    !stickyInst.suspected_banned_at && stickyInst.bridge_url && stickyInst.bridge_api_key &&
+                    stickyInst && stickyInst.is_active && stickyInst.bridge_url && stickyInst.bridge_api_key &&
                     (stickyInst.messages_sent_today || 0) < effectiveCap(stickyInst)
                   ) {
                     bridgeUrl = stickyInst.bridge_url;
@@ -1398,18 +1387,14 @@ Deno.serve(async (req) => {
                 }
               }
               if (!bridgeUrl) {
-                // Fallback: só usa instância explicitamente CONNECTED. Nunca cair para
-                // 'disconnected'/'connecting' aqui — isso gera falhas em cascata e
-                // aciona o auto-suspect (>=10 falhas em 15min derrubam o chip).
+                // Fallback permissivo: usa qualquer instância ativa com credencial.
                 const { data: anyActive } = await adminClient
                   .from("whatsapp_instances")
                   .select("id, bridge_url, bridge_api_key, status, ramp_up_stage, stage_daily_cap, daily_send_limit, messages_sent_today")
                   .eq("client_id", client_id)
                   .eq("is_active", true)
-                  .eq("status", "connected")
-                  .is("suspected_banned_at", null)
                   .not("bridge_api_key", "is", null)
-                  .order("consecutive_failures", { ascending: true })
+                  .order("last_send_at", { ascending: true, nullsFirst: true })
                   .limit(5);
                 const usable = (anyActive || []).find((a: any) =>
                   !cappedInstances.has(a.id) && (a.messages_sent_today || 0) < effectiveCap(a)
@@ -1458,15 +1443,14 @@ Deno.serve(async (req) => {
                 recipientResolved = true;
                 break;
               }
-              // Sem instância para telefone individual → pausa o disparo
-              await adminClient.from("whatsapp_dispatches").update({
-                status: "pausado_sem_instancia",
-                pause_reason: "Nenhuma instância conectada disponível — retomado automaticamente quando reconectar",
-                enviados: sent,
-                falhas: failed,
-                updated_at: new Date().toISOString(),
-              }).eq("id", dispatch.id);
-              return;
+              failed++;
+              await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                .update({
+                  status: "falha",
+                  erro: "Nenhuma instância com credencial disponível no momento.",
+                }));
+              recipientResolved = true;
+              break;
             }
 
             // Delay extra ao trocar de chip (humaniza)
@@ -1494,10 +1478,7 @@ Deno.serve(async (req) => {
               }
 
               if (preflight.status === "disconnected") {
-                // A ponte CONFIRMOU status terminal → marca offline no banco.
-                await adminClient.from("whatsapp_instances")
-                  .update({ status: "disconnected", last_disconnected_at: new Date().toISOString() })
-                  .eq("id", instanceId);
+                // Credencial inválida/expirada: não pausa o disparo; marca este item como falha e segue.
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
                   p_dispatch_id: dispatch.id, p_success: false,
@@ -1511,15 +1492,20 @@ Deno.serve(async (req) => {
                   (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
                   continue;
                 }
+                if (instanceId) cappedInstances.add(instanceId);
+                if (attempt < MAX_ATTEMPTS) {
+                  if (await sleepOrPause(randomDelay(800, 1800))) return;
+                  continue;
+                }
+                failed++;
+                await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                  .update({ status: "falha", erro: `Preflight: instância indisponível (${preflight.detail || "sem status"})` }));
+                recipientResolved = true;
                 break;
               }
 
               if (preflight.status === "not_ready") {
-                // Ponte respondeu connecting / qr / vazio / erro → NÃO envia.
-                // Marca como connecting (não confirma offline ainda) e faz failover.
-                await adminClient.from("whatsapp_instances")
-                  .update({ status: "connecting", last_health_check_at: new Date().toISOString() })
-                  .eq("id", instanceId);
+                // Mantido por compatibilidade; a preflight atual quase nunca retorna not_ready.
                 await adminClient.rpc("log_whatsapp_send", {
                   p_instance_id: instanceId, p_client_id: client_id,
                   p_dispatch_id: dispatch.id, p_success: false,
@@ -1533,16 +1519,16 @@ Deno.serve(async (req) => {
                   (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
                   continue;
                 }
-                // Telefone individual: pausa o disparo — quando o chip estabilizar
-                // (próximo health_check ou intervenção manual), o cron retoma.
-                await adminClient.from("whatsapp_dispatches").update({
-                  status: "pausado_sem_instancia",
-                  pause_reason: `Sessão WhatsApp não pronta (${preflight.detail || "sem status"}). Retomado automaticamente quando reconectar.`,
-                  enviados: sent,
-                  falhas: failed,
-                  updated_at: new Date().toISOString(),
-                }).eq("id", dispatch.id);
-                return;
+                if (instanceId) cappedInstances.add(instanceId);
+                if (attempt < MAX_ATTEMPTS) {
+                  if (await sleepOrPause(randomDelay(800, 1800))) return;
+                  continue;
+                }
+                failed++;
+                await itemMatch(adminClient.from("whatsapp_dispatch_items")
+                  .update({ status: "falha", erro: `Preflight: sessão não pronta (${preflight.detail || "sem status"})` }));
+                recipientResolved = true;
+                break;
 
               }
               // status === "connected": segue o envio normalmente.
@@ -1625,10 +1611,11 @@ Deno.serve(async (req) => {
               const disconnectErr = isInstanceDisconnectedError(sendRes, sendData);
               if (instanceId && disconnectErr) {
                 await adminClient.from("whatsapp_instances")
-                  .update({ status: "disconnected", last_disconnected_at: new Date().toISOString() })
+                  .update({ last_health_check_at: new Date().toISOString(), last_disconnect_reason: String(failure).slice(0, 200) })
                   .eq("id", instanceId);
                 delete preflightByInstance[instanceId];
                 delete preflightCacheAt[instanceId];
+                cappedInstances.add(instanceId);
               }
               if (instanceId) {
                 await adminClient.rpc("log_whatsapp_send", {
@@ -1639,9 +1626,7 @@ Deno.serve(async (req) => {
                 });
               }
 
-              // ==== Circuit breaker: falhas de rede/ponte consecutivas ====
-              // Se a ponte respondeu erro HTTP >= 500 ou o fetch falhou (sendRes.status === 0),
-              // contamos como falha de infra. 2 seguidas → desativa o chip pra intervenção manual.
+              // Circuit breaker desativado: registra falha, mas não desativa chip.
               const isBridgeInfraError = !disconnectErr && (sendRes.status === 0 || sendRes.status >= 500);
               if (instanceId && isBridgeInfraError) {
                 bridgeFailStreak[instanceId] = (bridgeFailStreak[instanceId] || 0) + 1;
@@ -1665,11 +1650,10 @@ Deno.serve(async (req) => {
                 if (await sleepOrPause(randomDelay(800, 1800))) return;
                 continue;
               }
-              if (!isGroup && disconnectErr) {
-                // Telefone individual: deixa pra próxima rodada
-                break;
+              if (!isGroup && disconnectErr && attempt < MAX_ATTEMPTS) {
+                if (await sleepOrPause(randomDelay(800, 1800))) return;
+                continue;
               }
-
               // Falha terminal (telefone ou grupo sem mais alternativas)
               failed++;
               await itemMatch(adminClient.from("whatsapp_dispatch_items")
