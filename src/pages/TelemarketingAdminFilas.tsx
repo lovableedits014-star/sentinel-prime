@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks } from "lucide-react";
+import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,10 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
 import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
+import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
+
+interface OpCount { operador_id: string | null; operador_nome: string; pendentes: number; ligados: number }
+
 
 interface FilaResumo {
   campanha_id: string;
