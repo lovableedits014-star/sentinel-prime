@@ -223,6 +223,19 @@ export default function TelemarketingAdminFilas() {
           onCreated={() => load()}
         />
       )}
+
+      {clientId && atribDialog.open && (
+        <AtribuicoesDialog
+          open={atribDialog.open}
+          onOpenChange={(o) => setAtribDialog(s => ({ ...s, open: o }))}
+          clientId={clientId}
+          campanhaId={atribDialog.campanhaId}
+          campanhaNome={atribDialog.nome}
+          operadores={operadores}
+          onChanged={() => load()}
+        />
+      )}
     </div>
   );
 }
+
