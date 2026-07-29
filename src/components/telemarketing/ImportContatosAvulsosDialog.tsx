@@ -47,8 +47,10 @@ export default function ImportContatosAvulsosDialog({
   const [colBairro, setColBairro] = useState(NONE);
   const [campanhaId, setCampanhaId] = useState<string>(defaultCampanhaId || "");
   const [operadorId, setOperadorId] = useState<string>(NONE);
+  const [skipGlobalDupes, setSkipGlobalDupes] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+
 
   useEffect(() => {
     if (open) {
