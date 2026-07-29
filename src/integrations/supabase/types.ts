@@ -10288,6 +10288,7 @@ export type Database = {
           script_intro: string
           script_perguntas: Json
           tags_rapidas: Json
+          whatsapp_template: string
         }[]
       }
       tele_list_contatos: {
