@@ -32,6 +32,10 @@ export default function TelemarketingAdminFilas() {
   const [filas, setFilas] = useState<FilaResumo[]>([]);
   const [loading, setLoading] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [countsMap, setCountsMap] = useState<Record<string, OpCount[]>>({});
+  const [atribDialog, setAtribDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
+  const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
+
 
   const load = async () => {
     if (!clientId) return;
