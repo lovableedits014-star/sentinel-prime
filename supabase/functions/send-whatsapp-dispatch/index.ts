@@ -1492,6 +1492,11 @@ Deno.serve(async (req) => {
                   (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
                   continue;
                 }
+                if (instanceId) cappedInstances.add(instanceId);
+                if (attempt < MAX_ATTEMPTS) {
+                  if (await sleepOrPause(randomDelay(800, 1800))) return;
+                  continue;
+                }
                 failed++;
                 await itemMatch(adminClient.from("whatsapp_dispatch_items")
                   .update({ status: "falha", erro: `Preflight: instância indisponível (${preflight.detail || "sem status"})` }));
@@ -1512,6 +1517,11 @@ Deno.serve(async (req) => {
                 delete (preflightCacheAt as any)[instanceId];
                 if (isGroup) {
                   (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
+                  continue;
+                }
+                if (instanceId) cappedInstances.add(instanceId);
+                if (attempt < MAX_ATTEMPTS) {
+                  if (await sleepOrPause(randomDelay(800, 1800))) return;
                   continue;
                 }
                 failed++;
@@ -1605,6 +1615,7 @@ Deno.serve(async (req) => {
                   .eq("id", instanceId);
                 delete preflightByInstance[instanceId];
                 delete preflightCacheAt[instanceId];
+                cappedInstances.add(instanceId);
               }
               if (instanceId) {
                 await adminClient.rpc("log_whatsapp_send", {
@@ -1636,6 +1647,10 @@ Deno.serve(async (req) => {
               if (isGroup && instanceId) {
                 // Failover dentro do mesmo grupo: exclui essa instância e tenta a próxima
                 (excludedByGroup[groupJid] ??= new Set()).add(instanceId);
+                if (await sleepOrPause(randomDelay(800, 1800))) return;
+                continue;
+              }
+              if (!isGroup && disconnectErr && attempt < MAX_ATTEMPTS) {
                 if (await sleepOrPause(randomDelay(800, 1800))) return;
                 continue;
               }
