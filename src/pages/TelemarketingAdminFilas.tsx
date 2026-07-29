@@ -41,16 +41,37 @@ export default function TelemarketingAdminFilas() {
     if (!clientId) return;
     setLoading(true);
     const { data, error } = await supabase.rpc("tele_fila_summary" as any, { _client_id: clientId });
-    setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setFilas(((data as any[]) || []).map(r => ({
+    if (error) { setLoading(false); toast.error(error.message); return; }
+    const list = ((data as any[]) || []).map(r => ({
       campanha_id: r.campanha_id, nome: r.nome, descricao: r.descricao, ativo: r.ativo,
       created_at: r.created_at, total: Number(r.total || 0), ligados: Number(r.ligados || 0),
       pendentes: Number(r.pendentes || 0), confirmados: Number(r.confirmados || 0),
-    })));
+    }));
+    setFilas(list);
+    // Carrega contagem por operador em cada fila
+    const map: Record<string, OpCount[]> = {};
+    await Promise.all(list.map(async (f) => {
+      const { data: rows } = await supabase.rpc("tele_operador_counts_por_campanha" as any, {
+        _client_id: clientId, _campanha_id: f.campanha_id,
+      });
+      map[f.campanha_id] = ((rows as any[]) || []).map(x => ({
+        operador_id: x.operador_id, operador_nome: x.operador_nome,
+        pendentes: Number(x.pendentes || 0), ligados: Number(x.ligados || 0),
+      }));
+    }));
+    setCountsMap(map);
+    setLoading(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
+  const loadOperadores = async () => {
+    if (!clientId) return;
+    const { data } = await supabase.from("telemarketing_operadores")
+      .select("id, nome, ativo").eq("client_id", clientId).order("nome");
+    setOperadores(((data as any[]) || []).map(o => ({ id: o.id, nome: o.nome, ativo: !!o.ativo })));
+  };
+
+  useEffect(() => { load(); loadOperadores(); /* eslint-disable-next-line */ }, [clientId]);
+
 
   const linkOperador = (campanhaId: string) =>
     `${window.location.origin}/telemarketing/${clientId}?campanha=${campanhaId}`;
