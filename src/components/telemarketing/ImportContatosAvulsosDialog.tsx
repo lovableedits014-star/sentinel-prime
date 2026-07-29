@@ -263,8 +263,21 @@ export default function ImportContatosAvulsosDialog({
                 </Select>
               </div>
             </div>
+
+            <label className="flex items-center gap-2 text-xs text-muted-foreground border rounded-md p-2">
+              <input
+                type="checkbox"
+                checked={skipGlobalDupes}
+                onChange={(e) => setSkipGlobalDupes(e.target.checked)}
+              />
+              <span>
+                <strong>Ignorar contatos que já estão em outra fila</strong> deste cliente
+                (recomendado para evitar ligações duplicadas por operadores diferentes).
+              </span>
+            </label>
           </div>
         )}
+
 
         <DialogFooter className="gap-2">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
