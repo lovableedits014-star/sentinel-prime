@@ -8087,6 +8087,7 @@ export type Database = {
           script_perguntas: Json
           tags_rapidas: Json
           updated_at: string
+          whatsapp_template: string | null
         }
         Insert: {
           ativo?: boolean
@@ -8100,6 +8101,7 @@ export type Database = {
           script_perguntas?: Json
           tags_rapidas?: Json
           updated_at?: string
+          whatsapp_template?: string | null
         }
         Update: {
           ativo?: boolean
@@ -8113,6 +8115,7 @@ export type Database = {
           script_perguntas?: Json
           tags_rapidas?: Json
           updated_at?: string
+          whatsapp_template?: string | null
         }
         Relationships: []
       }
@@ -10213,7 +10216,12 @@ export type Database = {
       }
       tele_import_contato_avulso_batch:
         | {
-            Args: { _campanha_id: string; _client_id: string; _rows: Json }
+            Args: {
+              _assigned_operador_id?: string
+              _campanha_id: string
+              _client_id: string
+              _rows: Json
+            }
             Returns: Json
           }
         | {
@@ -10222,6 +10230,7 @@ export type Database = {
               _campanha_id: string
               _client_id: string
               _rows: Json
+              _skip_global_dupes?: boolean
             }
             Returns: Json
           }
@@ -10331,6 +10340,15 @@ export type Database = {
           total_meus: number
         }[]
       }
+      tele_operador_counts_por_campanha: {
+        Args: { _campanha_id: string; _client_id: string }
+        Returns: {
+          ligados: number
+          operador_id: string
+          operador_nome: string
+          pendentes: number
+        }[]
+      }
       tele_operadores_ao_vivo: {
         Args: { _client_id: string }
         Returns: {
@@ -10413,6 +10431,23 @@ export type Database = {
           ultimo_status_ligacao: string
           vota_candidato: string
         }[]
+      }
+      tele_reassign_from_operador: {
+        Args: {
+          _client_id: string
+          _operador_id: string
+          _to_operador_ids?: string[]
+        }
+        Returns: Json
+      }
+      tele_redistribute_campanha: {
+        Args: {
+          _campanha_id: string
+          _client_id: string
+          _only_pending?: boolean
+          _operador_ids: string[]
+        }
+        Returns: Json
       }
       tele_registrar_ligacao: {
         Args: {
