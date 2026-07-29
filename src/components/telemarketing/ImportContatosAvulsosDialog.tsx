@@ -139,13 +139,21 @@ export default function ImportContatosAvulsosDialog({
       _campanha_id: campanhaId,
       _rows: contatosValidos as any,
       _assigned_operador_id: operadorId !== NONE ? operadorId : null,
+      _skip_global_dupes: skipGlobalDupes,
     });
     setImporting(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(`${(data as any)?.inserted ?? 0} contatos importados`);
+    const r = (data as any) || {};
+    const parts: string[] = [];
+    if (r.skipped_same_campaign) parts.push(`${r.skipped_same_campaign} já estavam nesta fila`);
+    if (r.skipped_other_campaign) parts.push(`${r.skipped_other_campaign} já em outra fila`);
+    toast.success(`${r.inserted ?? 0} contatos importados`, {
+      description: parts.length ? parts.join(" · ") : undefined,
+    });
     onImported();
     onClose();
   };
+
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
