@@ -8,5 +8,6 @@ export default defineConfig({
   nitro: false,
   tanstackStart: {
     target: "node-server",
+    server: { entry: "server" },
   },
 });
