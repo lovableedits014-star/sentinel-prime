@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -14,8 +14,11 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientId: string;
+  /** Nome pré-preenchido ao abrir (usado pelo cadastro de perfis do engajamento). */
+  initialNome?: string;
   onSuccess: () => void;
 }
+
 
 const TIPO_OPTIONS = [
   { value: "apoiador", label: "Apoiador" },
@@ -25,7 +28,7 @@ const TIPO_OPTIONS = [
   { value: "cabo", label: "Cabo Eleitoral" },
 ];
 
-export default function NovaPessoaDialog({ open, onOpenChange, clientId, onSuccess }: Props) {
+export default function NovaPessoaDialog({ open, onOpenChange, clientId, initialNome, onSuccess }: Props) {
   const [saving, setSaving] = useState(false);
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -40,6 +43,13 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, onSucce
     funcionarioId: string;
     funcionarioNome: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (open && initialNome) setNome(initialNome);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialNome]);
+
+
 
   function resetForm() {
     setNome(""); setEmail(""); setTelefone(""); setCpf("");

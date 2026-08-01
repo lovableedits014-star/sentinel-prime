@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { extractHandleFromUrl } from "@/lib/social-url";
 import NovaPessoaDialog from "@/components/pessoas/NovaPessoaDialog";
 import VincularAutorDialog from "./VincularAutorDialog";
+import CadastrarPerfilDialog from "./CadastrarPerfilDialog";
+
 
 type PerfilRow = {
   pessoa_id: string;
@@ -76,7 +78,10 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
   const [busca, setBusca] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [novaPessoa, setNovaPessoa] = useState(false);
+  const [novaPessoaNome, setNovaPessoaNome] = useState("");
+  const [cadastrarPerfil, setCadastrarPerfil] = useState(false);
   const [vincular, setVincular] = useState<{ id: string; nome: string } | null>(null);
+
 
   // edição inline do instagram
   const [editing, setEditing] = useState<string | null>(null);
@@ -185,10 +190,15 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                 <RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                 Atualizar
               </Button>
-              <Button size="sm" onClick={() => setNovaPessoa(true)}>
+              <Button size="sm" onClick={() => setCadastrarPerfil(true)}>
+                <Search className="mr-1 h-4 w-4" />
+                Cadastrar perfil
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setNovaPessoaNome(""); setNovaPessoa(true); }}>
                 <Plus className="mr-1 h-4 w-4" />
                 Adicionar pessoa
               </Button>
+
             </div>
           </div>
         </CardHeader>
@@ -406,15 +416,36 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
         </CardContent>
       </Card>
 
+      <CadastrarPerfilDialog
+        open={cadastrarPerfil}
+        onOpenChange={setCadastrarPerfil}
+        clientId={clientId}
+        pessoas={rows.map((r) => ({
+          pessoa_id: r.pessoa_id,
+          nome: r.nome,
+          tipo_pessoa: r.tipo_pessoa,
+          instagram_handle: r.instagram_handle,
+          facebook_key: r.facebook_key,
+          facebook_label: r.facebook_label,
+        }))}
+        onSaved={fetchData}
+        onCreatePessoa={(nome) => {
+          setNovaPessoaNome(nome);
+          setNovaPessoa(true);
+        }}
+      />
+
       <NovaPessoaDialog
         open={novaPessoa}
         onOpenChange={setNovaPessoa}
         clientId={clientId}
+        initialNome={novaPessoaNome}
         onSuccess={() => {
           setNovaPessoa(false);
           fetchData();
         }}
       />
+
 
       <VincularAutorDialog
         open={!!vincular}
