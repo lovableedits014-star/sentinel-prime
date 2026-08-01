@@ -190,10 +190,15 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                 <RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                 Atualizar
               </Button>
-              <Button size="sm" onClick={() => setNovaPessoa(true)}>
+              <Button size="sm" onClick={() => setCadastrarPerfil(true)}>
+                <Search className="mr-1 h-4 w-4" />
+                Cadastrar perfil
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setNovaPessoaNome(""); setNovaPessoa(true); }}>
                 <Plus className="mr-1 h-4 w-4" />
                 Adicionar pessoa
               </Button>
+
             </div>
           </div>
         </CardHeader>
