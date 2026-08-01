@@ -10,6 +10,24 @@ import { Facebook, Link2, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { norm, similarity } from "@/lib/engagement-match";
 
+export type UnlinkedAuthor = {
+  platform_user_id: string;
+  author_name: string | null;
+  author_profile_picture: string | null;
+  total_comments: number;
+  last_seen: string | null;
+};
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clientId: string;
+  /** Pessoa alvo do vínculo. */
+  pessoa: { id: string; nome: string } | null;
+  platform?: "facebook" | "instagram";
+  onLinked: () => void;
+}
+
 
 export default function VincularAutorDialog({
   open,
