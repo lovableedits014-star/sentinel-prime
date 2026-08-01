@@ -15,6 +15,7 @@ import {
   Settings,
   Users,
   AlertTriangle,
+  UserCog,
 } from "lucide-react";
 import InfluenciadoresTab from "@/components/engagement/InfluenciadoresTab";
 import PerfisTimeTab from "@/components/engagement/PerfisTimeTab";
