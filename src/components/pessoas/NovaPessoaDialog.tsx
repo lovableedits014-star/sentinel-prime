@@ -14,8 +14,11 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientId: string;
+  /** Nome pré-preenchido ao abrir (usado pelo cadastro de perfis do engajamento). */
+  initialNome?: string;
   onSuccess: () => void;
 }
+
 
 const TIPO_OPTIONS = [
   { value: "apoiador", label: "Apoiador" },
