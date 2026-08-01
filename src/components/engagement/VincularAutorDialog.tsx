@@ -8,42 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Facebook, Link2, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { norm, similarity } from "@/lib/engagement-match";
 
-export type UnlinkedAuthor = {
-  platform_user_id: string;
-  author_name: string | null;
-  author_profile_picture: string | null;
-  total_comments: number;
-  last_seen: string | null;
-};
-
-interface Props {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  clientId: string;
-  /** Pessoa alvo do vínculo. */
-  pessoa: { id: string; nome: string } | null;
-  platform?: "facebook" | "instagram";
-  onLinked: () => void;
-}
-
-const norm = (s: string | null | undefined) =>
-  (s || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9 ]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length >= 3)
-    .join(" ");
-
-function similarity(a: string, b: string): number {
-  const ta = norm(a).split(" ").filter(Boolean);
-  const tb = norm(b).split(" ").filter(Boolean);
-  if (ta.length === 0 || tb.length === 0) return 0;
-  const overlap = ta.filter((t) => tb.includes(t)).length;
-  return overlap / Math.max(ta.length, tb.length);
-}
 
 export default function VincularAutorDialog({
   open,
