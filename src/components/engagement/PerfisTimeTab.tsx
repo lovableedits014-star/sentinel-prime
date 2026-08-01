@@ -78,7 +78,10 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
   const [busca, setBusca] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [novaPessoa, setNovaPessoa] = useState(false);
+  const [novaPessoaNome, setNovaPessoaNome] = useState("");
+  const [cadastrarPerfil, setCadastrarPerfil] = useState(false);
   const [vincular, setVincular] = useState<{ id: string; nome: string } | null>(null);
+
 
   // edição inline do instagram
   const [editing, setEditing] = useState<string | null>(null);
