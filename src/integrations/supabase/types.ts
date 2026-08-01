@@ -9547,6 +9547,60 @@ export type Database = {
         Args: { _indicado_id: string; _token: string }
         Returns: Json
       }
+      engagement_ensure_pessoa_supporter: {
+        Args: { p_pessoa_id: string }
+        Returns: string
+      }
+      engagement_link_author: {
+        Args: {
+          p_author_name?: string
+          p_pessoa_id: string
+          p_picture?: string
+          p_platform: string
+          p_platform_user_id: string
+        }
+        Returns: Json
+      }
+      engagement_perfis_overview: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          facebook_comments: number
+          facebook_key: string
+          facebook_label: string
+          instagram_comments: number
+          instagram_handle: string
+          last_interaction: string
+          nome: string
+          other_actions: number
+          pessoa_id: string
+          supporter_id: string
+          telefone: string
+          tipo_pessoa: string
+        }[]
+      }
+      engagement_remove_social: {
+        Args: { p_pessoa_id: string; p_plataforma: string }
+        Returns: boolean
+      }
+      engagement_unlinked_authors: {
+        Args: { p_client_id: string; p_limit?: number; p_platform?: string }
+        Returns: {
+          author_name: string
+          author_profile_picture: string
+          last_seen: string
+          platform_user_id: string
+          total_comments: number
+        }[]
+      }
+      engagement_upsert_social: {
+        Args: {
+          p_pessoa_id: string
+          p_plataforma: string
+          p_url?: string
+          p_usuario: string
+        }
+        Returns: Json
+      }
       enqueue_whatsapp_retry: {
         Args: {
           p_client_id: string
