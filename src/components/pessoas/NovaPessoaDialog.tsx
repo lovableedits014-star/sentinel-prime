@@ -28,7 +28,7 @@ const TIPO_OPTIONS = [
   { value: "cabo", label: "Cabo Eleitoral" },
 ];
 
-export default function NovaPessoaDialog({ open, onOpenChange, clientId, onSuccess }: Props) {
+export default function NovaPessoaDialog({ open, onOpenChange, clientId, initialNome, onSuccess }: Props) {
   const [saving, setSaving] = useState(false);
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
