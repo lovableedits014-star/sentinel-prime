@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { extractHandleFromUrl } from "@/lib/social-url";
 import NovaPessoaDialog from "@/components/pessoas/NovaPessoaDialog";
 import VincularAutorDialog from "./VincularAutorDialog";
+import CadastrarPerfilDialog from "./CadastrarPerfilDialog";
+
 
 type PerfilRow = {
   pessoa_id: string;
