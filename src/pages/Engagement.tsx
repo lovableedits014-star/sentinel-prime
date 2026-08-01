@@ -15,8 +15,10 @@ import {
   Settings,
   Users,
   AlertTriangle,
+  UserCog,
 } from "lucide-react";
 import InfluenciadoresTab from "@/components/engagement/InfluenciadoresTab";
+import PerfisTimeTab from "@/components/engagement/PerfisTimeTab";
 
 type EngagementConfig = {
   id: string;
@@ -101,6 +103,10 @@ export default function Engagement() {
             <Users className="h-4 w-4" />
             Influenciadores
           </TabsTrigger>
+          <TabsTrigger value="time" className="text-xs sm:text-sm gap-1.5">
+            <UserCog className="h-4 w-4" />
+            Perfis do Time
+          </TabsTrigger>
           <TabsTrigger value="config" className="text-xs sm:text-sm gap-1.5">
             <Settings className="h-4 w-4" />
             Config
@@ -119,6 +125,19 @@ export default function Engagement() {
             </Card>
           )}
         </TabsContent>
+
+        <TabsContent value="time">
+          {client?.id ? (
+            <PerfisTimeTab clientId={client.id} />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Nenhum cliente vinculado a este usuário.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
 
         <TabsContent value="config">
           <Card>
