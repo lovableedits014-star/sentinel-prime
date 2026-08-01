@@ -416,15 +416,36 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
         </CardContent>
       </Card>
 
+      <CadastrarPerfilDialog
+        open={cadastrarPerfil}
+        onOpenChange={setCadastrarPerfil}
+        clientId={clientId}
+        pessoas={rows.map((r) => ({
+          pessoa_id: r.pessoa_id,
+          nome: r.nome,
+          tipo_pessoa: r.tipo_pessoa,
+          instagram_handle: r.instagram_handle,
+          facebook_key: r.facebook_key,
+          facebook_label: r.facebook_label,
+        }))}
+        onSaved={fetchData}
+        onCreatePessoa={(nome) => {
+          setNovaPessoaNome(nome);
+          setNovaPessoa(true);
+        }}
+      />
+
       <NovaPessoaDialog
         open={novaPessoa}
         onOpenChange={setNovaPessoa}
         clientId={clientId}
+        initialNome={novaPessoaNome}
         onSuccess={() => {
           setNovaPessoa(false);
           fetchData();
         }}
       />
+
 
       <VincularAutorDialog
         open={!!vincular}
