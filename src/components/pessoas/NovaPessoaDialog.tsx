@@ -44,6 +44,13 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
     funcionarioNome: string;
   } | null>(null);
 
+  useEffect(() => {
+    if (open && initialNome) setNome(initialNome);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialNome]);
+
+
+
   function resetForm() {
     setNome(""); setEmail(""); setTelefone(""); setCpf("");
     setCidade("Campo Grande"); setBairro(""); setTipo("apoiador");
