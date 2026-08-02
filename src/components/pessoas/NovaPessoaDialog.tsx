@@ -89,14 +89,21 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
       error = r.error;
     } else {
       // coordenador / lider / cabo → eleicao_pessoas
+      const cidadeFinal = cidade.trim() || "Campo Grande";
+      const escopo =
+        cidadeFinal.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === "campo grande"
+          ? "campo_grande"
+          : "interior";
       const r = await supabase.from("eleicao_pessoas" as any).insert({
         client_id: clientId,
         nome: nome.trim(),
         email: email.trim() || null,
-        telefone: telDigits || null,
-        cpf: cpfDigits || null,
-        cidade: cidade.trim() || "Campo Grande",
+        telefone: telDigits, // NOT NULL na tabela
+        cidade: cidadeFinal,
         bairro: bairro.trim() || null,
+        regiao: bairro.trim() || null,
+        endereco: bairro.trim() || cidadeFinal, // NOT NULL na tabela
+        escopo,
         tipo,
         funcionario_id: funcionarioId,
       } as any);
@@ -128,13 +135,21 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
     }
     const telDigits = onlyDigits(telefone);
 
-    // Para coordenador/líder/cabo: se telefone já é de funcionário, oferecer vínculo.
-    if (["coordenador", "lider", "cabo"].includes(tipo) && telDigits.length >= 10) {
+    // Para coordenador/líder/cabo: telefone é obrigatório na estrutura eleitoral.
+    if (["coordenador", "lider", "cabo"].includes(tipo)) {
+      if (telDigits.length < 10) {
+        toast.error("Telefone é obrigatório para coordenador, líder e cabo eleitoral.");
+        return;
+      }
       const func = await findFuncionarioByPhone(clientId, telDigits);
       if (func) {
         setLinkPrompt({ funcionarioId: func.id, funcionarioNome: func.nome });
         return;
       }
+    }
+    if (tipo === "funcionario" && telDigits.length < 10) {
+      toast.error("Telefone é obrigatório para funcionário.");
+      return;
     }
 
     await doInsert(null);
