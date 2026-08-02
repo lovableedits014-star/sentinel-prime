@@ -135,13 +135,21 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
     }
     const telDigits = onlyDigits(telefone);
 
-    // Para coordenador/líder/cabo: se telefone já é de funcionário, oferecer vínculo.
-    if (["coordenador", "lider", "cabo"].includes(tipo) && telDigits.length >= 10) {
+    // Para coordenador/líder/cabo: telefone é obrigatório na estrutura eleitoral.
+    if (["coordenador", "lider", "cabo"].includes(tipo)) {
+      if (telDigits.length < 10) {
+        toast.error("Telefone é obrigatório para coordenador, líder e cabo eleitoral.");
+        return;
+      }
       const func = await findFuncionarioByPhone(clientId, telDigits);
       if (func) {
         setLinkPrompt({ funcionarioId: func.id, funcionarioNome: func.nome });
         return;
       }
+    }
+    if (tipo === "funcionario" && telDigits.length < 10) {
+      toast.error("Telefone é obrigatório para funcionário.");
+      return;
     }
 
     await doInsert(null);
