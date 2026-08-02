@@ -36,6 +36,8 @@ import { DEFAULT_COMPOSITION, FrameComposition, preloadComposition } from "./typ
 import BatchFrameGenerator from "./BatchFrameGenerator";
 import { useBatchRenderer } from "./useBatchRenderer";
 import { publishItemsToGallery, slugify } from "./useGalleryUpload";
+import RawPhotoUploader from "./RawPhotoUploader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Frame {
   id: string;
@@ -526,6 +528,19 @@ function GalleryWorkspaceDialog({
     setExistingItems(data ?? []);
   };
 
+  const handleRawPublished = async ({ firstUrl }: { uploaded: number; firstUrl: string | null }) => {
+    const patch: any = { status: "published" };
+    if (!gallery.cover_url && firstUrl) patch.cover_url = firstUrl;
+    await supabase.from("campaign_photo_galleries").update(patch).eq("id", gallery.id);
+    onChanged();
+    const { data } = await supabase
+      .from("campaign_photo_gallery_items")
+      .select("*")
+      .eq("gallery_id", gallery.id)
+      .order("order_index");
+    setExistingItems(data ?? []);
+  };
+
   const handleRemoveExisting = async (item: any) => {
     if (!confirm("Remover esta foto da galeria?")) return;
     await supabase.storage.from("campaign-frame-assets").remove([item.storage_path]);
@@ -533,6 +548,7 @@ function GalleryWorkspaceDialog({
     setExistingItems((cur) => cur.filter((x) => x.id !== item.id));
     onChanged();
   };
+
 
   const link = `${hubBase}/${gallery.slug}`;
 
@@ -592,8 +608,25 @@ function GalleryWorkspaceDialog({
 
         <div className="border-t pt-3">
           <h4 className="text-sm font-semibold mb-2">Adicionar novas fotos</h4>
-          <BatchFrameGenerator composition={composition} frameName={frame?.nome} batch={batch} />
+          <Tabs defaultValue="frame">
+            <TabsList className="mb-3">
+              <TabsTrigger value="frame">Com moldura</TabsTrigger>
+              <TabsTrigger value="raw">Sem moldura (arquivos prontos)</TabsTrigger>
+            </TabsList>
+            <TabsContent value="frame">
+              <BatchFrameGenerator composition={composition} frameName={frame?.nome} batch={batch} />
+            </TabsContent>
+            <TabsContent value="raw">
+              <RawPhotoUploader
+                clientId={gallery.client_id}
+                galleryId={gallery.id}
+                startIndex={existingItems.length}
+                onPublished={handleRawPublished}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
+
 
         <DialogFooter className="flex-wrap gap-2">
           <Button variant="outline" onClick={onClose}>
