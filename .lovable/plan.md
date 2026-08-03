@@ -1,56 +1,70 @@
-# Migração de VPS — diagnóstico e plano
+# Engajamento como painel de gestão do time
 
-Resposta curta: **sim, é simples** no seu caso. Praticamente tudo que é "estado" (banco, arquivos, funções, cron) vive fora da VPS, no Supabase. A VPS só roda o site (build Node em Docker). Não é "só apontar o domínio", mas a lista de coisas a ajustar é curta e previsível.
+## O que eu verifiquei no sistema (medido agora)
 
-## O que analisei (estado atual)
+- A aba **Perfis do Time** lê **somente a tabela `pessoas` (38 registros)**. Por isso quase ninguém aparece: os **444 registros de coordenadores/líderes/cabos** (`eleicao_pessoas`), os **2 funcionários** (`funcionarios`) e as **30 contas do portal** (`supporter_accounts`) ficam de fora. É a causa principal de "não carrega todos".
+- O **Ranking completo tem corte fixo em 50 pessoas** no código, mesmo que existam mais. Além disso as listas de pessoas/funcionários são buscadas sem paginação (teto de 1.000 por consulta), então em bases maiores parte do time é ignorada no cruzamento.
+- **Não existe nenhuma edição de cargo em Engajamento**: a tabela só permite editar Instagram e vincular Facebook. O cargo de verdade está espalhado por tabelas diferentes (`pessoas`, `funcionarios`, `eleicao_pessoas`), e o tipo "funcionário" nem existe na lista de tipos de `pessoas` — por isso trocar Apoiador → Funcionário é impossível hoje pela tela.
+- A busca por nome funciona, mas só procura **entre as 38 pessoas já carregadas** e entre autores de comentários. Como o time real está nas outras tabelas, "não acha muitas pessoas".
+- Existem **2.803 autores distintos** de comentários captados (7.183 comentários) — matéria-prima suficiente para sugerir vínculos automaticamente.
+- Já existem funções prontas de consulta de rede social (`preview-social-profile`, `resolve-social-link`) usadas nos cadastros públicos, mas **não estão sendo usadas em Engajamento**. É o que resolve o "tenho que procurar fora e colar o link".
 
-- O deploy é um **Docker de 2 estágios** (`Dockerfile`) que compila o app e roda `server-entry.mjs` (Node, porta 3000). Serve tanto o SSR quanto os arquivos estáticos — não depende de Nginx/Apache específico da VPS.
-- **Nenhum domínio da sua VPS está escrito no código.** Busquei em `src/` e `supabase/functions/` e só existem domínios externos (Facebook, IBGE, TSE, etc.).
-- **Banco, Auth, Storage e Edge Functions estão no Supabase** (`xvlvlhwlatclucjzwhld`). Nada disso muda de lugar.
-- Os **cron jobs** que chamam o app usam a URL estável `project--<id>.lovable.app`, não a VPS. Continuam funcionando sem tocar em nada.
-- O **bridge do WhatsApp** aponta para um projeto Supabase externo (`vxqvrsaxppbgxookyimz...`), ou seja, não roda dentro da sua VPS.
-- `clients.public_base_url` está **vazio** hoje (links públicos usam a origem do navegador) — ponto a preencher com o domínio final depois da migração.
+## O plano
 
-Conclusão: não há dados nem serviços "presos" à VPS atual. É um container stateless.
+### Entrega 1 — Ver o time inteiro (base para tudo)
 
-## Onde estão as (poucas) dores de cabeça
+- Nova consulta única de time que junta **pessoas + funcionários + coordenadores/líderes/cabos + contratados + contas do portal**, sem duplicar quem aparece em mais de um lugar (dedupe por telefone e nome normalizado, com prioridade para o cargo mais alto).
+- A tabela passa a ter: Nome, **Cargo**, Origem, Região/Cidade, Instagram, Facebook, Interações, Status, Última interação.
+- Filtros por **cargo**, **status de rastreamento**, **região/cidade** e busca por nome ou telefone; paginação real (sem teto de 50 nem de 1.000).
+- Contadores no topo: total do time, com @ cadastrado, rastreáveis, sem nenhuma rede.
 
-1. **Variáveis de ambiente.** Precisa recriar no novo host: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` (build) e `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (runtime). Esquecer a service role key é a falha nº 1 — quebra missões públicas e rotas de servidor.
-2. **URLs de redirect no Supabase Auth.** Site URL + allowlist precisam conter o domínio novo, senão login/reset de senha voltam para o lugar errado.
-3. **Chave do Google Maps** (`VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY`) costuma ter restrição por domínio — adicionar o domínio novo.
-4. **Service worker / PWA** (`public/sw.js`, `manifest.webmanifest`): quem já instalou o app na tela inicial pode ficar com cache antigo. Resolve-se com bump de versão do cache.
-5. **DNS e SSL**: propagação (até algumas horas) e emissão do certificado no novo host.
-6. **Janela de indisponibilidade**: dá para deixar quase zero se você subir o app novo *antes* de mexer no DNS.
+### Entrega 2 — Trocar o cargo levando tudo
 
-## Plano de migração (ordem recomendada)
+- Botão **Alterar cargo** em cada linha, com os cargos reais: Apoiador, Funcionário, Coordenador, Líder, Cabo eleitoral, Eleitor, Influenciador, Jornalista, Voluntário.
+- A troca **move o cadastro de verdade** para a tabela do novo cargo, preservando: telefone, endereço/região, redes sociais vinculadas, histórico de interações, missões e o vínculo de apoiador (`supporter_id`). Nada de registro duplicado nem perda de histórico.
+- Regras de segurança do que já existe:
+  - Ao promover para Coordenador/Líder, entra no fluxo de escopo já existente (cidade/região) — reaproveita a propagação de escopo que já criamos.
+  - Ao rebaixar quem tem subordinados, reaproveita o tratamento de "órfãos" já implementado (pergunta antes e converte em avulsos).
+  - Se o cargo exigir telefone e o cadastro não tiver, a tela pede o telefone antes de concluir, em vez de falhar com erro de banco.
+- Registro em log de auditoria de cada troca (quem mudou, de que cargo para qual, quando).
 
-1. **Escolher o destino.** Três opções, do mais simples ao mais barato:
-   - Publicar direto pelo Lovable (sem VPS): já existe URL estável e SSL automático — zero manutenção.
-   - VPS nova com Easypanel/Coolify/Dokploy: mesmo fluxo que você já usa hoje, Dockerfile já pronto.
-   - Plataforma gerenciada (Railway/Render/Fly): deploy via GitHub, sem administrar servidor.
-2. **Conectar o GitHub** no novo host e apontar para o repositório do projeto (build via `Dockerfile`, porta 3000).
-3. **Cadastrar as variáveis de ambiente** listadas acima antes do primeiro build.
-4. **Fazer o primeiro deploy e testar pela URL temporária do host** (ainda sem tocar no DNS): login, dashboard, envio de WhatsApp, missão pública, upload de foto.
-5. **Apontar o DNS** do domínio para o novo host e aguardar o SSL.
-6. **Atualizar as allowlists**: Supabase Auth (Site URL + Redirect URLs), chave do Google Maps e, se usar login social, os redirect URIs do provedor.
-7. **Preencher `public_base_url`** nas Configurações do cliente com o domínio definitivo, para os links de missão/galeria enviados por WhatsApp saírem corretos.
-8. **Bump do cache do service worker** e teste em celular (PWA instalado).
-9. **Só então desligar a VPS antiga**, depois de 48h de funcionamento estável.
+### Entrega 3 — Cadastro de rede social que realmente encontra a pessoa
+
+- A busca por nome passa a consultar **o time inteiro no servidor** (todas as tabelas), não apenas as linhas já carregadas — com resultado enquanto digita, tolerante a acento e nome parcial, e busca também por telefone.
+- Três formas de resolver o @ na mesma tela:
+  1. **Digitar/colar** @ ou URL (Instagram e Facebook) — normaliza sozinho.
+  2. **Consultar o perfil** com o mesmo verificador dos cadastros públicos: mostra foto, nome e confirma se o perfil existe antes de salvar (fim do "colar link no escuro").
+  3. **Sugestões automáticas**: entre os 2.803 autores já captados, o sistema ordena os mais parecidos com o nome digitado e mostra foto + nº de comentários para você confirmar com um clique — é a única forma de o Facebook ficar rastreável.
+- Modo **cadastro em série**: ao salvar, volta ao campo de nome já pronto para a próxima pessoa, mostrando quantas interações passadas foram reaproveitadas.
+- Botão **Sugerir vínculos** que roda a comparação de nomes em lote e apresenta uma fila de confirmações prováveis (nunca vincula sozinho).
+
+### Entrega 4 — Cobrança dos funcionários e relatórios em PDF
+
+Metas conforme você definiu: **interagir nas publicações** e **compartilhar (missões do portal)**.
+
+- Nova aba **Cobrança do time** com configuração simples por cargo: nº mínimo de interações no período e nº mínimo de missões concluídas.
+- Painel por pessoa com semáforo: **Em dia**, **Abaixo da meta**, **Zerado no período**, **Sem @ cadastrado** (esse último é falha de cadastro, não de esforço — fica separado para não distorcer a cobrança).
+- Colunas: interações (IG/FB), missões recebidas, missões abertas, missões concluídas, última interação, dias sem interagir.
+- **Relatório em PDF** no mesmo padrão dos seus relatórios atuais:
+  - Capa com período e resumo (total do time, em dia, abaixo da meta, zerados);
+  - Agrupado por **cargo** e, dentro dele, por **região** em ordem alfabética, depois por nome — mesma organização que você pediu nas exportações de Eleição;
+  - Uma seção final "Precisam de cobrança" com nome, telefone e o que faltou.
+- Também um PDF individual por pessoa (histórico de interações e missões do período), útil para conversa direta.
+
+## Ordem de execução
+
+1. Entrega 1 (visão completa do time) — libera todo o resto.
+2. Entrega 2 (troca de cargo).
+3. Entrega 3 (busca e cadastro de redes).
+4. Entrega 4 (metas + PDF).
 
 ## Detalhes técnicos
 
-- O `Dockerfile` hoje embute as três variáveis `VITE_SUPABASE_*` como `ENV` fixas no estágio de build. Funciona, mas vale trocar por `ARG`/env do host para não ter valor duplicado em dois lugares.
-- O install usa `npm install --legacy-peer-deps` e Node 22 — qualquer host com Docker atende; não precisa de Bun em produção.
-- `server-entry.mjs` lê `PORT`/`HOST` do ambiente; se o host novo exigir outra porta, basta a variável.
-- Nada de arquivos gravados em disco pela aplicação (uploads vão para o Storage do Supabase), então **não há volume a migrar**.
-- Um ponto a confirmar antes de desligar a máquina antiga: se você (ou alguém) instalou **qualquer serviço extra dentro dessa VPS** (bridge de WhatsApp próprio, n8n, cron do sistema, banco local). Pelo código, nada disso é usado — mas se existir algo instalado à parte, precisa ser migrado separadamente.
-
-## Riscos e mitigação
-
-| Risco | Mitigação |
-| --- | --- |
-| Login quebrado após trocar domínio | Atualizar Auth URLs no mesmo dia do DNS |
-| Missões/rotas de servidor com erro 500 | Conferir `SUPABASE_SERVICE_ROLE_KEY` no runtime |
-| Mapa em branco | Liberar domínio novo na chave do Google Maps |
-| PWA antigo servindo tela velha | Bump da versão do cache no `sw.js` |
-| Indisponibilidade | Testar na URL temporária antes de mexer no DNS |
+- Nova função de banco `engagement_time_overview(client_id, days, filtros, paginação)` substituindo `engagement_perfis_overview`, unindo `pessoas`, `funcionarios`, `eleicao_pessoas`, `contratados`, `contratado_indicados`, `supporter_accounts`, com dedupe por telefone normalizado + nome sem acento e coluna `origem`/`cargo`. `SECURITY DEFINER` com a checagem `is_client_member` que já é usada.
+- `engagement_alterar_cargo(pessoa_ref, origem_atual, novo_cargo, extras)`: transação que cria o registro no destino, migra `supporter_id`/`supporter_profiles`/`pessoa_social`, reescreve referências e remove a origem; reaproveita `ensure_supporter_for_entity`, `eleicao_pessoas_propagate_scope` e o tratamento de órfãos existente. Grava em `action_logs`.
+- `engagement_buscar_time(client_id, termo)` para o autocomplete server-side (limite 20, ordenado por similaridade), evitando trazer 400+ linhas ao navegador.
+- Ranking: remover o `.slice(0, 50)` de `InfluenciadoresTab.tsx`, paginar as consultas de entidades e passar o cruzamento para a nova função de banco, mantendo o cálculo de score atual intacto.
+- Cadastro de redes: reuso de `SocialConnectFlow` (que já chama `preview-social-profile`/`resolve-social-link`) dentro de `CadastrarPerfilDialog.tsx`, e de `engagement_upsert_social`/`engagement_link_author` para gravar.
+- Metas: nova tabela `engagement_metas` (por cliente e cargo) + função de apuração que soma `comments`, `engagement_actions` e `mission_events`/`mission_distributions` no período.
+- PDF: reuso do gerador já existente (`jspdf` + `jspdf-autotable`) com a ordenação por região que já está implementada em `eleicao-export-pdf`.
+- Nada dos módulos de disparo/WhatsApp, missões públicas ou telemarketing é alterado.
