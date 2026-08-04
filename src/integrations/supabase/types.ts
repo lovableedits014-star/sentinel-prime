@@ -3803,6 +3803,47 @@ export type Database = {
           },
         ]
       }
+      engagement_metas: {
+        Row: {
+          cargo: string
+          client_id: string
+          created_at: string
+          id: string
+          min_interacoes: number
+          min_missoes: number
+          periodo_dias: number
+          updated_at: string
+        }
+        Insert: {
+          cargo: string
+          client_id: string
+          created_at?: string
+          id?: string
+          min_interacoes?: number
+          min_missoes?: number
+          periodo_dias?: number
+          updated_at?: string
+        }
+        Update: {
+          cargo?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          min_interacoes?: number
+          min_missoes?: number
+          periodo_dias?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_metas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engagement_score_history: {
         Row: {
           action_count: number
@@ -9591,6 +9632,31 @@ export type Database = {
           ref_id: string
           regiao: string
           supporter_id: string
+          telefone: string
+        }[]
+      }
+      engagement_cobranca_overview: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          cargo: string
+          cidade: string
+          dias_sem_interagir: number
+          facebook_comments: number
+          facebook_key: string
+          instagram_comments: number
+          instagram_handle: string
+          interacoes: number
+          last_interaction: string
+          min_interacoes: number
+          min_missoes: number
+          missoes_abertas: number
+          missoes_concluidas: number
+          missoes_disponiveis: number
+          nome: string
+          origem: string
+          ref_id: string
+          regiao: string
+          situacao: string
           telefone: string
         }[]
       }
