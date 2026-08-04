@@ -2229,6 +2229,7 @@ export type Database = {
           redes_sociais: Json | null
           secao_eleitoral: string | null
           status: string
+          supporter_id: string | null
           telefone: string
           tentativas_count: number
           updated_at: string
@@ -2264,6 +2265,7 @@ export type Database = {
           redes_sociais?: Json | null
           secao_eleitoral?: string | null
           status?: string
+          supporter_id?: string | null
           telefone: string
           tentativas_count?: number
           updated_at?: string
@@ -2299,6 +2301,7 @@ export type Database = {
           redes_sociais?: Json | null
           secao_eleitoral?: string | null
           status?: string
+          supporter_id?: string | null
           telefone?: string
           tentativas_count?: number
           updated_at?: string
@@ -2327,6 +2330,13 @@ export type Database = {
             columns: ["lider_id"]
             isOneToOne: false
             referencedRelation: "contratados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratados_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
             referencedColumns: ["id"]
           },
         ]
@@ -3394,6 +3404,7 @@ export type Database = {
           rateio_parceiro: number
           regiao: string | null
           rua: string | null
+          supporter_id: string | null
           telefone: string
           tentativas_count: number
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
@@ -3438,6 +3449,7 @@ export type Database = {
           rateio_parceiro?: number
           regiao?: string | null
           rua?: string | null
+          supporter_id?: string | null
           telefone: string
           tentativas_count?: number
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
@@ -3482,6 +3494,7 @@ export type Database = {
           rateio_parceiro?: number
           regiao?: string | null
           rua?: string | null
+          supporter_id?: string | null
           telefone?: string
           tentativas_count?: number
           tipo?: Database["public"]["Enums"]["eleicao_tipo"]
@@ -3532,6 +3545,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_eleicao_indicadores_cobranca"
             referencedColumns: ["indicador_id"]
+          },
+          {
+            foreignKeyName: "eleicao_pessoas_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -9547,9 +9567,65 @@ export type Database = {
         Args: { _indicado_id: string; _token: string }
         Returns: Json
       }
+      engagement_alterar_cargo: {
+        Args: {
+          p_cidade?: string
+          p_novo_cargo: string
+          p_orfaos?: string
+          p_origem: string
+          p_ref: string
+          p_regiao?: string
+          p_telefone?: string
+        }
+        Returns: Json
+      }
+      engagement_buscar_time: {
+        Args: { p_client_id: string; p_limit?: number; p_termo: string }
+        Returns: {
+          cargo: string
+          cidade: string
+          facebook_key: string
+          instagram_handle: string
+          nome: string
+          origem: string
+          ref_id: string
+          regiao: string
+          supporter_id: string
+          telefone: string
+        }[]
+      }
+      engagement_ensure_entity_supporter: {
+        Args: { p_origem: string; p_ref: string }
+        Returns: string
+      }
       engagement_ensure_pessoa_supporter: {
         Args: { p_pessoa_id: string }
         Returns: string
+      }
+      engagement_entity_link_author: {
+        Args: {
+          p_author_name?: string
+          p_origem: string
+          p_picture?: string
+          p_platform: string
+          p_platform_user_id: string
+          p_ref: string
+        }
+        Returns: Json
+      }
+      engagement_entity_remove_social: {
+        Args: { p_origem: string; p_plataforma: string; p_ref: string }
+        Returns: boolean
+      }
+      engagement_entity_upsert_social: {
+        Args: {
+          p_origem: string
+          p_plataforma: string
+          p_ref: string
+          p_url?: string
+          p_usuario: string
+        }
+        Returns: Json
       }
       engagement_link_author: {
         Args: {
@@ -9581,6 +9657,28 @@ export type Database = {
       engagement_remove_social: {
         Args: { p_pessoa_id: string; p_plataforma: string }
         Returns: boolean
+      }
+      engagement_time_overview: {
+        Args: { p_client_id: string; p_days?: number }
+        Returns: {
+          cargo: string
+          cidade: string
+          facebook_comments: number
+          facebook_key: string
+          facebook_label: string
+          instagram_comments: number
+          instagram_handle: string
+          last_interaction: string
+          missoes_abertas: number
+          missoes_concluidas: number
+          nome: string
+          origem: string
+          other_actions: number
+          ref_id: string
+          regiao: string
+          supporter_id: string
+          telefone: string
+        }[]
       }
       engagement_unlinked_authors: {
         Args: { p_client_id: string; p_limit?: number; p_platform?: string }
@@ -9735,6 +9833,7 @@ export type Database = {
           rateio_parceiro: number
           regiao: string | null
           rua: string | null
+          supporter_id: string | null
           telefone: string
           tentativas_count: number
           tipo: Database["public"]["Enums"]["eleicao_tipo"]
