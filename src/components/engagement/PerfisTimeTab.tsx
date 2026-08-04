@@ -1,52 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Check, Facebook, Instagram, Link2, Plus, RefreshCw, Search, Trash2, X,
+  Table as TableIcon,
+  Check,
+  Facebook,
+  Instagram,
+  Link2,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  UserCog,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { extractHandleFromUrl } from "@/lib/social-url";
 import NovaPessoaDialog from "@/components/pessoas/NovaPessoaDialog";
-import VincularAutorDialog from "./VincularAutorDialog";
+import VincularAutorDialog, { type AlvoVinculo } from "./VincularAutorDialog";
 import CadastrarPerfilDialog from "./CadastrarPerfilDialog";
-
-
-type PerfilRow = {
-  pessoa_id: string;
-  nome: string;
-  tipo_pessoa: string | null;
-  telefone: string | null;
-  supporter_id: string | null;
-  instagram_handle: string | null;
-  facebook_key: string | null;
-  facebook_label: string | null;
-  instagram_comments: number;
-  facebook_comments: number;
-  other_actions: number;
-  last_interaction: string | null;
-};
-
-const isMetaScopedId = (v: string | null | undefined) => !!v && /^\d{8,}$/.test(v);
-
-type Status = "rastreavel" | "aguardando" | "nao_rastreavel" | "sem_cadastro";
-
-function statusOf(r: PerfilRow): Status {
-  const interacted = r.instagram_comments + r.facebook_comments + r.other_actions > 0;
-  const hasIg = !!r.instagram_handle;
-  const hasFb = !!r.facebook_key;
-  if (!hasIg && !hasFb) return "sem_cadastro";
-  if (interacted) return "rastreavel";
-  if (hasFb && !isMetaScopedId(r.facebook_key) && !hasIg) return "nao_rastreavel";
-  return "aguardando";
-}
+import AlterarCargoDialog, { type AlvoCargo } from "./AlterarCargoDialog";
+import {
+  cargoLabel,
+  fetchTeamOverview,
+  isMetaScopedId,
+  ORIGEM_LABEL,
+  removeSocial as removeSocialRpc,
+  statusOf,
+  totalInteracoes,
+  upsertSocial,
+  type Status,
+  type TeamRow,
+} from "@/lib/engagement-team";
 
 const STATUS_META: Record<Status, { label: string; className: string; hint: string }> = {
   rastreavel: {
@@ -62,7 +52,7 @@ const STATUS_META: Record<Status, { label: string; className: string; hint: stri
   nao_rastreavel: {
     label: "Não rastreável",
     className: "bg-destructive/15 text-destructive border-destructive/30",
-    hint: "O Facebook só é rastreável quando vinculado por um comentário real (a Meta não expõe o @).",
+    hint: "O Facebook só é rastreável quando vinculado a um comentário real (a Meta não expõe o @).",
   },
   sem_cadastro: {
     label: "Sem @",
@@ -71,17 +61,22 @@ const STATUS_META: Record<Status, { label: string; className: string; hint: stri
   },
 };
 
+const PAGE_SIZE = 50;
+
 export default function PerfisTimeTab({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState<PerfilRow[]>([]);
+  const [rows, setRows] = useState<TeamRow[]>([]);
   const [days, setDays] = useState(30);
   const [busca, setBusca] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [cargoFilter, setCargoFilter] = useState<string>("todos");
+  const [origemFilter, setOrigemFilter] = useState<string>("todos");
+  const [page, setPage] = useState(1);
   const [novaPessoa, setNovaPessoa] = useState(false);
   const [novaPessoaNome, setNovaPessoaNome] = useState("");
   const [cadastrarPerfil, setCadastrarPerfil] = useState(false);
-  const [vincular, setVincular] = useState<{ id: string; nome: string } | null>(null);
-
+  const [vincular, setVincular] = useState<AlvoVinculo | null>(null);
+  const [alterarCargoAlvo, setAlterarCargoAlvo] = useState<AlvoCargo | null>(null);
 
   // edição inline do instagram
   const [editing, setEditing] = useState<string | null>(null);
@@ -90,18 +85,14 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await (supabase as any).rpc("engagement_perfis_overview", {
-      p_client_id: clientId,
-      p_days: days,
-    });
-    if (error) {
-      console.error(error);
-      toast.error("Erro ao carregar perfis: " + error.message);
+    try {
+      setRows(await fetchTeamOverview(clientId, days));
+    } catch (e) {
+      toast.error("Erro ao carregar perfis: " + (e as Error).message);
       setRows([]);
-    } else {
-      setRows((data || []) as PerfilRow[]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -109,14 +100,31 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, days]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [busca, statusFilter, cargoFilter, origemFilter]);
+
+  const cargos = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.cargo))).sort((a, b) => cargoLabel(a).localeCompare(cargoLabel(b))),
+    [rows],
+  );
+
   const filtered = useMemo(() => {
     const term = busca.trim().toLowerCase();
     return rows.filter((r) => {
-      if (term && !(r.nome || "").toLowerCase().includes(term)) return false;
+      if (term && !(r.nome || "").toLowerCase().includes(term) && !(r.telefone || "").includes(term)) return false;
       if (statusFilter !== "todos" && statusOf(r) !== statusFilter) return false;
+      if (cargoFilter !== "todos" && r.cargo !== cargoFilter) return false;
+      if (origemFilter !== "todos" && r.origem !== origemFilter) return false;
       return true;
     });
-  }, [rows, busca, statusFilter]);
+  }, [rows, busca, statusFilter, cargoFilter, origemFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageRows = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page],
+  );
 
   const counts = useMemo(() => {
     const c: Record<Status, number> = { rastreavel: 0, aguardando: 0, nao_rastreavel: 0, sem_cadastro: 0 };
@@ -124,7 +132,9 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
     return c;
   }, [rows]);
 
-  async function saveInstagram(r: PerfilRow) {
+  const rowKey = (r: TeamRow) => `${r.origem}:${r.ref_id}`;
+
+  async function saveInstagram(r: TeamRow) {
     const raw = igValue.trim();
     if (!raw) {
       setEditing(null);
@@ -132,34 +142,32 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
     }
     const handle = (raw.startsWith("http") ? extractHandleFromUrl("instagram", raw) : null) || raw.replace(/^@/, "");
     setSaving(true);
-    const { data, error } = await (supabase as any).rpc("engagement_upsert_social", {
-      p_pessoa_id: r.pessoa_id,
-      p_plataforma: "instagram",
-      p_usuario: handle,
-      p_url: `https://instagram.com/${handle.replace(/^@/, "")}`,
-    });
-    setSaving(false);
-    if (error) {
-      toast.error("Erro ao salvar @: " + error.message);
-      return;
+    try {
+      const { relinked } = await upsertSocial(
+        r.origem,
+        r.ref_id,
+        "instagram",
+        handle,
+        `https://instagram.com/${handle.replace(/^@/, "")}`,
+      );
+      toast.success(`@ salvo${relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""}`);
+      setEditing(null);
+      fetchData();
+    } catch (e) {
+      toast.error("Erro ao salvar @: " + (e as Error).message);
+    } finally {
+      setSaving(false);
     }
-    const relinked = (data as any)?.relinked ?? 0;
-    toast.success(`@ salvo${relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""}`);
-    setEditing(null);
-    fetchData();
   }
 
-  async function removeSocial(r: PerfilRow, plataforma: "instagram" | "facebook") {
-    const { error } = await (supabase as any).rpc("engagement_remove_social", {
-      p_pessoa_id: r.pessoa_id,
-      p_plataforma: plataforma,
-    });
-    if (error) {
-      toast.error("Erro ao remover: " + error.message);
-      return;
+  async function handleRemoveSocial(r: TeamRow, plataforma: "instagram" | "facebook") {
+    try {
+      await removeSocialRpc(r.origem, r.ref_id, plataforma);
+      toast.success("Vínculo removido");
+      fetchData();
+    } catch (e) {
+      toast.error("Erro ao remover: " + (e as Error).message);
     }
-    toast.success("Vínculo removido");
-    fetchData();
   }
 
   return (
@@ -170,8 +178,9 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
             <div>
               <CardTitle className="text-base sm:text-lg">Perfis do time</CardTitle>
               <CardDescription className="text-xs sm:text-sm">
-                Cadastre aqui o @ de cada pessoa. O Instagram é rastreado pelo próprio @. O Facebook só é
-                rastreável quando vinculado a um comentário real — a Meta não expõe o @ público nos comentários.
+                Todo o time em uma única lista — CRM, funcionários, estrutura eleitoral, contratados e contas do
+                portal. O Instagram é rastreado pelo @; o Facebook só é rastreável quando vinculado a um
+                comentário real (a Meta não expõe o @ público).
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -198,7 +207,6 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                 <Plus className="mr-1 h-4 w-4" />
                 Adicionar pessoa
               </Button>
-
             </div>
           </div>
         </CardHeader>
@@ -209,10 +217,36 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
               <Input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar pessoa…"
+                placeholder="Buscar por nome ou telefone…"
                 className="pl-8"
               />
             </div>
+            <Select value={cargoFilter} onValueChange={setCargoFilter}>
+              <SelectTrigger className="h-9 w-[170px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os cargos</SelectItem>
+                {cargos.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {cargoLabel(c)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={origemFilter} onValueChange={setOrigemFilter}>
+              <SelectTrigger className="h-9 w-[170px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as origens</SelectItem>
+                {(Object.keys(ORIGEM_LABEL) as Array<keyof typeof ORIGEM_LABEL>).map((o) => (
+                  <SelectItem key={o} value={o}>
+                    {ORIGEM_LABEL[o]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-9 w-[190px]">
                 <SelectValue />
@@ -239,39 +273,50 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Pessoa</TableHead>
+                    <TableHead>Cargo</TableHead>
                     <TableHead>Instagram</TableHead>
                     <TableHead>Facebook</TableHead>
                     <TableHead className="text-center">Interações</TableHead>
+                    <TableHead className="text-center">Missões</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.length === 0 ? (
+                  {pageRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                         Nenhuma pessoa encontrada.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((r) => {
+                    pageRows.map((r) => {
+                      const key = rowKey(r);
                       const st = statusOf(r);
                       const meta = STATUS_META[st];
-                      const total = r.instagram_comments + r.facebook_comments + r.other_actions;
+                      const total = totalInteracoes(r);
                       return (
-                        <TableRow key={r.pessoa_id}>
+                        <TableRow key={key}>
                           <TableCell className="max-w-[220px]">
                             <p className="truncate text-sm font-medium">{r.nome}</p>
                             <p className="text-xs text-muted-foreground">
-                              {r.tipo_pessoa || "—"}
+                              {ORIGEM_LABEL[r.origem]}
+                              {r.regiao || r.cidade ? ` · ${r.regiao || r.cidade}` : ""}
                               {r.last_interaction
-                                ? ` · última interação ${new Date(r.last_interaction).toLocaleDateString("pt-BR")}`
+                                ? ` · última ${new Date(r.last_interaction).toLocaleDateString("pt-BR")}`
                                 : ""}
                             </p>
                           </TableCell>
 
+                          <TableCell>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {cargoLabel(r.cargo)}
+                            </Badge>
+                          </TableCell>
+
                           {/* Instagram */}
                           <TableCell>
-                            {editing === r.pessoa_id ? (
+                            {editing === key ? (
                               <div className="flex items-center gap-1">
                                 <Input
                                   autoFocus
@@ -306,7 +351,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                   variant="ghost"
                                   className="h-7 w-7"
                                   onClick={() => {
-                                    setEditing(r.pessoa_id);
+                                    setEditing(key);
                                     setIgValue(r.instagram_handle || "");
                                   }}
                                 >
@@ -316,7 +361,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                   size="icon"
                                   variant="ghost"
                                   className="h-7 w-7 text-destructive"
-                                  onClick={() => removeSocial(r, "instagram")}
+                                  onClick={() => handleRemoveSocial(r, "instagram")}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -327,7 +372,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                 variant="outline"
                                 className="h-7"
                                 onClick={() => {
-                                  setEditing(r.pessoa_id);
+                                  setEditing(key);
                                   setIgValue("");
                                 }}
                               >
@@ -358,7 +403,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                   variant="ghost"
                                   className="h-7 w-7"
                                   title="Revincular por comentário"
-                                  onClick={() => setVincular({ id: r.pessoa_id, nome: r.nome })}
+                                  onClick={() => setVincular({ origem: r.origem, refId: r.ref_id, nome: r.nome })}
                                 >
                                   <Link2 className="h-3 w-3" />
                                 </Button>
@@ -366,7 +411,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                   size="icon"
                                   variant="ghost"
                                   className="h-7 w-7 text-destructive"
-                                  onClick={() => removeSocial(r, "facebook")}
+                                  onClick={() => handleRemoveSocial(r, "facebook")}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -376,7 +421,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                 size="sm"
                                 variant="outline"
                                 className="h-7"
-                                onClick={() => setVincular({ id: r.pessoa_id, nome: r.nome })}
+                                onClick={() => setVincular({ origem: r.origem, refId: r.ref_id, nome: r.nome })}
                               >
                                 <Link2 className="mr-1 h-3 w-3" />
                                 Vincular Facebook
@@ -394,10 +439,39 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                             </div>
                           </TableCell>
 
+                          <TableCell className="text-center">
+                            <span className="text-sm font-semibold">{r.missoes_concluidas}</span>
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              /{r.missoes_abertas + r.missoes_concluidas}
+                            </span>
+                          </TableCell>
+
                           <TableCell>
                             <Badge variant="outline" className={`text-[10px] ${meta.className}`} title={meta.hint}>
                               {meta.label}
                             </Badge>
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7"
+                              onClick={() =>
+                                setAlterarCargoAlvo({
+                                  origem: r.origem,
+                                  refId: r.ref_id,
+                                  nome: r.nome,
+                                  cargo: r.cargo,
+                                  telefone: r.telefone,
+                                  cidade: r.cidade,
+                                  regiao: r.regiao,
+                                })
+                              }
+                            >
+                              <UserCog className="mr-1 h-3 w-3" />
+                              Cargo
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );
@@ -405,6 +479,28 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                   )}
                 </TableBody>
               </Table>
+            </div>
+          )}
+
+          {!loading && filtered.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                <TableIcon className="mr-1 inline h-3 w-3" />
+                {filtered.length} pessoa(s) · página {page} de {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Próxima
+                </Button>
+              </div>
             </div>
           )}
 
@@ -420,14 +516,6 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
         open={cadastrarPerfil}
         onOpenChange={setCadastrarPerfil}
         clientId={clientId}
-        pessoas={rows.map((r) => ({
-          pessoa_id: r.pessoa_id,
-          nome: r.nome,
-          tipo_pessoa: r.tipo_pessoa,
-          instagram_handle: r.instagram_handle,
-          facebook_key: r.facebook_key,
-          facebook_label: r.facebook_label,
-        }))}
         onSaved={fetchData}
         onCreatePessoa={(nome) => {
           setNovaPessoaNome(nome);
@@ -446,14 +534,24 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
         }}
       />
 
-
       <VincularAutorDialog
         open={!!vincular}
-        onOpenChange={(v) => !v && setVincular(null)}
+        onOpenChange={(v) => {
+          if (!v) setVincular(null);
+        }}
         clientId={clientId}
-        pessoa={vincular}
+        alvo={vincular}
         platform="facebook"
         onLinked={fetchData}
+      />
+
+      <AlterarCargoDialog
+        open={!!alterarCargoAlvo}
+        onOpenChange={(v) => {
+          if (!v) setAlterarCargoAlvo(null);
+        }}
+        alvo={alterarCargoAlvo}
+        onChanged={fetchData}
       />
     </div>
   );

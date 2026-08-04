@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Facebook, Link2, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { norm, similarity } from "@/lib/engagement-match";
+import { linkAuthor, type Origem } from "@/lib/engagement-team";
 
 export type UnlinkedAuthor = {
   platform_user_id: string;
@@ -18,22 +19,23 @@ export type UnlinkedAuthor = {
   last_seen: string | null;
 };
 
+export type AlvoVinculo = { origem: Origem; refId: string; nome: string };
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientId: string;
-  /** Pessoa alvo do vínculo. */
-  pessoa: { id: string; nome: string } | null;
+  /** Pessoa/registro alvo do vínculo (qualquer origem do time). */
+  alvo: AlvoVinculo | null;
   platform?: "facebook" | "instagram";
   onLinked: () => void;
 }
-
 
 export default function VincularAutorDialog({
   open,
   onOpenChange,
   clientId,
-  pessoa,
+  alvo,
   platform = "facebook",
   onLinked,
 }: Props) {
@@ -68,36 +70,37 @@ export default function VincularAutorDialog({
   }, [open, clientId, platform]);
 
   const lista = useMemo(() => {
-    const target = pessoa?.nome || "";
+    const target = alvo?.nome || "";
     const scored = authors.map((a) => ({ ...a, score: target ? similarity(target, a.author_name || "") : 0 }));
     const term = norm(busca);
     const filtered = term
       ? scored.filter((a) => norm(a.author_name).includes(term) || a.platform_user_id.includes(busca.trim()))
       : scored;
     return filtered.sort((a, b) => b.score - a.score || b.total_comments - a.total_comments);
-  }, [authors, busca, pessoa?.nome]);
+  }, [authors, busca, alvo?.nome]);
 
   async function handleLink(a: UnlinkedAuthor) {
-    if (!pessoa) return;
+    if (!alvo) return;
     setLinking(a.platform_user_id);
-    const { data, error } = await (supabase as any).rpc("engagement_link_author", {
-      p_pessoa_id: pessoa.id,
-      p_platform: platform,
-      p_platform_user_id: a.platform_user_id,
-      p_author_name: a.author_name,
-      p_picture: a.author_profile_picture,
-    });
-    setLinking(null);
-    if (error) {
-      toast.error("Erro ao vincular: " + error.message);
-      return;
+    try {
+      const { relinked } = await linkAuthor(
+        alvo.origem,
+        alvo.refId,
+        platform,
+        a.platform_user_id,
+        a.author_name,
+        a.author_profile_picture,
+      );
+      toast.success(
+        `Perfil vinculado a ${alvo.nome}${relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""}`,
+      );
+      onLinked();
+      onOpenChange(false);
+    } catch (e) {
+      toast.error("Erro ao vincular: " + (e as Error).message);
+    } finally {
+      setLinking(null);
     }
-    const relinked = (data as any)?.relinked ?? 0;
-    toast.success(
-      `Perfil vinculado a ${pessoa.nome}${relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""}`,
-    );
-    onLinked();
-    onOpenChange(false);
   }
 
   return (
@@ -109,8 +112,8 @@ export default function VincularAutorDialog({
             Vincular {platform === "facebook" ? "Facebook" : "Instagram"} por comentário
           </DialogTitle>
           <DialogDescription>
-            {pessoa
-              ? `Escolha o autor que corresponde a ${pessoa.nome}. O identificador interno da Meta será gravado e todas as interações (passadas e futuras) passam a contar.`
+            {alvo
+              ? `Escolha o autor que corresponde a ${alvo.nome}. O identificador interno da Meta será gravado e todas as interações (passadas e futuras) passam a contar.`
               : "Selecione uma pessoa primeiro."}
           </DialogDescription>
         </DialogHeader>
@@ -163,7 +166,7 @@ export default function VincularAutorDialog({
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={!pessoa || linking === a.platform_user_id}
+                  disabled={!alvo || linking === a.platform_user_id}
                   onClick={() => handleLink(a)}
                 >
                   <Link2 className="mr-1 h-3.5 w-3.5" />

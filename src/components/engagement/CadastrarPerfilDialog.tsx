@@ -14,24 +14,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { extractHandleFromUrl } from "@/lib/social-url";
-import { matchesQuery, similarity } from "@/lib/engagement-match";
+import { similarity } from "@/lib/engagement-match";
 import type { UnlinkedAuthor } from "./VincularAutorDialog";
-
-export type PessoaOption = {
-  pessoa_id: string;
-  nome: string;
-  tipo_pessoa: string | null;
-  instagram_handle: string | null;
-  facebook_key: string | null;
-  facebook_label: string | null;
-};
+import {
+  buscarTime, cargoLabel, linkAuthor, ORIGEM_LABEL, upsertSocial, type BuscaRow,
+} from "@/lib/engagement-team";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientId: string;
-  /** Pessoas já carregadas na aba (autocomplete em memória). */
-  pessoas: PessoaOption[];
   /** Recarrega a tabela após cada gravação. */
   onSaved: () => void;
   /** Abre o cadastro de nova pessoa com o nome digitado. */
@@ -41,10 +33,12 @@ interface Props {
 type AuthorWithPlatform = UnlinkedAuthor & { platform: "facebook" | "instagram" };
 
 export default function CadastrarPerfilDialog({
-  open, onOpenChange, clientId, pessoas, onSaved, onCreatePessoa,
+  open, onOpenChange, clientId, onSaved, onCreatePessoa,
 }: Props) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<PessoaOption | null>(null);
+  const [resultados, setResultados] = useState<BuscaRow[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [selected, setSelected] = useState<BuscaRow | null>(null);
   const [authors, setAuthors] = useState<AuthorWithPlatform[]>([]);
   const [loadingAuthors, setLoadingAuthors] = useState(false);
   const [igValue, setIgValue] = useState("");
@@ -86,26 +80,49 @@ export default function CadastrarPerfilDialog({
       setQuery("");
       setSelected(null);
       setIgValue("");
+      setResultados([]);
     }
   }, [open]);
+
+  // busca no servidor (todas as origens do time), com debounce
+  useEffect(() => {
+    if (!open || selected) return;
+    const termo = query.trim();
+    if (termo.length < 2) {
+      setResultados([]);
+      return;
+    }
+    let cancelled = false;
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      try {
+        const rows = await buscarTime(clientId, termo, 20);
+        if (!cancelled) setResultados(rows);
+      } catch (e) {
+        if (!cancelled) {
+          console.error(e);
+          setResultados([]);
+        }
+      } finally {
+        if (!cancelled) setBuscando(false);
+      }
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, open, clientId, selected]);
 
   // ao selecionar pessoa, pré-preenche o @ atual
   useEffect(() => {
     setIgValue(selected?.instagram_handle ? `@${selected.instagram_handle.replace(/^@/, "")}` : "");
-  }, [selected?.pessoa_id]);
-
-  const pessoasFiltradas = useMemo(() => {
-    if (query.trim().length < 2) return [];
-    return pessoas
-      .filter((p) => matchesQuery(p.nome, query))
-      .sort((a, b) => similarity(query, b.nome) - similarity(query, a.nome) || a.nome.localeCompare(b.nome))
-      .slice(0, 12);
-  }, [pessoas, query]);
+  }, [selected?.ref_id]);
 
   const autoresFiltrados = useMemo(() => {
     if (query.trim().length < 2) return [];
+    const q = query.trim().toLowerCase();
     return authors
-      .filter((a) => matchesQuery(a.author_name, query))
+      .filter((a) => (a.author_name || "").toLowerCase().includes(q))
       .sort((a, b) => b.total_comments - a.total_comments)
       .slice(0, 12);
   }, [authors, query]);
@@ -117,7 +134,7 @@ export default function CadastrarPerfilDialog({
       .map((a) => ({ ...a, score: similarity(selected.nome, a.author_name || "") }))
       .sort((a, b) => b.score - a.score || b.total_comments - a.total_comments)
       .slice(0, 8);
-  }, [authors, selected?.pessoa_id]);
+  }, [authors, selected?.ref_id]);
 
   async function salvarInstagram() {
     if (!selected) return;
@@ -126,55 +143,60 @@ export default function CadastrarPerfilDialog({
     const handle =
       (raw.startsWith("http") ? extractHandleFromUrl("instagram", raw) : null) || raw.replace(/^@/, "");
     setSaving(true);
-    const { data, error } = await (supabase as any).rpc("engagement_upsert_social", {
-      p_pessoa_id: selected.pessoa_id,
-      p_plataforma: "instagram",
-      p_usuario: handle,
-      p_url: `https://instagram.com/${handle.replace(/^@/, "")}`,
-    });
-    setSaving(false);
-    if (error) {
-      toast.error("Erro ao salvar @: " + error.message);
-      return;
+    try {
+      const { relinked } = await upsertSocial(
+        selected.origem,
+        selected.ref_id,
+        "instagram",
+        handle,
+        `https://instagram.com/${handle.replace(/^@/, "")}`,
+      );
+      toast.success(`@${handle} salvo${relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""}`);
+      setSelected({ ...selected, instagram_handle: handle });
+      onSaved();
+    } catch (e) {
+      toast.error("Erro ao salvar @: " + (e as Error).message);
+    } finally {
+      setSaving(false);
     }
-    const relinked = (data as any)?.relinked ?? 0;
-    toast.success(`@${handle} salvo${relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""}`);
-    setSelected({ ...selected, instagram_handle: handle });
-    onSaved();
   }
 
-  async function vincularAutor(a: AuthorWithPlatform, pessoa: PessoaOption) {
+  async function vincularAutor(a: AuthorWithPlatform, pessoa: BuscaRow) {
     setLinking(a.platform_user_id);
-    const { data, error } = await (supabase as any).rpc("engagement_link_author", {
-      p_pessoa_id: pessoa.pessoa_id,
-      p_platform: a.platform,
-      p_platform_user_id: a.platform_user_id,
-      p_author_name: a.author_name,
-      p_picture: a.author_profile_picture,
-    });
-    setLinking(null);
-    if (error) {
-      toast.error("Erro ao vincular: " + error.message);
-      return;
+    try {
+      const { relinked } = await linkAuthor(
+        pessoa.origem,
+        pessoa.ref_id,
+        a.platform,
+        a.platform_user_id,
+        a.author_name,
+        a.author_profile_picture,
+      );
+      toast.success(
+        `${a.platform === "facebook" ? "Facebook" : "Instagram"} vinculado a ${pessoa.nome}` +
+          (relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""),
+      );
+      setAuthors((prev) =>
+        prev.filter((x) => !(x.platform === a.platform && x.platform_user_id === a.platform_user_id)),
+      );
+      if (a.platform === "facebook") {
+        setSelected({ ...pessoa, facebook_key: a.platform_user_id });
+      } else {
+        setSelected({ ...pessoa, instagram_handle: a.author_name || pessoa.instagram_handle });
+      }
+      onSaved();
+    } catch (e) {
+      toast.error("Erro ao vincular: " + (e as Error).message);
+    } finally {
+      setLinking(null);
     }
-    const relinked = (data as any)?.relinked ?? 0;
-    toast.success(
-      `${a.platform === "facebook" ? "Facebook" : "Instagram"} vinculado a ${pessoa.nome}` +
-        (relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""),
-    );
-    setAuthors((prev) => prev.filter((x) => !(x.platform === a.platform && x.platform_user_id === a.platform_user_id)));
-    if (a.platform === "facebook") {
-      setSelected({ ...pessoa, facebook_key: a.platform_user_id, facebook_label: a.author_name });
-    } else {
-      setSelected({ ...pessoa, instagram_handle: a.author_name || pessoa.instagram_handle });
-    }
-    onSaved();
   }
 
   function proximaPessoa() {
     setSelected(null);
     setQuery("");
     setIgValue("");
+    setResultados([]);
   }
 
   return (
@@ -188,7 +210,7 @@ export default function CadastrarPerfilDialog({
           <DialogDescription>
             {selected
               ? `Cadastre o Instagram e vincule o Facebook de ${selected.nome}.`
-              : "Digite o nome — o sistema mostra as pessoas cadastradas e quem já comentou nas redes."}
+              : "Digite o nome — a busca varre todo o time (CRM, funcionários, estrutura, contratados e portal) e também quem já comentou nas redes."}
           </DialogDescription>
         </DialogHeader>
 
@@ -216,12 +238,17 @@ export default function CadastrarPerfilDialog({
                     <p className="text-[11px] font-semibold uppercase text-muted-foreground">
                       Pessoas cadastradas
                     </p>
-                    {pessoasFiltradas.length === 0 ? (
+                    {buscando ? (
+                      <>
+                        <Skeleton className="h-11 w-full" />
+                        <Skeleton className="h-11 w-full" />
+                      </>
+                    ) : resultados.length === 0 ? (
                       <p className="px-1 py-2 text-xs text-muted-foreground">Nenhuma pessoa com esse nome.</p>
                     ) : (
-                      pessoasFiltradas.map((p) => (
+                      resultados.map((p) => (
                         <button
-                          key={p.pessoa_id}
+                          key={`${p.origem}:${p.ref_id}`}
                           type="button"
                           onClick={() => setSelected(p)}
                           className="flex w-full items-center gap-2 rounded-md border p-2 text-left hover:bg-accent/50"
@@ -229,7 +256,7 @@ export default function CadastrarPerfilDialog({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{p.nome}</p>
                             <p className="text-xs text-muted-foreground">
-                              {p.tipo_pessoa || "—"}
+                              {cargoLabel(p.cargo)} · {ORIGEM_LABEL[p.origem]}
                               {p.instagram_handle ? ` · @${p.instagram_handle}` : ""}
                               {p.facebook_key ? " · FB vinculado" : ""}
                             </p>
@@ -328,8 +355,7 @@ export default function CadastrarPerfilDialog({
               </Label>
               {selected.facebook_key ? (
                 <p className="text-sm">
-                  Vinculado a{" "}
-                  <span className="font-medium">{selected.facebook_label || selected.facebook_key}</span>
+                  Vinculado a <span className="font-medium">{selected.facebook_key}</span>
                 </p>
               ) : (
                 <>
