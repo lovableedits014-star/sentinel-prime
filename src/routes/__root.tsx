@@ -34,35 +34,59 @@ function RootErrorComponent({ error, reset }: { error: Error; reset: () => void 
     console.error("[root route error]", error);
   }, [error]);
 
+  const handleReset = () => {
+    // Tenta limpar caches do roteador e do navegador
+    try {
+      router.invalidate();
+    } catch (e) {
+      console.warn("Failed to invalidate router:", e);
+    }
+    reset();
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-2xl font-bold text-foreground">Erro ao carregar o sistema</h1>
+      <div className="max-w-md w-full text-center p-6 border rounded-lg bg-card shadow-lg">
+        <h1 className="text-2xl font-bold text-foreground">Erro de Inicialização</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Recarregue a tela. Se o erro continuar, o registro técnico ficará disponível para correção.
+          Ocorreu uma falha crítica ao carregar o sistema. Isso pode ser um problema de cache ou uma atualização pendente.
         </p>
-        {import.meta.env.DEV && error.message && (
-          <pre className="mt-4 max-h-40 overflow-auto rounded-md bg-muted p-3 text-left font-mono text-xs text-destructive">
-            {error.message}
+        
+        <div className="mt-4 p-4 bg-muted/50 rounded-md text-left border border-destructive/20 overflow-hidden">
+          <p className="text-xs font-semibold text-destructive uppercase tracking-wider mb-2">Detalhes do erro:</p>
+          <pre className="max-h-32 overflow-auto font-mono text-xs text-destructive break-all whitespace-pre-wrap">
+            {error?.message || "Erro desconhecido"}
+            {error?.stack && (
+              <div className="mt-2 pt-2 border-t border-destructive/10 opacity-60">
+                {error.stack}
+              </div>
+            )}
           </pre>
-        )}
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3">
           <button
             type="button"
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            onClick={handleReset}
+            className="w-full inline-flex items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-95"
           >
-            Tentar novamente
+            Tentar novamente (Limpar Cache)
           </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Ir para o início
-          </a>
+          <div className="flex gap-2">
+            <a
+              href="/"
+              className="flex-1 inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Ir para o início
+            </a>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="flex-1 inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Recarregar Página
+            </button>
+          </div>
         </div>
       </div>
     </div>

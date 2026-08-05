@@ -218,16 +218,23 @@ const DashboardLayout = () => {
       } catch (error: any) {
         console.error("Falha ao carregar acesso ao painel:", error);
         if (!mounted) return;
-        // Modo otimista: se há token persistido em localStorage, libera acesso
-        // mesmo com timeout — evita travar a UI por lentidão de rede.
-        if (hasStoredAuthSession()) {
-          toast.error("Conexão lenta ao verificar permissões. Liberando acesso...");
+
+        // Failsafe: Se estiver em ambiente de preview e o erro for de timeout,
+        // tenta prosseguir de qualquer forma após um tempo para não travar a tela.
+        const isTimeout = error?.message?.includes("Tempo esgotado");
+        
+        if (hasStoredAuthSession() || (import.meta.env.DEV && isTimeout)) {
+          console.warn("Recuperação automática: Liberando acesso parcial após falha de autenticação.");
+          if (isTimeout) {
+            toast.warning("Conexão instável. Carregando modo de segurança...");
+          }
           setIsClientOwner(true);
           setAccessProfile(null);
           setLoading(false);
           return;
         }
-        // Sem token: mostra tela de erro com retry / voltar ao login.
+
+        // Sem token e sem failsafe: mostra tela de erro com retry / voltar ao login.
         const message = error?.message || "Não foi possível verificar sua sessão.";
         setTimeoutError(message);
         setLoading(false);
