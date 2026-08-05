@@ -10656,6 +10656,7 @@ export type Database = {
           contato_nome: string
           contato_telefone: string
           expires_at: string
+          lista_nome: string
           operador_nome: string
           started_at: string
           tabela: string
