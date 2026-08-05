@@ -174,6 +174,8 @@ const RoutesWithBoundary = () => {
               <Route path="/telemarketing-admin/configuracoes" element={<TelemarketingAdminConfig />} />
               <Route path="/telemarketing-admin/campanhas" element={<TelemarketingAdminCampanhas />} />
             <Route path="/telemarketing-admin/filas" element={<TelemarketingAdminFilas />} />
+            <Route path="/telemarketing-admin/listas" element={<TelemarketingAdminListas />} />
+
             <Route path="/fotos-campanha" element={<FotosCampanha />} />
               <Route path="/status-whatsapp" element={<Navigate to="/whatsapp?tab=status" replace />} />
             </Route>
