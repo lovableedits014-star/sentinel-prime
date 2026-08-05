@@ -277,9 +277,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
       const r = (impData as any) || {};
       total = Number(r.inserted || 0);
       const parts: string[] = [];
-      if (r.skipped_same_campaign) parts.push(`${r.skipped_same_campaign} já na fila`);
-      if (r.skipped_other_campaign) parts.push(`${r.skipped_other_campaign} já em outra fila`);
-      if (parts.length) toast.info(parts.join(" · "));
+      if (r.skipped_global) parts.push(`${r.skipped_global} duplicados ignorados`);
+      if (parts.length) toast.info(parts.join(" · "), { duration: 5000 });
     }
 
     // Salva whatsapp_template se preenchido
