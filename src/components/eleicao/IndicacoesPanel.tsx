@@ -345,11 +345,18 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
         {/* ──────────── COBRANÇA ──────────── */}
         <TabsContent value="cobranca" className="space-y-4 mt-4">
           {/* KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Card className="p-3">
               <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Total geral</div>
               <div className="text-2xl font-bold">{stats.grandTotal.toLocaleString("pt-BR")}</div>
               <div className="text-[11px] text-muted-foreground">de {stats.grandMeta.toLocaleString("pt-BR")} esperadas</div>
+            </Card>
+            <Card className="p-3 border-amber-500/40">
+              <div className="text-[11px] text-amber-600 uppercase tracking-wide flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />Fora da meta
+              </div>
+              <div className="text-2xl font-bold text-amber-600">{stats.foraDaMeta.toLocaleString("pt-BR")}</div>
+              <div className="text-[11px] text-muted-foreground">de {rows.length} indicadores</div>
             </Card>
             {(["coord", "lider", "cabo"] as const).map((k) => {
               const a = stats.agg[k];
@@ -364,6 +371,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               );
             })}
           </div>
+
 
           {/* Filtros */}
           <div className="flex flex-wrap gap-2 items-center">
