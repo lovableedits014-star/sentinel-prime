@@ -270,7 +270,9 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
         _rows: csvRows as any,
         _assigned_operador_id: opUnicoParaCriar,
         _skip_global_dupes: skipGlobalDupes,
+        _lista_nome: nomeLista.trim() || null,
       });
+
       if (impErr) { setBusy(false); toast.error("Fila criada, mas falhou a importação: " + impErr.message); return; }
       const r = (impData as any) || {};
       total = Number(r.inserted || 0);
