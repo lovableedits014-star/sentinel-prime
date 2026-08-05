@@ -5,7 +5,9 @@ import { cn } from "@/lib/utils";
 const items = [
   { to: "/telemarketing-admin", label: "Visão geral", icon: LayoutDashboard, end: true },
   { to: "/telemarketing-admin/filas", label: "Filas", icon: Phone },
+  { to: "/telemarketing-admin/listas", label: "Listas", icon: Database },
   { to: "/telemarketing-admin/resultados", label: "Resultados", icon: ListChecks },
+
   { to: "/telemarketing-admin/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/telemarketing-admin/ranking", label: "Ranking", icon: Trophy },
   { to: "/telemarketing-admin/operadores", label: "Operadores", icon: Users },
