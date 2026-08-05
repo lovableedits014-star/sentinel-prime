@@ -8193,6 +8193,7 @@ export type Database = {
           id: string
           ligacao_em: string | null
           ligacao_status: string | null
+          lista_id: string | null
           nome: string
           observacao_tele: string | null
           operador_nome: string | null
@@ -8213,6 +8214,7 @@ export type Database = {
           id?: string
           ligacao_em?: string | null
           ligacao_status?: string | null
+          lista_id?: string | null
           nome: string
           observacao_tele?: string | null
           operador_nome?: string | null
@@ -8233,6 +8235,7 @@ export type Database = {
           id?: string
           ligacao_em?: string | null
           ligacao_status?: string | null
+          lista_id?: string | null
           nome?: string
           observacao_tele?: string | null
           operador_nome?: string | null
@@ -8254,6 +8257,64 @@ export type Database = {
             columns: ["campanha_id"]
             isOneToOne: false
             referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemarketing_contatos_avulsos_lista_id_fkey"
+            columns: ["lista_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_listas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telemarketing_listas: {
+        Row: {
+          arquivado_em: string | null
+          campanha_id: string
+          client_id: string
+          criado_em: string | null
+          descricao: string | null
+          id: string
+          nome: string
+          status: string | null
+          total_contatos: number | null
+        }
+        Insert: {
+          arquivado_em?: string | null
+          campanha_id: string
+          client_id: string
+          criado_em?: string | null
+          descricao?: string | null
+          id?: string
+          nome: string
+          status?: string | null
+          total_contatos?: number | null
+        }
+        Update: {
+          arquivado_em?: string | null
+          campanha_id?: string
+          client_id?: string
+          criado_em?: string | null
+          descricao?: string | null
+          id?: string
+          nome?: string
+          status?: string | null
+          total_contatos?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemarketing_listas_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemarketing_listas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -8293,6 +8354,7 @@ export type Database = {
           failed_attempts: number
           id: string
           last_login_at: string | null
+          lista_atual_id: string | null
           locked_until: string | null
           nome: string
           password_updated_at: string
@@ -8305,6 +8367,7 @@ export type Database = {
           failed_attempts?: number
           id?: string
           last_login_at?: string | null
+          lista_atual_id?: string | null
           locked_until?: string | null
           nome: string
           password_updated_at?: string
@@ -8317,6 +8380,7 @@ export type Database = {
           failed_attempts?: number
           id?: string
           last_login_at?: string | null
+          lista_atual_id?: string | null
           locked_until?: string | null
           nome?: string
           password_updated_at?: string
@@ -8328,6 +8392,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemarketing_operadores_lista_atual_id_fkey"
+            columns: ["lista_atual_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_listas"
             referencedColumns: ["id"]
           },
         ]
