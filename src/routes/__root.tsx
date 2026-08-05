@@ -115,7 +115,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   return (
-    <ClientOnly fallback={<div />}>
+    <ClientOnly fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Carregando framework…</div>}>
       <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Carregando…</div>}>
         <App />
       </Suspense>

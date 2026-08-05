@@ -13,7 +13,7 @@ import SuperAdminClientSwitcher from "@/components/SuperAdminClientSwitcher";
 import RequireClient from "@/components/RequireClient";
 
 
-const AUTH_CHECK_TIMEOUT_MS = 6000;
+const AUTH_CHECK_TIMEOUT_MS = import.meta.env.DEV ? 15000 : 6000;
 
 const hasStoredAuthSession = () => {
   try {
