@@ -10,6 +10,7 @@ import { Loader2, Search, UserCheck, Users, Unlock, Shuffle } from "lucide-react
 import { toast } from "sonner";
 
 interface Operador { id: string; nome: string; ativo?: boolean }
+interface Lista { id: string; nome: string; total_contatos: number }
 interface Contato {
   id: string; nome: string; telefone: string;
   cidade: string | null; bairro: string | null;
@@ -17,7 +18,9 @@ interface Contato {
   assigned_operador_id: string | null;
   assigned_operador_nome: string | null;
   tentativas_count: number;
+  lista_id: string | null;
 }
+
 
 interface Props {
   open: boolean;
