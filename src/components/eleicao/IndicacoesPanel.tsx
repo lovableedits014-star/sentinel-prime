@@ -729,7 +729,18 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {importFor && (
+        <ImportarIndicadosDialog
+          open={!!importFor}
+          onOpenChange={(v) => { if (!v) setImportFor(null); }}
+          indicadorId={importFor.indicador_id}
+          indicadorNome={importFor.nome}
+          onImported={load}
+        />
+      )}
     </div>
+
   );
 }
 
