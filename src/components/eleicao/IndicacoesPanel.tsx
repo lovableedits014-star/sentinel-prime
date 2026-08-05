@@ -84,13 +84,15 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"all" | Tipo>("all");
   const [filtroStatus, setFiltroStatus] = useState<"all" | "zerados" | "abaixo" | "ok">("all");
-  const [config, setConfig] = useState<Config>({ meta_coordenador: 30, meta_lider: 30, meta_cabo: 5, limite_diario_token: 200 });
+  const [config, setConfig] = useState<Config>({ meta_coordenador: 40, meta_lider: 25, meta_cabo: 2, limite_diario_token: 999999 });
   const [savingConfig, setSavingConfig] = useState(false);
   const [gerando, setGerando] = useState<string | null>(null);
   const [candidatoNome, setCandidatoNome] = useState<string>("");
   const [addingFor, setAddingFor] = useState<string | null>(null);
+  const [importFor, setImportFor] = useState<Row | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [nowTick, setNowTick] = useState<number>(Date.now());
+
 
   // ===== Disparo em massa =====
   const TEMPLATE_PADRAO = {
