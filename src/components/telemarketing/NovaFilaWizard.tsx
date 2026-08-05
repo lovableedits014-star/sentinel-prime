@@ -83,6 +83,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
   const [modoDesignacao, setModoDesignacao] = useState<ModoDesignacao>("pool");
   const [operadorUnico, setOperadorUnico] = useState<string>("");
   const [operadoresDividir, setOperadoresDividir] = useState<Set<string>>(new Set());
+  const [nomeLista, setNomeLista] = useState("");
+
 
   const [busy, setBusy] = useState(false);
 
