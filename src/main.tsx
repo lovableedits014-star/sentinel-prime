@@ -2,6 +2,15 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+// Limpa qualquer erro fatal anterior do sessionStorage para permitir reidratação limpa
+try {
+  if (typeof window !== "undefined") {
+    // Remove flags de erro que o roteador possa ter persistido
+    sessionStorage.removeItem('__ts_error');
+    console.log("[main] Environment cleanup complete");
+  }
+} catch (e) {}
+
 createRoot(document.getElementById("root")!).render(<App />);
 
 // ──────────────────────────────────────────────────────────────────────
