@@ -43,10 +43,13 @@ export default function AtribuicoesDialog({
   const [search, setSearch] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<"pendentes" | "todos" | "livres" | "atribuidos">("pendentes");
   const [filtroOperador, setFiltroOperador] = useState<string>(ALL);
+  const [filtroLista, setFiltroLista] = useState<string>(ALL);
+  const [listas, setListas] = useState<Lista[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [modoDistribuicao, setModoDistribuicao] = useState(false);
   const [opsSelecionados, setOpsSelecionados] = useState<Set<string>>(new Set());
+
 
   const load = async () => {
     setLoading(true);
