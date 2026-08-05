@@ -10020,6 +10020,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      hash_telemarketing_senha: { Args: { p_senha: string }; Returns: string }
       ic_trigger_monthly_drift: { Args: never; Returns: undefined }
       increment_material_download: {
         Args: { _material_id: string }
