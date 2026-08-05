@@ -346,6 +346,16 @@ export default function Eleicao() {
     if (!form.nome.trim() || !form.telefone.trim() || !form.bairro.trim()) {
       toast.error("Nome, telefone e bairro são obrigatórios"); return;
     }
+
+    const telLimpo = onlyDigits(form.telefone);
+    const dupe = pessoas.find(p => p.id !== editing?.id && onlyDigits(p.telefone) === telLimpo);
+    if (dupe) {
+      toast.error(`Já existe um cadastro com este telefone: ${dupe.nome} (${TIPO_META[dupe.tipo].label})`, {
+        description: "O sistema não permite telefones duplicados para garantir a integridade da comunicação."
+      });
+      return;
+    }
+
     if (form.escopo === "interior" && !form.cidade.trim()) {
       toast.error("Cidade é obrigatória para Interior"); return;
     }
