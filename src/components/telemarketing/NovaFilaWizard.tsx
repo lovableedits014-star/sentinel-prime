@@ -97,9 +97,11 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     setPasteMode(false); setPasteText(""); setSkipGlobalDupes(true);
     setCidade(""); setBairro(""); setTipo("__all__"); setIndicadorId("__all__");
     setApenasPendentes(true); setSubstituir(false);
-    setIntro(""); setPerguntas(""); setWhatsappTemplate("");
+    setIntro(""); setPerguntas(""); setTags("Não mora mais aqui\nNúmero errado\nPediu retorno"); setWhatsappTemplate("");
     setModoDesignacao("pool"); setOperadorUnico(""); setOperadoresDividir(new Set());
+    setNomeLista("");
     if (fileRef.current) fileRef.current.value = "";
+
   }, [open]);
 
   useEffect(() => {
