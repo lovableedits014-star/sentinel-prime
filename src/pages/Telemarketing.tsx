@@ -620,10 +620,16 @@ export default function Telemarketing() {
           <p className="text-xs text-muted-foreground">
             Operador: <span className="font-medium text-foreground">{operadorNome}</span>
             {campanhaNome && <> · Fila: <span className="font-medium text-foreground">{campanhaNome}</span></>}
+            {current?.lista_id && (
+              <Badge variant="outline" className="ml-2 bg-amber-500/10 text-amber-700 border-amber-500/20 animate-pulse">
+                <Lock className="w-3 h-3 mr-1" />
+                Lista Designada
+              </Badge>
+            )}
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          {!campanhaIdParam && scripts.length > 1 && (
+          {!current?.lista_id && !campanhaIdParam && scripts.length > 1 && (
             <Button size="sm" variant="outline" onClick={() => setPickingCampanha(true)}>
               Trocar campanha
             </Button>
