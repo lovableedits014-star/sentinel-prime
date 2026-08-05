@@ -188,10 +188,16 @@ const RoutesWithBoundary = () => {
 };
 
 const AppRouter = () => {
-  const history = useMemo(() => createBrowserHistory({ window }), []);
+  const [history, setHistory] = useState<any>(null);
+
+  useEffect(() => {
+    setHistory(createBrowserHistory({ window }));
+  }, []);
+
+  if (!history) return <PageFallback />;
 
   return (
-    <HistoryRouter history={history as any} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <HistoryRouter history={history} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <RoutesWithBoundary />
     </HistoryRouter>
   );
