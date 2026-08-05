@@ -81,7 +81,12 @@ export default function AtribuicoesDialog({
         if (filtroOperador === NONE) { if (c.assigned_operador_id) return false; }
         else if (c.assigned_operador_id !== filtroOperador) return false;
       }
+      if (filtroLista !== ALL) {
+        if (filtroLista === NONE) { if (c.lista_id) return false; }
+        else if (c.lista_id !== filtroLista) return false;
+      }
       if (q && !(`${c.nome} ${c.telefone} ${c.cidade || ""} ${c.bairro || ""}`.toLowerCase().includes(q))) return false;
+
       return true;
     });
   }, [contatos, search, filtroStatus, filtroOperador]);
