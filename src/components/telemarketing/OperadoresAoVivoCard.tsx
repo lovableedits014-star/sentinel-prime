@@ -12,7 +12,9 @@ interface OperadorLive {
   contato_telefone: string | null;
   started_at: string;
   expires_at: string;
+  lista_nome?: string | null;
 }
+
 
 function fmtAgo(ts: string) {
   const s = Math.max(0, Math.floor((Date.now() - new Date(ts).getTime()) / 1000));
@@ -65,6 +67,12 @@ export default function OperadoresAoVivoCard({ clientId }: { clientId: string })
                   <User2 className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span className="font-medium truncate">{r.operador_nome}</span>
                   <span className="text-muted-foreground truncate">→ {r.contato_nome || "(sem nome)"}</span>
+                  {r.lista_nome && (
+                    <Badge variant="outline" className="text-[9px] px-1 h-3.5 bg-primary/5 border-primary/20 text-primary uppercase font-bold shrink-0">
+                      {r.lista_nome}
+                    </Badge>
+                  )}
+
                 </div>
                 <span className="text-[10px] text-muted-foreground shrink-0">há {fmtAgo(r.started_at)}</span>
               </li>
