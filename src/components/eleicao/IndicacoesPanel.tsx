@@ -415,6 +415,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                 {filtered.map((r) => {
                   const pct = r.meta ? Math.min(100, Math.round((r.total_indicacoes / r.meta) * 100)) : 0;
                   const cor = r.total_indicacoes === 0 ? "bg-red-500" : pct < 50 ? "bg-amber-500" : pct < 100 ? "bg-blue-500" : "bg-emerald-500";
+                  const faltam = Math.max(0, (r.meta || 0) - (r.total_indicacoes || 0));
                   return (
                     <div key={r.indicador_id} className="p-3 hover:bg-muted/40 transition-colors">
                       <div className="flex items-center gap-3">
@@ -422,6 +423,18 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium truncate">{r.nome}</span>
                             <Badge variant="outline" className="text-[10px]">{tipoLabel[r.tipo]}</Badge>
+                            {faltam > 0 ? (
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] gap-1 ${r.total_indicacoes === 0 ? "border-red-500/60 text-red-600" : "border-amber-500/60 text-amber-600"}`}
+                                title={`Meta do cargo: ${r.meta}`}
+                              >
+                                <AlertTriangle className="w-3 h-3" />
+                                Fora da meta — faltam {faltam}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] border-emerald-500/60 text-emerald-600">Meta ok</Badge>
+                            )}
                             {r.regiao && <span className="text-xs text-muted-foreground">{r.regiao}{r.cidade ? ` · ${r.cidade}` : ""}</span>}
                           </div>
                           <div className="flex items-center gap-2 mt-1.5">
@@ -452,7 +465,16 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                               {addingFor === r.indicador_id ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Importar planilha de indicações (nome, telefone, bairro)"
+                            onClick={() => setImportFor(r)}
+                          >
+                            <FileSpreadsheet className="w-4 h-4" />
+                          </Button>
                           {r.token ? (
+
                             <>
                               <Button size="sm" variant="ghost" title="Copiar link" onClick={() => copiarLink(r.token!)}>
                                 <Copy className="w-4 h-4" />
