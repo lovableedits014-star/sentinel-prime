@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye, UserPlus, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye, UserPlus, Plus, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from "lucide-react";
 import CobrancaAutoConfig from "./CobrancaAutoConfig";
 import IndicarPaginaConfig from "./IndicarPaginaConfig";
+import ImportarIndicadosDialog from "./ImportarIndicadosDialog";
+
 
 type DispatchHist = {
   id: string;
@@ -82,13 +84,15 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"all" | Tipo>("all");
   const [filtroStatus, setFiltroStatus] = useState<"all" | "zerados" | "abaixo" | "ok">("all");
-  const [config, setConfig] = useState<Config>({ meta_coordenador: 30, meta_lider: 30, meta_cabo: 5, limite_diario_token: 200 });
+  const [config, setConfig] = useState<Config>({ meta_coordenador: 40, meta_lider: 25, meta_cabo: 2, limite_diario_token: 999999 });
   const [savingConfig, setSavingConfig] = useState(false);
   const [gerando, setGerando] = useState<string | null>(null);
   const [candidatoNome, setCandidatoNome] = useState<string>("");
   const [addingFor, setAddingFor] = useState<string | null>(null);
+  const [importFor, setImportFor] = useState<Row | null>(null);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [nowTick, setNowTick] = useState<number>(Date.now());
+
 
   // ===== Disparo em massa =====
   const TEMPLATE_PADRAO = {
@@ -166,8 +170,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     }
     const grandTotal = agg.coord.total + agg.lider.total + agg.cabo.total;
     const grandMeta = agg.coord.meta + agg.lider.meta + agg.cabo.meta;
-    return { agg, grandTotal, grandMeta };
+    const foraDaMeta = rows.filter((r) => (r.total_indicacoes || 0) < (r.meta || 0)).length;
+    return { agg, grandTotal, grandMeta, foraDaMeta };
   }, [rows]);
+
 
   async function gerarToken(indicadorId: string) {
     setGerando(indicadorId);
@@ -339,11 +345,18 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
         {/* ──────────── COBRANÇA ──────────── */}
         <TabsContent value="cobranca" className="space-y-4 mt-4">
           {/* KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Card className="p-3">
               <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Total geral</div>
               <div className="text-2xl font-bold">{stats.grandTotal.toLocaleString("pt-BR")}</div>
               <div className="text-[11px] text-muted-foreground">de {stats.grandMeta.toLocaleString("pt-BR")} esperadas</div>
+            </Card>
+            <Card className="p-3 border-amber-500/40">
+              <div className="text-[11px] text-amber-600 uppercase tracking-wide flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />Fora da meta
+              </div>
+              <div className="text-2xl font-bold text-amber-600">{stats.foraDaMeta.toLocaleString("pt-BR")}</div>
+              <div className="text-[11px] text-muted-foreground">de {rows.length} indicadores</div>
             </Card>
             {(["coord", "lider", "cabo"] as const).map((k) => {
               const a = stats.agg[k];
@@ -358,6 +371,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               );
             })}
           </div>
+
 
           {/* Filtros */}
           <div className="flex flex-wrap gap-2 items-center">
@@ -401,6 +415,7 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                 {filtered.map((r) => {
                   const pct = r.meta ? Math.min(100, Math.round((r.total_indicacoes / r.meta) * 100)) : 0;
                   const cor = r.total_indicacoes === 0 ? "bg-red-500" : pct < 50 ? "bg-amber-500" : pct < 100 ? "bg-blue-500" : "bg-emerald-500";
+                  const faltam = Math.max(0, (r.meta || 0) - (r.total_indicacoes || 0));
                   return (
                     <div key={r.indicador_id} className="p-3 hover:bg-muted/40 transition-colors">
                       <div className="flex items-center gap-3">
@@ -408,6 +423,18 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium truncate">{r.nome}</span>
                             <Badge variant="outline" className="text-[10px]">{tipoLabel[r.tipo]}</Badge>
+                            {faltam > 0 ? (
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] gap-1 ${r.total_indicacoes === 0 ? "border-red-500/60 text-red-600" : "border-amber-500/60 text-amber-600"}`}
+                                title={`Meta do cargo: ${r.meta}`}
+                              >
+                                <AlertTriangle className="w-3 h-3" />
+                                Fora da meta — faltam {faltam}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] border-emerald-500/60 text-emerald-600">Meta ok</Badge>
+                            )}
                             {r.regiao && <span className="text-xs text-muted-foreground">{r.regiao}{r.cidade ? ` · ${r.cidade}` : ""}</span>}
                           </div>
                           <div className="flex items-center gap-2 mt-1.5">
@@ -438,7 +465,16 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                               {addingFor === r.indicador_id ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Importar planilha de indicações (nome, telefone, bairro)"
+                            onClick={() => setImportFor(r)}
+                          >
+                            <FileSpreadsheet className="w-4 h-4" />
+                          </Button>
                           {r.token ? (
+
                             <>
                               <Button size="sm" variant="ghost" title="Copiar link" onClick={() => copiarLink(r.token!)}>
                                 <Copy className="w-4 h-4" />
@@ -550,14 +586,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
             </div>
 
             <div className="border-t pt-4">
-              <Label className="text-xs">Limite diário de indicações por link</Label>
-              <Input type="number" min={1} max={1000} value={config.limite_diario_token}
-                onChange={(e) => setConfig({ ...config, limite_diario_token: parseInt(e.target.value) || 0 })}
-                className="max-w-[150px]" />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Proteção contra abuso. Se um indicador atingir esse número em 24h, novas indicações ficam bloqueadas até o dia seguinte. Padrão: 200.
+              <p className="text-[11px] text-muted-foreground">
+                Não existe limite de quantidade: coordenadores, líderes e cabos podem indicar à vontade.
+                As metas acima servem apenas como sinalização — quem estiver abaixo aparece marcado como
+                <strong> fora da meta</strong> na lista e entra nas cobranças.
               </p>
             </div>
+
 
             <div className="flex justify-end">
               <Button onClick={salvarConfig} disabled={savingConfig}>
@@ -694,7 +729,18 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {importFor && (
+        <ImportarIndicadosDialog
+          open={!!importFor}
+          onOpenChange={(v) => { if (!v) setImportFor(null); }}
+          indicadorId={importFor.indicador_id}
+          indicadorNome={importFor.nome}
+          onImported={load}
+        />
+      )}
     </div>
+
   );
 }
 
