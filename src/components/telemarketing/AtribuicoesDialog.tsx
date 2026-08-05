@@ -89,7 +89,7 @@ export default function AtribuicoesDialog({
 
       return true;
     });
-  }, [contatos, search, filtroStatus, filtroOperador]);
+  }, [contatos, search, filtroStatus, filtroOperador, filtroLista]);
 
   const counts = useMemo(() => {
     const pend = contatos.filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
