@@ -9417,6 +9417,7 @@ export type Database = {
           cidade: string | null
           client_id: string | null
           cobrancas_enviadas: number | null
+          fora_da_meta: boolean | null
           indicador_id: string | null
           meta: number | null
           nome: string | null
@@ -9634,6 +9635,10 @@ export type Database = {
         Returns: string
       }
       eleicao_indicador_info: { Args: { _token: string }; Returns: Json }
+      eleicao_indicar_lote: {
+        Args: { _indicador_id: string; _linhas: Json }
+        Returns: Json
+      }
       eleicao_indicar_via_token: {
         Args: {
           _bairro?: string
