@@ -170,8 +170,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     }
     const grandTotal = agg.coord.total + agg.lider.total + agg.cabo.total;
     const grandMeta = agg.coord.meta + agg.lider.meta + agg.cabo.meta;
-    return { agg, grandTotal, grandMeta };
+    const foraDaMeta = rows.filter((r) => (r.total_indicacoes || 0) < (r.meta || 0)).length;
+    return { agg, grandTotal, grandMeta, foraDaMeta };
   }, [rows]);
+
 
   async function gerarToken(indicadorId: string) {
     setGerando(indicadorId);
