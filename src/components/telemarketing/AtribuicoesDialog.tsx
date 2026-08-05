@@ -10,6 +10,7 @@ import { Loader2, Search, UserCheck, Users, Unlock, Shuffle } from "lucide-react
 import { toast } from "sonner";
 
 interface Operador { id: string; nome: string; ativo?: boolean }
+interface Lista { id: string; nome: string; total_contatos: number }
 interface Contato {
   id: string; nome: string; telefone: string;
   cidade: string | null; bairro: string | null;
@@ -17,7 +18,9 @@ interface Contato {
   assigned_operador_id: string | null;
   assigned_operador_nome: string | null;
   tentativas_count: number;
+  lista_id: string | null;
 }
+
 
 interface Props {
   open: boolean;
@@ -40,20 +43,29 @@ export default function AtribuicoesDialog({
   const [search, setSearch] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<"pendentes" | "todos" | "livres" | "atribuidos">("pendentes");
   const [filtroOperador, setFiltroOperador] = useState<string>(ALL);
+  const [filtroLista, setFiltroLista] = useState<string>(ALL);
+  const [listas, setListas] = useState<Lista[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [modoDistribuicao, setModoDistribuicao] = useState(false);
   const [opsSelecionados, setOpsSelecionados] = useState<Set<string>>(new Set());
 
+
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("tele_admin_listar_avulsos" as any, {
-      _client_id: clientId, _campanha_id: campanhaId,
-    });
+    const [{ data: contatosData, error: errC }, { data: listasData, error: errL }] = await Promise.all([
+      supabase.rpc("tele_admin_listar_avulsos" as any, { _client_id: clientId, _campanha_id: campanhaId }),
+      supabase.from('telemarketing_listas').select('id, nome').eq('client_id', clientId).order('created_at', { ascending: false })
+    ]);
+    
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setContatos((data as any[]) || []);
+    if (errC) { toast.error(errC.message); return; }
+    if (errL) { toast.error(errL.message); return; }
+    
+    setContatos((contatosData as any[]) || []);
+    setListas((listasData as any[]) || []);
     setSelected(new Set());
+
   };
 
   useEffect(() => { if (open) { load(); setModoDistribuicao(false); setOpsSelecionados(new Set()); } /* eslint-disable-next-line */ }, [open, campanhaId]);
@@ -69,10 +81,15 @@ export default function AtribuicoesDialog({
         if (filtroOperador === NONE) { if (c.assigned_operador_id) return false; }
         else if (c.assigned_operador_id !== filtroOperador) return false;
       }
+      if (filtroLista !== ALL) {
+        if (filtroLista === NONE) { if (c.lista_id) return false; }
+        else if (c.lista_id !== filtroLista) return false;
+      }
       if (q && !(`${c.nome} ${c.telefone} ${c.cidade || ""} ${c.bairro || ""}`.toLowerCase().includes(q))) return false;
+
       return true;
     });
-  }, [contatos, search, filtroStatus, filtroOperador]);
+  }, [contatos, search, filtroStatus, filtroOperador, filtroLista]);
 
   const counts = useMemo(() => {
     const pend = contatos.filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
@@ -193,6 +210,15 @@ export default function AtribuicoesDialog({
               {operadores.map(o => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={filtroLista} onValueChange={setFiltroLista}>
+            <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Lista..." /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas as listas</SelectItem>
+              <SelectItem value={NONE}>— Sem lista —</SelectItem>
+              {listas.map(l => <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
           <Button size="sm" variant="outline" onClick={redistribuirFila} disabled={busy}>
             <Shuffle className="w-3.5 h-3.5 mr-1" />Redistribuir fila
           </Button>

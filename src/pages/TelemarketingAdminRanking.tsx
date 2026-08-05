@@ -100,7 +100,7 @@ export default function TelemarketingAdminRanking() {
           <Settings2 className="w-3.5 h-3.5" />
           Metas atuais — Coordenador: <strong className="text-foreground">{metaCfg.meta_coordenador}</strong> · Líder: <strong className="text-foreground">{metaCfg.meta_lider}</strong> · Cabo: <strong className="text-foreground">{metaCfg.meta_cabo}</strong>
           <Button asChild variant="link" size="sm" className="h-auto px-1 py-0">
-            <Link to="/eleicao">Ajustar em Eleição → Indicações</Link>
+            <Link to="/$">Ajustar em Eleição → Indicações</Link>
           </Button>
         </div>
       )}

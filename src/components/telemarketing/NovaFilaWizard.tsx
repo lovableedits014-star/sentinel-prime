@@ -83,6 +83,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
   const [modoDesignacao, setModoDesignacao] = useState<ModoDesignacao>("pool");
   const [operadorUnico, setOperadorUnico] = useState<string>("");
   const [operadoresDividir, setOperadoresDividir] = useState<Set<string>>(new Set());
+  const [nomeLista, setNomeLista] = useState("");
+
 
   const [busy, setBusy] = useState(false);
 
@@ -95,9 +97,11 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     setPasteMode(false); setPasteText(""); setSkipGlobalDupes(true);
     setCidade(""); setBairro(""); setTipo("__all__"); setIndicadorId("__all__");
     setApenasPendentes(true); setSubstituir(false);
-    setIntro(""); setPerguntas(""); setWhatsappTemplate("");
+    setIntro(""); setPerguntas(""); setTags("Não mora mais aqui\nNúmero errado\nPediu retorno"); setWhatsappTemplate("");
     setModoDesignacao("pool"); setOperadorUnico(""); setOperadoresDividir(new Set());
+    setNomeLista("");
     if (fileRef.current) fileRef.current.value = "";
+
   }, [open]);
 
   useEffect(() => {
@@ -266,7 +270,9 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
         _rows: csvRows as any,
         _assigned_operador_id: opUnicoParaCriar,
         _skip_global_dupes: skipGlobalDupes,
+        _lista_nome: nomeLista.trim() || null,
       });
+
       if (impErr) { setBusy(false); toast.error("Fila criada, mas falhou a importação: " + impErr.message); return; }
       const r = (impData as any) || {};
       total = Number(r.inserted || 0);
@@ -382,26 +388,43 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
             {origem === "csv" ? (
               <>
                 {!pasteMode && !fileName && (
-                  <Card
-                    className="p-8 text-center border-dashed border-2 cursor-pointer hover:bg-muted/40"
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    <Upload className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
-                    <div className="font-medium">Clique para escolher um arquivo</div>
-                    <div className="text-xs text-muted-foreground mt-1">Aceita .xlsx, .xls e .csv</div>
-                    <input
-                      ref={fileRef} type="file" className="hidden"
-                      accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
-                    />
-                    {parsing && <div className="mt-3 text-sm flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Lendo…</div>}
-                    <div className="mt-4 text-xs">
-                      <button type="button" className="underline text-muted-foreground hover:text-foreground" onClick={() => setPasteMode(true)}>
-                        Prefiro colar texto
-                      </button>
+                  <div className="space-y-4">
+                    <Card
+                      className="p-8 text-center border-dashed border-2 cursor-pointer hover:bg-muted/40"
+                      onClick={() => fileRef.current?.click()}
+                    >
+                      <Upload className="w-10 h-10 mx-auto mb-2 text-muted-foreground" />
+                      <div className="font-medium">Clique para escolher um arquivo</div>
+                      <div className="text-xs text-muted-foreground mt-1">Aceita .xlsx, .xls e .csv</div>
+                      <input
+                        ref={fileRef} type="file" className="hidden"
+                        accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
+                      />
+                      {parsing && <div className="mt-3 text-sm flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Lendo…</div>}
+                      <div className="mt-4 text-xs">
+                        <button type="button" className="underline text-muted-foreground hover:text-foreground" onClick={() => setPasteMode(true)}>
+                          Prefiro colar texto
+                        </button>
+                      </div>
+                    </Card>
+
+                    <div className="bg-muted/50 p-4 rounded-lg border space-y-3">
+                      <Label className="flex items-center gap-2">
+                        <Database className="w-4 h-4 text-primary" /> Nome desta lista para relatórios
+                      </Label>
+                      <Input 
+                        placeholder="Ex: Lote 1 - Bairro Centro" 
+                        value={nomeLista} 
+                        onChange={(e) => setNomeLista(e.target.value)} 
+                      />
+                      <p className="text-[10px] text-muted-foreground italic">
+                        Ao salvar com um nome, o sistema cria um agrupamento permanente para você gerar relatórios individuais deste lote depois.
+                      </p>
                     </div>
-                  </Card>
+                  </div>
                 )}
+
 
                 {!pasteMode && fileName && (
                   <div className="space-y-3">

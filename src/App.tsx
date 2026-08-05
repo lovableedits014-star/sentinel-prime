@@ -66,7 +66,9 @@ const TelemarketingAdminOperadores = lazy(() => import("./pages/TelemarketingAdm
 const TelemarketingAdminConfig = lazy(() => import("./pages/TelemarketingAdminConfig"));
 const TelemarketingAdminCampanhas = lazy(() => import("./pages/TelemarketingAdminCampanhas"));
 const TelemarketingAdminFilas = lazy(() => import("./pages/TelemarketingAdminFilas"));
+const TelemarketingAdminListas = lazy(() => import("./pages/TelemarketingAdminListas"));
 const FotosCampanha = lazy(() => import("./pages/FotosCampanha"));
+
 const GaleriaPublica = lazy(() => import("./pages/GaleriaPublica"));
 const GaleriaEvento = lazy(() => import("./pages/GaleriaEvento"));
 const MissaoPublica = lazy(() => import("./pages/MissaoPublica"));
@@ -172,6 +174,8 @@ const RoutesWithBoundary = () => {
               <Route path="/telemarketing-admin/configuracoes" element={<TelemarketingAdminConfig />} />
               <Route path="/telemarketing-admin/campanhas" element={<TelemarketingAdminCampanhas />} />
             <Route path="/telemarketing-admin/filas" element={<TelemarketingAdminFilas />} />
+            <Route path="/telemarketing-admin/listas" element={<TelemarketingAdminListas />} />
+
             <Route path="/fotos-campanha" element={<FotosCampanha />} />
               <Route path="/status-whatsapp" element={<Navigate to="/whatsapp?tab=status" replace />} />
             </Route>
