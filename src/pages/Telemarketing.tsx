@@ -31,6 +31,7 @@ interface ContatoTele {
   campanha_id: string | null;
   indicador_nome: string | null;
   indicador_tipo: string | null;
+  lista_id: string | null;
 }
 
 interface CampanhaScript {
@@ -172,6 +173,7 @@ export default function Telemarketing() {
       campanha_id: r.campanha_id ?? null,
       indicador_nome: r.indicador_nome ?? null,
       indicador_tipo: r.indicador_tipo ?? null,
+      lista_id: r.lista_id ?? null,
     }));
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
@@ -212,7 +214,13 @@ export default function Telemarketing() {
       _campanha_id: selectedCampanhaId,
       _ttl_seconds: 300,
     });
-    const res = pick as { found: boolean; tabela?: string; contato_id?: string } | null;
+    const res = pick as { found: boolean; tabela?: string; contato_id?: string; lista_id?: string } | null;
+    
+    // Se o operador tem lista travada, ignoramos escolha de campanha e focamos na lista
+    if (res?.lista_id) {
+      setPickingCampanha(false);
+    }
+
     if (res?.found) {
       const idx = lista.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
       setCurrentIndex(idx >= 0 ? idx : 0);
@@ -272,6 +280,7 @@ export default function Telemarketing() {
         campanha_id: r.campanha_id ?? null,
         indicador_nome: r.indicador_nome ?? null,
         indicador_tipo: r.indicador_tipo ?? null,
+        lista_id: r.lista_id ?? null,
       }))
       .filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
     setContatos(lista);
@@ -325,6 +334,7 @@ export default function Telemarketing() {
         campanha_id: r.campanha_id ?? null,
         indicador_nome: r.indicador_nome ?? null,
         indicador_tipo: r.indicador_tipo ?? null,
+        lista_id: r.lista_id ?? null,
       }))
       .filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
     setContatos(lista);
@@ -616,10 +626,16 @@ export default function Telemarketing() {
           <p className="text-xs text-muted-foreground">
             Operador: <span className="font-medium text-foreground">{operadorNome}</span>
             {campanhaNome && <> · Fila: <span className="font-medium text-foreground">{campanhaNome}</span></>}
+            {current?.lista_id && (
+              <Badge variant="outline" className="ml-2 bg-amber-500/10 text-amber-700 border-amber-500/20 animate-pulse">
+                <Lock className="w-3 h-3 mr-1" />
+                Lista Designada
+              </Badge>
+            )}
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          {!campanhaIdParam && scripts.length > 1 && (
+          {!current?.lista_id && !campanhaIdParam && scripts.length > 1 && (
             <Button size="sm" variant="outline" onClick={() => setPickingCampanha(true)}>
               Trocar campanha
             </Button>
@@ -640,7 +656,8 @@ export default function Telemarketing() {
       </div>
 
       {/* Type filter */}
-      <div className="flex gap-2 flex-wrap">
+      {!current?.lista_id && (
+        <div className="flex gap-2 flex-wrap">
         {(["todos", "lider", "liderado", "indicado", "avulso", "eleicao_indicado", "estrutura"] as const).map((f) => (
           <Button
             key={f}
@@ -657,6 +674,7 @@ export default function Telemarketing() {
           </Button>
         ))}
       </div>
+      )}
 
       {/* Current contact */}
       {current ? (
