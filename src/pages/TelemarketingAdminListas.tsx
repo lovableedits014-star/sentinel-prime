@@ -8,8 +8,10 @@ import {
   Users, 
   Calendar, 
   BarChart3,
-  ExternalLink,
-  Table as TableIcon
+  Table as TableIcon,
+  AlertTriangle,
+  X,
+  UserCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,6 +25,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -30,6 +39,10 @@ export default function TelemarketingAdminListas() {
   const [listas, setListas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState("");
+  const [dupesOpen, setDupesOpen] = useState(false);
+  const [selectedLista, setSelectedLista] = useState<any>(null);
+  const [dupes, setDupes] = useState<any[]>([]);
+  const [loadingDupes, setLoadingDupes] = useState(false);
   const { toast } = useToast();
 
   const fetchListas = async () => {
@@ -53,12 +66,36 @@ export default function TelemarketingAdminListas() {
     fetchListas();
   }, []);
 
+  const openDupes = async (lista: any) => {
+    setSelectedLista(lista);
+    setDupesOpen(true);
+    setLoadingDupes(true);
+    try {
+      const { data, error } = await supabase
+        .from('telemarketing_import_duplicatas')
+        .select('*')
+        .eq('lista_id', lista.id)
+        .order('criado_em', { ascending: false });
+      
+      if (error) throw error;
+      setDupes(data || []);
+    } catch (err: any) {
+      toast({
+        title: "Erro ao carregar duplicatas",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingDupes(false);
+    }
+  };
+
   const filteredListas = listas.filter(l => 
     l.nome?.toLowerCase().includes(filtro.toLowerCase())
   );
 
   const totalContatos = listas.reduce((acc, curr) => acc + curr.total_contatos, 0);
-  const totalConcluidos = listas.reduce((acc, curr) => acc + curr.concluidos, 0);
+  const totalConcluidos = listas.reduce((acc, curr) => acc + (curr.concluidos || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -128,7 +165,7 @@ export default function TelemarketingAdminListas() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">
               <CardTitle>Listas Importadas</CardTitle>
-              <CardDescription>Clique em uma lista para ver o relatório detalhado ou designar operadores.</CardDescription>
+              <CardDescription>Gerencie os lotes de importação e verifique duplicatas filtradas pelo sistema.</CardDescription>
             </div>
             <div className="relative w-full md:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -169,7 +206,14 @@ export default function TelemarketingAdminListas() {
                 filteredListas.map((lista) => (
                   <TableRow key={lista.id}>
                     <TableCell className="font-medium">
-                      {lista.nome}
+                      <div className="flex flex-col">
+                        <span>{lista.nome}</span>
+                        {lista.campanha_nome && (
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
+                            <Users className="w-3 h-3" /> {lista.campanha_nome}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -178,20 +222,31 @@ export default function TelemarketingAdminListas() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="font-mono">
-                        {lista.total_contatos}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="font-mono">
+                          {lista.total_contatos}
+                        </Badge>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-[10px] gap-1 px-2"
+                          onClick={() => openDupes(lista)}
+                        >
+                          <AlertTriangle className="w-3 h-3 text-amber-500" />
+                          Duplicados
+                        </Button>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1 w-full max-w-[120px]">
                         <div className="flex justify-between text-[10px] font-medium">
-                          <span>{Math.round((lista.concluidos / lista.total_contatos) * 100)}%</span>
-                          <span className="text-muted-foreground">{lista.concluidos}/{lista.total_contatos}</span>
+                          <span>{lista.total_contatos > 0 ? Math.round(((lista.concluidos || 0) / lista.total_contatos) * 100) : 0}%</span>
+                          <span className="text-muted-foreground">{lista.concluidos || 0}/{lista.total_contatos}</span>
                         </div>
                         <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-primary transition-all" 
-                            style={{ width: `${(lista.concluidos / lista.total_contatos) * 100}%` }}
+                            style={{ width: `${lista.total_contatos > 0 ? ((lista.concluidos || 0) / lista.total_contatos) * 100 : 0}%` }}
                           />
                         </div>
                       </div>
@@ -204,11 +259,14 @@ export default function TelemarketingAdminListas() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem className="gap-2" onClick={() => openDupes(lista)}>
+                            <AlertTriangle className="w-4 h-4 text-amber-500" /> Ver Duplicados
+                          </DropdownMenuItem>
                           <DropdownMenuItem className="gap-2">
-                            <BarChart3 className="w-4 h-4" /> Relatório
+                            <BarChart3 className="w-4 h-4" /> Relatório Completo
                           </DropdownMenuItem>
                           <DropdownMenuItem className="gap-2 text-destructive">
-                            <Trash2 className="w-4 h-4" /> Excluir
+                            <Trash2 className="w-4 h-4" /> Excluir Lista
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -220,6 +278,80 @@ export default function TelemarketingAdminListas() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Dialog de Duplicatas */}
+      <Dialog open={dupesOpen} onOpenChange={setDupesOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  Contatos Duplicados - {selectedLista?.nome}
+                </DialogTitle>
+                <DialogDescription>
+                  Estes contatos foram detectados na planilha, mas ignorados na importação por já existirem no sistema.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
+            {loadingDupes ? (
+              <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
+                <Users className="w-8 h-8 animate-pulse text-muted-foreground/40" />
+                Carregando histórico de duplicatas...
+              </div>
+            ) : dupes.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground flex flex-col items-center gap-3 bg-muted/20 rounded-lg border-2 border-dashed">
+                <UserCheck className="w-10 h-10 text-green-500/40" />
+                <div>
+                  <p className="font-medium text-foreground">Lista 100% Limpa!</p>
+                  <p className="text-xs">Nenhum contato desta importação era duplicado.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Telefone</TableHead>
+                      <TableHead>Localização</TableHead>
+                      <TableHead>Motivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dupes.map((dupe) => (
+                      <TableRow key={dupe.id}>
+                        <TableCell className="font-medium">{dupe.nome || 'Sem nome'}</TableCell>
+                        <TableCell className="font-mono text-xs">{dupe.telefone}</TableCell>
+                        <TableCell className="text-xs">
+                          {dupe.bairro}{dupe.bairro && dupe.cidade ? ', ' : ''}{dupe.cidade}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[9px] uppercase">
+                            {dupe.motivo === 'global' ? 'Já existe no sistema' : 'Duplicado na lista'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+          
+          <div className="p-6 pt-2 border-t bg-muted/30 flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">
+              Total de <strong>{dupes.length}</strong> duplicatas encontradas
+            </span>
+            <Button variant="outline" onClick={() => setDupesOpen(false)}>
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
