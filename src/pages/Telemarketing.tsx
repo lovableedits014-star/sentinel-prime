@@ -214,7 +214,13 @@ export default function Telemarketing() {
       _campanha_id: selectedCampanhaId,
       _ttl_seconds: 300,
     });
-    const res = pick as { found: boolean; tabela?: string; contato_id?: string } | null;
+    const res = pick as { found: boolean; tabela?: string; contato_id?: string; lista_id?: string } | null;
+    
+    // Se o operador tem lista travada, ignoramos escolha de campanha e focamos na lista
+    if (res?.lista_id) {
+      setPickingCampanha(false);
+    }
+
     if (res?.found) {
       const idx = lista.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
       setCurrentIndex(idx >= 0 ? idx : 0);
