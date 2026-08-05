@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, ListChecks, BarChart3, Users, Settings as SettingsIcon, Phone, Megaphone, Trophy } from "lucide-react";
+import { LayoutDashboard, ListChecks, BarChart3, Users, Settings as SettingsIcon, Phone, Megaphone, Trophy, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
