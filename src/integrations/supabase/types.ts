@@ -10395,6 +10395,19 @@ export type Database = {
           vota_candidato: string
         }[]
       }
+      tele_admin_resumo_listas: {
+        Args: { _campanha_id?: string; _client_id: string }
+        Returns: {
+          campanha_id: string
+          campanha_nome: string
+          criado_em: string
+          id: string
+          ligados: number
+          nome: string
+          pendentes: number
+          total: number
+        }[]
+      }
       tele_assign_contatos: {
         Args: {
           _campanha_id: string
@@ -10444,6 +10457,10 @@ export type Database = {
           _filtros: Json
           _substituir?: boolean
         }
+        Returns: Json
+      }
+      tele_designar_lista_operador: {
+        Args: { _client_id: string; _lista_id: string; _operador_id: string }
         Returns: Json
       }
       tele_distribute_contatos: {
@@ -10505,26 +10522,17 @@ export type Database = {
         }
         Returns: Json
       }
-      tele_import_contato_avulso_batch:
-        | {
-            Args: {
-              _assigned_operador_id?: string
-              _campanha_id: string
-              _client_id: string
-              _rows: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _assigned_operador_id?: string
-              _campanha_id: string
-              _client_id: string
-              _rows: Json
-              _skip_global_dupes?: boolean
-            }
-            Returns: Json
-          }
+      tele_import_contato_avulso_batch: {
+        Args: {
+          _assigned_operador_id?: string
+          _campanha_id: string
+          _client_id: string
+          _lista_nome?: string
+          _rows: Json
+          _skip_global_dupes?: boolean
+        }
+        Returns: Json
+      }
       tele_indicador_drill: {
         Args: {
           _campanha_id?: string
