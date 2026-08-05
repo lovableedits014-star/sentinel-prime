@@ -31,6 +31,7 @@ interface ContatoTele {
   campanha_id: string | null;
   indicador_nome: string | null;
   indicador_tipo: string | null;
+  lista_id: string | null;
 }
 
 interface CampanhaScript {
