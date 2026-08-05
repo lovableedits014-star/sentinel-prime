@@ -210,6 +210,15 @@ export default function AtribuicoesDialog({
               {operadores.map(o => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={filtroLista} onValueChange={setFiltroLista}>
+            <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Lista..." /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas as listas</SelectItem>
+              <SelectItem value={NONE}>— Sem lista —</SelectItem>
+              {listas.map(l => <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
           <Button size="sm" variant="outline" onClick={redistribuirFila} disabled={busy}>
             <Shuffle className="w-3.5 h-3.5 mr-1" />Redistribuir fila
           </Button>
