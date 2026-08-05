@@ -8268,6 +8268,57 @@ export type Database = {
           },
         ]
       }
+      telemarketing_import_duplicatas: {
+        Row: {
+          bairro: string | null
+          cidade: string | null
+          client_id: string
+          criado_em: string | null
+          id: string
+          lista_id: string | null
+          motivo: string | null
+          nome: string | null
+          telefone: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cidade?: string | null
+          client_id: string
+          criado_em?: string | null
+          id?: string
+          lista_id?: string | null
+          motivo?: string | null
+          nome?: string | null
+          telefone?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cidade?: string | null
+          client_id?: string
+          criado_em?: string | null
+          id?: string
+          lista_id?: string | null
+          motivo?: string | null
+          nome?: string | null
+          telefone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemarketing_import_duplicatas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemarketing_import_duplicatas_lista_id_fkey"
+            columns: ["lista_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_listas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telemarketing_listas: {
         Row: {
           arquivado_em: string | null
