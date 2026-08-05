@@ -53,13 +53,19 @@ export default function AtribuicoesDialog({
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("tele_admin_listar_avulsos" as any, {
-      _client_id: clientId, _campanha_id: campanhaId,
-    });
+    const [{ data: contatosData, error: errC }, { data: listasData, error: errL }] = await Promise.all([
+      supabase.rpc("tele_admin_listar_avulsos" as any, { _client_id: clientId, _campanha_id: campanhaId }),
+      supabase.from('telemarketing_listas').select('id, nome').eq('client_id', clientId).order('created_at', { ascending: false })
+    ]);
+    
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setContatos((data as any[]) || []);
+    if (errC) { toast.error(errC.message); return; }
+    if (errL) { toast.error(errL.message); return; }
+    
+    setContatos((contatosData as any[]) || []);
+    setListas((listasData as any[]) || []);
     setSelected(new Set());
+
   };
 
   useEffect(() => { if (open) { load(); setModoDistribuicao(false); setOpsSelecionados(new Set()); } /* eslint-disable-next-line */ }, [open, campanhaId]);
