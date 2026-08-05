@@ -10607,6 +10607,7 @@ export type Database = {
           indicador_tipo: string
           ligacao_em: string
           ligacao_status: string
+          lista_id: string
           locked_by: string
           locked_until: string
           nome: string
