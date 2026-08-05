@@ -550,14 +550,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
             </div>
 
             <div className="border-t pt-4">
-              <Label className="text-xs">Limite diário de indicações por link</Label>
-              <Input type="number" min={1} max={1000} value={config.limite_diario_token}
-                onChange={(e) => setConfig({ ...config, limite_diario_token: parseInt(e.target.value) || 0 })}
-                className="max-w-[150px]" />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Proteção contra abuso. Se um indicador atingir esse número em 24h, novas indicações ficam bloqueadas até o dia seguinte. Padrão: 200.
+              <p className="text-[11px] text-muted-foreground">
+                Não existe limite de quantidade: coordenadores, líderes e cabos podem indicar à vontade.
+                As metas acima servem apenas como sinalização — quem estiver abaixo aparece marcado como
+                <strong> fora da meta</strong> na lista e entra nas cobranças.
               </p>
             </div>
+
 
             <div className="flex justify-end">
               <Button onClick={salvarConfig} disabled={savingConfig}>
