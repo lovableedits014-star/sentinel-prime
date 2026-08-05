@@ -66,7 +66,9 @@ const TelemarketingAdminOperadores = lazy(() => import("./pages/TelemarketingAdm
 const TelemarketingAdminConfig = lazy(() => import("./pages/TelemarketingAdminConfig"));
 const TelemarketingAdminCampanhas = lazy(() => import("./pages/TelemarketingAdminCampanhas"));
 const TelemarketingAdminFilas = lazy(() => import("./pages/TelemarketingAdminFilas"));
+const TelemarketingAdminListas = lazy(() => import("./pages/TelemarketingAdminListas"));
 const FotosCampanha = lazy(() => import("./pages/FotosCampanha"));
+
 const GaleriaPublica = lazy(() => import("./pages/GaleriaPublica"));
 const GaleriaEvento = lazy(() => import("./pages/GaleriaEvento"));
 const MissaoPublica = lazy(() => import("./pages/MissaoPublica"));
