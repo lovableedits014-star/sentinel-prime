@@ -350,8 +350,18 @@ export default function Eleicao() {
     const telLimpo = onlyDigits(form.telefone);
     const dupe = pessoas.find(p => p.id !== editing?.id && onlyDigits(p.telefone) === telLimpo);
     if (dupe) {
-      toast.error(`Já existe um cadastro com este telefone: ${dupe.nome} (${TIPO_META[dupe.tipo].label})`, {
-        description: "O sistema não permite telefones duplicados para garantir a integridade da comunicação."
+      // Buscar o nome do coordenador/pai se houver
+      let vinculadoA = "base geral (avulso)";
+      if (dupe.parent_id) {
+        const pai = pessoas.find(p => p.id === dupe.parent_id);
+        if (pai) {
+          vinculadoA = `${pai.nome} (${TIPO_META[pai.tipo].label})`;
+        }
+      }
+
+      toast.error(`Este telefone já está cadastrado!`, {
+        description: `Pertence a: ${dupe.nome} (${TIPO_META[dupe.tipo].label})\nVinculado a: ${vinculadoA}`,
+        duration: 6000
       });
       return;
     }
