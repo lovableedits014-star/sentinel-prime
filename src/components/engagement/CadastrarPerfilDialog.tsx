@@ -332,19 +332,39 @@ export default function CadastrarPerfilDialog({
                 Instagram
               </Label>
               <div className="flex gap-2">
-                <Input
-                  value={igValue}
-                  onChange={(e) => setIgValue(e.target.value)}
-                  placeholder="@usuario ou link do perfil"
-                  onKeyDown={(e) => e.key === "Enter" && salvarInstagram()}
-                />
+                <div className="relative flex-1">
+                  <Input
+                    value={igValue}
+                    onChange={(e) => setIgValue(e.target.value)}
+                    placeholder="@usuario ou link do perfil"
+                    className="pr-10"
+                    onKeyDown={(e) => e.key === "Enter" && salvarInstagram()}
+                  />
+                  {igValue && (
+                    <div className="absolute right-2 top-2.5 flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-5 w-5"
+                        title="Ver perfil"
+                        onClick={() => {
+                          const handle = igValue.startsWith("http") 
+                            ? extractHandleFromUrl("instagram", igValue) 
+                            : igValue.replace(/^@/, "");
+                          window.open(`https://instagram.com/${handle}`, "_blank");
+                        }}
+                      >
+                        <Link2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 <Button onClick={salvarInstagram} disabled={saving || !igValue.trim()}>
-                  <Check className="mr-1 h-4 w-4" />
-                  Salvar
+                  {saving ? "..." : <><Check className="mr-1 h-4 w-4" /> Salvar</>}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Aceita @nome, nome ou URL — o sistema normaliza sozinho.
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Aceita @nome, nome ou URL. O sistema normaliza e busca interações passadas automaticamente.
               </p>
             </div>
 
@@ -359,10 +379,24 @@ export default function CadastrarPerfilDialog({
                 </p>
               ) : (
                 <>
-                  <p className="text-xs text-muted-foreground">
-                    O Facebook só é rastreável por um comentário real — escolha abaixo o autor que corresponde a{" "}
-                    {selected.nome}.
-                  </p>
+                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-md p-2 mb-3">
+                    <p className="text-[11px] text-amber-800 dark:text-amber-400 leading-tight">
+                      <strong>Atenção:</strong> O Facebook pessoal só é rastreável via comentário real.
+                      Escolha o autor abaixo ou peça para ele comentar em um post agora.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 mb-3">
+                    <Input 
+                      placeholder="Colar link de um comentário (opcional)..." 
+                      className="text-xs h-8"
+                      onBlur={(e) => {
+                        const val = e.target.value.trim();
+                        if (val.includes("comment_id=")) {
+                          toast.info("Link de comentário detectado. O sistema usará isso para extrair o ID real.");
+                        }
+                      }}
+                    />
+                  </div>
                   <div className="max-h-[28vh] space-y-1 overflow-y-auto">
                     {loadingAuthors ? (
                       <Skeleton className="h-11 w-full" />

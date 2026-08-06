@@ -109,10 +109,14 @@ export function extractHandleFromUrl(platform: string, url: string): string | nu
   if (!url) return null;
   try {
     const u = new URL(url.startsWith("http") ? url : `https://${url}`);
-    // Para facebook.com/profile.php?id=123
-    if (platform === "facebook" && u.pathname.includes("profile.php")) {
-      const id = u.searchParams.get("id");
-      return id && /^\d+$/.test(id) ? id : null;
+    // Para facebook.com/profile.php?id=123 ou /posts/123?comment_id=456
+    if (platform === "facebook") {
+      if (u.pathname.includes("profile.php")) {
+        const id = u.searchParams.get("id");
+        return id && /^\d+$/.test(id) ? id : null;
+      }
+      const commentId = u.searchParams.get("comment_id");
+      if (commentId) return commentId; // O ID do comentário muitas vezes contém o ID do autor
     }
     // Pega o primeiro segmento do path
     const segments = u.pathname.split("/").filter(Boolean);
