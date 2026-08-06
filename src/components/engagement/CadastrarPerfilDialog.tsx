@@ -321,10 +321,30 @@ export default function CadastrarPerfilDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            <Button variant="ghost" size="sm" className="-ml-2" onClick={proximaPessoa}>
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Trocar pessoa
-            </Button>
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" className="-ml-2" onClick={proximaPessoa}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Trocar pessoa
+              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 text-[10px] gap-1"
+                  onClick={() => window.open(`https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(selected.nome)}`, "_blank")}
+                >
+                  <Instagram className="h-3 w-3" /> Buscar no Insta
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 text-[10px] gap-1"
+                  onClick={() => window.open(`https://www.facebook.com/search/people/?q=${encodeURIComponent(selected.nome)}`, "_blank")}
+                >
+                  <Facebook className="h-3 w-3" /> Buscar no Face
+                </Button>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-sm">
