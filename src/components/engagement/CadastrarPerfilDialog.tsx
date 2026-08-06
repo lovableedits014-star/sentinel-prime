@@ -44,6 +44,7 @@ export default function CadastrarPerfilDialog({
   const [igValue, setIgValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState<string | null>(null);
+  const [fbValue, setFbValue] = useState("");
 
   // carrega autores não vinculados (FB + IG) uma vez por abertura
   useEffect(() => {
@@ -80,6 +81,7 @@ export default function CadastrarPerfilDialog({
       setQuery("");
       setSelected(null);
       setIgValue("");
+      setFbValue("");
       setResultados([]);
     }
   }, [open]);
@@ -116,6 +118,7 @@ export default function CadastrarPerfilDialog({
   // ao selecionar pessoa, pré-preenche o @ atual
   useEffect(() => {
     setIgValue(selected?.instagram_handle ? `@${selected.instagram_handle.replace(/^@/, "")}` : "");
+    setFbValue(selected?.facebook_key || "");
   }, [selected?.ref_id]);
 
   const autoresFiltrados = useMemo(() => {
@@ -156,6 +159,30 @@ export default function CadastrarPerfilDialog({
       onSaved();
     } catch (e) {
       toast.error("Erro ao salvar @: " + (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  
+  async function salvarFacebook() {
+    if (!selected) return;
+    const raw = fbValue.trim();
+    if (!raw) return;
+    
+    setSaving(true);
+    try {
+      const { relinked, handle } = await upsertSocial(
+        selected.origem,
+        selected.ref_id,
+        "facebook",
+        raw,
+        raw.startsWith("http") ? raw : `https://facebook.com/${raw}`
+      );
+      toast.success(`${handle} salvo${relinked > 0 ? ` — ${relinked} interações vinculadas` : ""}`);
+      setSelected({ ...selected, facebook_key: handle });
+      onSaved();
+    } catch (e) {
+      toast.error("Erro ao salvar Facebook: " + (e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -393,36 +420,63 @@ export default function CadastrarPerfilDialog({
                 <Facebook className="h-4 w-4" />
                 Facebook
               </Label>
-              {selected.facebook_key ? (
-                <p className="text-sm">
-                  Vinculado a <span className="font-medium">{selected.facebook_key}</span>
-                </p>
+              {selected.facebook_key && /^\d{8,}$/.test(selected.facebook_key) ? (
+                <div className="flex items-center justify-between p-2 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50">
+                  <p className="text-sm">
+                    Vinculado ao ID <span className="font-mono font-medium">{selected.facebook_key}</span>
+                  </p>
+                  <Badge variant="outline" className="text-[10px] text-emerald-700">Rastreável</Badge>
+                </div>
               ) : (
                 <>
-                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-md p-2 mb-3">
-                    <p className="text-[11px] text-amber-800 dark:text-amber-400 leading-tight">
-                      <strong>Atenção:</strong> O Facebook pessoal só é rastreável via comentário real.
-                      Escolha o autor abaixo ou peça para ele comentar em um post agora.
+                  <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-md p-2 mb-3">
+                    <p className="text-[11px] text-blue-800 dark:text-blue-400 leading-tight">
+                      <strong>Dica:</strong> Se você tiver o link do perfil (ex: facebook.com/joao), cole abaixo para vincular agora. 
+                      O ID numérico é extraído automaticamente.
                     </p>
                   </div>
                   <div className="flex gap-2 mb-3">
-                    <Input 
-                      placeholder="Colar link de um comentário (opcional)..." 
-                      className="text-xs h-8"
-                      onBlur={(e) => {
-                        const val = e.target.value.trim();
-                        if (val.includes("comment_id=")) {
-                          toast.info("Link de comentário detectado. O sistema usará isso para extrair o ID real.");
-                        }
-                      }}
-                    />
+                    <div className="relative flex-1">
+                      <Input 
+                        value={fbValue}
+                        onChange={(e) => setFbValue(e.target.value)}
+                        placeholder="Link do perfil ou handle..." 
+                        className="text-xs h-9 pr-10"
+                        onKeyDown={(e) => e.key === "Enter" && salvarFacebook()}
+                      />
+                      {fbValue && (
+                        <div className="absolute right-2 top-2 flex gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5"
+                            onClick={() => {
+                              const handle = fbValue.startsWith("http") 
+                                ? extractHandleFromUrl("facebook", fbValue) 
+                                : fbValue;
+                              if (handle) window.open(`https://facebook.com/${handle}`, "_blank");
+                            }}
+                          >
+                            <Link2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <Button size="sm" onClick={salvarFacebook} disabled={saving || !fbValue.trim()}>
+                      {saving ? "..." : <><Check className="mr-1 h-3 w-3" /> Salvar</>}
+                    </Button>
                   </div>
+
+                  <p className="text-[10px] font-semibold uppercase text-muted-foreground mt-4 mb-2">
+                    Autores sugeridos (via comentários)
+                  </p>
+
                   <div className="max-h-[28vh] space-y-1 overflow-y-auto">
                     {loadingAuthors ? (
                       <Skeleton className="h-11 w-full" />
                     ) : sugestoesFb.length === 0 ? (
                       <p className="py-3 text-xs text-muted-foreground">
-                        Nenhum autor do Facebook disponível. Assim que essa pessoa comentar, ela aparece aqui.
+                        Nenhum autor do Facebook detectado nos comentários recentes para este nome.
                       </p>
                     ) : (
                       sugestoesFb.map((a) => (
