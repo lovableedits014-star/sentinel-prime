@@ -360,170 +360,244 @@ export default function CadastrarPerfilDialog({
                 <ArrowLeft className="mr-1 h-4 w-4" />
                 Trocar pessoa
               </Button>
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 text-[10px] gap-1"
-                  onClick={() => window.open(`https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(selected.nome)}`, "_blank")}
-                >
-                  <Instagram className="h-3 w-3" /> Buscar no Insta
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 text-[10px] gap-1"
-                  onClick={() => window.open(`https://www.facebook.com/search/people/?q=${encodeURIComponent(selected.nome)}`, "_blank")}
-                >
-                  <Facebook className="h-3 w-3" /> Buscar no Face
-                </Button>
+              <Badge variant="outline" className="text-[10px] uppercase">
+                {cargoLabel(selected.cargo)}
+              </Badge>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <UserPlus className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold">{selected.nome}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {ORIGEM_LABEL[selected.origem]} {selected.cidade ? `· ${selected.cidade}` : ""}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-sm">
-                <Instagram className="h-4 w-4" />
-                Instagram
-              </Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    value={igValue}
-                    onChange={(e) => setIgValue(e.target.value)}
-                    placeholder="@usuario ou link do perfil"
-                    className="pr-10"
-                    onKeyDown={(e) => e.key === "Enter" && salvarInstagram()}
-                  />
-                  {igValue && (
-                    <div className="absolute right-2 top-2.5 flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-5 w-5"
-                        title="Ver perfil"
-                        onClick={() => {
-                          const handle = igValue.startsWith("http") 
-                            ? extractHandleFromUrl("instagram", igValue) 
-                            : igValue.replace(/^@/, "");
-                          window.open(`https://instagram.com/${handle}`, "_blank");
-                        }}
-                      >
-                        <Link2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+            <div className="space-y-4">
+              {/* INSTAGRAM SECTION */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Instagram className="h-4 w-4 text-pink-600" />
+                    Instagram
+                  </Label>
+                  {selected.instagram_handle ? (
+                    <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 border-emerald-200">
+                      Vinculado: @{selected.instagram_handle}
+                    </Badge>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 text-[10px] px-2"
+                      onClick={() => setManualIgMode(!manualIgMode)}
+                    >
+                      {manualIgMode ? "Ver sugestões" : "Digitar manualmente"}
+                    </Button>
                   )}
                 </div>
-                <Button onClick={salvarInstagram} disabled={saving || !igValue.trim()}>
-                  {saving ? "..." : <><Check className="mr-1 h-4 w-4" /> Salvar</>}
-                </Button>
-              </div>
-              <p className="text-[10px] text-muted-foreground leading-tight">
-                Aceita @nome, nome ou URL. O sistema normaliza e busca interações passadas automaticamente.
-              </p>
-            </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-sm">
-                <Facebook className="h-4 w-4" />
-                Facebook
-              </Label>
-              {selected.facebook_key && /^\d{8,}$/.test(selected.facebook_key) ? (
-                <div className="flex items-center justify-between p-2 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50">
-                  <p className="text-sm">
-                    Vinculado ao ID <span className="font-mono font-medium">{selected.facebook_key}</span>
-                  </p>
-                  <Badge variant="outline" className="text-[10px] text-emerald-700">Rastreável</Badge>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-md p-2 mb-3">
-                    <p className="text-[11px] text-blue-800 dark:text-blue-400 leading-tight">
-                      <strong>Dica:</strong> Se você tiver o link do perfil (ex: facebook.com/joao), cole abaixo para vincular agora. 
-                      O ID numérico é extraído automaticamente.
-                    </p>
+                {!selected.instagram_handle && !manualIgMode && (
+                  <div className="space-y-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-11 justify-start gap-2 bg-pink-50/50 hover:bg-pink-50 dark:bg-pink-950/10 dark:hover:bg-pink-950/20 border-pink-100 dark:border-pink-900/50"
+                      onClick={() => window.open(`https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(selected.nome)}`, "_blank")}
+                    >
+                      <Search className="h-4 w-4 text-pink-600" />
+                      <span className="flex-1 text-left text-xs">Pesquisar "{selected.nome}" no Instagram</span>
+                      <Instagram className="h-4 w-4 opacity-50" />
+                    </Button>
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-semibold uppercase text-muted-foreground">Sugestões (quem comentou)</p>
+                      {loadingAuthors ? (
+                        <Skeleton className="h-11 w-full" />
+                      ) : (
+                        authors
+                          .filter(a => a.platform === "instagram")
+                          .map(a => ({ ...a, score: similarity(selected.nome, a.author_name || "") }))
+                          .sort((a, b) => b.score - a.score || b.total_comments - a.total_comments)
+                          .slice(0, 3)
+                          .map(a => (
+                            <div key={a.platform_user_id} className="flex items-center gap-2 rounded-md border p-2 bg-white dark:bg-background">
+                              <Avatar className="h-7 w-7">
+                                <AvatarImage src={a.author_profile_picture || undefined} />
+                                <AvatarFallback>{(a.author_name || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-medium">{a.author_name}</p>
+                                <p className="text-[10px] text-muted-foreground">{a.total_comments} coment.</p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-[10px] hover:bg-pink-50"
+                                disabled={linking === a.platform_user_id}
+                                onClick={() => vincularAutor(a, selected)}
+                              >
+                                {linking === a.platform_user_id ? "…" : "Vincular"}
+                              </Button>
+                            </div>
+                          ))
+                      )}
+                      {authors.filter(a => a.platform === "instagram").length === 0 && !loadingAuthors && (
+                        <p className="py-2 text-[10px] text-center text-muted-foreground italic">
+                          Nenhum comentário detectado. Use a busca ou digite manual.
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2 mb-3">
+                )}
+
+                {(manualIgMode || selected.instagram_handle) && (
+                  <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Input 
+                      <Input
+                        value={igValue}
+                        onChange={(e) => setIgValue(e.target.value)}
+                        placeholder="@usuario ou link do perfil"
+                        className="pr-10 h-10 text-sm"
+                        onKeyDown={(e) => e.key === "Enter" && salvarInstagram()}
+                      />
+                      {igValue && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="absolute right-1 top-1.5 h-7 w-7"
+                          onClick={() => {
+                            const handle = igValue.startsWith("http") 
+                              ? extractHandleFromUrl("instagram", igValue) 
+                              : igValue.replace(/^@/, "");
+                            window.open(`https://instagram.com/${handle}`, "_blank");
+                          }}
+                        >
+                          <Link2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    <Button onClick={salvarInstagram} disabled={saving || !igValue.trim()} className="h-10 px-4 bg-pink-600 hover:bg-pink-700">
+                      {saving ? "..." : <Check className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* FACEBOOK SECTION */}
+              <div className="space-y-2 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 text-sm">
+                    <Facebook className="h-4 w-4 text-blue-600" />
+                    Facebook
+                  </Label>
+                  {selected.facebook_key ? (
+                    <Badge variant="secondary" className="bg-blue-50 text-blue-700 dark:bg-blue-950/30 border-blue-200">
+                      Vinculado
+                    </Badge>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 text-[10px] px-2"
+                      onClick={() => setManualFbMode(!manualFbMode)}
+                    >
+                      {manualFbMode ? "Ver sugestões" : "Colar link direto"}
+                    </Button>
+                  )}
+                </div>
+
+                {!selected.facebook_key && !manualFbMode && (
+                  <div className="space-y-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-11 justify-start gap-2 bg-blue-50/50 hover:bg-blue-50 dark:bg-blue-950/10 dark:hover:bg-blue-950/20 border-blue-100 dark:border-blue-900/50"
+                      onClick={() => window.open(`https://www.facebook.com/search/people/?q=${encodeURIComponent(selected.nome)}`, "_blank")}
+                    >
+                      <Search className="h-4 w-4 text-blue-600" />
+                      <span className="flex-1 text-left text-xs">Pesquisar "{selected.nome}" no Facebook</span>
+                      <Facebook className="h-4 w-4 opacity-50" />
+                    </Button>
+
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-semibold uppercase text-muted-foreground">Autores sugeridos (via comentários)</p>
+                      {loadingAuthors ? (
+                        <Skeleton className="h-11 w-full" />
+                      ) : sugestoesFb.length === 0 ? (
+                        <p className="py-2 text-[10px] text-center text-muted-foreground italic">
+                          Sem comentários vinculados a este nome.
+                        </p>
+                      ) : (
+                        sugestoesFb.slice(0, 4).map((a) => (
+                          <div key={a.platform_user_id} className="flex items-center gap-2 rounded-md border p-2 bg-white dark:bg-background">
+                            <Avatar className="h-7 w-7">
+                              <AvatarImage src={a.author_profile_picture || undefined} />
+                              <AvatarFallback>{(a.author_name || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium">{a.author_name}</p>
+                              {a.score >= 0.5 && <Badge className="text-[8px] h-3 px-1" variant="secondary">Provável</Badge>}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-[10px] hover:bg-blue-50"
+                              disabled={linking === a.platform_user_id}
+                              onClick={() => vincularAutor(a, selected)}
+                            >
+                              {linking === a.platform_user_id ? "…" : "Vincular"}
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {(manualFbMode || selected.facebook_key) && (
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
                         value={fbValue}
                         onChange={(e) => setFbValue(e.target.value)}
-                        placeholder="Link do perfil ou handle..." 
-                        className="text-xs h-9 pr-10"
+                        placeholder="Link do perfil ou handle..."
+                        className="pr-10 h-10 text-sm"
                         onKeyDown={(e) => e.key === "Enter" && salvarFacebook()}
                       />
                       {fbValue && (
-                        <div className="absolute right-2 top-2 flex gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-5 w-5"
-                            onClick={() => {
-                              const handle = fbValue.startsWith("http") 
-                                ? extractHandleFromUrl("facebook", fbValue) 
-                                : fbValue;
-                              if (handle) window.open(`https://facebook.com/${handle}`, "_blank");
-                            }}
-                          >
-                            <Link2 className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="absolute right-1 top-1.5 h-7 w-7"
+                          onClick={() => {
+                            const handle = fbValue.startsWith("http") 
+                              ? extractHandleFromUrl("facebook", fbValue) 
+                              : fbValue;
+                            if (handle) window.open(`https://facebook.com/${handle}`, "_blank");
+                          }}
+                        >
+                          <Link2 className="h-3 w-3" />
+                        </Button>
                       )}
                     </div>
-                    <Button size="sm" onClick={salvarFacebook} disabled={saving || !fbValue.trim()}>
-                      {saving ? "..." : <><Check className="mr-1 h-3 w-3" /> Salvar</>}
+                    <Button onClick={salvarFacebook} disabled={saving || !fbValue.trim()} className="h-10 px-4 bg-blue-600 hover:bg-blue-700">
+                      {saving ? "..." : <Check className="h-4 w-4" />}
                     </Button>
                   </div>
-
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground mt-4 mb-2">
-                    Autores sugeridos (via comentários)
-                  </p>
-
-                  <div className="max-h-[28vh] space-y-1 overflow-y-auto">
-                    {loadingAuthors ? (
-                      <Skeleton className="h-11 w-full" />
-                    ) : sugestoesFb.length === 0 ? (
-                      <p className="py-3 text-xs text-muted-foreground">
-                        Nenhum autor do Facebook detectado nos comentários recentes para este nome.
-                      </p>
-                    ) : (
-                      sugestoesFb.map((a) => (
-                        <div key={a.platform_user_id} className="flex items-center gap-2 rounded-md border p-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={a.author_profile_picture || undefined} />
-                            <AvatarFallback>{(a.author_name || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{a.author_name || "Sem nome"}</p>
-                            <p className="text-xs text-muted-foreground">{a.total_comments} comentário(s)</p>
-                          </div>
-                          {a.score >= 0.5 && (
-                            <Badge variant="secondary" className="gap-1 text-[10px]">
-                              <Sparkles className="h-3 w-3" />
-                              provável
-                            </Badge>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={linking === a.platform_user_id}
-                            onClick={() => vincularAutor(a, selected)}
-                          >
-                            <Link2 className="mr-1 h-3.5 w-3.5" />
-                            {linking === a.platform_user_id ? "…" : "Vincular"}
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </>
-              )}
+                )}
+              </div>
             </div>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={proximaPessoa}>
-                Cadastrar próxima pessoa
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" size="sm" onClick={proximaPessoa}>
+                Próximo registro
               </Button>
-              <Button onClick={() => onOpenChange(false)}>Concluir</Button>
+              <Button size="sm" onClick={() => onOpenChange(false)}>Fechar</Button>
             </div>
           </div>
         )}
