@@ -60,6 +60,7 @@ export interface ExportOptions {
   filtros?: { label: string; value: string }[];
   fileNameSuffix?: string;
   mode?: "save" | "print";
+  apenasAvulsos?: boolean;
 }
 
 function outputPdf(doc: jsPDF, filename: string, mode: "save" | "print" = "save") {
@@ -167,7 +168,10 @@ export function exportEleicaoPdf(opts: ExportOptions) {
   // Agrupar por tipo, depois região/cidade
   const tiposOrdem: Array<ExportPessoa["tipo"]> = ["coordenador", "lider", "cabo"];
   for (const tipo of tiposOrdem) {
-    const grupo = opts.pessoas.filter((p) => p.tipo === tipo);
+    let grupo = opts.pessoas.filter((p) => p.tipo === tipo);
+    if (opts.apenasAvulsos && tipo === "lider") {
+      grupo = grupo.filter(p => !p.parent_id);
+    }
     if (grupo.length === 0) continue;
 
     if (y > pageHeight - 120) {
@@ -271,7 +275,12 @@ export function exportEleicaoCsv(opts: ExportOptions) {
     return /[";,\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [headers.join(";")];
-  for (const p of [...opts.pessoas].sort(sortByRegiaoNome)) {
+  const sortedPessoas = [...opts.pessoas].sort(sortByRegiaoNome);
+  const finalPessoas = opts.apenasAvulsos 
+    ? sortedPessoas.filter(p => p.tipo === "lider" && !p.parent_id)
+    : sortedPessoas;
+
+  for (const p of finalPessoas) {
     lines.push(
       [
         TIPO_LABEL[p.tipo] || p.tipo,
@@ -312,6 +321,7 @@ export interface RaizExportOptions {
   pessoas: ExportPessoa[]; // todas as pessoas do escopo (com id e parent_id)
   tipos?: Array<"coordenador" | "lider" | "cabo">;
   incluirAvulsos?: boolean;
+  apenasAvulsos?: boolean;
   coordenadorFiltro?: { id: string; nome: string } | null;
   filtros?: { label: string; value: string }[];
   fileNameSuffix?: string;
@@ -327,17 +337,19 @@ interface EquipeNode {
 }
 
 function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
-  const { pessoas, incluirAvulsos = true, coordenadorFiltro, tipos } = opts;
+  const { pessoas, incluirAvulsos = true, apenasAvulsos = false, coordenadorFiltro, tipos } = opts;
   const byId = new Map<string, ExportPessoa>();
   for (const p of pessoas) if (p.id) byId.set(p.id, p);
 
   const filterTipo = (p: ExportPessoa) => !tipos || tipos.includes(p.tipo);
 
-  const coords = pessoas.filter(p => p.tipo === "coordenador")
-    .filter(c => !coordenadorFiltro || c.id === coordenadorFiltro.id)
-    .filter(filterTipo);
+  const coords = apenasAvulsos 
+    ? [] 
+    : pessoas.filter(p => p.tipo === "coordenador")
+      .filter(c => !coordenadorFiltro || c.id === coordenadorFiltro.id)
+      .filter(filterTipo);
   const lideres = pessoas.filter(p => p.tipo === "lider").filter(filterTipo);
-  const cabos = pessoas.filter(p => p.tipo === "cabo").filter(filterTipo);
+  const cabos = apenasAvulsos ? [] : pessoas.filter(p => p.tipo === "cabo").filter(filterTipo);
 
   const lideresPorCoord = new Map<string, ExportPessoa[]>();
   const avulsos: ExportPessoa[] = [];

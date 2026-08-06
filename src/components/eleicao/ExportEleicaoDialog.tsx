@@ -27,6 +27,7 @@ export interface ExportConfig {
   incluirAvulsos: boolean;
   parceiroId: string | null; // null = todas as dobradinhas; "__none" = sem dobradinha
   porParceiro: boolean; // gerar um arquivo por dobradinha
+  apenasAvulsos?: boolean;
 }
 
 interface CoordOption { id: string; nome: string; regiao?: string | null }
@@ -49,6 +50,7 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const [modo, setModo] = useState<ExportModo>("lista");
   const [tipos, setTipos] = useState<ExportTipo[]>(TODOS);
   const [apenasLideres, setApenasLideres] = useState(false);
+  const [apenasAvulsos, setApenasAvulsos] = useState(false);
   const [coordenadorId, setCoordenadorId] = useState<string>("__all");
   const [regiao, setRegiao] = useState<string>("__all");
   const [incluirAvulsos, setIncluirAvulsos] = useState(true);
@@ -63,12 +65,13 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const podeAvulsos = tipos.includes("lider") && coordenadorId === "__all";
   const podePorParceiro = parceiroSel === "__all" && parceiros.length > 0;
 
-  // Reset apenasLideres se "líder" não estiver selecionado
+  // Reset estados específicos se "líder" não estiver selecionado
   useEffect(() => {
-    if (!tipos.includes("lider") && apenasLideres) {
+    if (!tipos.includes("lider")) {
       setApenasLideres(false);
+      setApenasAvulsos(false);
     }
-  }, [tipos, apenasLideres]);
+  }, [tipos]);
 
   // Coordenadores filtrados pela região escolhida
   const coordsOrdenados = useMemo(() => {
@@ -93,18 +96,19 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
     const parceiroId =
       parceiroSel === "__all" ? null : parceiroSel; // "__none" ou uuid
     
-    // Se "Apenas Líderes" estiver ativo, forçamos os tipos para ser apenas líder
-    const tiposFinal = apenasLideres ? ["lider" as ExportTipo] : tipos;
+    // Se "Apenas Líderes" ou "Apenas Avulsos" estiver ativo, forçamos os tipos para ser apenas líder
+    const tiposFinal = (apenasLideres || apenasAvulsos) ? ["lider" as ExportTipo] : tipos;
 
     onExport({
       formato,
       modo,
       tipos: tiposFinal,
-      coordenadorId: coordenadorId === "__all" ? null : coordenadorId,
+      coordenadorId: (coordenadorId === "__all" || apenasAvulsos) ? null : coordenadorId,
       regiao: regiao === "__all" ? null : regiao,
-      incluirAvulsos: podeAvulsos ? incluirAvulsos : false,
+      incluirAvulsos: apenasAvulsos ? true : (podeAvulsos ? incluirAvulsos : false),
       parceiroId,
       porParceiro: podePorParceiro && porParceiro,
+      apenasAvulsos: apenasAvulsos,
     });
     onOpenChange(false);
   }
@@ -159,11 +163,34 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
             )}
 
             {tipos.includes("lider") && (
-              <div className="flex items-center gap-2 mt-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md border border-blue-100 dark:border-blue-800">
-                <Checkbox id="apenas-lideres" checked={apenasLideres} onCheckedChange={(v) => setApenasLideres(!!v)} />
-                <Label htmlFor="apenas-lideres" className="text-xs font-medium text-blue-700 dark:text-blue-300 cursor-pointer">
-                  Extrair apenas Líderes (ignora Coordenadores e Cabos no arquivo final)
-                </Label>
+              <div className="space-y-2 mt-2">
+                <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md border border-blue-100 dark:border-blue-800">
+                  <Checkbox 
+                    id="apenas-lideres" 
+                    checked={apenasLideres && !apenasAvulsos} 
+                    onCheckedChange={(v) => {
+                      setApenasLideres(!!v);
+                      if (v) setApenasAvulsos(false);
+                    }} 
+                  />
+                  <Label htmlFor="apenas-lideres" className="text-xs font-medium text-blue-700 dark:text-blue-300 cursor-pointer">
+                    Extrair apenas Líderes (ignora Coordenadores e Cabos no arquivo final)
+                  </Label>
+                </div>
+
+                <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-md border border-amber-100 dark:border-amber-800">
+                  <Checkbox 
+                    id="apenas-avulsos" 
+                    checked={apenasAvulsos} 
+                    onCheckedChange={(v) => {
+                      setApenasAvulsos(!!v);
+                      if (v) setApenasLideres(false);
+                    }} 
+                  />
+                  <Label htmlFor="apenas-avulsos" className="text-xs font-medium text-amber-700 dark:text-amber-300 cursor-pointer">
+                    Extrair apenas Líderes Avulsos (sem coordenador vinculado)
+                  </Label>
+                </div>
               </div>
             )}
           </div>
