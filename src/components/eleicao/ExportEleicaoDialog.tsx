@@ -48,6 +48,7 @@ const TODOS: ExportTipo[] = ["coordenador", "lider", "cabo"];
 export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores, regioes, escopoTipo, parceiros = [], onExport }: Props) {
   const [modo, setModo] = useState<ExportModo>("lista");
   const [tipos, setTipos] = useState<ExportTipo[]>(TODOS);
+  const [apenasLideres, setApenasLideres] = useState(false);
   const [coordenadorId, setCoordenadorId] = useState<string>("__all");
   const [regiao, setRegiao] = useState<string>("__all");
   const [incluirAvulsos, setIncluirAvulsos] = useState(true);
@@ -61,6 +62,13 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const incluiLideresOuCabos = tipos.includes("lider") || tipos.includes("cabo");
   const podeAvulsos = tipos.includes("lider") && coordenadorId === "__all";
   const podePorParceiro = parceiroSel === "__all" && parceiros.length > 0;
+
+  // Reset apenasLideres se "líder" não estiver selecionado
+  useEffect(() => {
+    if (!tipos.includes("lider") && apenasLideres) {
+      setApenasLideres(false);
+    }
+  }, [tipos, apenasLideres]);
 
   // Coordenadores filtrados pela região escolhida
   const coordsOrdenados = useMemo(() => {
@@ -84,10 +92,14 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
     if (tipos.length === 0) return;
     const parceiroId =
       parceiroSel === "__all" ? null : parceiroSel; // "__none" ou uuid
+    
+    // Se "Apenas Líderes" estiver ativo, forçamos os tipos para ser apenas líder
+    const tiposFinal = apenasLideres ? ["lider" as ExportTipo] : tipos;
+
     onExport({
       formato,
       modo,
-      tipos,
+      tipos: tiposFinal,
       coordenadorId: coordenadorId === "__all" ? null : coordenadorId,
       regiao: regiao === "__all" ? null : regiao,
       incluirAvulsos: podeAvulsos ? incluirAvulsos : false,
@@ -144,6 +156,15 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
             </div>
             {tipos.length === 0 && (
               <p className="text-xs text-destructive">Selecione pelo menos um tipo.</p>
+            )}
+
+            {tipos.includes("lider") && (
+              <div className="flex items-center gap-2 mt-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md border border-blue-100 dark:border-blue-800">
+                <Checkbox id="apenas-lideres" checked={apenasLideres} onCheckedChange={(v) => setApenasLideres(!!v)} />
+                <Label htmlFor="apenas-lideres" className="text-xs font-medium text-blue-700 dark:text-blue-300 cursor-pointer">
+                  Extrair apenas Líderes (ignora Coordenadores e Cabos no arquivo final)
+                </Label>
+              </div>
             )}
           </div>
 
