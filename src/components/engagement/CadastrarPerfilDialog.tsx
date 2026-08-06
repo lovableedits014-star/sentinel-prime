@@ -45,6 +45,8 @@ export default function CadastrarPerfilDialog({
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState<string | null>(null);
   const [fbValue, setFbValue] = useState("");
+  const [manualIgMode, setManualIgMode] = useState(false);
+  const [manualFbMode, setManualFbMode] = useState(false);
 
   // carrega autores não vinculados (FB + IG) uma vez por abertura
   useEffect(() => {
@@ -83,6 +85,8 @@ export default function CadastrarPerfilDialog({
       setIgValue("");
       setFbValue("");
       setResultados([]);
+      setManualIgMode(false);
+      setManualFbMode(false);
     }
   }, [open]);
 
@@ -223,7 +227,10 @@ export default function CadastrarPerfilDialog({
     setSelected(null);
     setQuery("");
     setIgValue("");
+    setFbValue("");
     setResultados([]);
+    setManualIgMode(false);
+    setManualFbMode(false);
   }
 
   return (
