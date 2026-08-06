@@ -310,6 +310,7 @@ export interface RaizExportOptions {
   clientName?: string;
   escopoLabel: string;
   pessoas: ExportPessoa[]; // todas as pessoas do escopo (com id e parent_id)
+  tipos?: Array<"coordenador" | "lider" | "cabo">;
   incluirAvulsos?: boolean;
   coordenadorFiltro?: { id: string; nome: string } | null;
   filtros?: { label: string; value: string }[];
@@ -326,14 +327,17 @@ interface EquipeNode {
 }
 
 function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
-  const { pessoas, incluirAvulsos = true, coordenadorFiltro } = opts;
+  const { pessoas, incluirAvulsos = true, coordenadorFiltro, tipos } = opts;
   const byId = new Map<string, ExportPessoa>();
   for (const p of pessoas) if (p.id) byId.set(p.id, p);
 
+  const filterTipo = (p: ExportPessoa) => !tipos || tipos.includes(p.tipo);
+
   const coords = pessoas.filter(p => p.tipo === "coordenador")
-    .filter(c => !coordenadorFiltro || c.id === coordenadorFiltro.id);
-  const lideres = pessoas.filter(p => p.tipo === "lider");
-  const cabos = pessoas.filter(p => p.tipo === "cabo");
+    .filter(c => !coordenadorFiltro || c.id === coordenadorFiltro.id)
+    .filter(filterTipo);
+  const lideres = pessoas.filter(p => p.tipo === "lider").filter(filterTipo);
+  const cabos = pessoas.filter(p => p.tipo === "cabo").filter(filterTipo);
 
   const lideresPorCoord = new Map<string, ExportPessoa[]>();
   const avulsos: ExportPessoa[] = [];
