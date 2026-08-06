@@ -845,7 +845,12 @@ export default function Eleicao() {
 
     // Aplica filtro de tipos do dialog
     const tiposSet = new Set(cfg.tipos);
-    const listaTipada = lista.filter(p => tiposSet.has(p.tipo));
+    let listaTipada = lista.filter(p => tiposSet.has(p.tipo));
+
+    // Filtro especial para Líderes Avulsos
+    if (cfg.apenasAvulsos) {
+      listaTipada = listaTipada.filter(p => p.tipo === "lider" && !p.parent_id);
+    }
 
     if (listaTipada.length === 0) {
       toast.error("Nenhum cadastro para exportar com os filtros escolhidos.");
@@ -911,6 +916,7 @@ export default function Eleicao() {
           filtros,
           fileNameSuffix,
           mode,
+          apenasAvulsos: cfg.apenasAvulsos,
         };
         if (cfg.formato === "csv") exportEleicaoCsvRaiz(opts);
         else exportEleicaoPdfRaiz(opts);
@@ -934,7 +940,7 @@ export default function Eleicao() {
         parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
       }));
       const mode: "save" | "print" = cfg.formato === "print" ? "print" : "save";
-      const opts = { escopoLabel, pessoas: items, filtros, fileNameSuffix, mode };
+      const opts = { escopoLabel, pessoas: items, filtros, fileNameSuffix, mode, apenasAvulsos: cfg.apenasAvulsos };
       if (cfg.formato === "csv") exportEleicaoCsv(opts);
       else exportEleicaoPdf(opts);
       return items.length;
