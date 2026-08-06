@@ -532,7 +532,7 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
 
   for (const eq of equipes) {
     const coordNome = eq.coord?.nome || "— AVULSOS —";
-    if (eq.coord) {
+    if (eq.coord && (!opts.tipos || opts.tipos.includes("coordenador"))) {
       push([
         "coordenador", coordNome, "",
         TIPO_LABEL.coordenador, eq.coord.nome, fmtPhone(eq.coord.telefone),
@@ -541,19 +541,23 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
       ]);
     }
     for (const { lider, cabos } of eq.lideres) {
-      push([
-        "lider", coordNome, lider.nome,
-        TIPO_LABEL.lider, lider.nome, fmtPhone(lider.telefone),
-        cap(lider.regiao), lider.cidade || "", lider.bairro || "",
-        (lider.valor_contratacao || 0).toFixed(2).replace(".", ","),
-      ]);
-      for (const c of cabos) {
+      if (!opts.tipos || opts.tipos.includes("lider")) {
         push([
-          "cabo", coordNome, lider.nome,
-          TIPO_LABEL.cabo, c.nome, fmtPhone(c.telefone),
-          cap(c.regiao), c.cidade || "", c.bairro || "",
-          (c.valor_contratacao || 0).toFixed(2).replace(".", ","),
+          "lider", coordNome, lider.nome,
+          TIPO_LABEL.lider, lider.nome, fmtPhone(lider.telefone),
+          cap(lider.regiao), lider.cidade || "", lider.bairro || "",
+          (lider.valor_contratacao || 0).toFixed(2).replace(".", ","),
         ]);
+      }
+      if (!opts.tipos || opts.tipos.includes("cabo")) {
+        for (const c of cabos) {
+          push([
+            "cabo", coordNome, lider.nome,
+            TIPO_LABEL.cabo, c.nome, fmtPhone(c.telefone),
+            cap(c.regiao), c.cidade || "", c.bairro || "",
+            (c.valor_contratacao || 0).toFixed(2).replace(".", ","),
+          ]);
+        }
       }
     }
   }
