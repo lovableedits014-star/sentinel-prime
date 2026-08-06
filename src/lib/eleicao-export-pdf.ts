@@ -310,6 +310,7 @@ export interface RaizExportOptions {
   clientName?: string;
   escopoLabel: string;
   pessoas: ExportPessoa[]; // todas as pessoas do escopo (com id e parent_id)
+  tipos?: Array<"coordenador" | "lider" | "cabo">;
   incluirAvulsos?: boolean;
   coordenadorFiltro?: { id: string; nome: string } | null;
   filtros?: { label: string; value: string }[];
@@ -326,14 +327,17 @@ interface EquipeNode {
 }
 
 function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
-  const { pessoas, incluirAvulsos = true, coordenadorFiltro } = opts;
+  const { pessoas, incluirAvulsos = true, coordenadorFiltro, tipos } = opts;
   const byId = new Map<string, ExportPessoa>();
   for (const p of pessoas) if (p.id) byId.set(p.id, p);
 
+  const filterTipo = (p: ExportPessoa) => !tipos || tipos.includes(p.tipo);
+
   const coords = pessoas.filter(p => p.tipo === "coordenador")
-    .filter(c => !coordenadorFiltro || c.id === coordenadorFiltro.id);
-  const lideres = pessoas.filter(p => p.tipo === "lider");
-  const cabos = pessoas.filter(p => p.tipo === "cabo");
+    .filter(c => !coordenadorFiltro || c.id === coordenadorFiltro.id)
+    .filter(filterTipo);
+  const lideres = pessoas.filter(p => p.tipo === "lider").filter(filterTipo);
+  const cabos = pessoas.filter(p => p.tipo === "cabo").filter(filterTipo);
 
   const lideresPorCoord = new Map<string, ExportPessoa[]>();
   const avulsos: ExportPessoa[] = [];
@@ -528,7 +532,7 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
 
   for (const eq of equipes) {
     const coordNome = eq.coord?.nome || "— AVULSOS —";
-    if (eq.coord) {
+    if (eq.coord && (!opts.tipos || opts.tipos.includes("coordenador"))) {
       push([
         "coordenador", coordNome, "",
         TIPO_LABEL.coordenador, eq.coord.nome, fmtPhone(eq.coord.telefone),
@@ -537,19 +541,23 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
       ]);
     }
     for (const { lider, cabos } of eq.lideres) {
-      push([
-        "lider", coordNome, lider.nome,
-        TIPO_LABEL.lider, lider.nome, fmtPhone(lider.telefone),
-        cap(lider.regiao), lider.cidade || "", lider.bairro || "",
-        (lider.valor_contratacao || 0).toFixed(2).replace(".", ","),
-      ]);
-      for (const c of cabos) {
+      if (!opts.tipos || opts.tipos.includes("lider")) {
         push([
-          "cabo", coordNome, lider.nome,
-          TIPO_LABEL.cabo, c.nome, fmtPhone(c.telefone),
-          cap(c.regiao), c.cidade || "", c.bairro || "",
-          (c.valor_contratacao || 0).toFixed(2).replace(".", ","),
+          "lider", coordNome, lider.nome,
+          TIPO_LABEL.lider, lider.nome, fmtPhone(lider.telefone),
+          cap(lider.regiao), lider.cidade || "", lider.bairro || "",
+          (lider.valor_contratacao || 0).toFixed(2).replace(".", ","),
         ]);
+      }
+      if (!opts.tipos || opts.tipos.includes("cabo")) {
+        for (const c of cabos) {
+          push([
+            "cabo", coordNome, lider.nome,
+            TIPO_LABEL.cabo, c.nome, fmtPhone(c.telefone),
+            cap(c.regiao), c.cidade || "", c.bairro || "",
+            (c.valor_contratacao || 0).toFixed(2).replace(".", ","),
+          ]);
+        }
       }
     }
   }
