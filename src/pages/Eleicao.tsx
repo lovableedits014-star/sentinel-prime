@@ -906,6 +906,7 @@ export default function Eleicao() {
           escopoLabel,
           pessoas: itemsRaiz,
           incluirAvulsos: cfg.incluirAvulsos,
+          tipos: cfg.tipos,
           coordenadorFiltro: coordFiltro,
           filtros,
           fileNameSuffix,
