@@ -180,39 +180,52 @@ export default function CobrancaTimeTab({ clientId, clientName }: { clientId: st
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((r) => (
-                    <TableRow key={`${r.origem}:${r.ref_id}`}>
-                      <TableCell className="max-w-[240px]">
-                        <p className="truncate text-sm font-medium">{r.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {r.regiao || r.cidade || "—"}
-                          {r.instagram_handle ? ` · @${r.instagram_handle}` : ""}
-                          {r.facebook_key ? " · FB" : ""}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[10px]">
-                          {cargoLabel(r.cargo)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="text-sm font-semibold">{r.interacoes}</span>
-                        <span className="ml-1 text-[10px] text-muted-foreground">/ {r.min_interacoes}</span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="text-sm font-semibold">{r.missoes_concluidas}</span>
-                        <span className="ml-1 text-[10px] text-muted-foreground">/ {r.min_missoes}</span>
-                      </TableCell>
-                      <TableCell className="text-center text-sm">
-                        {r.dias_sem_interagir == null ? "—" : `${r.dias_sem_interagir}d`}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-[10px] ${SITUACAO[r.situacao].className}`}>
-                          {SITUACAO[r.situacao].label}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filtered.map((r) => {
+                    const status = SITUACAO[r.situacao];
+                    const isSemCadastro = r.situacao === "sem_cadastro";
+                    
+                    return (
+                      <TableRow key={`${r.origem}:${r.ref_id}`} className={isSemCadastro ? "bg-muted/5" : ""}>
+                        <TableCell className="max-w-[240px]">
+                          <p className="truncate text-sm font-medium">{r.nome}</p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            {r.regiao || r.cidade || "—"}
+                            {r.instagram_handle && <Badge variant="outline" className="h-4 px-1 text-[9px] border-indigo-500/20 text-indigo-500">@{r.instagram_handle}</Badge>}
+                            {r.facebook_key && <Badge variant="outline" className="h-4 px-1 text-[9px] border-blue-500/20 text-blue-500">FB</Badge>}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {cargoLabel(r.cargo)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={`text-sm font-semibold ${r.interacoes < r.min_interacoes ? "text-amber-600" : ""}`}>
+                            {r.interacoes}
+                          </span>
+                          <span className="ml-1 text-[10px] text-muted-foreground">/ {r.min_interacoes}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={`text-sm font-semibold ${r.missoes_concluidas < r.min_missoes ? "text-amber-600" : ""}`}>
+                            {r.missoes_concluidas}
+                          </span>
+                          <span className="ml-1 text-[10px] text-muted-foreground">/ {r.min_missoes}</span>
+                        </TableCell>
+                        <TableCell className="text-center text-sm">
+                          {r.dias_sem_interagir == null ? "—" : (
+                            <span className={r.dias_sem_interagir > 7 ? "text-destructive font-medium" : ""}>
+                              {r.dias_sem_interagir}d
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={`text-[10px] shadow-sm ${status.className}`}>
+                            {status.label}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
