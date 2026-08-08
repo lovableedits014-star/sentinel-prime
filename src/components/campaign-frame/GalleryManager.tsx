@@ -39,6 +39,7 @@ import BatchFrameGenerator from "./BatchFrameGenerator";
 import { useBatchRenderer } from "./useBatchRenderer";
 import { publishItemsToGallery, slugify } from "./useGalleryUpload";
 import RawPhotoUploader from "./RawPhotoUploader";
+import BatchFrameMigrator from "./BatchFrameMigrator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -194,33 +195,51 @@ export default function GalleryManager({ clientId, publicSlug }: Props) {
         </div>
       </div>
 
-      {loading ? (
-        <div className="py-8 text-center text-muted-foreground text-sm">
-          <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Carregando…
-        </div>
-      ) : galleries.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-sm text-muted-foreground space-y-3">
-            <ImageIcon className="w-10 h-10 mx-auto opacity-50" />
-            <p>Nenhuma galeria ainda. Crie a primeira para o seu próximo evento.</p>
-            <Button onClick={() => setOpenNew(true)} className="gap-1.5">
-              <Plus className="w-4 h-4" /> Criar galeria
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {galleries.map((g) => (
-            <GalleryCard
-              key={g.id}
-              gallery={g}
-              hubBase={hubBase}
-              onOpen={() => setActiveGallery(g)}
-              onChanged={loadAll}
-            />
-          ))}
-        </div>
-      )}
+      <Tabs defaultValue="list" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+          <TabsTrigger value="list">Minhas Galerias</TabsTrigger>
+          <TabsTrigger value="batch">Ajustes em Lote</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="list" className="mt-4">
+          {loading ? (
+            <div className="py-8 text-center text-muted-foreground text-sm">
+              <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Carregando…
+            </div>
+          ) : galleries.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground space-y-3">
+                <ImageIcon className="w-10 h-10 mx-auto opacity-50" />
+                <p>Nenhuma galeria ainda. Crie a primeira para o seu próximo evento.</p>
+                <Button onClick={() => setOpenNew(true)} className="gap-1.5">
+                  <Plus className="w-4 h-4" /> Criar galeria
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {galleries.map((g) => (
+                <GalleryCard
+                  key={g.id}
+                  gallery={g}
+                  hubBase={hubBase}
+                  onOpen={() => setActiveGallery(g)}
+                  onChanged={loadAll}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="batch" className="mt-4">
+          <BatchFrameMigrator 
+            clientId={clientId} 
+            frames={frames} 
+            galleries={galleries}
+            onChanged={loadAll}
+          />
+        </TabsContent>
+      </Tabs>
 
       <NewGalleryDialog
         open={openNew}
