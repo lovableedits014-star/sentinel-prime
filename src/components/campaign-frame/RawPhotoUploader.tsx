@@ -37,6 +37,8 @@ export default function RawPhotoUploader({
 }: Props) {
   const [pending, setPending] = useState<Pending[]>([]);
   const [publishing, setPublishing] = useState(false);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState({ done: 0, total: 0 });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -49,12 +51,26 @@ export default function RawPhotoUploader({
 
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return;
+    setLoadingFiles(true);
+    setLoadingProgress({ done: 0, total: files.length });
     const accepted: Pending[] = [];
     let rejected = 0;
     const fileArr = Array.from(files);
 
+    let heic2any: any = null;
+    const heicFiles = fileArr.filter(f => /\.(heic|heif)$/i.test(f.name) || f.type === "image/heic" || f.type === "image/heif");
+    
+    if (heicFiles.length > 0) {
+      try {
+        heic2any = (await import("heic2any")).default;
+      } catch (err) {
+        console.error("Failed to load heic2any", err);
+      }
+    }
+
     for (let i = 0; i < fileArr.length; i++) {
       let file = fileArr[i];
+      setLoadingProgress({ done: i, total: fileArr.length });
       const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
       const okType = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(file.type) || isHEIC;
       const okSize = file.size <= MAX_FILE_MB * 1024 * 1024;
@@ -65,13 +81,12 @@ export default function RawPhotoUploader({
       }
 
       // Se for HEIC, converte imediatamente para preview funcionar
-      if (isHEIC) {
+      if (isHEIC && heic2any) {
         try {
-          const heic2any = (await import("heic2any")).default;
           const converted = await heic2any({
             blob: file,
             toType: "image/jpeg",
-            quality: 0.7
+            quality: 0.6 // Qualidade menor para preview rápido
           });
           const blob = Array.isArray(converted) ? converted[0] : converted;
           file = new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
@@ -80,6 +95,9 @@ export default function RawPhotoUploader({
           rejected += 1;
           continue;
         }
+      } else if (isHEIC && !heic2any) {
+        rejected += 1;
+        continue;
       }
 
       accepted.push({
@@ -87,11 +105,13 @@ export default function RawPhotoUploader({
         file,
         previewUrl: URL.createObjectURL(file),
       });
+      setLoadingProgress({ done: i + 1, total: fileArr.length });
     }
 
     if (rejected) toast.warning(`${rejected} arquivo(s) ignorado(s) ou falha na conversão`);
     if (accepted.length) setPending((cur) => [...cur, ...accepted]);
     if (inputRef.current) inputRef.current.value = "";
+    setLoadingFiles(false);
   };
 
   const removeOne = (id: string) => {
@@ -111,21 +131,36 @@ export default function RawPhotoUploader({
     if (!pending.length) return;
     setPublishing(true);
     setProgress({ done: 0, total: pending.length });
-    const result = await publishRawFilesToGallery({
-      clientId,
-      galleryId,
-      files: pending.map((p) => p.file),
-      startIndex,
-      watermarkLogo,
-      logoSettings,
-      onProgress: setProgress,
-    });
-    setPublishing(false);
-    setProgress(null);
-    if (result.failed > 0) toast.warning(`${result.uploaded} publicadas, ${result.failed} falharam`);
-    else toast.success(`${result.uploaded} fotos publicadas!`);
-    clearAll();
-    onPublished({ uploaded: result.uploaded, firstUrl: result.firstUrl });
+    try {
+      const result = await publishRawFilesToGallery({
+        clientId,
+        galleryId,
+        files: pending.map((p) => p.file),
+        startIndex,
+        watermarkLogo,
+        logoSettings,
+        onProgress: setProgress,
+      });
+      
+      if (result.failed > 0) {
+        toast.warning(`${result.uploaded} publicadas, ${result.failed} falharam`);
+      } else if (result.uploaded > 0) {
+        toast.success(`${result.uploaded} fotos publicadas!`);
+      } else {
+        toast.info("Nenhuma foto foi publicada.");
+      }
+      
+      if (result.uploaded > 0) {
+        onPublished({ uploaded: result.uploaded, firstUrl: result.firstUrl });
+      }
+      clearAll();
+    } catch (err: any) {
+      console.error("Publish error:", err);
+      toast.error("Erro ao publicar fotos: " + (err.message || "Erro desconhecido"));
+    } finally {
+      setPublishing(false);
+      setProgress(null);
+    }
   };
 
   return (
@@ -150,8 +185,9 @@ export default function RawPhotoUploader({
           className="hidden"
           onChange={(e) => addFiles(e.target.files)}
         />
-        <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={publishing}>
-          Selecionar arquivos
+        <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={publishing || loadingFiles}>
+          {loadingFiles ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+          {loadingFiles ? `Processando (${loadingProgress.done}/${loadingProgress.total})...` : "Selecionar arquivos"}
         </Button>
         <p className="text-[11px] text-muted-foreground">JPG, PNG, WebP ou HEIC · até {MAX_FILE_MB}MB por foto</p>
       </div>

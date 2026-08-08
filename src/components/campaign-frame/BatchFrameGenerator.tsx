@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Upload, Download, Trash2, RefreshCw, Loader2, FileImage } from "lucide-react";
@@ -16,11 +16,13 @@ interface Props {
 
 export default function BatchFrameGenerator({ composition, frameName, batch: externalBatch }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [loadingFiles, setLoadingFiles] = useState(false);
   const internalBatch = useBatchRenderer(composition);
   const batch = externalBatch ?? internalBatch;
 
   const onPick = useCallback(async (files: FileList | null) => {
     if (!files || !files.length) return;
+    setLoadingFiles(true);
     if (!composition) {
       toast.error("Selecione uma moldura primeiro");
       return;
@@ -36,7 +38,11 @@ export default function BatchFrameGenerator({ composition, frameName, batch: ext
     }
     const remaining = BATCH_MAX - batch.items.length;
     if (arr.length > remaining) toast.warning(`Apenas ${remaining} foto(s) serão processadas (limite ${BATCH_MAX})`);
-    await batch.addFiles(arr);
+    try {
+      await batch.addFiles(arr);
+    } finally {
+      setLoadingFiles(false);
+    }
     toast.success(`Fotos processadas`);
   }, [batch, composition]);
 
@@ -62,10 +68,11 @@ export default function BatchFrameGenerator({ composition, frameName, batch: ext
         </p>
         <Button
           onClick={() => inputRef.current?.click()}
-          disabled={!composition || batch.items.length >= BATCH_MAX}
+          disabled={!composition || batch.items.length >= BATCH_MAX || loadingFiles || !!batch.progress}
           className="gap-2"
         >
-          <Upload className="w-4 h-4" /> Selecionar fotos ({batch.items.length}/{BATCH_MAX})
+          {loadingFiles ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {loadingFiles ? "Processando arquivos..." : `Selecionar fotos (${batch.items.length}/${BATCH_MAX})`}
         </Button>
       </div>
 
