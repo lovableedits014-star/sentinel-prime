@@ -78,13 +78,12 @@ interface Props {
 }
 
 const buildShareText = (link: string, galleryName: string) => {
-  const dateStr = new Date().toLocaleDateString("pt-BR");
   return [
     `📸 Sua foto de *${galleryName}* já está pronta!`,
     `Acesse o link e baixe a sua foto com a moldura oficial do evento:`,
     `${link}`,
     ``,
-    `✨ Corra antes que o "enviado por" apareça em outra foto! Baixe a sua agora e compartilhe com quem também participou.`,
+    `✨ Baixe a sua agora e compartilhe com quem também participou.`,
     ``,
     `#FotosDoEvento #MolduraOficial`,
   ].join("\n");
