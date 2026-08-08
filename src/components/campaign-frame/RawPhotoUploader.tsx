@@ -130,21 +130,36 @@ export default function RawPhotoUploader({
     if (!pending.length) return;
     setPublishing(true);
     setProgress({ done: 0, total: pending.length });
-    const result = await publishRawFilesToGallery({
-      clientId,
-      galleryId,
-      files: pending.map((p) => p.file),
-      startIndex,
-      watermarkLogo,
-      logoSettings,
-      onProgress: setProgress,
-    });
-    setPublishing(false);
-    setProgress(null);
-    if (result.failed > 0) toast.warning(`${result.uploaded} publicadas, ${result.failed} falharam`);
-    else toast.success(`${result.uploaded} fotos publicadas!`);
-    clearAll();
-    onPublished({ uploaded: result.uploaded, firstUrl: result.firstUrl });
+    try {
+      const result = await publishRawFilesToGallery({
+        clientId,
+        galleryId,
+        files: pending.map((p) => p.file),
+        startIndex,
+        watermarkLogo,
+        logoSettings,
+        onProgress: setProgress,
+      });
+      
+      if (result.failed > 0) {
+        toast.warning(`${result.uploaded} publicadas, ${result.failed} falharam`);
+      } else if (result.uploaded > 0) {
+        toast.success(`${result.uploaded} fotos publicadas!`);
+      } else {
+        toast.info("Nenhuma foto foi publicada.");
+      }
+      
+      if (result.uploaded > 0) {
+        onPublished({ uploaded: result.uploaded, firstUrl: result.firstUrl });
+      }
+      clearAll();
+    } catch (err: any) {
+      console.error("Publish error:", err);
+      toast.error("Erro ao publicar fotos: " + (err.message || "Erro desconhecido"));
+    } finally {
+      setPublishing(false);
+      setProgress(null);
+    }
   };
 
   return (
