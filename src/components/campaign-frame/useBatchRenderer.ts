@@ -16,7 +16,7 @@ export interface BatchItem {
   resultUrl?: string;
 }
 
-export const BATCH_MAX = 100;
+export const BATCH_MAX = 99999; // Aumentado para "ilimitado" conforme solicitado
 export const BATCH_MAX_FILE_MB = 25; // Aumentado para 25MB conforme solicitado
 export const OUTPUT_MIME = "image/jpeg";
 export const OUTPUT_QUALITY = 0.85; // Leve aumento na qualidade
