@@ -13,6 +13,7 @@ interface Props {
   galleryId: string;
   startIndex: number;
   watermarkLogo?: string;
+  logoSettings?: any;
   onPublished: (info: { uploaded: number; firstUrl: string | null }) => void;
 }
 
@@ -22,7 +23,7 @@ interface Pending {
   previewUrl: string;
 }
 
-export default function RawPhotoUploader({ clientId, galleryId, startIndex, watermarkLogo, onPublished }: Props) {
+export default function RawPhotoUploader({ clientId, galleryId, startIndex, watermarkLogo, logoSettings, onPublished }: Props) {
   const [pending, setPending] = useState<Pending[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -105,6 +106,7 @@ export default function RawPhotoUploader({ clientId, galleryId, startIndex, wate
       files: pending.map((p) => p.file),
       startIndex,
       watermarkLogo,
+      logoSettings,
       onProgress: setProgress,
     });
     setPublishing(false);

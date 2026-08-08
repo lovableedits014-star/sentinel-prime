@@ -67,13 +67,19 @@ export default function BatchPhotoCard({ item, index, composition, onAdjust, onR
       <div className="relative aspect-square bg-muted">
         {item.status === "ready" && item.resultUrl ? (
           <img 
+            key={item.resultUrl}
             src={item.resultUrl} 
             alt={item.fileName} 
             className="w-full h-full object-cover" 
+            onLoad={() => console.log("BatchPhotoCard image loaded success", item.id)}
             onError={(e) => {
-              console.error("BatchPhotoCard image load error", item.id);
-              e.currentTarget.style.display = 'none';
-              // Could trigger a re-render or show error status
+              console.error("BatchPhotoCard image load error", item.id, item.resultUrl);
+              // Forçar o navegador a tentar novamente se for erro de rede/blob
+              const img = e.currentTarget;
+              if (!img.dataset.retried) {
+                img.dataset.retried = "true";
+                setTimeout(() => { img.src = item.resultUrl! + "?retry=" + Date.now(); }, 200);
+              }
             }}
           />
         ) : item.status === "error" ? (

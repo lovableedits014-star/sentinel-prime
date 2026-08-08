@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import type { BatchItem } from "./useBatchRenderer";
-import heic2any from "heic2any";
+
 
 const BUCKET = "campaign-frame-assets";
 
@@ -67,13 +67,13 @@ const EXT_BY_TYPE: Record<string, string> = {
   "image/webp": "webp",
 };
 
-/** Publica arquivos já prontos (sem aplicar moldura) na galeria. */
 export async function publishRawFilesToGallery(opts: {
   clientId: string;
   galleryId: string;
   files: File[];
   startIndex?: number;
   watermarkLogo?: string;
+  logoSettings?: any;
   onProgress?: (p: PublishProgress) => void;
 }): Promise<{ uploaded: number; failed: number; firstUrl: string | null }> {
   const files = opts.files;
@@ -101,13 +101,28 @@ export async function publishRawFilesToGallery(opts: {
   for (let i = 0; i < files.length; i++) {
     let file = files[i];
     try {
-      let currentBlob: Blob = file;
       const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
       
+      // Se for HEIC, precisamos converter antes de tentar carregar no Image/Canvas
+      if (isHEIC) {
+        try {
+          const heic2any = (await import("heic2any")).default;
+          const converted = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 0.85
+          });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          file = new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+        } catch (convErr) {
+          console.error("Erro na conversão HEIC durante publicação:", convErr);
+          throw new Error("Não foi possível converter o formato HEIC do iPhone");
+        }
+      }
+
       // Sempre processamos pelo canvas para garantir:
-      // 1. Conversão de HEIC
-      // 2. Redimensionamento para economia de espaço
-      // 3. Aplicação de Logo opcional
+      // 1. Redimensionamento para economia de espaço
+      // 2. Aplicação de Logo opcional
       const img: HTMLImageElement = await new Promise((res, rej) => {
         const url = URL.createObjectURL(file);
         const img = new Image();
@@ -115,7 +130,10 @@ export async function publishRawFilesToGallery(opts: {
           URL.revokeObjectURL(url);
           res(img);
         };
-        img.onerror = rej;
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          rej(new Error("Não foi possível carregar a imagem selecionada"));
+        };
         img.src = url;
       });
 
@@ -137,23 +155,44 @@ export async function publishRawFilesToGallery(opts: {
 
       // Aplica logo se configurado
       if (logoImg) {
-        const logoSize = Math.min(width, height) * 0.15; // 15% da imagem
+        const logoSettings = opts.logoSettings || { position: "bottom-right", size: 15, margin: 3, opacity: 0.8 };
+        const sizePercent = (logoSettings.size || 15) / 100;
+        const marginPercent = (logoSettings.margin || 3) / 100;
+        
+        const logoSize = Math.min(width, height) * sizePercent;
         const aspect = logoImg.height / logoImg.width;
         const lw = logoSize;
         const lh = logoSize * aspect;
-        const margin = Math.min(width, height) * 0.03;
-        ctx.globalAlpha = 0.8;
-        ctx.drawImage(logoImg, width - lw - margin, height - lh - margin, lw, lh);
+        const margin = Math.min(width, height) * marginPercent;
+        
+        let lx = width - lw - margin;
+        let ly = height - lh - margin;
+
+        if (logoSettings.position === "bottom-left") {
+          lx = margin;
+        } else if (logoSettings.position === "top-right") {
+          ly = margin;
+        } else if (logoSettings.position === "top-left") {
+          lx = margin;
+          ly = margin;
+        } else if (logoSettings.position === "center") {
+          lx = (width - lw) / 2;
+          ly = (height - lh) / 2;
+        }
+
+        ctx.globalAlpha = logoSettings.opacity ?? 0.8;
+        ctx.drawImage(logoImg, lx, ly, lw, lh);
+        ctx.globalAlpha = 1.0;
       }
 
-      currentBlob = await new Promise((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.85));
+      const finalBlob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.85));
       
       const itemId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${i}`;
       const path = `${opts.clientId}/gallery/${opts.galleryId}/${itemId}.jpg`;
 
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, currentBlob, { contentType: "image/jpeg", upsert: false });
+        .upload(path, finalBlob, { contentType: "image/jpeg", upsert: false });
       if (upErr) throw upErr;
 
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);

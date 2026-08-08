@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 import JSZip from "jszip";
 import { FrameComposition, preloadComposition, renderComposition } from "./types";
 import { saveBlob } from "@/lib/mobile-download";
-import heic2any from "heic2any";
 
 export interface BatchItem {
   id: string;
@@ -107,6 +106,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
       
       if (isHEIC) {
         try {
+          const heic2any = (await import("heic2any")).default;
           const converted = await heic2any({
             blob: f,
             toType: "image/jpeg",
@@ -116,6 +116,17 @@ export function useBatchRenderer(composition: FrameComposition | null) {
           f = new File([blob], f.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
         } catch (err) {
           console.error("HEIC conversion error", err);
+          created.push({
+            id: crypto.randomUUID(),
+            fileName: f.name,
+            originalUrl: "",
+            image: null,
+            zoom: 1,
+            offset: { x: 0, y: 0 },
+            status: "error",
+            error: "não foi possível converter HEIC",
+          });
+          continue;
         }
       }
 
@@ -125,14 +136,17 @@ export function useBatchRenderer(composition: FrameComposition | null) {
         img = await loadImage(url); 
       } catch (e) { 
         console.error("Erro ao carregar imagem para Canvas:", f.name, e);
-        // Tentar um fallback se o erro for de origin/blob
+        // Tentar um fallback forçando o recarregamento
         try {
-          // Pequeno delay para garantir que a URL do blob está pronta
-          await new Promise(r => setTimeout(r, 100));
+          await new Promise(r => setTimeout(r, 150));
           img = await loadImage(url);
         } catch (e2) {
           console.error("Segunda tentativa falhou:", f.name, e2);
         }
+      }
+      
+      if (!img) {
+        URL.revokeObjectURL(url);
       }
       
       created.push({
@@ -143,7 +157,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
         zoom: 1,
         offset: { x: 0, y: 0 },
         status: img ? "queued" : "error",
-        error: img ? undefined : "erro ao carregar imagem",
+        error: img ? undefined : "falha técnica ao ler arquivo (tente novamente)",
       });
     }
     setItems((cur) => [...cur, ...created]);
