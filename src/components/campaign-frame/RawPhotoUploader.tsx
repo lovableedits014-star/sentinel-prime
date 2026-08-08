@@ -38,6 +38,7 @@ export default function RawPhotoUploader({
   const [pending, setPending] = useState<Pending[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState({ done: 0, total: 0 });
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +52,7 @@ export default function RawPhotoUploader({
   const addFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     setLoadingFiles(true);
+    setLoadingProgress({ done: 0, total: files.length });
     const accepted: Pending[] = [];
     let rejected = 0;
     const fileArr = Array.from(files);
@@ -102,6 +104,7 @@ export default function RawPhotoUploader({
         file,
         previewUrl: URL.createObjectURL(file),
       });
+      setLoadingProgress(prev => ({ ...prev, done: i + 1 }));
     }
 
     if (rejected) toast.warning(`${rejected} arquivo(s) ignorado(s) ou falha na conversão`);
@@ -168,7 +171,7 @@ export default function RawPhotoUploader({
         />
         <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={publishing || loadingFiles}>
           {loadingFiles ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-          {loadingFiles ? "Processando..." : "Selecionar arquivos"}
+          {loadingFiles ? `Processando (${loadingProgress.done}/${loadingProgress.total})...` : "Selecionar arquivos"}
         </Button>
         <p className="text-[11px] text-muted-foreground">JPG, PNG, WebP ou HEIC · até {MAX_FILE_MB}MB por foto</p>
       </div>
