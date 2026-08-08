@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import type { BatchItem } from "./useBatchRenderer";
+import heic2any from "heic2any";
 
 const BUCKET = "campaign-frame-assets";
 
@@ -81,8 +82,25 @@ export async function publishRawFilesToGallery(opts: {
   let firstUrl: string | null = null;
 
   for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+    let file = files[i];
     try {
+      const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
+      
+      if (isHEIC) {
+        try {
+          const converted = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 0.85
+          });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          file = new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+        } catch (err) {
+          console.error("HEIC conversion failed", err);
+          // continua com o arquivo original se falhar, ou joga erro se preferir
+        }
+      }
+
       const ext = EXT_BY_TYPE[file.type] || (file.name.split(".").pop() || "jpg").toLowerCase();
       const itemId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${i}`;
       const path = `${opts.clientId}/gallery/${opts.galleryId}/${itemId}.${ext}`;

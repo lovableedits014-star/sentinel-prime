@@ -5,8 +5,8 @@ import { Loader2, Send, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { publishRawFilesToGallery } from "./useGalleryUpload";
 
-const ACCEPT = "image/jpeg,image/png,image/webp";
-const MAX_FILE_MB = 15;
+const ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif";
+const MAX_FILE_MB = 25;
 
 interface Props {
   clientId: string;
@@ -39,7 +39,8 @@ export default function RawPhotoUploader({ clientId, galleryId, startIndex, onPu
     const accepted: Pending[] = [];
     let rejected = 0;
     Array.from(files).forEach((file, idx) => {
-      const okType = /^image\/(jpeg|jpg|png|webp)$/i.test(file.type);
+      const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
+      const okType = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(file.type) || isHEIC;
       const okSize = file.size <= MAX_FILE_MB * 1024 * 1024;
       if (!okType || !okSize) {
         rejected += 1;
