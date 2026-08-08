@@ -55,6 +55,14 @@ interface Gallery {
   frame_id: string | null;
   status: "draft" | "published" | "archived";
   cover_url: string | null;
+  logo_url?: string | null;
+  logo_settings?: {
+    position: "bottom-right" | "bottom-left" | "top-right" | "top-left" | "center";
+    size: number;
+    margin: number;
+    opacity: number;
+  };
+  enable_auto_logo?: boolean;
   created_at: string;
   item_count?: number;
 }
@@ -476,7 +484,24 @@ function GalleryWorkspaceDialog({
     frames,
     gallery.frame_id,
   ]);
-  const composition = useMemo(() => (frame ? getComposition(frame) : null), [frame]);
+  const composition = useMemo(() => {
+    if (!frame) return null;
+    const base = getComposition(frame);
+    if (gallery.enable_auto_logo && gallery.logo_url) {
+      return {
+        ...base,
+        watermark: {
+          url: gallery.logo_url,
+          position: gallery.logo_settings?.position ?? "bottom-right",
+          size: gallery.logo_settings?.size ?? 15,
+          margin: gallery.logo_settings?.margin ?? 3,
+          opacity: gallery.logo_settings?.opacity ?? 1,
+        },
+      };
+    }
+    return base;
+  }, [frame, gallery.enable_auto_logo, gallery.logo_url, gallery.logo_settings]);
+
   const batch = useBatchRenderer(composition);
   const [publishing, setPublishing] = useState(false);
   const [existingItems, setExistingItems] = useState<any[]>([]);
