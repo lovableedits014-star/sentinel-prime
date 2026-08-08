@@ -50,7 +50,7 @@ export default function BatchFrameGenerator({ composition, frameName, batch: ext
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif"
           multiple
           hidden
           onChange={(e) => { onPick(e.target.files); e.target.value = ""; }}
