@@ -136,14 +136,17 @@ export function useBatchRenderer(composition: FrameComposition | null) {
         img = await loadImage(url); 
       } catch (e) { 
         console.error("Erro ao carregar imagem para Canvas:", f.name, e);
-        // Tentar um fallback se o erro for de origin/blob
+        // Tentar um fallback forçando o recarregamento
         try {
-          // Pequeno delay para garantir que a URL do blob está pronta
-          await new Promise(r => setTimeout(r, 100));
+          await new Promise(r => setTimeout(r, 150));
           img = await loadImage(url);
         } catch (e2) {
           console.error("Segunda tentativa falhou:", f.name, e2);
         }
+      }
+      
+      if (!img) {
+        URL.revokeObjectURL(url);
       }
       
       created.push({
@@ -154,7 +157,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
         zoom: 1,
         offset: { x: 0, y: 0 },
         status: img ? "queued" : "error",
-        error: img ? undefined : "erro ao carregar imagem",
+        error: img ? undefined : "falha técnica ao ler arquivo (tente novamente)",
       });
     }
     setItems((cur) => [...cur, ...created]);
