@@ -170,7 +170,7 @@ export default function RawPhotoUploader({
           onChange={(e) => addFiles(e.target.files)}
         />
         <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={publishing || loadingFiles}>
-          {loadingFiles ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+          {loadingFiles ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
           {loadingFiles ? `Processando (${loadingProgress.done}/${loadingProgress.total})...` : "Selecionar arquivos"}
         </Button>
         <p className="text-[11px] text-muted-foreground">JPG, PNG, WebP ou HEIC · até {MAX_FILE_MB}MB por foto</p>
