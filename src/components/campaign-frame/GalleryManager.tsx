@@ -39,6 +39,7 @@ import BatchFrameGenerator from "./BatchFrameGenerator";
 import { useBatchRenderer } from "./useBatchRenderer";
 import { publishItemsToGallery, slugify } from "./useGalleryUpload";
 import RawPhotoUploader from "./RawPhotoUploader";
+import BatchFrameMigrator from "./BatchFrameMigrator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
