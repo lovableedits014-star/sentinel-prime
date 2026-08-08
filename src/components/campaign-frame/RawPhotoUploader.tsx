@@ -193,7 +193,7 @@ export default function RawPhotoUploader({
 
       <Button onClick={handlePublish} disabled={publishing || pending.length === 0} className="gap-1.5">
         {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        Publicar {pending.length} fotos sem moldura
+        {buttonLabel || `Publicar ${pending.length} fotos sem moldura`}
       </Button>
     </div>
   );
