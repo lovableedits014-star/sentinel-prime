@@ -681,6 +681,12 @@ function GalleryWorkspaceDialog({
   onChanged: (g?: Gallery) => void;
   hubBase: string;
 }) {
+  const [localGallery, setLocalGallery] = useState(gallery);
+  const [editingLogo, setEditingLogo] = useState(false);
+
+  useEffect(() => {
+    setLocalGallery(gallery);
+  }, [gallery]);
   const frame = useMemo(() => frames.find((f) => f.id === gallery.frame_id) ?? frames[0], [
     frames,
     gallery.frame_id,
@@ -688,20 +694,20 @@ function GalleryWorkspaceDialog({
   const composition = useMemo(() => {
     if (!frame) return null;
     const base = getComposition(frame);
-    if (gallery.enable_auto_logo && gallery.logo_url) {
+    if (localGallery.enable_auto_logo && localGallery.logo_url) {
       return {
         ...base,
         watermark: {
-          url: gallery.logo_url,
-          position: gallery.logo_settings?.position ?? "bottom-right",
-          size: gallery.logo_settings?.size ?? 15,
-          margin: gallery.logo_settings?.margin ?? 3,
-          opacity: gallery.logo_settings?.opacity ?? 1,
+          url: localGallery.logo_url,
+          position: localGallery.logo_settings?.position ?? "bottom-right",
+          size: localGallery.logo_settings?.size ?? 15,
+          margin: localGallery.logo_settings?.margin ?? 3,
+          opacity: localGallery.logo_settings?.opacity ?? 1,
         },
       };
     }
     return base;
-  }, [frame, gallery.enable_auto_logo, gallery.logo_url, gallery.logo_settings]);
+  }, [frame, localGallery.enable_auto_logo, localGallery.logo_url, localGallery.logo_settings]);
 
   const batch = useBatchRenderer(composition);
   const [publishing, setPublishing] = useState(false);
@@ -712,7 +718,7 @@ function GalleryWorkspaceDialog({
       const { data } = await supabase
         .from("campaign_photo_gallery_items")
         .select("*")
-        .eq("gallery_id", gallery.id)
+        .eq("gallery_id", localGallery.id)
         .order("order_index");
       setExistingItems(data ?? []);
     })();
@@ -731,14 +737,14 @@ function GalleryWorkspaceDialog({
     }
     setPublishing(true);
     const result = await publishItemsToGallery({
-      clientId: gallery.client_id,
-      galleryId: gallery.id,
+      clientId: localGallery.client_id,
+      galleryId: localGallery.id,
       items: batch.items,
       onProgress: () => {},
     });
     // Set as published + cover if needed
     const patch: any = { status: "published" };
-    if (!gallery.cover_url && result.firstUrl) patch.cover_url = result.firstUrl;
+    if (!localGallery.cover_url && result.firstUrl) patch.cover_url = result.firstUrl;
     await supabase.from("campaign_photo_galleries").update(patch).eq("id", localGallery.id);
 
     setPublishing(false);
@@ -749,20 +755,20 @@ function GalleryWorkspaceDialog({
     const { data } = await supabase
       .from("campaign_photo_gallery_items")
       .select("*")
-      .eq("gallery_id", gallery.id)
+      .eq("gallery_id", localGallery.id)
       .order("order_index");
     setExistingItems(data ?? []);
   };
 
   const handleRawPublished = async ({ firstUrl }: { uploaded: number; firstUrl: string | null }) => {
     const patch: any = { status: "published" };
-    if (!gallery.cover_url && firstUrl) patch.cover_url = firstUrl;
+    if (!localGallery.cover_url && firstUrl) patch.cover_url = firstUrl;
     await supabase.from("campaign_photo_galleries").update(patch).eq("id", localGallery.id);
     onChanged();
     const { data } = await supabase
       .from("campaign_photo_gallery_items")
       .select("*")
-      .eq("gallery_id", gallery.id)
+      .eq("gallery_id", localGallery.id)
       .order("order_index");
     setExistingItems(data ?? []);
   };
@@ -783,9 +789,9 @@ function GalleryWorkspaceDialog({
       <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {gallery.nome}{" "}
-            <Badge variant={gallery.status === "published" ? "default" : "secondary"}>
-              {gallery.status === "published" ? "Publicada" : "Rascunho"}
+            {localGallery.nome}{" "}
+            <Badge variant={localGallery.status === "published" ? "default" : "secondary"}>
+              {localGallery.status === "published" ? "Publicada" : "Rascunho"}
             </Badge>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingLogo(!editingLogo)}>
               <Settings2 className="w-4 h-4" />
@@ -793,8 +799,8 @@ function GalleryWorkspaceDialog({
           </DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">
             <span>
-              {gallery.event_date
-                ? new Date(gallery.event_date + "T00:00:00").toLocaleDateString("pt-BR")
+              {localGallery.event_date
+                ? new Date(localGallery.event_date + "T00:00:00").toLocaleDateString("pt-BR")
                 : "Sem data"}{" "}
               · Moldura: <strong>{frame?.nome ?? "—"}</strong>
             </span>
@@ -803,7 +809,7 @@ function GalleryWorkspaceDialog({
               variant="ghost"
               className="h-7 gap-1"
               onClick={() => {
-                const shareText = buildShareText(link, gallery.nome);
+                const shareText = buildShareText(link, localGallery.nome);
                 navigator.clipboard.writeText(shareText);
                 toast.success("Link copiado com convite");
               }}
@@ -819,7 +825,7 @@ function GalleryWorkspaceDialog({
               logoUrl={localGallery.logo_url ?? null}
               settings={localGallery.logo_settings}
               enabled={!!localGallery.enable_auto_logo}
-              clientId={gallery.client_id}
+              clientId={localGallery.client_id}
               onUpdate={async (url, settings, enabled) => {
                 if (url === localGallery.logo_url && JSON.stringify(settings) === JSON.stringify(localGallery.logo_settings) && enabled === localGallery.enable_auto_logo) return;
                 
@@ -830,7 +836,7 @@ function GalleryWorkspaceDialog({
                     logo_settings: settings,
                     enable_auto_logo: enabled
                   })
-                  .eq("id", gallery.id)
+                  .eq("id", localGallery.id)
                   .select()
                   .single();
                 
@@ -902,8 +908,8 @@ function GalleryWorkspaceDialog({
             </TabsContent>
             <TabsContent value="raw">
               <RawPhotoUploader
-                clientId={gallery.client_id}
-                galleryId={gallery.id}
+                clientId={localGallery.client_id}
+                galleryId={localGallery.id}
                 startIndex={existingItems.length}
                 onPublished={handleRawPublished}
               />
