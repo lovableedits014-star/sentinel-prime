@@ -185,14 +185,14 @@ export async function publishRawFilesToGallery(opts: {
         ctx.globalAlpha = 1.0;
       }
 
-      currentBlob = await new Promise((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.85));
+      const finalBlob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.85));
       
       const itemId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${i}`;
       const path = `${opts.clientId}/gallery/${opts.galleryId}/${itemId}.jpg`;
 
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, currentBlob, { contentType: "image/jpeg", upsert: false });
+        .upload(path, finalBlob, { contentType: "image/jpeg", upsert: false });
       if (upErr) throw upErr;
 
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
