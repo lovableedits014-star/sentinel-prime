@@ -28,8 +28,12 @@ export default function BatchFrameGenerator({ composition, frameName, batch: ext
     const arr = Array.from(files);
     const oversize = arr.filter((f) => f.size > BATCH_MAX_FILE_MB * 1024 * 1024);
     const nonImage = arr.filter((f) => !f.type.startsWith("image/"));
-    if (oversize.length) toast.warning(`${oversize.length} arquivo(s) ignorado(s) (>${BATCH_MAX_FILE_MB}MB)`);
-    if (nonImage.length) toast.warning(`${nonImage.length} arquivo(s) ignorado(s) (não é imagem)`);
+    if (oversize.length) toast.warning(`${oversize.length} arquivo(s) ignorado(s) (maior que ${BATCH_MAX_FILE_MB}MB)`);
+    if (nonImage.length) {
+      const allowedExts = [".heic", ".heif"];
+      const actualNonImage = nonImage.filter(f => !allowedExts.some(ext => f.name.toLowerCase().endsWith(ext)));
+      if (actualNonImage.length) toast.warning(`${actualNonImage.length} arquivo(s) ignorado(s) (não é imagem suportada)`);
+    }
     const remaining = BATCH_MAX - batch.items.length;
     if (arr.length > remaining) toast.warning(`Apenas ${remaining} foto(s) serão processadas (limite ${BATCH_MAX})`);
     await batch.addFiles(arr);
