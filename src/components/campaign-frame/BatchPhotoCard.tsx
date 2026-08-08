@@ -66,15 +66,25 @@ export default function BatchPhotoCard({ item, index, composition, onAdjust, onR
     <div className="border rounded-lg overflow-hidden bg-card flex flex-col">
       <div className="relative aspect-square bg-muted">
         {item.status === "ready" && item.resultUrl ? (
-          <img src={item.resultUrl} alt={item.fileName} className="w-full h-full object-cover" />
+          <img 
+            src={item.resultUrl} 
+            alt={item.fileName} 
+            className="w-full h-full object-cover" 
+            onError={(e) => {
+              console.error("BatchPhotoCard image load error", item.id);
+              e.currentTarget.style.display = 'none';
+              // Could trigger a re-render or show error status
+            }}
+          />
         ) : item.status === "error" ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-destructive p-2 text-center">
             <AlertCircle className="w-6 h-6 mb-1" />
             <p className="text-[10px]">{item.error ?? "Erro"}</p>
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <span className="text-[9px] text-muted-foreground animate-pulse">Processando...</span>
           </div>
         )}
         <span className="absolute top-1 left-1 bg-background/80 backdrop-blur rounded px-1.5 py-0.5 text-[10px] font-medium">

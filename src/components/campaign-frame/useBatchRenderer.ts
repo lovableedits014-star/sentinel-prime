@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import JSZip from "jszip";
 import { FrameComposition, preloadComposition, renderComposition } from "./types";
 import { saveBlob } from "@/lib/mobile-download";
+import heic2any from "heic2any";
 
 export interface BatchItem {
   id: string;
@@ -16,9 +17,9 @@ export interface BatchItem {
 }
 
 export const BATCH_MAX = 100;
-export const BATCH_MAX_FILE_MB = 10;
+export const BATCH_MAX_FILE_MB = 25; // Aumentado para 25MB conforme solicitado
 export const OUTPUT_MIME = "image/jpeg";
-export const OUTPUT_QUALITY = 0.82;
+export const OUTPUT_QUALITY = 0.85; // Leve aumento na qualidade
 export const OUTPUT_EXT = "jpg";
 const CONCURRENCY = 3;
 const CANVAS_SIZE = 1080;
@@ -94,10 +95,29 @@ export function useBatchRenderer(composition: FrameComposition | null) {
 
   const addFiles = useCallback(async (files: File[]) => {
     const available = BATCH_MAX - items.length;
-    const accept = files.slice(0, available).filter((f) => f.type.startsWith("image/") && f.size <= BATCH_MAX_FILE_MB * 1024 * 1024);
+    const accept = files.slice(0, available).filter((f) => {
+      const isHEIC = /\.(heic|heif)$/i.test(f.name) || f.type === "image/heic" || f.type === "image/heif";
+      return (f.type.startsWith("image/") || isHEIC) && f.size <= BATCH_MAX_FILE_MB * 1024 * 1024;
+    });
 
     const created: BatchItem[] = [];
-    for (const f of accept) {
+    for (let f of accept) {
+      const isHEIC = /\.(heic|heif)$/i.test(f.name) || f.type === "image/heic" || f.type === "image/heif";
+      
+      if (isHEIC) {
+        try {
+          const converted = await heic2any({
+            blob: f,
+            toType: "image/jpeg",
+            quality: 0.85
+          });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          f = new File([blob], f.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+        } catch (err) {
+          console.error("HEIC conversion error", err);
+        }
+      }
+
       const url = URL.createObjectURL(f);
       let img: HTMLImageElement | null = null;
       try { img = await loadImage(url); } catch { /* ignore */ }
