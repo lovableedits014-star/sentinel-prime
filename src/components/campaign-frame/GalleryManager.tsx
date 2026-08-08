@@ -493,39 +493,6 @@ function NewGalleryDialog({
       </DialogContent>
     </Dialog>
   );
-
-    for (let i = 0; i < 5; i++) {
-      const { data: existing } = await supabase
-        .from("campaign_photo_galleries")
-        .select("id")
-        .eq("client_id", clientId)
-        .eq("slug", slug)
-        .maybeSingle();
-      if (!existing) break;
-      slug = `${baseSlug}-${Math.floor(Math.random() * 999)}`;
-    }
-
-    const { data, error } = await supabase
-      .from("campaign_photo_galleries")
-      .insert({
-        client_id: clientId,
-        slug,
-        nome: nome.trim(),
-        event_date: date || null,
-        frame_id: frameId || null,
-        status: "draft",
-        ...extra
-      })
-      .select()
-      .single();
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    delete (window as any)._pendingLogo;
-    onCreated(data as any as Gallery);
-  }
 }
 
 /* ------------ Logo Config Panel ------------ */
