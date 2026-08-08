@@ -25,7 +25,16 @@ interface Pending {
   previewUrl: string;
 }
 
-export default function RawPhotoUploader({ clientId, galleryId, startIndex, watermarkLogo, logoSettings, onPublished }: Props) {
+export default function RawPhotoUploader({ 
+  clientId, 
+  galleryId, 
+  startIndex, 
+  watermarkLogo, 
+  logoSettings, 
+  onPublished,
+  description,
+  buttonLabel
+}: Props) {
   const [pending, setPending] = useState<Pending[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
