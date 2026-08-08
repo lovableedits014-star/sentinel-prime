@@ -892,6 +892,7 @@ function GalleryWorkspaceDialog({
                 clientId={localGallery.client_id}
                 galleryId={localGallery.id}
                 startIndex={existingItems.length}
+                watermarkLogo={localGallery.enable_auto_logo ? (localGallery.logo_url || undefined) : undefined}
                 onPublished={handleRawPublished}
               />
             </TabsContent>

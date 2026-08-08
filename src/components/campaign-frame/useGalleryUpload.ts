@@ -73,6 +73,7 @@ export async function publishRawFilesToGallery(opts: {
   galleryId: string;
   files: File[];
   startIndex?: number;
+  watermarkLogo?: string;
   onProgress?: (p: PublishProgress) => void;
 }): Promise<{ uploaded: number; failed: number; firstUrl: string | null }> {
   const files = opts.files;
@@ -81,33 +82,78 @@ export async function publishRawFilesToGallery(opts: {
   let failed = 0;
   let firstUrl: string | null = null;
 
+  // Carrega logo se houver
+  let logoImg: HTMLImageElement | null = null;
+  if (opts.watermarkLogo) {
+    try {
+      logoImg = await new Promise((res, rej) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => res(img);
+        img.onerror = rej;
+        img.src = opts.watermarkLogo!;
+      });
+    } catch (e) {
+      console.error("Erro ao carregar logo para marca d'água", e);
+    }
+  }
+
   for (let i = 0; i < files.length; i++) {
     let file = files[i];
     try {
+      let currentBlob: Blob = file;
       const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
       
-      if (isHEIC) {
-        try {
-          const converted = await heic2any({
-            blob: file,
-            toType: "image/jpeg",
-            quality: 0.85
-          });
-          const blob = Array.isArray(converted) ? converted[0] : converted;
-          file = new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
-        } catch (err) {
-          console.error("HEIC conversion failed", err);
-          // continua com o arquivo original se falhar, ou joga erro se preferir
-        }
+      // Sempre processamos pelo canvas para garantir:
+      // 1. Conversão de HEIC
+      // 2. Redimensionamento para economia de espaço
+      // 3. Aplicação de Logo opcional
+      const img: HTMLImageElement = await new Promise((res, rej) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          res(img);
+        };
+        img.onerror = rej;
+        img.src = url;
+      });
+
+      const canvas = document.createElement("canvas");
+      // Limitar dimensão máxima para economizar espaço
+      const MAX_DIM = 2048;
+      let { width, height } = img;
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+        width *= ratio;
+        height *= ratio;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context failed");
+      
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Aplica logo se configurado
+      if (logoImg) {
+        const logoSize = Math.min(width, height) * 0.15; // 15% da imagem
+        const aspect = logoImg.height / logoImg.width;
+        const lw = logoSize;
+        const lh = logoSize * aspect;
+        const margin = Math.min(width, height) * 0.03;
+        ctx.globalAlpha = 0.8;
+        ctx.drawImage(logoImg, width - lw - margin, height - lh - margin, lw, lh);
       }
 
-      const ext = EXT_BY_TYPE[file.type] || (file.name.split(".").pop() || "jpg").toLowerCase();
+      currentBlob = await new Promise((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.85));
+      
       const itemId = (crypto as any).randomUUID?.() ?? `${Date.now()}-${i}`;
-      const path = `${opts.clientId}/gallery/${opts.galleryId}/${itemId}.${ext}`;
+      const path = `${opts.clientId}/gallery/${opts.galleryId}/${itemId}.jpg`;
 
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
+        .upload(path, currentBlob, { contentType: "image/jpeg", upsert: false });
       if (upErr) throw upErr;
 
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
@@ -119,7 +165,7 @@ export async function publishRawFilesToGallery(opts: {
         .insert({
           gallery_id: opts.galleryId,
           client_id: opts.clientId,
-          original_file_name: file.name,
+          original_file_name: file.name.replace(/\.(heic|heif)$/i, ".jpg"),
           storage_path: path,
           public_url: publicUrl,
           order_index: start + i,
