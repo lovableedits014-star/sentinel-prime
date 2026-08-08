@@ -133,7 +133,6 @@ export function useBatchRenderer(composition: FrameComposition | null) {
           console.error("Segunda tentativa falhou:", f.name, e2);
         }
       }
-      }
       
       created.push({
         id: crypto.randomUUID(),
