@@ -13,12 +13,14 @@ export async function publishItemsToGallery(opts: {
   clientId: string;
   galleryId: string;
   items: BatchItem[];
+  startIndex?: number;
   onProgress?: (p: PublishProgress) => void;
 }): Promise<{ uploaded: number; failed: number; firstUrl: string | null }> {
   const ready = opts.items.filter((i) => i.status === "ready" && i.resultUrl);
   let uploaded = 0;
   let failed = 0;
   let firstUrl: string | null = null;
+  const start = opts.startIndex ?? 0;
 
   for (let i = 0; i < ready.length; i++) {
     const it = ready[i];
@@ -46,7 +48,7 @@ export async function publishItemsToGallery(opts: {
           original_file_name: it.fileName,
           storage_path: path,
           public_url: publicUrl,
-          order_index: i,
+          order_index: start + i,
         });
       if (insErr) throw insErr;
       uploaded += 1;

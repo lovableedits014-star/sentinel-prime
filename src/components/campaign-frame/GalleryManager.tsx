@@ -336,8 +336,8 @@ function GalleryCard({
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" variant="outline" className="gap-1 h-8" onClick={onOpen}>
-            <ImageIcon className="w-3.5 h-3.5" /> Abrir
+          <Button size="sm" variant="default" className="gap-1 h-8" onClick={onOpen}>
+            <Plus className="w-3.5 h-3.5" /> Add Fotos
           </Button>
           <Button
             size="sm"
@@ -720,6 +720,7 @@ function GalleryWorkspaceDialog({
       clientId: localGallery.client_id,
       galleryId: localGallery.id,
       items: batch.items,
+      startIndex: existingItems.length,
       onProgress: () => {},
     });
     // Set as published + cover if needed
