@@ -15,6 +15,8 @@ interface Props {
   watermarkLogo?: string;
   logoSettings?: any;
   onPublished: (info: { uploaded: number; firstUrl: string | null }) => void;
+  description?: string;
+  buttonLabel?: string;
 }
 
 interface Pending {
@@ -23,7 +25,16 @@ interface Pending {
   previewUrl: string;
 }
 
-export default function RawPhotoUploader({ clientId, galleryId, startIndex, watermarkLogo, logoSettings, onPublished }: Props) {
+export default function RawPhotoUploader({ 
+  clientId, 
+  galleryId, 
+  startIndex, 
+  watermarkLogo, 
+  logoSettings, 
+  onPublished,
+  description,
+  buttonLabel
+}: Props) {
   const [pending, setPending] = useState<Pending[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -129,7 +140,7 @@ export default function RawPhotoUploader({ clientId, galleryId, startIndex, wate
       >
         <Upload className="w-8 h-8 mx-auto text-muted-foreground opacity-60" />
         <p className="text-sm text-muted-foreground">
-          Arraste as fotos aqui ou selecione os arquivos. Elas serão publicadas exatamente como estão, sem moldura.
+          {description || "Arraste as fotos aqui ou selecione os arquivos. Elas serão publicadas exatamente como estão, sem moldura."}
         </p>
         <input
           ref={inputRef}
@@ -182,7 +193,7 @@ export default function RawPhotoUploader({ clientId, galleryId, startIndex, wate
 
       <Button onClick={handlePublish} disabled={publishing || pending.length === 0} className="gap-1.5">
         {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        Publicar {pending.length} fotos sem moldura
+        {buttonLabel || `Publicar ${pending.length} fotos sem moldura`}
       </Button>
     </div>
   );
