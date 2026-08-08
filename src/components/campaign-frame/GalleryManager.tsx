@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ import {
   EyeOff,
   Plus,
   Settings2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_COMPOSITION, FrameComposition, preloadComposition } from "./types";
