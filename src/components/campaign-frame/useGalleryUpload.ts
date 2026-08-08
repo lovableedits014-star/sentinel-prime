@@ -13,6 +13,7 @@ export async function publishItemsToGallery(opts: {
   clientId: string;
   galleryId: string;
   items: BatchItem[];
+  startIndex?: number;
   onProgress?: (p: PublishProgress) => void;
 }): Promise<{ uploaded: number; failed: number; firstUrl: string | null }> {
   const ready = opts.items.filter((i) => i.status === "ready" && i.resultUrl);
