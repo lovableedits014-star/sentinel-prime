@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 import JSZip from "jszip";
 import { FrameComposition, preloadComposition, renderComposition } from "./types";
 import { saveBlob } from "@/lib/mobile-download";
-import heic2any from "heic2any";
 
 export interface BatchItem {
   id: string;
@@ -117,6 +116,17 @@ export function useBatchRenderer(composition: FrameComposition | null) {
           f = new File([blob], f.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
         } catch (err) {
           console.error("HEIC conversion error", err);
+          created.push({
+            id: crypto.randomUUID(),
+            fileName: f.name,
+            originalUrl: "",
+            image: null,
+            zoom: 1,
+            offset: { x: 0, y: 0 },
+            status: "error",
+            error: "não foi possível converter HEIC",
+          });
+          continue;
         }
       }
 

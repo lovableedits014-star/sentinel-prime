@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import type { BatchItem } from "./useBatchRenderer";
-import heic2any from "heic2any";
+
 
 const BUCKET = "campaign-frame-assets";
 
@@ -101,13 +101,28 @@ export async function publishRawFilesToGallery(opts: {
   for (let i = 0; i < files.length; i++) {
     let file = files[i];
     try {
-      let currentBlob: Blob = file;
       const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
       
+      // Se for HEIC, precisamos converter antes de tentar carregar no Image/Canvas
+      if (isHEIC) {
+        try {
+          const heic2any = (await import("heic2any")).default;
+          const converted = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 0.85
+          });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          file = new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+        } catch (convErr) {
+          console.error("Erro na conversão HEIC durante publicação:", convErr);
+          throw new Error("Não foi possível converter o formato HEIC do iPhone");
+        }
+      }
+
       // Sempre processamos pelo canvas para garantir:
-      // 1. Conversão de HEIC
-      // 2. Redimensionamento para economia de espaço
-      // 3. Aplicação de Logo opcional
+      // 1. Redimensionamento para economia de espaço
+      // 2. Aplicação de Logo opcional
       const img: HTMLImageElement = await new Promise((res, rej) => {
         const url = URL.createObjectURL(file);
         const img = new Image();
@@ -115,7 +130,10 @@ export async function publishRawFilesToGallery(opts: {
           URL.revokeObjectURL(url);
           res(img);
         };
-        img.onerror = rej;
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          rej(new Error("Não foi possível carregar a imagem selecionada"));
+        };
         img.src = url;
       });
 
