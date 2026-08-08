@@ -48,7 +48,7 @@ export async function publishItemsToGallery(opts: {
           original_file_name: it.fileName,
           storage_path: path,
           public_url: publicUrl,
-          order_index: i,
+          order_index: start + i,
         });
       if (insErr) throw insErr;
       uploaded += 1;
