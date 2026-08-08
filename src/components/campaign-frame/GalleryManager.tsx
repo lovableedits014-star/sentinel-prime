@@ -381,7 +381,7 @@ function NewGalleryDialog({
     }
   }, [open, frames]);
 
-  const handleSave = async () => {
+  const handleSave = async (extra: any = {}) => {
     if (!nome.trim()) return toast.error("Dê um nome ao evento");
     setSaving(true);
     const baseSlug = slugify(`${nome}-${date}`);
@@ -408,6 +408,7 @@ function NewGalleryDialog({
         event_date: date || null,
         frame_id: frameId || null,
         status: "draft",
+        ...extra,
       })
       .select()
       .single();
@@ -483,7 +484,7 @@ function NewGalleryDialog({
               logo_settings: pending.settings,
               enable_auto_logo: pending.enabled
             } : {};
-            await handleSaveWithExtra(extra);
+            await handleSave(extra);
           }} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             Criar
@@ -492,45 +493,6 @@ function NewGalleryDialog({
       </DialogContent>
     </Dialog>
   );
-
-  async function handleSaveWithExtra(extra: any) {
-    if (!nome.trim()) return toast.error("Dê um nome ao evento");
-    setSaving(true);
-    const baseSlug = slugify(`${nome}-${date}`);
-    let slug = baseSlug;
-
-    for (let i = 0; i < 5; i++) {
-      const { data: existing } = await supabase
-        .from("campaign_photo_galleries")
-        .select("id")
-        .eq("client_id", clientId)
-        .eq("slug", slug)
-        .maybeSingle();
-      if (!existing) break;
-      slug = `${baseSlug}-${Math.floor(Math.random() * 999)}`;
-    }
-
-    const { data, error } = await supabase
-      .from("campaign_photo_galleries")
-      .insert({
-        client_id: clientId,
-        slug,
-        nome: nome.trim(),
-        event_date: date || null,
-        frame_id: frameId || null,
-        status: "draft",
-        ...extra
-      })
-      .select()
-      .single();
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    delete (window as any)._pendingLogo;
-    onCreated(data as any as Gallery);
-  }
 }
 
 /* ------------ Logo Config Panel ------------ */
