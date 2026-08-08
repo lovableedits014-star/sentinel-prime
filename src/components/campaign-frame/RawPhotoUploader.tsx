@@ -105,7 +105,6 @@ export default function RawPhotoUploader({
         file,
         previewUrl: URL.createObjectURL(file),
       });
-      setLoadingProgress(prev => ({ ...prev, done: i + 1 }));
       setLoadingProgress({ done: i + 1, total: fileArr.length });
     }
 

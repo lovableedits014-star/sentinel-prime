@@ -101,7 +101,10 @@ export function useBatchRenderer(composition: FrameComposition | null) {
     });
 
     const created: BatchItem[] = [];
-    for (let f of accept) {
+    setProgress({ done: 0, total: accept.length });
+    for (let i = 0; i < accept.length; i++) {
+      let f = accept[i];
+      setProgress({ done: i, total: accept.length });
       const isHEIC = /\.(heic|heif)$/i.test(f.name) || f.type === "image/heic" || f.type === "image/heif";
       
       if (isHEIC) {
@@ -159,6 +162,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
         status: img ? "queued" : "error",
         error: img ? undefined : "falha técnica ao ler arquivo (tente novamente)",
       });
+      setProgress({ done: i + 1, total: accept.length });
     }
     setItems((cur) => [...cur, ...created]);
 
