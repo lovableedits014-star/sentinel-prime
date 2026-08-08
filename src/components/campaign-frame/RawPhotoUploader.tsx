@@ -12,6 +12,7 @@ interface Props {
   clientId: string;
   galleryId: string;
   startIndex: number;
+  watermarkLogo?: string;
   onPublished: (info: { uploaded: number; firstUrl: string | null }) => void;
 }
 
@@ -21,7 +22,7 @@ interface Pending {
   previewUrl: string;
 }
 
-export default function RawPhotoUploader({ clientId, galleryId, startIndex, onPublished }: Props) {
+export default function RawPhotoUploader({ clientId, galleryId, startIndex, watermarkLogo, onPublished }: Props) {
   const [pending, setPending] = useState<Pending[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -34,25 +35,49 @@ export default function RawPhotoUploader({ clientId, galleryId, startIndex, onPu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const addFiles = (files: FileList | null) => {
+  const addFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     const accepted: Pending[] = [];
     let rejected = 0;
-    Array.from(files).forEach((file, idx) => {
+    const fileArr = Array.from(files);
+
+    for (let i = 0; i < fileArr.length; i++) {
+      let file = fileArr[i];
       const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
       const okType = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(file.type) || isHEIC;
       const okSize = file.size <= MAX_FILE_MB * 1024 * 1024;
+      
       if (!okType || !okSize) {
         rejected += 1;
-        return;
+        continue;
       }
+
+      // Se for HEIC, converte imediatamente para preview funcionar
+      if (isHEIC) {
+        try {
+          const heic2any = (await import("heic2any")).default;
+          const converted = await heic2any({
+            blob: file,
+            toType: "image/jpeg",
+            quality: 0.7
+          });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          file = new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+        } catch (err) {
+          console.error("HEIC conversion error for preview", err);
+          rejected += 1;
+          continue;
+        }
+      }
+
       accepted.push({
-        id: `${Date.now()}-${idx}-${file.name}`,
+        id: `${Date.now()}-${i}-${file.name}`,
         file,
         previewUrl: URL.createObjectURL(file),
       });
-    });
-    if (rejected) toast.warning(`${rejected} arquivo(s) ignorado(s) (formato ou tamanho acima de ${MAX_FILE_MB}MB)`);
+    }
+
+    if (rejected) toast.warning(`${rejected} arquivo(s) ignorado(s) ou falha na conversão`);
     if (accepted.length) setPending((cur) => [...cur, ...accepted]);
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -79,6 +104,7 @@ export default function RawPhotoUploader({ clientId, galleryId, startIndex, onPu
       galleryId,
       files: pending.map((p) => p.file),
       startIndex,
+      watermarkLogo,
       onProgress: setProgress,
     });
     setPublishing(false);

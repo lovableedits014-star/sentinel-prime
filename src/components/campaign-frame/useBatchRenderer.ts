@@ -23,6 +23,7 @@ export const OUTPUT_QUALITY = 0.85; // Leve aumento na qualidade
 export const OUTPUT_EXT = "jpg";
 const CONCURRENCY = 3;
 const CANVAS_SIZE = 1080;
+const MAX_DIMENSION = 2048; // Redimensionar se maior que isso para economizar espaço
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
