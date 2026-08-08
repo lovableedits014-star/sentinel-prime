@@ -1171,9 +1171,12 @@ export type Database = {
           cover_url: string | null
           created_at: string
           created_by: string | null
+          enable_auto_logo: boolean | null
           event_date: string | null
           frame_id: string | null
           id: string
+          logo_settings: Json | null
+          logo_url: string | null
           nome: string
           slug: string
           status: string
@@ -1184,9 +1187,12 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           created_by?: string | null
+          enable_auto_logo?: boolean | null
           event_date?: string | null
           frame_id?: string | null
           id?: string
+          logo_settings?: Json | null
+          logo_url?: string | null
           nome: string
           slug: string
           status?: string
@@ -1197,9 +1203,12 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           created_by?: string | null
+          enable_auto_logo?: boolean | null
           event_date?: string | null
           frame_id?: string | null
           id?: string
+          logo_settings?: Json | null
+          logo_url?: string | null
           nome?: string
           slug?: string
           status?: string
@@ -1229,6 +1238,7 @@ export type Database = {
           gallery_id: string
           height: number | null
           id: string
+          logo_override_settings: Json | null
           order_index: number
           original_file_name: string | null
           public_url: string
@@ -1241,6 +1251,7 @@ export type Database = {
           gallery_id: string
           height?: number | null
           id?: string
+          logo_override_settings?: Json | null
           order_index?: number
           original_file_name?: string | null
           public_url: string
@@ -1253,6 +1264,7 @@ export type Database = {
           gallery_id?: string
           height?: number | null
           id?: string
+          logo_override_settings?: Json | null
           order_index?: number
           original_file_name?: string | null
           public_url?: string
