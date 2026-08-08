@@ -16,9 +16,9 @@ export interface BatchItem {
 }
 
 export const BATCH_MAX = 100;
-export const BATCH_MAX_FILE_MB = 10;
+export const BATCH_MAX_FILE_MB = 25; // Aumentado para 25MB conforme solicitado
 export const OUTPUT_MIME = "image/jpeg";
-export const OUTPUT_QUALITY = 0.82;
+export const OUTPUT_QUALITY = 0.85; // Leve aumento na qualidade
 export const OUTPUT_EXT = "jpg";
 const CONCURRENCY = 3;
 const CANVAS_SIZE = 1080;
