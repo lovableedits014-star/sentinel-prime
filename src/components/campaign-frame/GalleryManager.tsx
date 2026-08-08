@@ -720,6 +720,7 @@ function GalleryWorkspaceDialog({
       clientId: localGallery.client_id,
       galleryId: localGallery.id,
       items: batch.items,
+      startIndex: existingItems.length,
       onProgress: () => {},
     });
     // Set as published + cover if needed
