@@ -882,19 +882,34 @@ function GalleryWorkspaceDialog({
           <Tabs defaultValue="frame">
             <TabsList className="mb-3">
               <TabsTrigger value="frame">Com moldura</TabsTrigger>
-              <TabsTrigger value="raw">Sem moldura (arquivos prontos)</TabsTrigger>
+              <TabsTrigger value="logo">Com logotipo avulso</TabsTrigger>
+              <TabsTrigger value="raw">Sem moldura (original)</TabsTrigger>
             </TabsList>
             <TabsContent value="frame">
               <BatchFrameGenerator composition={composition} frameName={frame?.nome} batch={batch} />
+            </TabsContent>
+            <TabsContent value="logo">
+              <RawPhotoUploader
+                clientId={localGallery.client_id}
+                galleryId={localGallery.id}
+                startIndex={existingItems.length}
+                watermarkLogo={localGallery.logo_url || undefined}
+                logoSettings={localGallery.logo_settings}
+                onPublished={handleRawPublished}
+                description="As fotos serão publicadas com o logotipo configurado aplicado no canto."
+                buttonLabel={`Publicar ${batch.items.length || 'as'} fotos com logotipo`}
+              />
             </TabsContent>
             <TabsContent value="raw">
               <RawPhotoUploader
                 clientId={localGallery.client_id}
                 galleryId={localGallery.id}
                 startIndex={existingItems.length}
-                watermarkLogo={localGallery.enable_auto_logo ? (localGallery.logo_url || undefined) : undefined}
-                logoSettings={localGallery.logo_settings}
+                watermarkLogo={undefined}
+                logoSettings={undefined}
                 onPublished={handleRawPublished}
+                description="As fotos serão publicadas exatamente como estão, sem moldura e sem logotipo."
+                buttonLabel={`Publicar ${batch.items.length || 'as'} fotos originais`}
               />
             </TabsContent>
           </Tabs>
