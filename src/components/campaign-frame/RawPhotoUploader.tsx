@@ -15,6 +15,8 @@ interface Props {
   watermarkLogo?: string;
   logoSettings?: any;
   onPublished: (info: { uploaded: number; firstUrl: string | null }) => void;
+  description?: string;
+  buttonLabel?: string;
 }
 
 interface Pending {
