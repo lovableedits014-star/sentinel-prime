@@ -70,6 +70,7 @@ export default function RawPhotoUploader({
 
     for (let i = 0; i < fileArr.length; i++) {
       let file = fileArr[i];
+      setLoadingProgress({ done: i, total: fileArr.length });
       const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
       const okType = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(file.type) || isHEIC;
       const okSize = file.size <= MAX_FILE_MB * 1024 * 1024;
@@ -105,6 +106,7 @@ export default function RawPhotoUploader({
         previewUrl: URL.createObjectURL(file),
       });
       setLoadingProgress(prev => ({ ...prev, done: i + 1 }));
+      setLoadingProgress({ done: i + 1, total: fileArr.length });
     }
 
     if (rejected) toast.warning(`${rejected} arquivo(s) ignorado(s) ou falha na conversão`);

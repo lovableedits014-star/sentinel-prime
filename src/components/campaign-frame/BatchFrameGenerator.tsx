@@ -38,8 +38,11 @@ export default function BatchFrameGenerator({ composition, frameName, batch: ext
     }
     const remaining = BATCH_MAX - batch.items.length;
     if (arr.length > remaining) toast.warning(`Apenas ${remaining} foto(s) serão processadas (limite ${BATCH_MAX})`);
-    await batch.addFiles(arr);
-    setLoadingFiles(false);
+    try {
+      await batch.addFiles(arr);
+    } finally {
+      setLoadingFiles(false);
+    }
     toast.success(`Fotos processadas`);
   }, [batch, composition]);
 
