@@ -20,6 +20,7 @@ export async function publishItemsToGallery(opts: {
   let uploaded = 0;
   let failed = 0;
   let firstUrl: string | null = null;
+  const start = opts.startIndex ?? 0;
 
   for (let i = 0; i < ready.length; i++) {
     const it = ready[i];
