@@ -23,6 +23,14 @@ export interface FrameComposition {
   photoCircle: { cx: number; cy: number; r: number };
   /** Stacked top-down: index 0 renders first (bottom) above the photo */
   layers: FrameLayer[];
+  /** Optional watermark logo */
+  watermark?: {
+    url: string;
+    position: "bottom-right" | "bottom-left" | "top-right" | "top-left" | "center";
+    size: number; // percentage of canvas dimension (e.g., 15)
+    margin: number; // percentage of canvas dimension (e.g., 3)
+    opacity: number;
+  };
 }
 
 export const DEFAULT_COMPOSITION: FrameComposition = {
@@ -121,12 +129,50 @@ export async function renderComposition(
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   }
+
+  // 4. Watermark Logo
+  if (comp.watermark?.url) {
+    const logoImg = opts.imageCache.get(comp.watermark.url);
+    if (logoImg) {
+      ctx.save();
+      ctx.globalAlpha = comp.watermark.opacity ?? 1;
+      
+      const sizePercent = comp.watermark.size / 100;
+      const marginPercent = comp.watermark.margin / 100;
+      
+      // Scale based on the smaller dimension to keep it proportional
+      const baseDim = Math.min(width, height);
+      const targetW = baseDim * sizePercent;
+      const aspect = logoImg.height / logoImg.width;
+      const targetH = targetW * aspect;
+      
+      const margin = baseDim * marginPercent;
+      let x = width - targetW - margin;
+      let y = height - targetH - margin;
+      
+      if (comp.watermark.position === "bottom-left") {
+        x = margin;
+      } else if (comp.watermark.position === "top-right") {
+        y = margin;
+      } else if (comp.watermark.position === "top-left") {
+        x = margin;
+        y = margin;
+      } else if (comp.watermark.position === "center") {
+        x = (width - targetW) / 2;
+        y = (height - targetH) / 2;
+      }
+      
+      ctx.drawImage(logoImg, x, y, targetW, targetH);
+      ctx.restore();
+    }
+  }
 }
 
 /** Preload all images referenced by a composition. */
 export async function preloadComposition(comp: FrameComposition): Promise<Map<string, HTMLImageElement>> {
   const urls = new Set<string>();
   if (comp.background.type === "image") urls.add(comp.background.imageUrl);
+  if (comp.watermark?.url) urls.add(comp.watermark.url);
   for (const l of comp.layers) urls.add(l.imageUrl);
   const cache = new Map<string, HTMLImageElement>();
   await Promise.all(
