@@ -140,7 +140,7 @@ export default function RawPhotoUploader({
       >
         <Upload className="w-8 h-8 mx-auto text-muted-foreground opacity-60" />
         <p className="text-sm text-muted-foreground">
-          Arraste as fotos aqui ou selecione os arquivos. Elas serão publicadas exatamente como estão, sem moldura.
+          {description || "Arraste as fotos aqui ou selecione os arquivos. Elas serão publicadas exatamente como estão, sem moldura."}
         </p>
         <input
           ref={inputRef}
