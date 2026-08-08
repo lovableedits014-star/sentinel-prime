@@ -30,6 +30,7 @@ import {
   Eye,
   EyeOff,
   Plus,
+  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_COMPOSITION, FrameComposition, preloadComposition } from "./types";
@@ -38,6 +39,8 @@ import { useBatchRenderer } from "./useBatchRenderer";
 import { publishItemsToGallery, slugify } from "./useGalleryUpload";
 import RawPhotoUploader from "./RawPhotoUploader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 
 interface Frame {
   id: string;
@@ -235,7 +238,10 @@ export default function GalleryManager({ clientId, publicSlug }: Props) {
           gallery={activeGallery}
           frames={frames}
           onClose={() => setActiveGallery(null)}
-          onChanged={loadAll}
+          onChanged={(g) => {
+            if (g) setGalleries((cur) => cur.map((x) => (x.id === g.id ? g : x)));
+            loadAll();
+          }}
           hubBase={hubBase}
         />
       )}
@@ -414,55 +420,249 @@ function NewGalleryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Nova galeria</DialogTitle>
           <DialogDescription>
             Crie uma pasta para o evento. Depois você sobe as fotos em lote e publica.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label className="text-xs">Nome do evento</Label>
-            <Input
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Ex.: Reunião nas Moreninhas"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="space-y-3">
             <div>
-              <Label className="text-xs">Data</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Label className="text-xs">Nome do evento</Label>
+              <Input
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex.: Reunião nas Moreninhas"
+              />
             </div>
-            <div>
-              <Label className="text-xs">Moldura</Label>
-              <Select value={frameId} onValueChange={setFrameId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {frames.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Data</Label>
+                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">Moldura</Label>
+                <Select value={frameId} onValueChange={setFrameId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {frames.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
+          
+          <LogoConfigPanel
+            logoUrl={null}
+            settings={{ position: "bottom-right", size: 15, margin: 3, opacity: 1 }}
+            enabled={false}
+            clientId={clientId}
+            onUpdate={(logoUrl, settings, enabled) => {
+              // We'll pass these in the insert during handleSave
+              (window as any)._pendingLogo = { logoUrl, settings, enabled };
+            }}
+          />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+          <Button onClick={async () => {
+            const pending = (window as any)._pendingLogo;
+            const extra = pending ? {
+              logo_url: pending.logoUrl,
+              logo_settings: pending.settings,
+              enable_auto_logo: pending.enabled
+            } : {};
+            await handleSaveWithExtra(extra);
+          }} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             Criar
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+
+  async function handleSaveWithExtra(extra: any) {
+    if (!nome.trim()) return toast.error("Dê um nome ao evento");
+    setSaving(true);
+    const baseSlug = slugify(`${nome}-${date}`);
+    let slug = baseSlug;
+
+    for (let i = 0; i < 5; i++) {
+      const { data: existing } = await supabase
+        .from("campaign_photo_galleries")
+        .select("id")
+        .eq("client_id", clientId)
+        .eq("slug", slug)
+        .maybeSingle();
+      if (!existing) break;
+      slug = `${baseSlug}-${Math.floor(Math.random() * 999)}`;
+    }
+
+    const { data, error } = await supabase
+      .from("campaign_photo_galleries")
+      .insert({
+        client_id: clientId,
+        slug,
+        nome: nome.trim(),
+        event_date: date || null,
+        frame_id: frameId || null,
+        status: "draft",
+        ...extra
+      })
+      .select()
+      .single();
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    delete (window as any)._pendingLogo;
+    onCreated(data as any as Gallery);
+  }
+}
+
+/* ------------ Logo Config Panel ------------ */
+function LogoConfigPanel({
+  logoUrl: initialUrl,
+  settings: initialSettings,
+  enabled: initialEnabled,
+  clientId,
+  onUpdate
+}: {
+  logoUrl: string | null;
+  settings: any;
+  enabled: boolean;
+  clientId: string;
+  onUpdate: (url: string | null, settings: any, enabled: boolean) => void;
+}) {
+  const [url, setUrl] = useState(initialUrl);
+  const [settings, setSettings] = useState(initialSettings || { position: "bottom-right", size: 15, margin: 3, opacity: 1 });
+  const [enabled, setEnabled] = useState(initialEnabled);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onUpdate(url, settings, enabled);
+  }, [url, settings, enabled]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.includes("png")) return toast.error("O logo deve ser um PNG transparente");
+    
+    setUploading(true);
+    try {
+      const path = `${clientId}/logos/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage
+        .from("campaign-frame-assets")
+        .upload(path, file);
+      if (upErr) throw upErr;
+      
+      const { data: pub } = supabase.storage.from("campaign-frame-assets").getPublicUrl(path);
+      setUrl(pub.publicUrl);
+      setEnabled(true);
+      toast.success("Logo enviado!");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Settings2 className="w-4 h-4 text-primary" />
+          <h4 className="text-sm font-semibold">Logotipo (Marca d'água)</h4>
+        </div>
+        <Switch checked={enabled} onCheckedChange={setEnabled} />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-16 h-16 border rounded bg-white flex items-center justify-center relative overflow-hidden group">
+            {url ? (
+              <img src={url} alt="Logo" className="max-w-full max-h-full object-contain p-1" />
+            ) : (
+              <ImageIcon className="w-6 h-6 text-muted-foreground opacity-30" />
+            )}
+            <input type="file" ref={fileInputRef} hidden accept="image/png" onChange={handleUpload} />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute inset-0 bg-black/40 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex-1 space-y-1">
+            <p className="text-[11px] text-muted-foreground leading-tight">
+              Suba um logo em <strong>PNG transparente</strong>. Ele será aplicado em todas as fotos da galeria.
+            </p>
+            {url && (
+              <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive px-2" onClick={() => setUrl(null)}>
+                Remover
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {enabled && (
+          <div className="space-y-3 pt-2">
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <Label className="text-[10px]">Tamanho ({settings.size}%)</Label>
+              </div>
+              <Slider 
+                value={[settings.size]} 
+                min={5} max={40} step={1} 
+                onValueChange={([v]) => setSettings({ ...settings, size: v })} 
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <Label className="text-[10px]">Posição</Label>
+              </div>
+              <Select value={settings.position} onValueChange={(v: any) => setSettings({ ...settings, position: v })}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bottom-right">Inferior Direito</SelectItem>
+                  <SelectItem value="bottom-left">Inferior Esquerdo</SelectItem>
+                  <SelectItem value="top-right">Superior Direito</SelectItem>
+                  <SelectItem value="top-left">Superior Esquerdo</SelectItem>
+                  <SelectItem value="center">Centro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <Label className="text-[10px]">Margem ({settings.margin}%)</Label>
+              </div>
+              <Slider 
+                value={[settings.margin]} 
+                min={0} max={10} step={0.5} 
+                onValueChange={([v]) => setSettings({ ...settings, margin: v })} 
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -477,7 +677,7 @@ function GalleryWorkspaceDialog({
   gallery: Gallery;
   frames: Frame[];
   onClose: () => void;
-  onChanged: () => void;
+  onChanged: (g?: Gallery) => void;
   hubBase: string;
 }) {
   const frame = useMemo(() => frames.find((f) => f.id === gallery.frame_id) ?? frames[0], [
@@ -538,7 +738,7 @@ function GalleryWorkspaceDialog({
     // Set as published + cover if needed
     const patch: any = { status: "published" };
     if (!gallery.cover_url && result.firstUrl) patch.cover_url = result.firstUrl;
-    await supabase.from("campaign_photo_galleries").update(patch).eq("id", gallery.id);
+    await supabase.from("campaign_photo_galleries").update(patch).eq("id", localGallery.id);
 
     setPublishing(false);
     if (result.failed > 0) toast.warning(`${result.uploaded} publicadas, ${result.failed} falharam`);
@@ -556,7 +756,7 @@ function GalleryWorkspaceDialog({
   const handleRawPublished = async ({ firstUrl }: { uploaded: number; firstUrl: string | null }) => {
     const patch: any = { status: "published" };
     if (!gallery.cover_url && firstUrl) patch.cover_url = firstUrl;
-    await supabase.from("campaign_photo_galleries").update(patch).eq("id", gallery.id);
+    await supabase.from("campaign_photo_galleries").update(patch).eq("id", localGallery.id);
     onChanged();
     const { data } = await supabase
       .from("campaign_photo_gallery_items")
@@ -586,6 +786,9 @@ function GalleryWorkspaceDialog({
             <Badge variant={gallery.status === "published" ? "default" : "secondary"}>
               {gallery.status === "published" ? "Publicada" : "Rascunho"}
             </Badge>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditingLogo(!editingLogo)}>
+              <Settings2 className="w-4 h-4" />
+            </Button>
           </DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">
             <span>
@@ -608,6 +811,61 @@ function GalleryWorkspaceDialog({
             </Button>
           </DialogDescription>
         </DialogHeader>
+
+        {editingLogo && (
+          <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top duration-200 mb-4">
+            <LogoConfigPanel
+              logoUrl={localGallery.logo_url ?? null}
+              settings={localGallery.logo_settings}
+              enabled={!!localGallery.enable_auto_logo}
+              clientId={gallery.client_id}
+              onUpdate={async (url, settings, enabled) => {
+                if (url === localGallery.logo_url && JSON.stringify(settings) === JSON.stringify(localGallery.logo_settings) && enabled === localGallery.enable_auto_logo) return;
+                
+                const { data, error } = await supabase
+                  .from("campaign_photo_galleries")
+                  .update({
+                    logo_url: url,
+                    logo_settings: settings,
+                    enable_auto_logo: enabled
+                  })
+                  .eq("id", gallery.id)
+                  .select()
+                  .single();
+                
+                if (!error && data) {
+                  setLocalGallery(data as any);
+                  onChanged(data as any);
+                }
+              }}
+            />
+            <div className="border rounded-lg p-4 bg-muted/10 flex flex-col items-center justify-center text-center space-y-2">
+              <div className="w-32 aspect-square border-2 border-dashed rounded relative bg-white overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center opacity-10">
+                  <ImageIcon className="w-12 h-12" />
+                </div>
+                {localGallery.enable_auto_logo && localGallery.logo_url && (
+                  <div 
+                    className="absolute"
+                    style={{
+                      opacity: localGallery.logo_settings?.opacity ?? 1,
+                      width: `${localGallery.logo_settings?.size ?? 15}%`,
+                      padding: `${(localGallery.logo_settings?.margin ?? 3) / 2}%`,
+                      ...(localGallery.logo_settings?.position === "bottom-right" ? { bottom: 0, right: 0 } :
+                         localGallery.logo_settings?.position === "bottom-left" ? { bottom: 0, left: 0 } :
+                         localGallery.logo_settings?.position === "top-right" ? { top: 0, right: 0 } :
+                         localGallery.logo_settings?.position === "top-left" ? { top: 0, left: 0 } :
+                         { top: "50%", left: "50%", transform: "translate(-50%, -50%)" })
+                    }}
+                  >
+                    <img src={localGallery.logo_url} alt="" className="w-full h-auto" />
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">Prévia do posicionamento (ilustrativo)</p>
+            </div>
+          </div>
+        )}
 
         {existingItems.length > 0 && (
           <div className="space-y-2">
