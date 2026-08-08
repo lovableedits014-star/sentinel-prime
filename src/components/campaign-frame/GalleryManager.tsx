@@ -893,11 +893,9 @@ function GalleryWorkspaceDialog({
                 clientId={localGallery.client_id}
                 galleryId={localGallery.id}
                 startIndex={existingItems.length}
-                watermarkLogo={localGallery.logo_url || undefined}
-                logoSettings={localGallery.logo_settings}
                 onPublished={handleRawPublished}
                 description="As fotos serão publicadas com o logotipo configurado aplicado no canto."
-                buttonLabel={`Publicar ${batch.items.length || 'as'} fotos com logotipo`}
+                buttonLabel="Publicar fotos com logotipo"
               />
             </TabsContent>
             <TabsContent value="raw">
@@ -909,7 +907,7 @@ function GalleryWorkspaceDialog({
                 logoSettings={undefined}
                 onPublished={handleRawPublished}
                 description="As fotos serão publicadas exatamente como estão, sem moldura e sem logotipo."
-                buttonLabel={`Publicar ${batch.items.length || 'as'} fotos originais`}
+                buttonLabel="Publicar fotos originais"
               />
             </TabsContent>
           </Tabs>
