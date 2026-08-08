@@ -114,7 +114,7 @@ export default function RawPhotoUploader({ clientId, galleryId, startIndex, onPu
         <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={publishing}>
           Selecionar arquivos
         </Button>
-        <p className="text-[11px] text-muted-foreground">JPG, PNG ou WebP · até {MAX_FILE_MB}MB por foto</p>
+        <p className="text-[11px] text-muted-foreground">JPG, PNG, WebP ou HEIC · até {MAX_FILE_MB}MB por foto</p>
       </div>
 
       {pending.length > 0 && (
