@@ -893,6 +893,8 @@ function GalleryWorkspaceDialog({
                 clientId={localGallery.client_id}
                 galleryId={localGallery.id}
                 startIndex={existingItems.length}
+                watermarkLogo={localGallery.logo_url || undefined}
+                logoSettings={localGallery.logo_settings}
                 onPublished={handleRawPublished}
                 description="As fotos serão publicadas com o logotipo configurado aplicado no canto."
                 buttonLabel="Publicar fotos com logotipo"
