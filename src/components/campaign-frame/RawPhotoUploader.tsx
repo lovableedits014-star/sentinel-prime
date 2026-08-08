@@ -55,6 +55,17 @@ export default function RawPhotoUploader({
     let rejected = 0;
     const fileArr = Array.from(files);
 
+    let heic2any: any = null;
+    const heicFiles = fileArr.filter(f => /\.(heic|heif)$/i.test(f.name) || f.type === "image/heic" || f.type === "image/heif");
+    
+    if (heicFiles.length > 0) {
+      try {
+        heic2any = (await import("heic2any")).default;
+      } catch (err) {
+        console.error("Failed to load heic2any", err);
+      }
+    }
+
     for (let i = 0; i < fileArr.length; i++) {
       let file = fileArr[i];
       const isHEIC = /\.(heic|heif)$/i.test(file.name) || file.type === "image/heic" || file.type === "image/heif";
@@ -67,13 +78,12 @@ export default function RawPhotoUploader({
       }
 
       // Se for HEIC, converte imediatamente para preview funcionar
-      if (isHEIC) {
+      if (isHEIC && heic2any) {
         try {
-          const heic2any = (await import("heic2any")).default;
           const converted = await heic2any({
             blob: file,
             toType: "image/jpeg",
-            quality: 0.7
+            quality: 0.6 // Qualidade menor para preview rápido
           });
           const blob = Array.isArray(converted) ? converted[0] : converted;
           file = new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
@@ -82,6 +92,9 @@ export default function RawPhotoUploader({
           rejected += 1;
           continue;
         }
+      } else if (isHEIC && !heic2any) {
+        rejected += 1;
+        continue;
       }
 
       accepted.push({
