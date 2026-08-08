@@ -107,6 +107,7 @@ export function useBatchRenderer(composition: FrameComposition | null) {
       
       if (isHEIC) {
         try {
+          const heic2any = (await import("heic2any")).default;
           const converted = await heic2any({
             blob: f,
             toType: "image/jpeg",

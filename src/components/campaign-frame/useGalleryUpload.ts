@@ -67,13 +67,13 @@ const EXT_BY_TYPE: Record<string, string> = {
   "image/webp": "webp",
 };
 
-/** Publica arquivos já prontos (sem aplicar moldura) na galeria. */
 export async function publishRawFilesToGallery(opts: {
   clientId: string;
   galleryId: string;
   files: File[];
   startIndex?: number;
   watermarkLogo?: string;
+  logoSettings?: any;
   onProgress?: (p: PublishProgress) => void;
 }): Promise<{ uploaded: number; failed: number; firstUrl: string | null }> {
   const files = opts.files;
@@ -137,13 +137,34 @@ export async function publishRawFilesToGallery(opts: {
 
       // Aplica logo se configurado
       if (logoImg) {
-        const logoSize = Math.min(width, height) * 0.15; // 15% da imagem
+        const logoSettings = opts.logoSettings || { position: "bottom-right", size: 15, margin: 3, opacity: 0.8 };
+        const sizePercent = (logoSettings.size || 15) / 100;
+        const marginPercent = (logoSettings.margin || 3) / 100;
+        
+        const logoSize = Math.min(width, height) * sizePercent;
         const aspect = logoImg.height / logoImg.width;
         const lw = logoSize;
         const lh = logoSize * aspect;
-        const margin = Math.min(width, height) * 0.03;
-        ctx.globalAlpha = 0.8;
-        ctx.drawImage(logoImg, width - lw - margin, height - lh - margin, lw, lh);
+        const margin = Math.min(width, height) * marginPercent;
+        
+        let lx = width - lw - margin;
+        let ly = height - lh - margin;
+
+        if (logoSettings.position === "bottom-left") {
+          lx = margin;
+        } else if (logoSettings.position === "top-right") {
+          ly = margin;
+        } else if (logoSettings.position === "top-left") {
+          lx = margin;
+          ly = margin;
+        } else if (logoSettings.position === "center") {
+          lx = (width - lw) / 2;
+          ly = (height - lh) / 2;
+        }
+
+        ctx.globalAlpha = logoSettings.opacity ?? 0.8;
+        ctx.drawImage(logoImg, lx, ly, lw, lh);
+        ctx.globalAlpha = 1.0;
       }
 
       currentBlob = await new Promise((res) => canvas.toBlob((b) => res(b!), "image/jpeg", 0.85));
