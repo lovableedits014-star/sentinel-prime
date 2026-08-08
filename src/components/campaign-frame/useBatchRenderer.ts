@@ -124,6 +124,15 @@ export function useBatchRenderer(composition: FrameComposition | null) {
         img = await loadImage(url); 
       } catch (e) { 
         console.error("Erro ao carregar imagem para Canvas:", f.name, e);
+        // Tentar um fallback se o erro for de origin/blob
+        try {
+          // Pequeno delay para garantir que a URL do blob está pronta
+          await new Promise(r => setTimeout(r, 100));
+          img = await loadImage(url);
+        } catch (e2) {
+          console.error("Segunda tentativa falhou:", f.name, e2);
+        }
+      }
       }
       
       created.push({
