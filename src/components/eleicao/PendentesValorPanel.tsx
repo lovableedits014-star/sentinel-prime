@@ -233,28 +233,51 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
         <Card className="p-3 border-primary/40 bg-primary/5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{selected.size} selecionado(s)</Badge>
-            <div className="flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4 text-muted-foreground" />
-              <Input
-                className="h-9 w-32"
-                inputMode="decimal"
-                placeholder="Valor R$"
-                value={bulkValor}
-                onChange={e => setBulkValor(e.target.value.replace(/[^0-9.,]/g, ""))}
-              />
-            </div>
-            <Button size="sm" onClick={aplicarValorEmMassa} disabled={savingBulk}>
-              {savingBulk ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
-              Aplicar a {selected.size}
-            </Button>
-            <Button size="sm" variant="outline" onClick={gerarLote} disabled={generatingZip}>
-              {generatingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <FileDown className="w-3.5 h-3.5 mr-1" />}
-              Gerar contratos (.zip)
-            </Button>
+            {view === "pendentes" ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  <Input
+                    className="h-9 w-32"
+                    inputMode="decimal"
+                    placeholder="Valor R$"
+                    value={bulkValor}
+                    onChange={e => setBulkValor(e.target.value.replace(/[^0-9.,]/g, ""))}
+                  />
+                </div>
+                <Button size="sm" onClick={aplicarValorEmMassa} disabled={savingBulk}>
+                  {savingBulk ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                  Aplicar a {selected.size}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-emerald-600 border-emerald-500/40"
+                  onClick={() => marcarVoluntario(selectedRows.map(r => r.id))}
+                  disabled={savingBulk}
+                >
+                  <Heart className="w-3.5 h-3.5 mr-1" /> Marcar como voluntários
+                </Button>
+                <Button size="sm" variant="outline" onClick={gerarLote} disabled={generatingZip}>
+                  {generatingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <FileDown className="w-3.5 h-3.5 mr-1" />}
+                  Gerar contratos (.zip)
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => desmarcarVoluntario(selectedRows.map(r => r.id))}
+                disabled={savingBulk}
+              >
+                <HandCoins className="w-3.5 h-3.5 mr-1" /> Voltar para pendentes
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Limpar</Button>
           </div>
         </Card>
       )}
+
 
       {/* Lista */}
       <Card>
