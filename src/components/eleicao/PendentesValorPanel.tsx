@@ -22,7 +22,15 @@ type Tipo = "coordenador" | "lider" | "cabo";
 interface PessoaRow extends PessoaContratada {
   client_id: string;
   escopo: "campo_grande" | "interior";
+  is_voluntario?: boolean | null;
+  voluntario_obs?: string | null;
 }
+
+function localKey(r: PessoaRow) {
+  const v = r.escopo === "campo_grande" ? r.regiao || r.cidade : r.cidade || r.regiao;
+  return (v || "").trim() || "Sem região definida";
+}
+
 
 const TIPO_META: Record<Tipo, { label: string; color: string; icon: any }> = {
   coordenador: { label: "Coordenador", color: "bg-red-500/10 text-red-600 border-red-500/30", icon: Crown },
