@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Crown, Users, UserCheck, Search, FileDown, DollarSign, Loader2, FileText, AlertTriangle } from "lucide-react";
+import { Crown, Users, UserCheck, Search, FileDown, DollarSign, Loader2, FileText, AlertTriangle, Heart, HandCoins } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   gerarContratoIndividual,
