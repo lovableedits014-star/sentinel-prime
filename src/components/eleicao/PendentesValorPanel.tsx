@@ -280,15 +280,40 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                     <Icon className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{p.nome}</p>
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                      {p.nome}
+                      {p.is_voluntario && (
+                        <Badge variant="outline" className="h-4 px-1 text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                          Voluntário
+                        </Badge>
+                      )}
+                    </p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                      {meta.label} · {p.cidade || p.regiao || "—"} · {p.telefone}
+                      {meta.label} · {localKey(p)} · {p.telefone}
+                      {p.is_voluntario && p.voluntario_obs ? ` · ${p.voluntario_obs}` : ""}
                     </p>
                   </div>
-                  <DefinirValorPopover pessoa={p} onSave={aplicarValorIndividual} suggestion={presets[p.tipo]} />
+                  {p.is_voluntario ? (
+                    <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => desmarcarVoluntario([p.id])}>
+                      <HandCoins className="w-3 h-3" /> Voltar p/ pendentes
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs gap-1 text-emerald-600"
+                        onClick={() => marcarVoluntario([p.id])}
+                      >
+                        <Heart className="w-3 h-3" /> Voluntário
+                      </Button>
+                      <DefinirValorPopover pessoa={p} onSave={aplicarValorIndividual} suggestion={presets[p.tipo]} />
+                    </>
+                  )}
                 </div>
               );
             })}
+
           </div>
         )}
       </Card>
