@@ -71,7 +71,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
     setLoading(true);
     const { data, error } = await supabase
       .from("eleicao_pessoas" as any)
-      .select("id,client_id,nome,tipo,telefone,endereco,cidade,regiao,escopo,parent_id,valor_contratacao")
+      .select("id,client_id,nome,tipo,telefone,endereco,cidade,regiao,escopo,parent_id,valor_contratacao,is_voluntario,voluntario_obs")
       .eq("client_id", clientId)
       .or("valor_contratacao.is.null,valor_contratacao.eq.0")
       .order("created_at", { ascending: false });
@@ -83,20 +83,65 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
 
+  const pendentes = useMemo(() => rows.filter(r => !r.is_voluntario), [rows]);
+  const voluntarios = useMemo(() => rows.filter(r => r.is_voluntario), [rows]);
+  const base = view === "pendentes" ? pendentes : voluntarios;
+
+  const regiaoOptions = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; total: number }>();
+    base.forEach(r => {
+      const key = localKey(r);
+      const cur = map.get(key);
+      if (cur) cur.total++;
+      else map.set(key, { key, label: key, total: 1 });
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [base]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return rows.filter(r => {
+    return base.filter(r => {
       if (tipoFilter !== "all" && r.tipo !== tipoFilter) return false;
+      if (regiaoFilter !== "all" && localKey(r) !== regiaoFilter) return false;
       if (!q) return true;
       return r.nome.toLowerCase().includes(q) || (r.telefone || "").includes(search) || (r.cidade || "").toLowerCase().includes(q);
     });
-  }, [rows, tipoFilter, search]);
+  }, [base, tipoFilter, regiaoFilter, search]);
 
   const counts = useMemo(() => {
     const c = { coordenador: 0, lider: 0, cabo: 0 };
-    rows.forEach(r => { c[r.tipo]++; });
+    filtered.forEach(r => { c[r.tipo]++; });
     return c;
-  }, [rows]);
+  }, [filtered]);
+
+  async function marcarVoluntario(ids: string[]) {
+    if (ids.length === 0) return;
+    setSavingBulk(true);
+    const { error } = await supabase
+      .from("eleicao_pessoas" as any)
+      .update({ is_voluntario: true, voluntario_marcado_em: new Date().toISOString(), valor_contratacao: 0 })
+      .in("id", ids);
+    setSavingBulk(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${ids.length} pessoa(s) marcada(s) como voluntário (sem custo)`);
+    onChanged?.();
+    load();
+  }
+
+  async function desmarcarVoluntario(ids: string[]) {
+    if (ids.length === 0) return;
+    setSavingBulk(true);
+    const { error } = await supabase
+      .from("eleicao_pessoas" as any)
+      .update({ is_voluntario: false, voluntario_marcado_em: null })
+      .in("id", ids);
+    setSavingBulk(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${ids.length} pessoa(s) voltaram para pendentes de valor`);
+    onChanged?.();
+    load();
+  }
+
 
   const allSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id));
   const selectedRows = useMemo(() => filtered.filter(r => selected.has(r.id)), [filtered, selected]);
