@@ -21,6 +21,8 @@ interface Pessoa {
   parceiro_id?: string | null;
   rateio_estadual?: number | null;
   rateio_parceiro?: number | null;
+  is_voluntario?: boolean | null;
+
 }
 
 const fmt = (v: number) =>

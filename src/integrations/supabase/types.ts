@@ -3398,6 +3398,7 @@ export type Database = {
           geocoded_at: string | null
           id: string
           is_favorito_regiao: boolean
+          is_voluntario: boolean
           lat: number | null
           ligacao_em: string | null
           ligacao_status: string | null
@@ -3423,6 +3424,8 @@ export type Database = {
           updated_at: string
           user_id: string | null
           valor_contratacao: number
+          voluntario_marcado_em: string | null
+          voluntario_obs: string | null
           vota_candidato: string | null
         }
         Insert: {
@@ -3443,6 +3446,7 @@ export type Database = {
           geocoded_at?: string | null
           id?: string
           is_favorito_regiao?: boolean
+          is_voluntario?: boolean
           lat?: number | null
           ligacao_em?: string | null
           ligacao_status?: string | null
@@ -3468,6 +3472,8 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           valor_contratacao?: number
+          voluntario_marcado_em?: string | null
+          voluntario_obs?: string | null
           vota_candidato?: string | null
         }
         Update: {
@@ -3488,6 +3494,7 @@ export type Database = {
           geocoded_at?: string | null
           id?: string
           is_favorito_regiao?: boolean
+          is_voluntario?: boolean
           lat?: number | null
           ligacao_em?: string | null
           ligacao_status?: string | null
@@ -3513,6 +3520,8 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           valor_contratacao?: number
+          voluntario_marcado_em?: string | null
+          voluntario_obs?: string | null
           vota_candidato?: string | null
         }
         Relationships: [
@@ -10020,6 +10029,7 @@ export type Database = {
           geocoded_at: string | null
           id: string
           is_favorito_regiao: boolean
+          is_voluntario: boolean
           lat: number | null
           ligacao_em: string | null
           ligacao_status: string | null
@@ -10045,6 +10055,8 @@ export type Database = {
           updated_at: string
           user_id: string | null
           valor_contratacao: number
+          voluntario_marcado_em: string | null
+          voluntario_obs: string | null
           vota_candidato: string | null
         }[]
         SetofOptions: {

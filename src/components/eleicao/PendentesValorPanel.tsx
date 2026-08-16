@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Crown, Users, UserCheck, Search, FileDown, DollarSign, Loader2, FileText, AlertTriangle } from "lucide-react";
+import { Crown, Users, UserCheck, Search, FileDown, DollarSign, Loader2, FileText, AlertTriangle, Heart, HandCoins } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   gerarContratoIndividual,
@@ -22,7 +22,15 @@ type Tipo = "coordenador" | "lider" | "cabo";
 interface PessoaRow extends PessoaContratada {
   client_id: string;
   escopo: "campo_grande" | "interior";
+  is_voluntario?: boolean | null;
+  voluntario_obs?: string | null;
 }
+
+function localKey(r: PessoaRow) {
+  const v = r.escopo === "campo_grande" ? r.regiao || r.cidade : r.cidade || r.regiao;
+  return (v || "").trim() || "Sem região definida";
+}
+
 
 const TIPO_META: Record<Tipo, { label: string; color: string; icon: any }> = {
   coordenador: { label: "Coordenador", color: "bg-red-500/10 text-red-600 border-red-500/30", icon: Crown },
@@ -48,6 +56,9 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
   const [rows, setRows] = useState<PessoaRow[]>([]);
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<Tipo | "all">("all");
+  const [regiaoFilter, setRegiaoFilter] = useState<string>("all");
+  const [view, setView] = useState<"pendentes" | "voluntarios">("pendentes");
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkValor, setBulkValor] = useState("");
   const [presets, setPresets] = useState<Record<Tipo, number>>(DEFAULT_PRESETS);
@@ -71,7 +82,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
     setLoading(true);
     const { data, error } = await supabase
       .from("eleicao_pessoas" as any)
-      .select("id,client_id,nome,tipo,telefone,endereco,cidade,regiao,escopo,parent_id,valor_contratacao")
+      .select("id,client_id,nome,tipo,telefone,endereco,cidade,regiao,escopo,parent_id,valor_contratacao,is_voluntario,voluntario_obs")
       .eq("client_id", clientId)
       .or("valor_contratacao.is.null,valor_contratacao.eq.0")
       .order("created_at", { ascending: false });
@@ -83,20 +94,65 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
 
+  const pendentes = useMemo(() => rows.filter(r => !r.is_voluntario), [rows]);
+  const voluntarios = useMemo(() => rows.filter(r => r.is_voluntario), [rows]);
+  const base = view === "pendentes" ? pendentes : voluntarios;
+
+  const regiaoOptions = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; total: number }>();
+    base.forEach(r => {
+      const key = localKey(r);
+      const cur = map.get(key);
+      if (cur) cur.total++;
+      else map.set(key, { key, label: key, total: 1 });
+    });
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [base]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return rows.filter(r => {
+    return base.filter(r => {
       if (tipoFilter !== "all" && r.tipo !== tipoFilter) return false;
+      if (regiaoFilter !== "all" && localKey(r) !== regiaoFilter) return false;
       if (!q) return true;
       return r.nome.toLowerCase().includes(q) || (r.telefone || "").includes(search) || (r.cidade || "").toLowerCase().includes(q);
     });
-  }, [rows, tipoFilter, search]);
+  }, [base, tipoFilter, regiaoFilter, search]);
 
   const counts = useMemo(() => {
     const c = { coordenador: 0, lider: 0, cabo: 0 };
-    rows.forEach(r => { c[r.tipo]++; });
+    filtered.forEach(r => { c[r.tipo]++; });
     return c;
-  }, [rows]);
+  }, [filtered]);
+
+  async function marcarVoluntario(ids: string[]) {
+    if (ids.length === 0) return;
+    setSavingBulk(true);
+    const { error } = await supabase
+      .from("eleicao_pessoas" as any)
+      .update({ is_voluntario: true, voluntario_marcado_em: new Date().toISOString(), valor_contratacao: 0 })
+      .in("id", ids);
+    setSavingBulk(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${ids.length} pessoa(s) marcada(s) como voluntário (sem custo)`);
+    onChanged?.();
+    load();
+  }
+
+  async function desmarcarVoluntario(ids: string[]) {
+    if (ids.length === 0) return;
+    setSavingBulk(true);
+    const { error } = await supabase
+      .from("eleicao_pessoas" as any)
+      .update({ is_voluntario: false, voluntario_marcado_em: null })
+      .in("id", ids);
+    setSavingBulk(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${ids.length} pessoa(s) voltaram para pendentes de valor`);
+    onChanged?.();
+    load();
+  }
+
 
   const allSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id));
   const selectedRows = useMemo(() => filtered.filter(r => selected.has(r.id)), [filtered, selected]);
@@ -188,12 +244,34 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
               Pessoas cadastradas pelos coordenadores que ainda não têm valor de contrato definido.
             </p>
           </div>
-          <div className="flex gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="px-2 py-1 rounded bg-red-500/10 text-red-600">{counts.coordenador} coord.</span>
             <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-600">{counts.lider} líderes</span>
             <span className="px-2 py-1 rounded bg-green-500/10 text-green-600">{counts.cabo} cabos</span>
+            <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-600">{voluntarios.length} voluntários</span>
           </div>
         </div>
+
+        {/* Alternador de visão */}
+        <div className="flex gap-1 mt-3">
+          <Button
+            size="sm"
+            variant={view === "pendentes" ? "default" : "outline"}
+            className="h-7 text-xs"
+            onClick={() => { setView("pendentes"); setSelected(new Set()); }}
+          >
+            Pendentes ({pendentes.length})
+          </Button>
+          <Button
+            size="sm"
+            variant={view === "voluntarios" ? "default" : "outline"}
+            className="h-7 text-xs"
+            onClick={() => { setView("voluntarios"); setSelected(new Set()); }}
+          >
+            <Heart className="w-3 h-3 mr-1" /> Voluntários ({voluntarios.length})
+          </Button>
+        </div>
+
 
         {/* Presets editáveis */}
         <div className="grid grid-cols-3 gap-2 mt-3">
@@ -217,6 +295,15 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9 h-9" placeholder="Buscar nome, telefone…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+        <Select value={regiaoFilter} onValueChange={setRegiaoFilter}>
+          <SelectTrigger className="w-56 h-9"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as regiões / cidades</SelectItem>
+            {regiaoOptions.map(o => (
+              <SelectItem key={o.key} value={o.key}>{o.label} ({o.total})</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as any)}>
           <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -228,33 +315,57 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
         </Select>
       </div>
 
+
       {/* Barra de ações em massa */}
       {selected.size > 0 && (
         <Card className="p-3 border-primary/40 bg-primary/5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{selected.size} selecionado(s)</Badge>
-            <div className="flex items-center gap-1.5">
-              <DollarSign className="w-4 h-4 text-muted-foreground" />
-              <Input
-                className="h-9 w-32"
-                inputMode="decimal"
-                placeholder="Valor R$"
-                value={bulkValor}
-                onChange={e => setBulkValor(e.target.value.replace(/[^0-9.,]/g, ""))}
-              />
-            </div>
-            <Button size="sm" onClick={aplicarValorEmMassa} disabled={savingBulk}>
-              {savingBulk ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
-              Aplicar a {selected.size}
-            </Button>
-            <Button size="sm" variant="outline" onClick={gerarLote} disabled={generatingZip}>
-              {generatingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <FileDown className="w-3.5 h-3.5 mr-1" />}
-              Gerar contratos (.zip)
-            </Button>
+            {view === "pendentes" ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  <Input
+                    className="h-9 w-32"
+                    inputMode="decimal"
+                    placeholder="Valor R$"
+                    value={bulkValor}
+                    onChange={e => setBulkValor(e.target.value.replace(/[^0-9.,]/g, ""))}
+                  />
+                </div>
+                <Button size="sm" onClick={aplicarValorEmMassa} disabled={savingBulk}>
+                  {savingBulk ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                  Aplicar a {selected.size}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-emerald-600 border-emerald-500/40"
+                  onClick={() => marcarVoluntario(selectedRows.map(r => r.id))}
+                  disabled={savingBulk}
+                >
+                  <Heart className="w-3.5 h-3.5 mr-1" /> Marcar como voluntários
+                </Button>
+                <Button size="sm" variant="outline" onClick={gerarLote} disabled={generatingZip}>
+                  {generatingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <FileDown className="w-3.5 h-3.5 mr-1" />}
+                  Gerar contratos (.zip)
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => desmarcarVoluntario(selectedRows.map(r => r.id))}
+                disabled={savingBulk}
+              >
+                <HandCoins className="w-3.5 h-3.5 mr-1" /> Voltar para pendentes
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Limpar</Button>
           </div>
         </Card>
       )}
+
 
       {/* Lista */}
       <Card>
@@ -280,15 +391,40 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                     <Icon className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{p.nome}</p>
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                      {p.nome}
+                      {p.is_voluntario && (
+                        <Badge variant="outline" className="h-4 px-1 text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                          Voluntário
+                        </Badge>
+                      )}
+                    </p>
                     <p className="text-[11px] text-muted-foreground truncate">
-                      {meta.label} · {p.cidade || p.regiao || "—"} · {p.telefone}
+                      {meta.label} · {localKey(p)} · {p.telefone}
+                      {p.is_voluntario && p.voluntario_obs ? ` · ${p.voluntario_obs}` : ""}
                     </p>
                   </div>
-                  <DefinirValorPopover pessoa={p} onSave={aplicarValorIndividual} suggestion={presets[p.tipo]} />
+                  {p.is_voluntario ? (
+                    <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => desmarcarVoluntario([p.id])}>
+                      <HandCoins className="w-3 h-3" /> Voltar p/ pendentes
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs gap-1 text-emerald-600"
+                        onClick={() => marcarVoluntario([p.id])}
+                      >
+                        <Heart className="w-3 h-3" /> Voluntário
+                      </Button>
+                      <DefinirValorPopover pessoa={p} onSave={aplicarValorIndividual} suggestion={presets[p.tipo]} />
+                    </>
+                  )}
                 </div>
               );
             })}
+
           </div>
         )}
       </Card>
