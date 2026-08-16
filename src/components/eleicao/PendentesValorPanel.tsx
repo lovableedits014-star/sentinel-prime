@@ -188,12 +188,34 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
               Pessoas cadastradas pelos coordenadores que ainda não têm valor de contrato definido.
             </p>
           </div>
-          <div className="flex gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="px-2 py-1 rounded bg-red-500/10 text-red-600">{counts.coordenador} coord.</span>
             <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-600">{counts.lider} líderes</span>
             <span className="px-2 py-1 rounded bg-green-500/10 text-green-600">{counts.cabo} cabos</span>
+            <span className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-600">{voluntarios.length} voluntários</span>
           </div>
         </div>
+
+        {/* Alternador de visão */}
+        <div className="flex gap-1 mt-3">
+          <Button
+            size="sm"
+            variant={view === "pendentes" ? "default" : "outline"}
+            className="h-7 text-xs"
+            onClick={() => { setView("pendentes"); setSelected(new Set()); }}
+          >
+            Pendentes ({pendentes.length})
+          </Button>
+          <Button
+            size="sm"
+            variant={view === "voluntarios" ? "default" : "outline"}
+            className="h-7 text-xs"
+            onClick={() => { setView("voluntarios"); setSelected(new Set()); }}
+          >
+            <Heart className="w-3 h-3 mr-1" /> Voluntários ({voluntarios.length})
+          </Button>
+        </div>
+
 
         {/* Presets editáveis */}
         <div className="grid grid-cols-3 gap-2 mt-3">
