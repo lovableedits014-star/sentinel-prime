@@ -217,6 +217,15 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9 h-9" placeholder="Buscar nome, telefone…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+        <Select value={regiaoFilter} onValueChange={setRegiaoFilter}>
+          <SelectTrigger className="w-56 h-9"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as regiões / cidades</SelectItem>
+            {regiaoOptions.map(o => (
+              <SelectItem key={o.key} value={o.key}>{o.label} ({o.total})</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as any)}>
           <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -227,6 +236,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           </SelectContent>
         </Select>
       </div>
+
 
       {/* Barra de ações em massa */}
       {selected.size > 0 && (
