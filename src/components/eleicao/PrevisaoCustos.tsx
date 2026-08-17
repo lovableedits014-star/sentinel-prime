@@ -51,6 +51,7 @@ const COR_ESTADUAL = "#7c3aed";
 export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[]; clientId?: string }) {
   const { parceiros } = useCandidatosParceiros(clientId);
   const [filtroCandidato, setFiltroCandidato] = useState<string>("todos"); // 'todos' | 'estadual' | parceiro_id
+  const [filtroEfetivacao, setFiltroEfetivacao] = useState<"todos" | "confirmados">("todos");
 
   // Mapa de parceiros por id
   const parceiroById = useMemo(() => {
@@ -73,7 +74,11 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
     };
 
     // Pessoas relevantes ao filtro
-    const pessoasFiltradas = pessoas.filter(p => valorFiltrado(p) > 0 || filtroCandidato === "todos");
+    const pessoasBase = filtroEfetivacao === "confirmados" 
+      ? pessoas.filter(p => p.status_contratacao === "confirmado")
+      : pessoas;
+
+    const pessoasFiltradas = pessoasBase.filter(p => valorFiltrado(p) > 0 || filtroCandidato === "todos");
 
     // === Breakdown por candidato pagador (sempre calculado, ignora filtro) ===
     const porCandidato: Array<{
@@ -83,8 +88,8 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
       total: number;
       pessoas: number;
     }> = [];
-    const estadualTotal = pessoas.reduce((s, p) => s + parteEstadual(p), 0);
-    const estadualPessoas = pessoas.filter(p => parteEstadual(p) > 0).length;
+    const estadualTotal = pessoasBase.reduce((s, p) => s + parteEstadual(p), 0);
+    const estadualPessoas = pessoasBase.filter(p => parteEstadual(p) > 0).length;
     porCandidato.push({
       key: "estadual",
       label: "Estadual (principal)",
@@ -93,7 +98,7 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
       pessoas: estadualPessoas,
     });
     parceiros.forEach(parc => {
-      const ps = pessoas.filter(p => p.parceiro_id === parc.id);
+      const ps = pessoasBase.filter(p => p.parceiro_id === parc.id);
       const total = ps.reduce((s, p) => s + parteParceiro(p), 0);
       const pessoasCount = ps.filter(p => parteParceiro(p) > 0).length;
       porCandidato.push({
@@ -157,12 +162,12 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
       .sort((a, b) => b.total - a.total);
 
     // === Tabela "Quem paga quem" — só quando há dobradinhas ===
-    const dobradinhas = pessoas
+    const dobradinhas = pessoasBase
       .filter(p => p.parceiro_id && (parteParceiro(p) > 0 || parteEstadual(p) > 0) && valor(p) > 0)
       .sort((a, b) => valor(b) - valor(a));
 
-    return { porTipo, totalGeral, porEscopo, top, porRegiao, porCandidato, totalGeralBruto, dobradinhas, pessoasFiltradas };
-  }, [pessoas, parceiros, filtroCandidato]);
+    return { porTipo, totalGeral, porEscopo, top, porRegiao, porCandidato, totalGeralBruto, dobradinhas, pessoasFiltradas, totalConfirmados: pessoas.filter(p => p.status_contratacao === 'confirmado').length };
+  }, [pessoas, parceiros, filtroCandidato, filtroEfetivacao]);
 
   const filtroLabel =
     filtroCandidato === "todos" ? "Custo total previsto" :
@@ -223,13 +228,41 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
       {/* Total geral (respeita filtro) */}
       <Card className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-primary" />
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-1">
+              <Label className="text-[10px] uppercase text-muted-foreground font-semibold">Exibir Custos</Label>
+              <div className="flex bg-background/50 p-0.5 rounded-lg border border-primary/20">
+                <button
+                  onClick={() => setFiltroEfetivacao("todos")}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-medium rounded-md transition-all",
+                    filtroEfetivacao === "todos" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-primary/10"
+                  )}
+                >
+                  Projetado (Total)
+                </button>
+                <button
+                  onClick={() => setFiltroEfetivacao("confirmados")}
+                  className={cn(
+                    "px-3 py-1 text-[10px] font-medium rounded-md transition-all",
+                    filtroEfetivacao === "confirmados" ? "bg-emerald-600 text-white shadow-sm" : "text-muted-foreground hover:bg-emerald-500/10"
+                  )}
+                >
+                  Real (Confirmados)
+                </button>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{filtroLabel}</p>
-              <p className="text-3xl font-bold tabular-nums">{fmt(data.totalGeral)}</p>
+            <div className="w-px h-8 bg-primary/20 hidden sm:block mx-1" />
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+                  {filtroLabel} {filtroEfetivacao === "confirmados" && "(Apenas Confirmados)"}
+                </p>
+                <p className="text-3xl font-bold tabular-nums">{fmt(data.totalGeral)}</p>
+              </div>
             </div>
           </div>
           <div className="flex gap-4 text-right">
