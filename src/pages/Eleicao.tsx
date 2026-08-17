@@ -1326,6 +1326,7 @@ export default function Eleicao() {
                     <SelectItem value="interior">Interior</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
             </div>
             
             <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
