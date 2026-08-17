@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { Crown, Users, UserCheck, DollarSign, TrendingUp, Handshake } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from "recharts";
 import { useCandidatosParceiros, type CandidatoParceiro } from "@/hooks/useCandidatosParceiros";
@@ -22,7 +24,7 @@ interface Pessoa {
   rateio_estadual?: number | null;
   rateio_parceiro?: number | null;
   is_voluntario?: boolean | null;
-
+  status_contratacao?: string | null;
 }
 
 const fmt = (v: number) =>
