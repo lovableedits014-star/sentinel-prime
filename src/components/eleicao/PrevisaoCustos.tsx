@@ -249,8 +249,6 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
               </p>
             </div>
           </div>
-            </p>
-          </div>
         </div>
       </Card>
 
