@@ -175,6 +175,8 @@ interface Pessoa {
   parceiro_id?: string | null;
   rateio_estadual?: number | null;
   rateio_parceiro?: number | null;
+  status_contratacao?: "pendente" | "em_negociacao" | "confirmado";
+  confirmado_em?: string | null;
   created_at: string;
 }
 
@@ -261,6 +263,7 @@ export default function Eleicao() {
     parceiro_id: "" as string,
     rateio_estadual: 100 as number,
     rateio_parceiro: 0 as number,
+    status_contratacao: "pendente" as "pendente" | "em_negociacao" | "confirmado",
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
@@ -338,6 +341,7 @@ export default function Eleicao() {
       parceiro_id: p.parceiro_id || "",
       rateio_estadual: p.rateio_estadual ?? 100,
       rateio_parceiro: p.rateio_parceiro ?? 0,
+      status_contratacao: p.status_contratacao || "pendente",
     });
     setDialogOpen(true);
   }
@@ -396,6 +400,8 @@ export default function Eleicao() {
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
+      status_contratacao: form.status_contratacao,
+      confirmado_em: form.status_contratacao === "confirmado" ? new Date().toISOString() : (editing?.confirmado_em || null),
     };
 
     // Dobradinha:
@@ -690,7 +696,7 @@ export default function Eleicao() {
 
   const [view, setView] = useState<"cadastros" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos" | "pendente" | "em_negociacao" | "confirmado">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
   const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
 
@@ -698,6 +704,9 @@ export default function Eleicao() {
     if (statusFilter === "sem_valor") return !p.valor_contratacao || p.valor_contratacao === 0;
     if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
     if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id;
+    if (statusFilter === "pendente") return p.status_contratacao === "pendente" || !p.status_contratacao;
+    if (statusFilter === "em_negociacao") return p.status_contratacao === "em_negociacao";
+    if (statusFilter === "confirmado") return p.status_contratacao === "confirmado";
     return true;
   };
   const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
@@ -1138,6 +1147,9 @@ export default function Eleicao() {
                 <SelectItem value="sem_valor">⚠ Sem valor</SelectItem>
                 <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
                 <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
+                <SelectItem value="pendente">⏳ Status: Pendente</SelectItem>
+                <SelectItem value="em_negociacao">🤝 Status: Em Negociação</SelectItem>
+                <SelectItem value="confirmado">✅ Status: Confirmado</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
