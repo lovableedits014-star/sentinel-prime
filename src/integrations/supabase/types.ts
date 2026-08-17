@@ -3386,6 +3386,7 @@ export type Database = {
           candidato_alternativo: string | null
           cidade: string | null
           client_id: string
+          confirmado_em: string | null
           created_at: string
           created_by: string | null
           email: string | null
@@ -3417,6 +3418,7 @@ export type Database = {
           rateio_parceiro: number
           regiao: string | null
           rua: string | null
+          status_contratacao: string | null
           supporter_id: string | null
           telefone: string
           tentativas_count: number
@@ -3434,6 +3436,7 @@ export type Database = {
           candidato_alternativo?: string | null
           cidade?: string | null
           client_id: string
+          confirmado_em?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -3465,6 +3468,7 @@ export type Database = {
           rateio_parceiro?: number
           regiao?: string | null
           rua?: string | null
+          status_contratacao?: string | null
           supporter_id?: string | null
           telefone: string
           tentativas_count?: number
@@ -3482,6 +3486,7 @@ export type Database = {
           candidato_alternativo?: string | null
           cidade?: string | null
           client_id?: string
+          confirmado_em?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -3513,6 +3518,7 @@ export type Database = {
           rateio_parceiro?: number
           regiao?: string | null
           rua?: string | null
+          status_contratacao?: string | null
           supporter_id?: string | null
           telefone?: string
           tentativas_count?: number
@@ -10017,6 +10023,7 @@ export type Database = {
           candidato_alternativo: string | null
           cidade: string | null
           client_id: string
+          confirmado_em: string | null
           created_at: string
           created_by: string | null
           email: string | null
@@ -10048,6 +10055,7 @@ export type Database = {
           rateio_parceiro: number
           regiao: string | null
           rua: string | null
+          status_contratacao: string | null
           supporter_id: string | null
           telefone: string
           tentativas_count: number
