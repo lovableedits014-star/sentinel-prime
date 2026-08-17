@@ -1326,6 +1326,36 @@ export default function Eleicao() {
                     <SelectItem value="interior">Interior</SelectItem>
                   </SelectContent>
                 </Select>
+            </div>
+            
+            <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Handshake className="w-3 h-3" />
+                Status de Contratação
+              </Label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "pendente", label: "Pendente", icon: AlertCircle, color: "text-muted-foreground", activeColor: "bg-muted text-foreground border-muted-foreground/30" },
+                  { id: "em_negociacao", label: "Reunião", icon: MessageCircle, color: "text-amber-600", activeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
+                  { id: "confirmado", label: "Confirmado", icon: CheckCircle2, color: "text-emerald-600", activeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" },
+                ].map(s => {
+                  const active = form.status_contratacao === s.id;
+                  const Icon = s.icon;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, status_contratacao: s.id as any }))}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-2 rounded-lg border transition-all gap-1 text-[10px] font-medium",
+                        active ? s.activeColor : "bg-background border-border hover:bg-muted/50 text-muted-foreground"
+                      )}
+                    >
+                      <Icon className={cn("w-4 h-4", active ? "" : s.color)} />
+                      {s.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
