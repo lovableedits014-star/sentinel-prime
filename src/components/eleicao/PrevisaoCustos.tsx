@@ -232,14 +232,22 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
               <p className="text-3xl font-bold tabular-nums">{fmt(data.totalGeral)}</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Pessoas com pagamento</p>
-            <p className="text-lg font-semibold">
-              {data.porTipo.reduce((s, x) => s + x.pagos, 0)}
-              <span className="text-muted-foreground text-sm font-normal">
-                {" "}/ {data.pessoasFiltradas.length}
-              </span>
-            </p>
+          <div className="flex gap-4 text-right">
+            <div>
+              <p className="text-xs text-muted-foreground">Voluntários</p>
+              <p className="text-lg font-semibold text-primary">
+                {data.porTipo.reduce((s, x) => s + x.voluntarios, 0)}
+              </p>
+            </div>
+            <div className="border-l border-primary/20 pl-4">
+              <p className="text-xs text-muted-foreground">Pessoas com pagamento</p>
+              <p className="text-lg font-semibold">
+                {data.porTipo.reduce((s, x) => s + x.pagos, 0)}
+                <span className="text-muted-foreground text-sm font-normal">
+                  {" "}/ {data.pessoasFiltradas.length}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
       </Card>
