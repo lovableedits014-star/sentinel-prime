@@ -24,6 +24,7 @@ export interface PessoaContratada {
   regiao: string | null;
   parent_id: string | null;
   valor_contratacao: number | null;
+  is_voluntario?: boolean | null;
 }
 
 export interface ContractTemplate {
@@ -312,7 +313,7 @@ export async function fetchTemplatesAndContext(clientId: string) {
       .eq("client_id", clientId)
       .in("tipo", ["eleicao_coordenador", "eleicao_lider", "eleicao_cabo"]),
     supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
-    supabase.from("eleicao_pessoas" as any).select("id,nome,tipo,telefone,endereco,cidade,regiao,parent_id,valor_contratacao")
+    supabase.from("eleicao_pessoas" as any).select("id,nome,tipo,telefone,endereco,cidade,regiao,parent_id,valor_contratacao,is_voluntario")
       .eq("client_id", clientId),
   ]);
 
@@ -338,6 +339,7 @@ export async function gerarLoteZip(
   const zip = new JSZip();
   const pulados: string[] = [];
   for (const p of pessoas) {
+    if (p.is_voluntario) continue;
     const tpl = tplByTipo.get(tipoToTemplateKey(p.tipo));
     if (!tpl) { pulados.push(p.nome); continue; }
     const blob = await gerarContratoDocxBlob(tpl, p, contratante, parents);
@@ -352,6 +354,7 @@ export async function gerarContratoIndividual(
   clientId: string,
 ): Promise<void> {
   const { tplByTipo, contratante, parents } = await fetchTemplatesAndContext(clientId);
+  if (pessoa.is_voluntario) throw new Error(`${pessoa.nome} é voluntário(a) e não gera contrato de custo.`);
   const tpl = tplByTipo.get(tipoToTemplateKey(pessoa.tipo));
   if (!tpl) throw new Error(`Modelo de contrato não encontrado para tipo ${pessoa.tipo}`);
   const blob = await gerarContratoDocxBlob(tpl, pessoa, contratante, parents);
