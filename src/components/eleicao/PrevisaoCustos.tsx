@@ -110,9 +110,11 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
     const byTipo = (t: Tipo) => pessoasFiltradas.filter(p => p.tipo === t);
     const porTipo = (["coordenador", "lider", "cabo"] as Tipo[]).map(t => {
       const list = byTipo(t);
-      const total = list.reduce((s, p) => s + valorFiltrado(p), 0);
-      const pagos = list.filter(p => valorFiltrado(p) > 0).length;
-      const avulsos = t === "lider" ? list.filter(p => !p.parent_id) : [];
+      const semVoluntarios = list.filter(p => !p.is_voluntario);
+      const total = semVoluntarios.reduce((s, p) => s + valorFiltrado(p), 0);
+      const pagos = semVoluntarios.filter(p => valorFiltrado(p) > 0).length;
+      const voluntarios = list.filter(p => p.is_voluntario).length;
+      const avulsos = t === "lider" ? list.filter(p => !p.parent_id && !p.is_voluntario) : [];
       const avulsosTotal = avulsos.reduce((s, p) => s + valorFiltrado(p), 0);
       return {
         tipo: t,
@@ -120,7 +122,8 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
         total,
         qtd: list.length,
         pagos,
-        gratis: list.length - pagos,
+        gratis: list.length - pagos - voluntarios,
+        voluntarios,
         media: pagos > 0 ? total / pagos : 0,
         avulsosQtd: avulsos.length,
         avulsosTotal,
@@ -260,9 +263,17 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
                 <span className="text-xs text-muted-foreground">{item.qtd}</span>
               </div>
               <p className="text-2xl font-bold tabular-nums">{fmt(item.total)}</p>
-              <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-                <span>{item.pagos} pagos · {item.gratis} sem custo</span>
-                {item.media > 0 && <span>Média {fmt(item.media)}</span>}
+              <div className="flex flex-col gap-1 mt-2 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>{item.pagos} pagos · {item.gratis} s/ custo</span>
+                  {item.voluntarios > 0 && (
+                    <span className="text-primary font-medium flex items-center gap-0.5">
+                      <span className="w-1 h-1 rounded-full bg-primary" />
+                      {item.voluntarios} volunt.
+                    </span>
+                  )}
+                </div>
+                {item.media > 0 && <span className="text-right italic">Média {fmt(item.media)}</span>}
               </div>
               {item.tipo === "lider" && item.avulsosQtd > 0 && (
                 <div className="mt-2 pt-2 border-t border-dashed border-border/60 text-[11px] text-muted-foreground flex items-center justify-between">
