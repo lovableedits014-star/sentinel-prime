@@ -42,6 +42,8 @@ const REQUIRED_PERMISSIONS = [
   { name: 'instagram_basic', label: 'Instagram básico', required: true, platform: 'instagram' },
   { name: 'instagram_manage_comments', label: 'Gerenciar comentários IG', required: true, platform: 'instagram' },
   { name: 'public_profile', label: 'Perfil público', required: false, platform: 'general' },
+  { name: 'pages_manage_posts', label: 'Publicar no Facebook', required: false, platform: 'facebook' },
+  { name: 'instagram_content_publish', label: 'Publicar no Instagram', required: false, platform: 'instagram' },
 ];
 
 const Integrations = () => {
