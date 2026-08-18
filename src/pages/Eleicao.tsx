@@ -413,7 +413,6 @@ export default function Eleicao() {
       confirmado_em: form.status_contratacao === "confirmado" ? new Date().toISOString() : (editing?.confirmado_em || null),
       participou_reuniao: form.participou_reuniao,
       reuniao_em: form.participou_reuniao && !editing?.participou_reuniao ? new Date().toISOString() : (editing?.reuniao_em || null),
-      pre_selecionado: form.pre_selecionado,
     };
 
     // Dobradinha:
