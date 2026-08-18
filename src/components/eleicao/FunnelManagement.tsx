@@ -28,6 +28,7 @@ interface FunnelManagementProps {
 export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport }: FunnelManagementProps) {
   const [regiaoFilter, setRegiaoFilter] = useState<string>("all");
   const [coordenadorFilter, setCoordenadorFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [avulsosOnly, setAvulsosOnly] = useState<boolean>(false);
 
   const coordenadores = useMemo(() => {
@@ -42,6 +43,10 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
 
   const filteredPessoas = useMemo(() => {
     return pessoas.filter(p => {
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        if (!p.nome.toLowerCase().includes(term) && !p.telefone.includes(term)) return false;
+      }
       if (regiaoFilter !== "all" && p.regiao !== regiaoFilter) return false;
       
       if (avulsosOnly) {
@@ -161,6 +166,7 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
     </div>
   );
   /* é importante na exportação do funil eu fazer um relatorio individual de cada coordenador de quem faltou: ou seja eu preciso saber dos lideres de um coordenador quem estava e quem nao estava na reunião: */
+  /* preciso de um filtro de pesquisa  tbm, pra buscar um nome especifico */
 
   return (
     <div className="flex flex-col gap-6">
@@ -172,6 +178,17 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
             Filtros
           </div>
           
+          <div className="w-full sm:w-64 relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 opacity-50 text-muted-foreground" />
+            <input 
+              type="text"
+              placeholder="Buscar por nome ou telefone..."
+              className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
           <div className="w-full sm:w-48">
             <Select value={regiaoFilter} onValueChange={setRegiaoFilter}>
               <SelectTrigger className="h-9">
@@ -223,11 +240,12 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
             </Button>
           </div>
 
-          {(regiaoFilter !== "all" || coordenadorFilter !== "all" || avulsosOnly) && (
+          {(regiaoFilter !== "all" || coordenadorFilter !== "all" || avulsosOnly || searchTerm) && (
             <Button variant="ghost" size="sm" className="h-9 text-xs gap-1 text-muted-foreground" onClick={() => {
               setRegiaoFilter("all");
               setCoordenadorFilter("all");
               setAvulsosOnly(false);
+              setSearchTerm("");
             }}>
               <X className="w-3 h-3" /> Limpar
             </Button>
