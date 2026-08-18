@@ -105,9 +105,15 @@ export default function MetaPostings() {
       
       const { data, error } = await supabase.storage
         .from('meta-media')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase Storage upload error details:", error);
+        throw error;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('meta-media')
