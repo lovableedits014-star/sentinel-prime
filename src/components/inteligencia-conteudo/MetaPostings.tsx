@@ -17,7 +17,7 @@ import {
   ExternalLink,
   ChevronRight,
   Upload,
-  RefreshCw
+  RefreshCw as RefreshIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
