@@ -1,5 +1,5 @@
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -10,15 +10,15 @@ import {
   Video, 
   History, 
   PlusCircle, 
-   
-   
   Loader2, 
   CheckCircle2, 
   AlertCircle,
   ExternalLink,
   ChevronRight,
   Upload,
-  RefreshCw as RefreshIcon
+  RefreshCw as RefreshIcon,
+  X,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,17 +32,32 @@ import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { useServerFn } from "@tanstack/react-start";
 import { publishMetaContent } from "@/lib/meta.functions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import ReactCalendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+type PostType = 'feed' | 'story' | 'reels';
 
 export default function MetaPostings() {
   const { data: clientId } = useCurrentClientId();
   const queryClient = useQueryClient();
   const publishFn = useServerFn(publishMetaContent);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [platform, setPlatform] = useState<{ fb: boolean; ig: boolean }>({ fb: false, ig: true });
+  const [platform, setPlatform] = useState<{ fb: boolean; ig: boolean }>({ fb: true, ig: true });
   const [content, setContent] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [postType, setPostType] = useState<PostType>('feed');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("create");
+  
+  // Scheduling state
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<Date>(new Date());
+  const [scheduledTime, setScheduledTime] = useState("12:00");
 
   // Fetch Meta Status
   const { data: metaStatus, isLoading: isLoadingStatus } = useQuery({
@@ -74,10 +89,57 @@ export default function MetaPostings() {
     enabled: !!clientId && activeTab === "history"
   });
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 100 * 1024 * 1024) { // 100MB limit for video
+      return toast.error("Arquivo muito grande. Limite de 100MB.");
+    }
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${clientId}/${Date.now()}.${fileExt}`;
+      const isVideo = file.type.startsWith('video/');
+      
+      const { data, error } = await supabase.storage
+        .from('meta-media')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('meta-media')
+        .getPublicUrl(fileName);
+
+      setMediaUrl(publicUrl);
+      setMediaType(isVideo ? 'video' : 'image');
+      toast.success("Mídia carregada!");
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error("Falha ao subir arquivo");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handlePublish = async () => {
     if (!clientId) return toast.error("Cliente não identificado");
     if (!content && !mediaUrl) return toast.error("Adicione conteúdo ou uma imagem");
     if (!platform.fb && !platform.ig) return toast.error("Selecione pelo menos uma plataforma");
+
+    let scheduledFor: string | undefined = undefined;
+    if (isScheduled) {
+      const [hours, minutes] = scheduledTime.split(':').map(Number);
+      const combinedDate = new Date(scheduledDate);
+      combinedDate.setHours(hours, minutes, 0, 0);
+      scheduledFor = combinedDate.toISOString();
+      
+      if (combinedDate.getTime() < Date.now() + 15 * 60 * 1000) {
+        return toast.error("O agendamento deve ser pelo menos 15 minutos no futuro.");
+      }
+    }
 
     setIsPublishing(true);
     try {
@@ -87,9 +149,10 @@ export default function MetaPostings() {
         data: {
           clientId,
           platform: selectedPlatform,
-          type: 'feed',
+          type: postType,
           content,
           mediaUrl: mediaUrl || undefined,
+          scheduledFor
         }
       });
 
@@ -98,9 +161,12 @@ export default function MetaPostings() {
         if (errors.length > 0) {
           errors.forEach((err: any) => toast.error(`Erro no ${err.platform}: ${err.error}`));
         } else {
-          toast.success("Publicado com sucesso!");
-          setContent("");
-          setMediaUrl("");
+          toast.success(isScheduled ? "Agendado com sucesso!" : "Publicado com sucesso!");
+          if (!isScheduled) {
+            setContent("");
+            setMediaUrl("");
+            setMediaType(null);
+          }
           queryClient.invalidateQueries({ queryKey: ["meta-history", clientId] });
         }
       }
@@ -122,7 +188,7 @@ export default function MetaPostings() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Postagens & Agendamento</h2>
           <p className="text-muted-foreground text-sm">
-            Gerencie sua presença no FacebookIcon e InstagramIcon.
+            Gerencie sua presença no Facebook e Instagram.
           </p>
         </div>
       </div>
@@ -149,7 +215,29 @@ export default function MetaPostings() {
             <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Configurar Publicação</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Configurar Publicação</CardTitle>
+                    <div className="flex bg-muted p-1 rounded-lg">
+                      <Button 
+                        variant={postType === 'feed' ? "secondary" : "ghost"} 
+                        size="sm" 
+                        className="h-8 text-xs"
+                        onClick={() => setPostType('feed')}
+                      >Feed</Button>
+                      <Button 
+                        variant={postType === 'story' ? "secondary" : "ghost"} 
+                        size="sm" 
+                        className="h-8 text-xs"
+                        onClick={() => setPostType('story')}
+                      >Story</Button>
+                      <Button 
+                        variant={postType === 'reels' ? "secondary" : "ghost"} 
+                        size="sm" 
+                        className="h-8 text-xs"
+                        onClick={() => setPostType('reels')}
+                      >Reels</Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Platform Selection */}
@@ -165,7 +253,7 @@ export default function MetaPostings() {
                         />
                         <Label htmlFor="fb" className="flex items-center gap-2 cursor-pointer">
                           <FacebookIcon className="w-4 h-4 text-blue-600" />
-                          <span>FacebookIcon</span>
+                          <span>Facebook</span>
                           {hasFB && <Badge variant="secondary" className="ml-1 text-[10px]">{metaStatus.page_name}</Badge>}
                           {!hasFB && <Badge variant="outline" className="text-destructive text-[10px]">Não conectado</Badge>}
                         </Label>
@@ -179,7 +267,7 @@ export default function MetaPostings() {
                         />
                         <Label htmlFor="ig" className="flex items-center gap-2 cursor-pointer">
                           <InstagramIcon className="w-4 h-4 text-pink-600" />
-                          <span>InstagramIcon</span>
+                          <span>Instagram</span>
                           {hasIG && <Badge variant="secondary" className="ml-1 text-[10px]">@{metaStatus.instagram.username}</Badge>}
                           {!hasIG && <Badge variant="outline" className="text-destructive text-[10px]">Não conectado</Badge>}
                         </Label>
@@ -189,19 +277,39 @@ export default function MetaPostings() {
 
                   {/* Media */}
                   <div className="space-y-3">
-                    <Label>Mídia (URL da Imagem/Vídeo)</Label>
+                    <Label>Mídia (Upload Local ou URL)</Label>
                     <div className="flex gap-2">
                       <Input 
                         placeholder="https://exemplo.com/imagem.jpg" 
                         value={mediaUrl} 
-                        onChange={(e) => setMediaUrl(e.target.value)}
+                        onChange={(e) => {
+                          setMediaUrl(e.target.value);
+                          setMediaType(e.target.value.includes('.mp4') ? 'video' : 'image');
+                        }}
                       />
-                      <Button variant="outline" size="icon">
-                        <Upload className="w-4 h-4" />
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*,video/*"
+                        onChange={handleFileUpload}
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                       </Button>
+                      {mediaUrl && (
+                        <Button variant="ghost" size="icon" onClick={() => { setMediaUrl(""); setMediaType(null); }}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      A Meta exige uma URL pública acessível para realizar o upload.
+                      Suba uma imagem ou vídeo diretamente. Vídeos em Stories/Reels podem ter até 60s.
                     </p>
                   </div>
 
@@ -210,27 +318,74 @@ export default function MetaPostings() {
                     <Label>Legenda / Texto</Label>
                     <Textarea 
                       placeholder="O que você quer compartilhar?" 
-                      className="min-h-[150px]"
+                      className="min-h-[120px]"
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
                     />
+                  </div>
+
+                  {/* Scheduling */}
+                  <div className="space-y-4 pt-2 border-t border-dashed">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="schedule" 
+                        checked={isScheduled} 
+                        onCheckedChange={(v) => setIsScheduled(!!v)}
+                      />
+                      <Label htmlFor="schedule" className="flex items-center gap-2 cursor-pointer font-medium">
+                        <Calendar className="w-4 h-4" />
+                        Agendar para depois
+                      </Label>
+                    </div>
+
+                    {isScheduled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-muted/30 rounded-lg animate-in fade-in slide-in-from-top-1">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Data</Label>
+                          <div className="bg-card rounded-md border p-2">
+                            <ReactCalendar 
+                              onChange={(v) => setScheduledDate(v as Date)} 
+                              value={scheduledDate}
+                              minDate={new Date()}
+                              className="border-none w-full text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Horário</Label>
+                            <Input 
+                              type="time" 
+                              value={scheduledTime}
+                              onChange={(e) => setScheduledTime(e.target.value)}
+                            />
+                          </div>
+                          <div className="p-3 bg-blue-500/10 text-blue-600 rounded-md text-[10px] flex items-start gap-2">
+                            <Clock className="w-3 h-3 mt-0.5 shrink-0" />
+                            <p>
+                              Agendado para: <strong>{format(scheduledDate, "dd 'de' MMMM", { locale: ptBR })} às {scheduledTime}</strong>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end pt-4">
                     <Button 
                       className="w-full sm:w-auto px-8" 
                       onClick={handlePublish}
-                      disabled={isPublishing || (!platform.fb && !platform.ig)}
+                      disabled={isPublishing || isUploading || (!platform.fb && !platform.ig)}
                     >
                       {isPublishing ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Publicando...
+                          Processando...
                         </>
                       ) : (
                         <>
-                          <Send className="mr-2 h-4 w-4" />
-                          Publicar Agora
+                          {isScheduled ? <Calendar className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+                          {isScheduled ? "Agendar Publicação" : "Publicar Agora"}
                         </>
                       )}
                     </Button>
@@ -244,18 +399,30 @@ export default function MetaPostings() {
                <Card className="overflow-hidden border-primary/10">
                 <CardHeader className="bg-muted/30 py-3">
                   <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <ImageIcon className="w-3 h-3" />
-                    Preview {platform.ig ? "InstagramIcon" : "FacebookIcon"}
+                    {mediaType === 'video' ? <Video className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
+                    Preview {platform.ig ? "Instagram" : "Facebook"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="aspect-square bg-muted flex items-center justify-center relative overflow-hidden">
                     {mediaUrl ? (
-                      <img src={mediaUrl} alt="Preview" className="w-full h-full object-cover" />
+                      mediaType === 'video' ? (
+                        <video src={mediaUrl} className="w-full h-full object-cover" controls />
+                      ) : (
+                        <img src={mediaUrl} alt="Preview" className="w-full h-full object-cover" />
+                      )
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <ImageIcon className="w-8 h-8 opacity-20" />
+                        {postType === 'feed' ? <ImageIcon className="w-8 h-8 opacity-20" /> : <Video className="w-8 h-8 opacity-20" />}
                         <span className="text-xs">Sem mídia</span>
+                      </div>
+                    )}
+                    {postType !== 'feed' && (
+                      <div className="absolute inset-0 border-4 border-black/20 pointer-events-none rounded-sm">
+                        <div className="absolute top-4 left-4 flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-white/20 backdrop-blur-sm" />
+                          <div className="w-16 h-2 bg-white/20 backdrop-blur-sm rounded-full" />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -266,12 +433,16 @@ export default function MetaPostings() {
                         <span className="text-xs font-bold leading-none">
                           {platform.ig ? (metaStatus?.instagram?.username || "usuario") : (metaStatus?.page_name || "Pagina")}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">Agora mesmo</span>
+                        <span className="text-[10px] text-muted-foreground">{isScheduled ? format(scheduledDate, "dd/MM/yyyy") : "Agora mesmo"}</span>
                       </div>
                     </div>
                     <p className="text-sm whitespace-pre-wrap line-clamp-4">
                       {content || <span className="text-muted-foreground italic">Sua legenda aparecerá aqui...</span>}
                     </p>
+                    <div className="flex items-center gap-1 pt-1">
+                      <Badge variant="outline" className="text-[9px] uppercase">{postType}</Badge>
+                      {isScheduled && <Badge variant="outline" className="text-[9px] uppercase border-blue-500/30 text-blue-600">Agendado</Badge>}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -283,7 +454,7 @@ export default function MetaPostings() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">FacebookIcon</span>
+                    <span className="text-muted-foreground">Facebook</span>
                     {hasFB ? (
                       <Badge variant="secondary" className="bg-green-500/10 text-green-600 hover:bg-green-500/10 border-green-500/20">Conectado</Badge>
                     ) : (
@@ -291,7 +462,7 @@ export default function MetaPostings() {
                     )}
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">InstagramIcon</span>
+                    <span className="text-muted-foreground">Instagram</span>
                     {hasIG ? (
                       <Badge variant="secondary" className="bg-green-500/10 text-green-600 hover:bg-green-500/10 border-green-500/20">Conectado</Badge>
                     ) : (
@@ -313,16 +484,68 @@ export default function MetaPostings() {
 
         <TabsContent value="scheduled" className="mt-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Publicações Agendadas</CardTitle>
-              <CardDescription>Visualize o que está na fila para ser publicado.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Publicações Agendadas</CardTitle>
+                <CardDescription>Visualize o que está na fila para ser publicado.</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["meta-history", clientId] })}>
+                <RefreshIcon className="w-4 h-4 mr-2" /> Atualizar
+              </Button>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-3">
-                <Calendar className="w-8 h-8 opacity-20" />
-                <p>Nenhuma publicação agendada no momento.</p>
-                <Button variant="outline" size="sm" onClick={() => setActiveTab("create")}>Criar primeiro agendamento</Button>
-              </div>
+              {isLoadingHistory ? (
+                <div className="flex justify-center py-12">
+                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : history && history.filter((p: any) => p.status === 'scheduled').length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {history.filter((p: any) => p.status === 'scheduled').map((post: any) => (
+                    <Card key={post.id} className="overflow-hidden border-primary/10">
+                      <div className="aspect-video bg-muted relative">
+                        {post.media_url ? (
+                          post.media_url.includes('.mp4') ? (
+                            <div className="w-full h-full flex items-center justify-center bg-black">
+                              <Video className="w-8 h-8 text-white/50" />
+                            </div>
+                          ) : (
+                            <img src={post.media_url} alt="Media" className="w-full h-full object-cover" />
+                          )
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <FileText className="w-8 h-8 text-muted-foreground/20" />
+                          </div>
+                        )}
+                        <div className="absolute top-2 right-2">
+                          <Badge className="bg-blue-600 border-none">{post.type || 'feed'}</Badge>
+                        </div>
+                      </div>
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            {post.platform === 'facebook' ? <FacebookIcon className="w-3 h-3 text-blue-600" /> : <InstagramIcon className="w-3 h-3 text-pink-600" />}
+                            <span className="text-[10px] font-bold uppercase">{post.platform}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                            <Clock className="w-3 h-3" />
+                            {post.scheduled_for ? format(new Date(post.scheduled_for), "dd/MM 'às' HH:mm", { locale: ptBR }) : 'Pendente'}
+                          </div>
+                        </div>
+                        <p className="text-xs line-clamp-2 text-muted-foreground italic">"{post.content || "Sem legenda"}"</p>
+                        <Button variant="outline" size="sm" className="w-full h-7 text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
+                          Cancelar Agendamento
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-3">
+                  <Calendar className="w-8 h-8 opacity-20" />
+                  <p>Nenhuma publicação agendada no momento.</p>
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab("create")}>Criar primeiro agendamento</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

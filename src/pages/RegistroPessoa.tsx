@@ -29,15 +29,15 @@ interface SocialEntry {
 const SOCIAL_PLATFORMS = [
   {
     id: "instagram",
-    label: "InstagramIcon",
-    icon: 
+    label: "Instagram",
+    icon: InstagramIcon,
     color: "text-pink-500",
     bgColor: "bg-pink-50 dark:bg-pink-950/20 border-pink-200 dark:border-pink-800",
     activeBg: "bg-pink-100 dark:bg-pink-950/40",
     emoji: "📸",
     helpImage: "/assets/help-instagram.png",
     steps: [
-      { text: "Abra o aplicativo do InstagramIcon no seu celular", emoji: "📱" },
+      { text: "Abra o aplicativo do Instagram no seu celular", emoji: "📱" },
       { text: "Toque no ícone da sua foto (canto inferior direito) para ir ao seu perfil", emoji: "👤" },
       { text: "No seu perfil, toque em \"Compartilhar Perfil\"", emoji: "⚙️" },
       { text: 'Toque em "Copiar Link"', emoji: "🔗" },
@@ -53,8 +53,8 @@ const SOCIAL_PLATFORMS = [
   },
   {
     id: "facebook",
-    label: "FacebookIcon",
-    icon: 
+    label: "Facebook",
+    icon: FacebookIcon,
     color: "text-blue-600",
     bgColor: "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800",
     activeBg: "bg-blue-100 dark:bg-blue-950/40",

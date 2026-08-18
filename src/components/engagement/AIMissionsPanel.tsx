@@ -39,8 +39,8 @@ const PRIORITY_CONFIG = {
 };
 
 const PLATFORM_ICON = {
-  facebook: 
-  instagram: 
+  facebook: FacebookIcon,
+  instagram: InstagramIcon,
   ambos: Globe,
 };
 
