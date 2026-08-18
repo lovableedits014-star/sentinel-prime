@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Facebook as FacebookIcon as Facebook as Facebook as FacebookIcon, Link2, Search, Sparkles } from "lucide-react";
+import {  Link2, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { norm, similarity } from "@/lib/engagement-match";
 import { linkAuthor, type Origem } from "@/lib/engagement-team";

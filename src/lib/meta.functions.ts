@@ -10,9 +10,10 @@ export const publishMetaContent = createServerFn({ method: "POST" })
     content: z.string(),
     mediaUrl: z.string().url().optional(),
     mediaType: z.enum(['IMAGE', 'VIDEO']).optional(),
+    scheduledFor: z.string().optional(),
   }).parse(data))
   .handler(async ({ data }) => {
-    const { clientId, platform, type, content, mediaUrl, mediaType } = data;
+    const { clientId, platform, type, content, mediaUrl, mediaType, scheduledFor } = data;
 
     // Get integration
     const { data: integration, error: intError } = await supabase

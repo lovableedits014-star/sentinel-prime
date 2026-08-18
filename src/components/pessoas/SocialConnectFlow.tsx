@@ -1,11 +1,12 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Facebook as FacebookIcon,
-  Instagram as InstagramIcon,
+  
+  
   ClipboardPaste,
   Loader2,
   CheckCircle2,
@@ -46,13 +47,13 @@ const PLATFORM_META: Record<Platform, { label: string; color: string; icon: type
   facebook: {
     label: "FacebookIcon",
     color: "text-blue-600",
-    icon: FacebookIcon,
+    icon: 
     bgChip: "bg-blue-50 dark:bg-blue-950/30",
   },
   instagram: {
     label: "InstagramIcon",
     color: "text-pink-500",
-    icon: InstagramIcon,
+    icon: 
     bgChip: "bg-pink-50 dark:bg-pink-950/30",
   },
 };

@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
@@ -8,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, Loader2, CheckCircle2, AlertCircle, MapPin, Phone, FileText, MessageCircle, Facebook as FacebookIcon as Facebook as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as Instagram as InstagramIcon, ClipboardPaste, X, Check, ChevronDown, ChevronUp, Cake } from "lucide-react";
+import { UserPlus, Loader2, CheckCircle2, AlertCircle, MapPin, Phone, FileText, MessageCircle,   ClipboardPaste, X, Check, ChevronDown, ChevronUp, Cake } from "lucide-react";
 import { formatCPF, formatPhone, isValidCPF, onlyDigits, translateRegistrationError } from "@/lib/cpf";
 
 const TIPO_OPTIONS = [
@@ -29,7 +30,7 @@ const SOCIAL_PLATFORMS = [
   {
     id: "instagram",
     label: "InstagramIcon",
-    icon: InstagramIcon,
+    icon: 
     color: "text-pink-500",
     bgColor: "bg-pink-50 dark:bg-pink-950/20 border-pink-200 dark:border-pink-800",
     activeBg: "bg-pink-100 dark:bg-pink-950/40",
@@ -53,7 +54,7 @@ const SOCIAL_PLATFORMS = [
   {
     id: "facebook",
     label: "FacebookIcon",
-    icon: FacebookIcon,
+    icon: 
     color: "text-blue-600",
     bgColor: "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800",
     activeBg: "bg-blue-100 dark:bg-blue-950/40",

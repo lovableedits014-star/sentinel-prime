@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Users, RefreshCw, Award, Crown, Medal, Trophy, Star, ThumbsUp, ThumbsDown, Minus, Facebook as FacebookIcon, Instagram as InstagramIcon,
+  Users, RefreshCw, Award, Crown, Medal, Trophy, Star, ThumbsUp, ThumbsDown, Minus,  
 } from "lucide-react";
 import { Wand2, Activity } from "lucide-react";
 import { toast } from "sonner";

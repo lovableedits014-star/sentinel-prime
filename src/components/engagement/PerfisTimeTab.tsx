@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table as TableIcon,
   Check,
-  Facebook as FacebookIcon,
-  Instagram as InstagramIcon,
+  
+  
   Link2,
   Plus,
   RefreshCw,

@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,8 +10,8 @@ import {
   Video, 
   History, 
   PlusCircle, 
-  Facebook as FacebookIcon, 
-  Instagram as InstagramIcon, 
+   
+   
   Loader2, 
   CheckCircle2, 
   AlertCircle,

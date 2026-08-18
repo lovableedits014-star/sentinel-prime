@@ -1,10 +1,11 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Minus, Calendar, Facebook as FacebookIcon as Facebook as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as Instagram as InstagramIcon, Loader2, ExternalLink, Ban, ShieldOff } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calendar,   Loader2, ExternalLink, Ban, ShieldOff } from "lucide-react";
 import { MilitantBadge } from "./MilitantBadge";
 import { Button } from "@/components/ui/button";
 import { getSocialProfileUrl } from "@/lib/social-url";
