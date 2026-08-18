@@ -1,5 +1,5 @@
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -10,15 +10,15 @@ import {
   Video, 
   History, 
   PlusCircle, 
-   
-   
   Loader2, 
   CheckCircle2, 
   AlertCircle,
   ExternalLink,
   ChevronRight,
   Upload,
-  RefreshCw as RefreshIcon
+  RefreshCw as RefreshIcon,
+  X,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,17 +32,32 @@ import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { useServerFn } from "@tanstack/react-start";
 import { publishMetaContent } from "@/lib/meta.functions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import ReactCalendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+type PostType = 'feed' | 'story' | 'reels';
 
 export default function MetaPostings() {
   const { data: clientId } = useCurrentClientId();
   const queryClient = useQueryClient();
   const publishFn = useServerFn(publishMetaContent);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [platform, setPlatform] = useState<{ fb: boolean; ig: boolean }>({ fb: false, ig: true });
+  const [platform, setPlatform] = useState<{ fb: boolean; ig: boolean }>({ fb: true, ig: true });
   const [content, setContent] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
+  const [postType, setPostType] = useState<PostType>('feed');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState("create");
+  
+  // Scheduling state
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<Date>(new Date());
+  const [scheduledTime, setScheduledTime] = useState("12:00");
 
   // Fetch Meta Status
   const { data: metaStatus, isLoading: isLoadingStatus } = useQuery({
