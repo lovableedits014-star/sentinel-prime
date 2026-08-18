@@ -164,7 +164,7 @@ export default function MetaPostings() {
                           disabled={!hasFB}
                         />
                         <Label htmlFor="fb" className="flex items-center gap-2 cursor-pointer">
-                          <Facebook className="w-4 h-4 text-blue-600" />
+                          <FacebookIcon className="w-4 h-4 text-blue-600" />
                           <span>Facebook</span>
                           {hasFB && <Badge variant="secondary" className="ml-1 text-[10px]">{metaStatus.page_name}</Badge>}
                           {!hasFB && <Badge variant="outline" className="text-destructive text-[10px]">Não conectado</Badge>}
@@ -178,7 +178,7 @@ export default function MetaPostings() {
                           disabled={!hasIG}
                         />
                         <Label htmlFor="ig" className="flex items-center gap-2 cursor-pointer">
-                          <Instagram className="w-4 h-4 text-pink-600" />
+                          <InstagramIcon className="w-4 h-4 text-pink-600" />
                           <span>Instagram</span>
                           {hasIG && <Badge variant="secondary" className="ml-1 text-[10px]">@{metaStatus.instagram.username}</Badge>}
                           {!hasIG && <Badge variant="outline" className="text-destructive text-[10px]">Não conectado</Badge>}
@@ -245,7 +245,7 @@ export default function MetaPostings() {
                 <CardHeader className="bg-muted/30 py-3">
                   <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <ImageIcon className="w-3 h-3" />
-                    Preview {platform.ig ? "Instagram" : "Facebook"}
+                    Preview {platform.ig ? "InstagramIcon" : "FacebookIcon"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -361,9 +361,9 @@ export default function MetaPostings() {
                           <td className="p-3">
                             <div className="flex items-center gap-2">
                               {post.platform === 'facebook' ? (
-                                <Facebook className="w-4 h-4 text-blue-600" />
+                                <FacebookIcon className="w-4 h-4 text-blue-600" />
                               ) : (
-                                <Instagram className="w-4 h-4 text-pink-600" />
+                                <InstagramIcon className="w-4 h-4 text-pink-600" />
                               )}
                               <span className="capitalize">{post.platform}</span>
                             </div>
