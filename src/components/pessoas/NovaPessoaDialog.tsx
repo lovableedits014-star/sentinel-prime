@@ -37,6 +37,8 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
   const [cidade, setCidade] = useState("Campo Grande");
   const [bairro, setBairro] = useState("");
   const [tipo, setTipo] = useState("apoiador");
+  const [parentId, setParentId] = useState("");
+  const [pessoas, setPessoas] = useState<any[]>([]);
 
   // Link confirmation dialog state
   const [linkPrompt, setLinkPrompt] = useState<{
