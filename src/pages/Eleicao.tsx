@@ -1377,6 +1377,7 @@ export default function Eleicao() {
             <DialogTitle>{editing ? "Editar cadastro" : "Novo cadastro"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 px-6 py-2 overflow-y-auto flex-1 min-h-0">
+            {/* Bloco de tipo e escopo */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Tipo *</Label>
@@ -1400,56 +1401,8 @@ export default function Eleicao() {
                 </Select>
               </div>
             </div>
-            
-            <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Handshake className="w-3 h-3" />
-                Status de Contratação
-              </Label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: "pendente", label: "Pendente", icon: AlertCircle, color: "text-muted-foreground", activeColor: "bg-muted text-foreground border-muted-foreground/30" },
-                  { id: "em_negociacao", label: "Reunião", icon: MessageCircle, color: "text-amber-600", activeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
-                  { id: "confirmado", label: "Confirmado", icon: CheckCircle2, color: "text-emerald-600", activeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" },
-                ].map(s => {
-                  const active = form.status_contratacao === s.id;
-                  const Icon = s.icon;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, status_contratacao: s.id as any }))}
-                      className={cn(
-                        "flex flex-col items-center justify-center p-2 rounded-lg border transition-all gap-1 text-[10px] font-medium",
-                        active ? s.activeColor : "bg-background border-border hover:bg-muted/50 text-muted-foreground"
-                      )}
-                    >
-                      <Icon className={cn("w-4 h-4", active ? "" : s.color)} />
-                      {s.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
-                <Checkbox
-                  checked={form.participou_reuniao}
-                  onCheckedChange={(c) => setForm(f => ({ ...f, participou_reuniao: !!c }))}
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-blue-500" />
-                    Participou da Reunião
-                  </span>
-                  <p className="text-[10px] text-muted-foreground line-clamp-1">Marcar presença física</p>
-                </div>
-              </label>
-
-              {/* Checkbox de pré-selecionado removida conforme plano */}
-            </div>
-
+            {/* Bloco de Região / Cidade */}
             {form.escopo === "campo_grande" ? (
               <div>
                 <Label>Região *</Label>
@@ -1467,42 +1420,115 @@ export default function Eleicao() {
               </div>
             )}
 
+            {/* Vínculos (Superior) */}
             {form.tipo !== "coordenador" && (
               <div className="space-y-2">
-                {form.tipo === "lider" && (
-                  <label className="flex items-start gap-2 text-sm font-medium rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5 cursor-pointer">
-                    <Checkbox
-                      checked={form.liderAvulso}
-                      onCheckedChange={(c) => setForm(f => ({ ...f, liderAvulso: !!c, parent_id: c ? "" : f.parent_id }))}
-                    />
-                    <div className="flex-1">
-                      <div className="text-amber-700 dark:text-amber-400">⚡ Líder avulso (sem coordenador vinculado)</div>
-                      <p className="text-[11px] font-normal text-muted-foreground mt-0.5">
-                        Use para líderes que vieram diretamente ao gabinete ou foram cadastrados sem indicação. Aparecerão na seção "Líderes avulsos" e contam nos relatórios.
-                      </p>
-                    </div>
-                  </label>
-                )}
-                {!(form.tipo === "lider" && form.liderAvulso) && (
-                  <div>
-                    <Label>Indicado por ({form.tipo === "lider" ? "Coordenador" : "Líder"})</Label>
-                    <Select value={form.parent_id || "none"} onValueChange={(v) => setForm(f => ({ ...f, parent_id: v === "none" ? "" : v }))}>
-                      <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— Sem vínculo —</SelectItem>
-                        {possibleParents.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {possibleParents.length === 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Nenhum {form.tipo === "lider" ? "coordenador" : "líder"} cadastrado nesta {form.escopo === "campo_grande" ? "região" : "cidade"} ainda.
-                        {form.tipo === "lider" && " Marque acima como avulso para prosseguir."}
-                      </p>
+                <div>
+                  <Label className="flex justify-between items-center">
+                    <span>{form.tipo === "lider" ? "Coordenador Responsável" : "Vinculado a (Líder ou Coordenador)"}</span>
+                    {form.tipo === "lider" && (
+                      <button 
+                        type="button" 
+                        onClick={() => setForm(f => ({ ...f, parent_id: "" }))}
+                        className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors", 
+                          !form.parent_id ? "bg-amber-500 text-white border-amber-600" : "text-muted-foreground hover:bg-muted border-border")}
+                      >
+                        Avulso
+                      </button>
                     )}
-                  </div>
-                )}
+                  </Label>
+                  <Select value={form.parent_id || "none"} onValueChange={(v) => setForm(f => ({ ...f, parent_id: v === "none" ? "" : v }))}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione o superior..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Sem superior (Avulso) —</SelectItem>
+                      {(() => {
+                        // Lógica de filtro para parent_id
+                        const escopoValue = form.escopo === "interior" ? form.cidade : form.regiao;
+                        const potential = pessoas.filter(p => {
+                          if (p.id === editing?.id) return false;
+                          const pEscopo = p.escopo === "interior" ? p.cidade : p.regiao;
+                          if (pEscopo !== escopoValue) return false;
+                          
+                          if (form.tipo === "lider") {
+                            // Líderes vinculam-se apenas a Coordenadores
+                            return p.tipo === "coordenador";
+                          } else if (form.tipo === "cabo") {
+                            // Cabos vinculam-se a Líderes ou Coordenadores
+                            return p.tipo === "lider" || p.tipo === "coordenador";
+                          }
+                          return false;
+                        });
+
+                        if (potential.length === 0) return <SelectItem value="no-options" disabled>Nenhum superior disponível nesta localidade</SelectItem>;
+
+                        return potential.sort((a,b) => a.nome.localeCompare(b.nome)).map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <span className="flex items-center gap-2">
+                              <Badge variant="outline" className={cn("text-[9px] h-4 px-1 leading-none uppercase", TIPO_META[p.tipo].color)}>
+                                {TIPO_META[p.tipo].label.split(" ")[0]}
+                              </Badge>
+                              {p.nome}
+                            </span>
+                          </SelectItem>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                  {!form.parent_id && (
+                    <p className="text-[10px] text-muted-foreground italic mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Este {TIPO_META[form.tipo].label} será cadastrado como Avulso (sem superior).
+                    </p>
+                  )}
+                </div>
               </div>
             )}
+
+            {/* Status e Reunião */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="rounded-md border border-border bg-muted/20 p-2 space-y-2">
+                <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Handshake className="w-3 h-3" /> Status
+                </Label>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    { id: "pendente", label: "Pend", icon: AlertCircle, color: "text-muted-foreground", activeColor: "bg-muted text-foreground border-muted-foreground/30" },
+                    { id: "em_negociacao", label: "Reuni", icon: MessageCircle, color: "text-amber-600", activeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
+                    { id: "confirmado", label: "Conf", icon: CheckCircle2, color: "text-emerald-600", activeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" },
+                  ].map(s => {
+                    const active = form.status_contratacao === s.id;
+                    const Icon = s.icon;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, status_contratacao: s.id as any }))}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-1 rounded-lg border transition-all gap-0.5 text-[9px] font-medium",
+                          active ? s.activeColor : "bg-background border-border hover:bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        <Icon className={cn("w-3 h-3", active ? "" : s.color)} />
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 p-2 rounded-md border border-border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                <Checkbox
+                  checked={form.participou_reuniao}
+                  onCheckedChange={(c) => setForm(f => ({ ...f, participou_reuniao: !!c }))}
+                />
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-medium flex items-center gap-1">
+                    <Users className="w-3 h-3 text-blue-500" /> Na Reunião
+                  </span>
+                  <p className="text-[9px] text-muted-foreground">Marcar presença física</p>
+                </div>
+              </label>
+            </div>
 
             <div>
               <Label>Nome *</Label>
