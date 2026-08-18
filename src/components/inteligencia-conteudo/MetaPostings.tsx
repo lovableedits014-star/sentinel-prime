@@ -484,16 +484,68 @@ export default function MetaPostings() {
 
         <TabsContent value="scheduled" className="mt-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Publicações Agendadas</CardTitle>
-              <CardDescription>Visualize o que está na fila para ser publicado.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Publicações Agendadas</CardTitle>
+                <CardDescription>Visualize o que está na fila para ser publicado.</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["meta-history", clientId] })}>
+                <RefreshIcon className="w-4 h-4 mr-2" /> Atualizar
+              </Button>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-3">
-                <Calendar className="w-8 h-8 opacity-20" />
-                <p>Nenhuma publicação agendada no momento.</p>
-                <Button variant="outline" size="sm" onClick={() => setActiveTab("create")}>Criar primeiro agendamento</Button>
-              </div>
+              {isLoadingHistory ? (
+                <div className="flex justify-center py-12">
+                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : history && history.filter((p: any) => p.status === 'scheduled').length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {history.filter((p: any) => p.status === 'scheduled').map((post: any) => (
+                    <Card key={post.id} className="overflow-hidden border-primary/10">
+                      <div className="aspect-video bg-muted relative">
+                        {post.media_url ? (
+                          post.media_url.includes('.mp4') ? (
+                            <div className="w-full h-full flex items-center justify-center bg-black">
+                              <Video className="w-8 h-8 text-white/50" />
+                            </div>
+                          ) : (
+                            <img src={post.media_url} alt="Media" className="w-full h-full object-cover" />
+                          )
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <FileText className="w-8 h-8 text-muted-foreground/20" />
+                          </div>
+                        )}
+                        <div className="absolute top-2 right-2">
+                          <Badge className="bg-blue-600 border-none">{post.type || 'feed'}</Badge>
+                        </div>
+                      </div>
+                      <CardContent className="p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            {post.platform === 'facebook' ? <FacebookIcon className="w-3 h-3 text-blue-600" /> : <InstagramIcon className="w-3 h-3 text-pink-600" />}
+                            <span className="text-[10px] font-bold uppercase">{post.platform}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-medium">
+                            <Clock className="w-3 h-3" />
+                            {post.scheduled_for ? format(new Date(post.scheduled_for), "dd/MM 'às' HH:mm", { locale: ptBR }) : 'Pendente'}
+                          </div>
+                        </div>
+                        <p className="text-xs line-clamp-2 text-muted-foreground italic">"{post.content || "Sem legenda"}"</p>
+                        <Button variant="outline" size="sm" className="w-full h-7 text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
+                          Cancelar Agendamento
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-3">
+                  <Calendar className="w-8 h-8 opacity-20" />
+                  <p>Nenhuma publicação agendada no momento.</p>
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab("create")}>Criar primeiro agendamento</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
