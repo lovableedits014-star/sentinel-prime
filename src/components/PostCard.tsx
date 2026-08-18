@@ -2,7 +2,7 @@ import { useState, useMemo, memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   MessageSquare, TrendingUp, TrendingDown, Minus,
-  Instagram, Facebook, ExternalLink, Image as ImageIcon, Play,
+  InstagramIcon, FacebookIcon, ExternalLink, Image as ImageIcon, Play,
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { CommentItem, type CommentData, type AuthorStatsMap } from "@/components/CommentItem";
@@ -60,8 +60,8 @@ function getPostMedia(group: PostGroup): { type: 'image' | 'video' | 'none'; url
 }
 
 function getPlatformIcon(platform: string) {
-  if (platform === "instagram") return <Instagram className="w-4 h-4 text-pink-500" />;
-  return <Facebook className="w-4 h-4 text-blue-600" />;
+  if (platform === "instagram") return <InstagramIcon className="w-4 h-4 text-pink-500" />;
+  return <FacebookIcon className="w-4 h-4 text-blue-600" />;
 }
 
 // Memoized to prevent re-renders when parent state changes

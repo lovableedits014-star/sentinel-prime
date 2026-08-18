@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Facebook, Brain, Save, AlertCircle, Zap, Check, Loader2, ShieldCheck, ShieldAlert, RefreshCw, Instagram, MessageSquareText } from "lucide-react";
+import { Facebook as FacebookIcon, Brain, Save, AlertCircle, Zap, Check, Loader2, ShieldCheck, ShieldAlert, RefreshCw, Instagram as InstagramIcon, MessageSquareText } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
@@ -39,11 +39,11 @@ const REQUIRED_PERMISSIONS = [
   { name: 'pages_manage_metadata', label: 'Metadados da página', required: true, platform: 'facebook' },
   { name: 'pages_manage_engagement', label: 'Gerenciar engajamento', required: false, platform: 'facebook' },
   { name: 'pages_show_list', label: 'Listar páginas', required: false, platform: 'facebook' },
-  { name: 'instagram_basic', label: 'Instagram básico', required: true, platform: 'instagram' },
+  { name: 'instagram_basic', label: 'InstagramIcon básico', required: true, platform: 'instagram' },
   { name: 'instagram_manage_comments', label: 'Gerenciar comentários IG', required: true, platform: 'instagram' },
   { name: 'public_profile', label: 'Perfil público', required: false, platform: 'general' },
-  { name: 'pages_manage_posts', label: 'Publicar no Facebook', required: false, platform: 'facebook' },
-  { name: 'instagram_content_publish', label: 'Publicar no Instagram', required: false, platform: 'instagram' },
+  { name: 'pages_manage_posts', label: 'Publicar no FacebookIcon', required: false, platform: 'facebook' },
+  { name: 'instagram_content_publish', label: 'Publicar no InstagramIcon', required: false, platform: 'instagram' },
 ];
 
 const Integrations = () => {
@@ -403,7 +403,7 @@ const Integrations = () => {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Integrações</h1>
         <p className="text-muted-foreground mt-2 text-sm max-w-3xl">
-          Configure a inteligência do seu painel. Conecte sua página do Facebook e Instagram para monitorar comentários, e escolha entre diferentes provedores de IA (Lovable, OpenAI, Anthropic, Gemini) para automatizar respostas e análises de sentimento.
+          Configure a inteligência do seu painel. Conecte sua página do FacebookIcon e InstagramIcon para monitorar comentários, e escolha entre diferentes provedores de IA (Lovable, OpenAI, Anthropic, Gemini) para automatizar respostas e análises de sentimento.
         </p>
       </div>
 
@@ -566,11 +566,11 @@ const Integrations = () => {
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <Facebook className="w-5 h-5 text-blue-500" />
+              <FacebookIcon className="w-5 h-5 text-blue-500" />
             </div>
             <div>
               <CardTitle>Meta Graph API</CardTitle>
-              <CardDescription>Conecte suas páginas do Facebook e Instagram</CardDescription>
+              <CardDescription>Conecte suas páginas do FacebookIcon e InstagramIcon</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -646,7 +646,7 @@ const Integrations = () => {
           )}
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="page-id">Page ID (Facebook)</Label>
+              <Label htmlFor="page-id">Page ID (FacebookIcon)</Label>
               <Input
                 id="page-id"
                 placeholder="ID da sua página"
@@ -655,7 +655,7 @@ const Integrations = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="instagram-id">Instagram Business ID</Label>
+              <Label htmlFor="instagram-id">InstagramIcon Business ID</Label>
               <Input
                 id="instagram-id"
                 placeholder="ID do perfil comercial"
@@ -716,7 +716,7 @@ const Integrations = () => {
                 <div className="flex items-center gap-2">
                   {pageName && (
                     <Badge variant="outline" className="text-xs">
-                      <Facebook className="w-3 h-3 mr-1" />
+                      <FacebookIcon className="w-3 h-3 mr-1" />
                       {pageName}
                     </Badge>
                   )}
@@ -778,7 +778,7 @@ const Integrations = () => {
                       ) : (
                         <AlertCircle className="w-3 h-3 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                       )}
-                      {isInstagram && <Instagram className="w-3 h-3 flex-shrink-0" />}
+                      {isInstagram && <InstagramIcon className="w-3 h-3 flex-shrink-0" />}
                       <span className="truncate">
                         {perm.name.replace(/_/g, ' ')}
                       </span>
@@ -805,12 +805,12 @@ const Integrations = () => {
                 </div>
               )}
               
-              {/* Instagram-specific warning */}
+              {/* InstagramIcon-specific warning */}
               {permissions.find(p => p.name === 'instagram_manage_comments' && !p.granted) && metaData.instagramId && (
                 <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-200">
-                  <Instagram className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <InstagramIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium">Instagram: @usernames não serão capturados</p>
+                    <p className="font-medium">InstagramIcon: @usernames não serão capturados</p>
                     <p className="text-amber-700 dark:text-amber-300">
                       Sem <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">instagram_manage_comments</code>, a API não retorna o @username de quem comentou.
                     </p>

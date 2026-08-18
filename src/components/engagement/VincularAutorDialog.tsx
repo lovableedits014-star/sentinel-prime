@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Facebook, Link2, Search, Sparkles } from "lucide-react";
+import { Facebook as FacebookIcon, Link2, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { norm, similarity } from "@/lib/engagement-match";
 import { linkAuthor, type Origem } from "@/lib/engagement-team";
@@ -108,8 +108,8 @@ export default function VincularAutorDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Facebook className="h-4 w-4" />
-            Vincular {platform === "facebook" ? "Facebook" : "Instagram"} por comentário
+            <FacebookIcon className="h-4 w-4" />
+            Vincular {platform === "facebook" ? "FacebookIcon" : "InstagramIcon"} por comentário
           </DialogTitle>
           <DialogDescription>
             {alvo

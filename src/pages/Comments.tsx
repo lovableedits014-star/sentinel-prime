@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   MessageSquare, Search, TrendingUp, TrendingDown,
-  Instagram, Facebook, RefreshCw, LayoutGrid, List,
+  InstagramIcon, FacebookIcon, RefreshCw, LayoutGrid, List,
   EyeOff, Eye, Sparkles, SkipForward, Flame,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -404,7 +404,7 @@ const Comments = () => {
       if (error) throw error;
 
       if (data.success) {
-        toast.success(`Resposta publicada no ${platform === 'instagram' ? 'Instagram' : 'Facebook'}!`);
+        toast.success(`Resposta publicada no ${platform === 'instagram' ? 'InstagramIcon' : 'FacebookIcon'}!`);
         // Optimistic update: mark as responded immediately so it leaves the "Pendentes" view
         const nowIso = new Date().toISOString();
         const markResponded = (c: any) =>
@@ -432,7 +432,7 @@ const Comments = () => {
       const isRateLimit = msg.includes('32') || msg.includes('368') || msg.includes('rate') || 
                           msg.includes('temporarily') || msg.includes('spam') || msg.includes('block');
       if (isRateLimit) {
-        toast.error("Facebook bloqueou temporariamente seu acesso. Aguarde alguns minutos e tente novamente.", { duration: 8000 });
+        toast.error("FacebookIcon bloqueou temporariamente seu acesso. Aguarde alguns minutos e tente novamente.", { duration: 8000 });
       } else {
         toast.error(msg);
       }
@@ -757,7 +757,7 @@ const Comments = () => {
       return bt.localeCompare(at);
     });
 
-    // Interleave Facebook and Instagram posts when platformFilter is "all"
+    // Interleave FacebookIcon and InstagramIcon posts when platformFilter is "all"
     // Since posts are published simultaneously on both platforms, pair them by date rank
     if (platformFilter === "all") {
       const fb = allGroups.filter(g => g.platforms.has('facebook') && !g.platforms.has('instagram'));
@@ -813,7 +813,7 @@ const Comments = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Comentários</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Todos os comentários do Facebook e Instagram em um só lugar. Responda, oculte, gere respostas com IA e acompanhe o sentimento de cada interação. Posts aparecem em ordem cronológica com as duas plataformas intercaladas.
+            Todos os comentários do FacebookIcon e InstagramIcon em um só lugar. Responda, oculte, gere respostas com IA e acompanhe o sentimento de cada interação. Posts aparecem em ordem cronológica com as duas plataformas intercaladas.
           </p>
         </div>
         {/* Action buttons: primary = Sincronizar, secondary = Atualizar */}
@@ -849,20 +849,20 @@ const Comments = () => {
         </div>
         <div className="bg-card rounded-xl border p-3 sm:p-4 flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Facebook className="w-4 h-4 text-primary" />
+            <FacebookIcon className="w-4 h-4 text-primary" />
           </div>
           <div>
             <p className="text-xl font-bold">{stats.facebookCount}</p>
-            <p className="text-xs text-muted-foreground">Facebook</p>
+            <p className="text-xs text-muted-foreground">FacebookIcon</p>
           </div>
         </div>
         <div className="bg-card rounded-xl border p-3 sm:p-4 flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-secondary/50 flex items-center justify-center shrink-0">
-            <Instagram className="w-4 h-4 text-secondary-foreground" />
+            <InstagramIcon className="w-4 h-4 text-secondary-foreground" />
           </div>
           <div>
             <p className="text-xl font-bold">{stats.instagramCount}</p>
-            <p className="text-xs text-muted-foreground">Instagram</p>
+            <p className="text-xs text-muted-foreground">InstagramIcon</p>
           </div>
         </div>
         <div className="bg-card rounded-xl border p-3 sm:p-4 flex items-center gap-3">
@@ -926,8 +926,8 @@ const Comments = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="facebook">Facebook</SelectItem>
-                <SelectItem value="instagram">Instagram</SelectItem>
+                <SelectItem value="facebook">FacebookIcon</SelectItem>
+                <SelectItem value="instagram">InstagramIcon</SelectItem>
               </SelectContent>
             </Select>
             <Select value={String(postsLimit)} onValueChange={(v) => setPostsLimit(Number(v))}>

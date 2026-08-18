@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table as TableIcon,
   Check,
-  Facebook,
-  Instagram,
+  FacebookIcon,
+  InstagramIcon,
   Link2,
   Plus,
   RefreshCw,
@@ -52,12 +52,12 @@ const STATUS_META: Record<Status, { label: string; className: string; hint: stri
   nao_rastreavel: {
     label: "Não rastreável",
     className: "bg-destructive/15 text-destructive border-destructive/30",
-    hint: "O Facebook só é rastreável quando vinculado a um comentário real (a Meta não expõe o @).",
+    hint: "O FacebookIcon só é rastreável quando vinculado a um comentário real (a Meta não expõe o @).",
   },
   sem_cadastro: {
     label: "Sem @",
     className: "bg-muted text-muted-foreground",
-    hint: "Cadastre o Instagram e/ou vincule o Facebook para medir as interações.",
+    hint: "Cadastre o InstagramIcon e/ou vincule o FacebookIcon para medir as interações.",
   },
 };
 
@@ -179,7 +179,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
               <CardTitle className="text-base sm:text-lg">Perfis do time</CardTitle>
               <CardDescription className="text-xs sm:text-sm">
                 Todo o time em uma única lista — CRM, funcionários, estrutura eleitoral, contratados e contas do
-                portal. O Instagram é rastreado pelo @; o Facebook só é rastreável quando vinculado a um
+                portal. O InstagramIcon é rastreado pelo @; o FacebookIcon só é rastreável quando vinculado a um
                 comentário real (a Meta não expõe o @ público).
               </CardDescription>
             </div>
@@ -274,8 +274,8 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                   <TableRow>
                     <TableHead>Pessoa</TableHead>
                     <TableHead>Cargo</TableHead>
-                    <TableHead>Instagram</TableHead>
-                    <TableHead>Facebook</TableHead>
+                    <TableHead>InstagramIcon</TableHead>
+                    <TableHead>FacebookIcon</TableHead>
                     <TableHead className="text-center">Interações</TableHead>
                     <TableHead className="text-center">Missões</TableHead>
                     <TableHead>Status</TableHead>
@@ -314,7 +314,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                             </Badge>
                           </TableCell>
 
-                          {/* Instagram */}
+                          {/* InstagramIcon */}
                           <TableCell>
                             {editing === key ? (
                               <div className="flex items-center gap-1">
@@ -344,7 +344,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-sm hover:underline"
                                 >
-                                  <Instagram className="h-3.5 w-3.5" />@{r.instagram_handle}
+                                  <InstagramIcon className="h-3.5 w-3.5" />@{r.instagram_handle}
                                 </a>
                                 <Button
                                   size="icon"
@@ -376,12 +376,12 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                   setIgValue("");
                                 }}
                               >
-                                <Plus className="mr-1 h-3 w-3" />@ Instagram
+                                <Plus className="mr-1 h-3 w-3" />@ InstagramIcon
                               </Button>
                             )}
                           </TableCell>
 
-                          {/* Facebook */}
+                          {/* FacebookIcon */}
                           <TableCell>
                             {r.facebook_key ? (
                               <div className="flex items-center gap-1">
@@ -393,7 +393,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                       : "border-destructive/30 text-destructive"
                                   }`}
                                 >
-                                  <Facebook className="h-3 w-3" />
+                                  <FacebookIcon className="h-3 w-3" />
                                   {isMetaScopedId(r.facebook_key)
                                     ? r.facebook_label || "vinculado"
                                     : `${r.facebook_label || r.facebook_key} (não rastreável)`}
@@ -424,7 +424,7 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
                                 onClick={() => setVincular({ origem: r.origem, refId: r.ref_id, nome: r.nome })}
                               >
                                 <Link2 className="mr-1 h-3 w-3" />
-                                Vincular Facebook
+                                Vincular FacebookIcon
                               </Button>
                             )}
                           </TableCell>
@@ -505,8 +505,8 @@ export default function PerfisTimeTab({ clientId }: { clientId: string }) {
           )}
 
           <p className="text-xs text-muted-foreground">
-            Curtidas do Facebook aparecem na coluna ♥ quando a coleta de reações está ativa. Curtidas do
-            Instagram e compartilhamentos não são disponibilizados pela Meta por pessoa — use as Missões do
+            Curtidas do FacebookIcon aparecem na coluna ♥ quando a coleta de reações está ativa. Curtidas do
+            InstagramIcon e compartilhamentos não são disponibilizados pela Meta por pessoa — use as Missões do
             Portal para medir compartilhamento com link rastreável.
           </p>
         </CardContent>

@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, FileText, Copy, Trash2, Sparkles, RefreshCw, History, Facebook, Instagram, ExternalLink, MessageSquare, ThumbsUp, ThumbsDown, FileDown, Send, Star, Pencil, X, Check } from "lucide-react";
+import { Loader2, FileText, Copy, Trash2, Sparkles, RefreshCw, History, Facebook as FacebookIcon, Instagram as InstagramIcon, ExternalLink, MessageSquare, ThumbsUp, ThumbsDown, FileDown, Send, Star, Pencil, X, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import DOMPurify from "dompurify";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -974,7 +974,7 @@ export function MateriasPanel({ clientId }: Props) {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {selected.fontes.posts_referenciados.map((p: any) => {
-                      const Icon = p.platform === "instagram" ? Instagram : Facebook;
+                      const Icon = p.platform === "instagram" ? InstagramIcon : FacebookIcon;
                       return (
                         <div key={p.post_id} className="rounded border bg-background p-2 text-xs flex gap-2">
                           <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
