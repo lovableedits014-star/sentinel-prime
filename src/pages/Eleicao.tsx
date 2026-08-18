@@ -33,6 +33,7 @@ import { useCandidatosParceiros } from "@/hooks/useCandidatosParceiros";
 import DobradinhasManagerPanel from "@/components/eleicao/DobradinhasManagerPanel";
 import DobradinhaPropagarDialog from "@/components/eleicao/DobradinhaPropagarDialog";
 import DistribuicaoContatosTab from "@/components/eleicao/DistribuicaoContatosTab";
+import { FunnelManagement } from "@/components/eleicao/FunnelManagement";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
