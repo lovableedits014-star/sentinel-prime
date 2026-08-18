@@ -208,17 +208,30 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
     let coordPhone: string | null = null;
     let coordNome: string | null = null;
 
-    // 8a. Parent direto, se for coordenador
+    // 8a. Parent direto (Coordenador ou Líder)
     if (p.parent_id) {
       const { data: parent } = await supabase
         .from("eleicao_pessoas" as any)
-        .select("nome, telefone, tipo")
+        .select("id, nome, telefone, tipo, parent_id")
         .eq("id", p.parent_id)
         .maybeSingle();
       const pr = parent as any;
+      
       if (pr?.tipo === "coordenador" && pr.telefone) {
         coordPhone = pr.telefone;
         coordNome = pr.nome;
+      } else if (pr?.tipo === "lider" && pr.parent_id) {
+        // Se o pai for um líder, tentamos pegar o coordenador desse líder
+        const { data: grandParent } = await supabase
+          .from("eleicao_pessoas" as any)
+          .select("nome, telefone, tipo")
+          .eq("id", pr.parent_id)
+          .maybeSingle();
+        const gpr = grandParent as any;
+        if (gpr?.tipo === "coordenador" && gpr.telefone) {
+          coordPhone = gpr.telefone;
+          coordNome = gpr.nome;
+        }
       }
     }
 
