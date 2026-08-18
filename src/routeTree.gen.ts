@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiPublicMetaPublishTestRouteImport } from './routes/api/public/meta-publish-test'
 import { Route as ApiPublicMissaoSwitchRouteImport } from './routes/api/public/missao/switch'
 import { Route as ApiPublicMissaoIdentifyRouteImport } from './routes/api/public/missao/identify'
 import { Route as ApiPublicMissaoEventRouteImport } from './routes/api/public/missao/event'
@@ -29,12 +28,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicMetaPublishTestRoute =
-  ApiPublicMetaPublishTestRouteImport.update({
-    id: '/api/public/meta-publish-test',
-    path: '/api/public/meta-publish-test',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicMissaoSwitchRoute = ApiPublicMissaoSwitchRouteImport.update({
   id: '/api/public/missao/switch',
   path: '/api/public/missao/switch',
@@ -72,7 +65,6 @@ const ApiPublicMMissionIdDCodeRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/api/public/meta-publish-test': typeof ApiPublicMetaPublishTestRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
   '/api/public/missao/event': typeof ApiPublicMissaoEventRoute
   '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
@@ -83,7 +75,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/api/public/meta-publish-test': typeof ApiPublicMetaPublishTestRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
   '/api/public/missao/event': typeof ApiPublicMissaoEventRoute
   '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
@@ -95,7 +86,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
-  '/api/public/meta-publish-test': typeof ApiPublicMetaPublishTestRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
   '/api/public/missao/event': typeof ApiPublicMissaoEventRoute
   '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
@@ -108,7 +98,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
-    | '/api/public/meta-publish-test'
     | '/api/public/hooks/eleicao-cobranca-auto'
     | '/api/public/missao/event'
     | '/api/public/missao/identify'
@@ -119,7 +108,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
-    | '/api/public/meta-publish-test'
     | '/api/public/hooks/eleicao-cobranca-auto'
     | '/api/public/missao/event'
     | '/api/public/missao/identify'
@@ -130,7 +118,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$'
-    | '/api/public/meta-publish-test'
     | '/api/public/hooks/eleicao-cobranca-auto'
     | '/api/public/missao/event'
     | '/api/public/missao/identify'
@@ -142,7 +129,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
-  ApiPublicMetaPublishTestRoute: typeof ApiPublicMetaPublishTestRoute
   ApiPublicHooksEleicaoCobrancaAutoRoute: typeof ApiPublicHooksEleicaoCobrancaAutoRoute
   ApiPublicMissaoEventRoute: typeof ApiPublicMissaoEventRoute
   ApiPublicMissaoIdentifyRoute: typeof ApiPublicMissaoIdentifyRoute
@@ -165,13 +151,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/meta-publish-test': {
-      id: '/api/public/meta-publish-test'
-      path: '/api/public/meta-publish-test'
-      fullPath: '/api/public/meta-publish-test'
-      preLoaderRoute: typeof ApiPublicMetaPublishTestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/missao/switch': {
@@ -222,7 +201,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
-  ApiPublicMetaPublishTestRoute: ApiPublicMetaPublishTestRoute,
   ApiPublicHooksEleicaoCobrancaAutoRoute:
     ApiPublicHooksEleicaoCobrancaAutoRoute,
   ApiPublicMissaoEventRoute: ApiPublicMissaoEventRoute,
