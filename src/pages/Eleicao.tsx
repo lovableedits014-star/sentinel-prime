@@ -1183,6 +1183,8 @@ export default function Eleicao() {
                 <SelectItem value="pendente">⏳ Status: Pendente</SelectItem>
                 <SelectItem value="em_negociacao">🤝 Status: Em Negociação</SelectItem>
                 <SelectItem value="confirmado">✅ Status: Confirmado</SelectItem>
+                <SelectItem value="reuniao">👥 Participou da Reunião</SelectItem>
+                <SelectItem value="pre_selecionado">⭐ Pré-selecionado</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
