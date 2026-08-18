@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FacebookIcon, InstagramIcon, CheckCircle2, Loader2, UserPlus, Phone, FileText, AlertCircle, Mail, Lock, Eye, EyeOff, LogIn, MapPin, Users, IdCard, Cake } from "lucide-react";
+import {   CheckCircle2, Loader2, UserPlus, Phone, FileText, AlertCircle, Mail, Lock, Eye, EyeOff, LogIn, MapPin, Users, IdCard, Cake } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { DateInputBr } from "@/components/ui/date-input-br";
 import { formatCpf, cpfDigits, isValidCpf } from "@/lib/cpf-mask";

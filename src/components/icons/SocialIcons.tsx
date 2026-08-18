@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import React from 'react';
 
 export const FacebookIcon = ({ className }: { className?: string }) => (

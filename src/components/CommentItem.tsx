@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useState, memo, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, Send,
-  InstagramIcon, FacebookIcon, Calendar, AlertTriangle, ExternalLink,
+    Calendar, AlertTriangle, ExternalLink,
   Trash2, EyeOff, Eye, Ban, Loader2, PenLine, X, Repeat, UserCheck,
   ThumbsUp, SkipForward, Undo2,
 } from "lucide-react";

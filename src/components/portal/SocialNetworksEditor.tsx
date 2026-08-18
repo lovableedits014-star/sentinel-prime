@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  FacebookIcon, InstagramIcon, Edit2, Plus, Trash2, Save, X, Loader2, CheckCircle2, ExternalLink,
+    Edit2, Plus, Trash2, Save, X, Loader2, CheckCircle2, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { extractHandleFromUrl, getSocialProfileUrl } from "@/lib/social-url";

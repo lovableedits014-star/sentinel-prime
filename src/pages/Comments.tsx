@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
@@ -9,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   MessageSquare, Search, TrendingUp, TrendingDown,
-  InstagramIcon, FacebookIcon, RefreshCw, LayoutGrid, List,
+    RefreshCw, LayoutGrid, List,
   EyeOff, Eye, Sparkles, SkipForward, Flame,
 } from "lucide-react";
 import { toast } from "sonner";

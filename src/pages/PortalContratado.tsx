@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
@@ -8,8 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Briefcase, LogOut, CheckCircle2, Loader2, ExternalLink, FacebookIcon,
-  InstagramIcon, CalendarCheck, UserPlus, Eye, EyeOff, Target, Users,
+  Briefcase, LogOut, CheckCircle2, Loader2, ExternalLink, 
+   CalendarCheck, UserPlus, Eye, EyeOff, Target, Users,
   Plus, Award, MessageCircle, Copy, Crown, AlertTriangle, Lock,
 } from "lucide-react";
 import { toast } from "sonner";

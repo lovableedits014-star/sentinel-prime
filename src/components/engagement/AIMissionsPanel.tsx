@@ -1,3 +1,4 @@
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Sparkles, RefreshCw, Target, FacebookIcon, InstagramIcon, Globe,
+  Sparkles, RefreshCw, Target,   Globe,
   ArrowUp, ArrowRight, ArrowDown, CheckCircle2, X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,8 +39,8 @@ const PRIORITY_CONFIG = {
 };
 
 const PLATFORM_ICON = {
-  facebook: FacebookIcon,
-  instagram: InstagramIcon,
+  facebook: 
+  instagram: 
   ambos: Globe,
 };
 
