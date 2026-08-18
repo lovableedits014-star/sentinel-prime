@@ -105,9 +105,15 @@ export default function MetaPostings() {
       
       const { data, error } = await supabase.storage
         .from('meta-media')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase Storage upload error details:", error);
+        throw error;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('meta-media')
@@ -117,8 +123,9 @@ export default function MetaPostings() {
       setMediaType(isVideo ? 'video' : 'image');
       toast.success("Mídia carregada!");
     } catch (error: any) {
-      console.error("Upload error:", error);
-      toast.error("Falha ao subir arquivo");
+      console.error("Upload error full object:", error);
+      const errorMessage = error.message || error.error_description || "Falha ao subir arquivo";
+      toast.error(`${errorMessage}`);
     } finally {
       setIsUploading(false);
     }
