@@ -334,7 +334,7 @@ export default function MetaPostings() {
                 <CardDescription>Logs de envios realizados através do sistema.</CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["meta-history", clientId] })}>
-                <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
+                <RefreshIcon className="w-4 h-4 mr-2" /> Atualizar
               </Button>
             </CardHeader>
             <CardContent>
