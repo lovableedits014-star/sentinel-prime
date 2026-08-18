@@ -1070,7 +1070,7 @@ export default function Eleicao() {
               <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
                 <FileDown className="w-4 h-4 mr-2" />Exportar
               </Button>
-                <!-- consigo exportar um relatorio? -->
+              {/* consigo exportar um relatorio? */}
               <Button onClick={() => openNew()}><Plus className="w-4 h-4 mr-2" />Novo cadastro</Button>
             </>
           )}
