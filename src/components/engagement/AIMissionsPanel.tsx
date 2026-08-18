@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Sparkles, RefreshCw, Target, Facebook as FacebookIcon, Instagram as InstagramIcon, Globe,
+  Sparkles, RefreshCw, Target, FacebookIcon, InstagramIcon, Globe,
   ArrowUp, ArrowRight, ArrowDown, CheckCircle2, X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,8 +38,8 @@ const PRIORITY_CONFIG = {
 };
 
 const PLATFORM_ICON = {
-  facebook: Facebook as FacebookIcon,
-  instagram: Instagram as InstagramIcon,
+  facebook: FacebookIcon,
+  instagram: InstagramIcon,
   ambos: Globe,
 };
 

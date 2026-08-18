@@ -105,8 +105,8 @@ export function AuthorHistoryDrawer({
                   </Badge>
                 )}
                 {isInstagram
-                  ? <Instagram as InstagramIcon className="w-4 h-4 text-pink-500 shrink-0" />
-                  : <Facebook as FacebookIcon className="w-4 h-4 text-blue-600 shrink-0" />}
+                  ? <InstagramIcon className="w-4 h-4 text-pink-500 shrink-0" />
+                  : <FacebookIcon className="w-4 h-4 text-blue-600 shrink-0" />}
               </SheetTitle>
               <SheetDescription className="text-xs">
                 Últimos comentários nesta rede
@@ -159,8 +159,8 @@ export function AuthorHistoryDrawer({
                   <AlertDialogTitle>Bloquear {authorName || "este usuário"}?</AlertDialogTitle>
                   <AlertDialogDescription>
                     {isInstagram
-                      ? "O Instagram as InstagramIcon não permite bloqueio via API. Você será notificado e precisará bloquear manualmente pelo app do Instagram as InstagramIcon."
-                      : "O usuário será bloqueado da sua página no Facebook as FacebookIcon e não poderá mais comentar ou interagir. O comentário mais recente também será ocultado."}
+                      ? "O InstagramIcon não permite bloqueio via API. Você será notificado e precisará bloquear manualmente pelo app do InstagramIcon."
+                      : "O usuário será bloqueado da sua página no FacebookIcon e não poderá mais comentar ou interagir. O comentário mais recente também será ocultado."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

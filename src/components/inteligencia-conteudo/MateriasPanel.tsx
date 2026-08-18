@@ -974,7 +974,7 @@ export function MateriasPanel({ clientId }: Props) {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {selected.fontes.posts_referenciados.map((p: any) => {
-                      const Icon = p.platform === "instagram" ? Instagram as InstagramIcon : Facebook as FacebookIcon;
+                      const Icon = p.platform === "instagram" ? InstagramIcon : FacebookIcon;
                       return (
                         <div key={p.post_id} className="rounded border bg-background p-2 text-xs flex gap-2">
                           <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />

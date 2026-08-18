@@ -311,8 +311,8 @@ export default function MissaoPublica() {
                       className="w-full justify-start gap-2"
                       onClick={() => handleExternal(linkFb, "click_facebook")}
                     >
-                      <Facebook as FacebookIcon className="w-4 h-4 text-blue-600" />
-                      Abrir no Facebook as FacebookIcon
+                      <FacebookIcon className="w-4 h-4 text-blue-600" />
+                      Abrir no FacebookIcon
                       <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
                     </Button>
                   )}
@@ -322,8 +322,8 @@ export default function MissaoPublica() {
                       className="w-full justify-start gap-2"
                       onClick={() => handleExternal(linkIg, "click_instagram")}
                     >
-                      <Instagram as InstagramIcon className="w-4 h-4 text-pink-500" />
-                      Abrir no Instagram as InstagramIcon
+                      <InstagramIcon className="w-4 h-4 text-pink-500" />
+                      Abrir no InstagramIcon
                       <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
                     </Button>
                   )}

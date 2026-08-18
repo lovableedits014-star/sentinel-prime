@@ -28,15 +28,15 @@ interface SocialEntry {
 const SOCIAL_PLATFORMS = [
   {
     id: "instagram",
-    label: "Instagram as InstagramIcon",
-    icon: Instagram as InstagramIcon,
+    label: "InstagramIcon",
+    icon: InstagramIcon,
     color: "text-pink-500",
     bgColor: "bg-pink-50 dark:bg-pink-950/20 border-pink-200 dark:border-pink-800",
     activeBg: "bg-pink-100 dark:bg-pink-950/40",
     emoji: "📸",
     helpImage: "/assets/help-instagram.png",
     steps: [
-      { text: "Abra o aplicativo do Instagram as InstagramIcon no seu celular", emoji: "📱" },
+      { text: "Abra o aplicativo do InstagramIcon no seu celular", emoji: "📱" },
       { text: "Toque no ícone da sua foto (canto inferior direito) para ir ao seu perfil", emoji: "👤" },
       { text: "No seu perfil, toque em \"Compartilhar Perfil\"", emoji: "⚙️" },
       { text: 'Toque em "Copiar Link"', emoji: "🔗" },
@@ -52,15 +52,15 @@ const SOCIAL_PLATFORMS = [
   },
   {
     id: "facebook",
-    label: "Facebook as FacebookIcon",
-    icon: Facebook as FacebookIcon,
+    label: "FacebookIcon",
+    icon: FacebookIcon,
     color: "text-blue-600",
     bgColor: "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800",
     activeBg: "bg-blue-100 dark:bg-blue-950/40",
     emoji: "👍",
     helpImage: "/assets/help-facebook.png",
     steps: [
-      { text: "Abra o aplicativo do Facebook as FacebookIcon no seu celular", emoji: "📱" },
+      { text: "Abra o aplicativo do FacebookIcon no seu celular", emoji: "📱" },
       { text: "Toque na sua foto de perfil (canto superior direito)", emoji: "👤" },
       { text: "Toque em \"Compartilhar perfil\" e depois em \"Copiar link\"", emoji: "🔗" },
       { text: "Pronto! Agora volte aqui e toque no botão COLAR abaixo 👇", emoji: "✅" },

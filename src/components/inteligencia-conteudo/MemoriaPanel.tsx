@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Brain, Trash2, ExternalLink, Loader2, Search, Sparkles, FileText,
   MapPin, Users, Megaphone, Quote, Hash, Flag, Calendar, FileAudio, BookOpen,
-  AlertTriangle, RefreshCw, Instagram as InstagramIcon, Facebook as FacebookIcon, MessageSquare, TrendingUp, TrendingDown, Minus,
+  AlertTriangle, RefreshCw, InstagramIcon, FacebookIcon, MessageSquare, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";
@@ -799,8 +799,8 @@ type TimelineItem =
   | { kind: "post"; date: string; id: string; post: PostTimelineItem };
 
 function platformIcon(platform: string) {
-  if (platform === "instagram") return <Instagram as InstagramIcon className="w-3.5 h-3.5 text-pink-500" />;
-  if (platform === "facebook") return <Facebook as FacebookIcon className="w-3.5 h-3.5 text-blue-600" />;
+  if (platform === "instagram") return <InstagramIcon className="w-3.5 h-3.5 text-pink-500" />;
+  if (platform === "facebook") return <FacebookIcon className="w-3.5 h-3.5 text-blue-600" />;
   return <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />;
 }
 
@@ -919,7 +919,7 @@ function DocumentsTimeline({ clientId }: { clientId: string }) {
 
   const filterChips: Array<{ id: typeof filter; label: string; icon: React.ReactNode }> = [
     { id: "todas", label: "Todas", icon: <FileText className="w-3 h-3" /> },
-    { id: "posts", label: "Posts", icon: <Instagram as InstagramIcon className="w-3 h-3" /> },
+    { id: "posts", label: "Posts", icon: <InstagramIcon className="w-3 h-3" /> },
     { id: "propostas", label: "Propostas", icon: <Megaphone className="w-3 h-3" /> },
     { id: "promessas", label: "Promessas", icon: <Flag className="w-3 h-3" /> },
     { id: "bandeiras", label: "Bandeiras", icon: <Hash className="w-3 h-3" /> },
@@ -941,7 +941,7 @@ function DocumentsTimeline({ clientId }: { clientId: string }) {
           <Calendar className="w-8 h-8 mx-auto text-muted-foreground/50" />
           <p>
             {filter === "posts"
-              ? "Nenhum post agregado ainda — posts vêm de comentários que o sistema coleta no Facebook as FacebookIcon/Instagram as InstagramIcon."
+              ? "Nenhum post agregado ainda — posts vêm de comentários que o sistema coleta no FacebookIcon/InstagramIcon."
               : "Sem itens nesse filtro."}
           </p>
         </CardContent>

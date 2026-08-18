@@ -108,8 +108,8 @@ export default function VincularAutorDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Facebook as FacebookIcon className="h-4 w-4" />
-            Vincular {platform === "facebook" ? "Facebook as FacebookIcon" : "Instagram as InstagramIcon"} por comentário
+            <FacebookIcon className="h-4 w-4" />
+            Vincular {platform === "facebook" ? "FacebookIcon" : "InstagramIcon"} por comentário
           </DialogTitle>
           <DialogDescription>
             {alvo

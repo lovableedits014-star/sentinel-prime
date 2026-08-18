@@ -39,7 +39,7 @@ const REQUIRED_PERMISSIONS = [
   { name: 'pages_manage_metadata', label: 'Metadados da página', required: true, platform: 'facebook' },
   { name: 'pages_manage_engagement', label: 'Gerenciar engajamento', required: false, platform: 'facebook' },
   { name: 'pages_show_list', label: 'Listar páginas', required: false, platform: 'facebook' },
-  { name: 'instagram_basic', label: 'Instagram as InstagramIcon básico', required: true, platform: 'instagram' },
+  { name: 'instagram_basic', label: 'InstagramIcon básico', required: true, platform: 'instagram' },
   { name: 'instagram_manage_comments', label: 'Gerenciar comentários IG', required: true, platform: 'instagram' },
   { name: 'public_profile', label: 'Perfil público', required: false, platform: 'general' },
 ];
@@ -1214,11 +1214,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <Facebook as FacebookIcon className="w-5 h-5 text-blue-500" />
+              <FacebookIcon className="w-5 h-5 text-blue-500" />
             </div>
             <div>
               <CardTitle>Meta Graph API</CardTitle>
-              <CardDescription>Conecte suas páginas do Facebook as FacebookIcon e Instagram as InstagramIcon</CardDescription>
+              <CardDescription>Conecte suas páginas do FacebookIcon e InstagramIcon</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -1269,11 +1269,11 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
 
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="page-id">Page ID (Facebook as FacebookIcon)</Label>
+              <Label htmlFor="page-id">Page ID (FacebookIcon)</Label>
               <Input id="page-id" placeholder="ID da sua página" value={metaData.pageId} onChange={(e) => setMetaData({ ...metaData, pageId: e.target.value })} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="instagram-id">Instagram as InstagramIcon Business ID</Label>
+              <Label htmlFor="instagram-id">InstagramIcon Business ID</Label>
               <Input id="instagram-id" placeholder="ID do perfil comercial" value={metaData.instagramId} onChange={(e) => setMetaData({ ...metaData, instagramId: e.target.value })} />
             </div>
           </div>
@@ -1299,7 +1299,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
                   <span className="font-medium text-sm">Diagnóstico de Permissões</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {pageName && <Badge variant="outline" className="text-xs"><Facebook as FacebookIcon className="w-3 h-3 mr-1" />{pageName}</Badge>}
+                  {pageName && <Badge variant="outline" className="text-xs"><FacebookIcon className="w-3 h-3 mr-1" />{pageName}</Badge>}
                   {tokenType && <Badge variant={tokenType === 'user_token' ? 'default' : 'secondary'} className="text-xs">
                     {tokenType === 'user_token' ? 'User Token ✓' : tokenType === 'page_token' ? 'Page Token' : 'Token'}
                   </Badge>}
@@ -1341,7 +1341,7 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
                       {perm.granted ? <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                         : isRequired ? <ShieldAlert className="w-3 h-3 text-destructive flex-shrink-0" />
                         : <AlertCircle className="w-3 h-3 text-amber-600 dark:text-amber-400 flex-shrink-0" />}
-                      {isInstagram && <Instagram as InstagramIcon className="w-3 h-3 flex-shrink-0" />}
+                      {isInstagram && <InstagramIcon className="w-3 h-3 flex-shrink-0" />}
                       <span className="truncate">{perm.name.replace(/_/g, ' ')}</span>
                       {isRequired && !perm.granted && <Badge variant="destructive" className="text-[10px] px-1 py-0 ml-auto">!</Badge>}
                     </div>
@@ -1361,9 +1361,9 @@ export default function IntegrationsPanel({ clientId }: IntegrationsPanelProps) 
 
               {permissions.find(p => p.name === 'instagram_manage_comments' && !p.granted) && metaData.instagramId && (
                 <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-200">
-                  <Instagram as InstagramIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <InstagramIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium">Instagram as InstagramIcon: @usernames não serão capturados</p>
+                    <p className="font-medium">InstagramIcon: @usernames não serão capturados</p>
                     <p className="text-amber-700 dark:text-amber-300">
                       Sem <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">instagram_manage_comments</code>, a API não retorna o @username de quem comentou.
                     </p>
