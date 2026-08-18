@@ -133,14 +133,15 @@ export function exportEleicaoPdf(opts: ExportOptions) {
   const coord = opts.pessoas.filter((p) => p.tipo === "coordenador").length;
   const lider = opts.pessoas.filter((p) => p.tipo === "lider").length;
   const cabo = opts.pessoas.filter((p) => p.tipo === "cabo").length;
-  const valorTotal = opts.pessoas.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+  const naReuniao = opts.pessoas.filter(p => p.participou_reuniao).length;
+  const faltantes = total - naReuniao;
 
   const cards = [
     { label: "Total", value: String(total), tone: [241, 245, 249] },
-    { label: "Coordenadores", value: String(coord), tone: [254, 226, 226] },
     { label: "Líderes", value: String(lider), tone: [219, 234, 254] },
     { label: "Cabos", value: String(cabo), tone: [220, 252, 231] },
-    { label: "Investimento", value: fmtBRL(valorTotal), tone: [209, 250, 229] },
+    { label: "Presentes", value: String(naReuniao), tone: [209, 250, 229] },
+    { label: "Faltantes", value: String(faltantes), tone: [254, 226, 226] },
   ];
   const cardW = (pageWidth - margin * 2 - 8 * 4) / 5;
   const cardH = 50;
@@ -210,14 +211,14 @@ export function exportEleicaoPdf(opts: ExportOptions) {
       p.nome,
       fmtPhone(p.telefone),
       p.regiao ? cap(p.regiao) : (p.cidade || "—"),
-      enderecoOf(p),
+      p.participou_reuniao ? "PRESENTE" : "FALTOU",
       p.parent_nome || (p.tipo === "lider" ? "— AVULSO —" : "—"),
       p.valor_contratacao && p.valor_contratacao > 0 ? fmtBRL(p.valor_contratacao) : "—",
     ]);
 
     autoTable(doc, {
       startY: y,
-      head: [["Nome", "Telefone", "Região/Cidade", "Endereço", "Vinculado a", "Valor"]],
+      head: [["Nome", "Telefone", "Região/Cidade", "Reunião", "Vinculado a", "Valor"]],
       body: rows,
       theme: "striped",
       styles: { fontSize: 9, cellPadding: 5, valign: "middle" },

@@ -234,15 +234,30 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
 
           <div className="flex-1" />
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-9 gap-1.5"
-            onClick={() => onOpenExport?.()}
-          >
-            <FileDown className="w-3.5 h-3.5" />
-            Exportar Funil
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-9 gap-1.5"
+              onClick={() => onOpenExport?.(false, false)}
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              Exportar Geral
+            </Button>
+
+            {coordenadorFilter !== "all" && (
+              <Button 
+                variant="default" 
+                size="sm" 
+                className="h-9 gap-1.5 bg-blue-600 hover:bg-blue-700"
+                onClick={() => onOpenExport?.(false, false)}
+                title="Exportar relatório individual deste coordenador com foco em quem faltou"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                Relatório de Faltas
+              </Button>
+            )}
+          </div>
 
           {stats && (
             <div className="ml-auto bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg flex items-center gap-3">
