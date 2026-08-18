@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,15 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
   const [regiaoFilter, setRegiaoFilter] = useState<string>("all");
   const [coordenadorFilter, setCoordenadorFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [localSearchTerm, setLocalSearchTerm] = useState<string>("");
   const [avulsosOnly, setAvulsosOnly] = useState<boolean>(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(localSearchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearchTerm]);
 
   const coordenadores = useMemo(() => {
     return pessoas.filter(p => p.tipo === "coordenador").sort((a, b) => a.nome.localeCompare(b.nome));
@@ -44,8 +52,10 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
   const filteredPessoas = useMemo(() => {
     return pessoas.filter(p => {
       if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        if (!p.nome.toLowerCase().includes(term) && !p.telefone.includes(term)) return false;
+        const term = searchTerm.toLowerCase().trim();
+        const nomeMatch = p.nome.toLowerCase().includes(term);
+        const foneMatch = p.telefone && p.telefone.includes(term);
+        if (!nomeMatch && !foneMatch) return false;
       }
       if (regiaoFilter !== "all" && p.regiao !== regiaoFilter) return false;
       
@@ -74,7 +84,7 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
       
       return true;
     });
-  }, [pessoas, regiaoFilter, coordenadorFilter, avulsosOnly]);
+  }, [pessoas, regiaoFilter, coordenadorFilter, avulsosOnly, searchTerm]);
 
   const groups = useMemo(() => {
     return {
@@ -185,8 +195,8 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
               type="text"
               placeholder="Buscar por nome ou telefone..."
               className="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={localSearchTerm}
+              onChange={(e) => setLocalSearchTerm(e.target.value)}
             />
           </div>
 
@@ -247,6 +257,7 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
               setCoordenadorFilter("all");
               setAvulsosOnly(false);
               setSearchTerm("");
+              setLocalSearchTerm("");
             }}>
               <X className="w-3 h-3" /> Limpar
             </Button>
