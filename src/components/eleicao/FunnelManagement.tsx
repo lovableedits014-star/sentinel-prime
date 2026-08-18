@@ -90,7 +90,7 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
 
     const time = pessoas.filter(p => 
       p.parent_id === coord.id || 
-      (p.tipo === "cabo" && pessoas.find(prev => prev.id === p.parent_id)?.parent_id === coord.id)
+      (p.parent_id && pessoas.find(prev => prev.id === p.parent_id)?.parent_id === coord.id)
     );
     const total = time.length;
     const naReuniao = time.filter(p => p.participou_reuniao).length;
