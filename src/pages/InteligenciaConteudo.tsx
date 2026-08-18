@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, RefreshCw, Loader2, Copy, ThumbsUp, ThumbsDown, Wand2, Brain, Flame, HelpCircle, AlertTriangle, Heart, TrendingUp, TrendingDown, Minus, Calendar, Users, Siren, Zap, Telescope, FileAudio, Upload, Download, Trash2, Pencil, Megaphone, Hash, Database, FileText, Camera } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Copy, ThumbsUp, ThumbsDown, Wand2, Brain, Flame, HelpCircle, AlertTriangle, Heart, TrendingUp, TrendingDown, Minus, Calendar, Users, Siren, Zap, Telescope, FileAudio, Upload, Download, Trash2, Pencil, Megaphone, Hash, Database, FileText, Camera, Send } from "lucide-react";
 import { MemoriaPanel } from "@/components/inteligencia-conteudo/MemoriaPanel";
 import { MateriasPanel } from "@/components/inteligencia-conteudo/MateriasPanel";
+import MetaPostings from "@/components/inteligencia-conteudo/MetaPostings";
+
 import { toast } from "sonner";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { useIdeias, useUpdateIdeaStatus, useCreateIdea } from "@/hooks/ic/useIdeias";
@@ -59,16 +61,18 @@ export default function InteligenciaConteudo() {
       </header>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid grid-cols-8 w-full max-w-5xl">
+        <TabsList className="grid grid-cols-9 w-full max-w-6xl">
           <TabsTrigger value="radar"><Flame className="w-4 h-4 mr-1.5" />Radar</TabsTrigger>
           <TabsTrigger value="ideias"><Sparkles className="w-4 h-4 mr-1.5" />Ideias</TabsTrigger>
           <TabsTrigger value="estudio"><Wand2 className="w-4 h-4 mr-1.5" />Estúdio</TabsTrigger>
+          <TabsTrigger value="posts"><Send className="w-4 h-4 mr-1.5" />Postagens</TabsTrigger>
           <TabsTrigger value="dna"><Brain className="w-4 h-4 mr-1.5" />DNA</TabsTrigger>
           <TabsTrigger value="transcricao"><FileAudio className="w-4 h-4 mr-1.5" />Transcrição</TabsTrigger>
           <TabsTrigger value="memoria"><Database className="w-4 h-4 mr-1.5" />Memória</TabsTrigger>
           <TabsTrigger value="materias"><FileText className="w-4 h-4 mr-1.5" />Matérias</TabsTrigger>
           <TabsTrigger value="fotos"><Camera className="w-4 h-4 mr-1.5" />Fotos</TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="radar" className="mt-4">
           <RadarPanel clientId={clientId} onSeed={() => setTab("ideias")} />
@@ -79,9 +83,13 @@ export default function InteligenciaConteudo() {
         <TabsContent value="estudio" className="mt-4">
           <EstudioPanel clientId={clientId} />
         </TabsContent>
+        <TabsContent value="posts" className="mt-4">
+          <MetaPostings />
+        </TabsContent>
         <TabsContent value="dna" className="mt-4">
           <DnaPanel clientId={clientId} />
         </TabsContent>
+
         <TabsContent value="transcricao" className="mt-4">
           <TranscricaoPanel clientId={clientId} />
         </TabsContent>
