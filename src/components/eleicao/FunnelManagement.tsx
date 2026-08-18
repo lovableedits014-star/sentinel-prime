@@ -160,6 +160,7 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
       </div>
     </div>
   );
+  /* é importante na exportação do funil eu fazer um relatorio individual de cada coordenador de quem faltou: ou seja eu preciso saber dos lideres de um coordenador quem estava e quem nao estava na reunião: */
 
   return (
     <div className="flex flex-col gap-6">
