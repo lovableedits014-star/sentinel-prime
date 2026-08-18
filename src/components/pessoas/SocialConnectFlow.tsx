@@ -45,15 +45,15 @@ type Step = "paste" | "tutorial" | "previewing" | "confirm";
 
 const PLATFORM_META: Record<Platform, { label: string; color: string; icon: typeof FacebookIcon; bgChip: string }> = {
   facebook: {
-    label: "FacebookIcon",
+    label: "Facebook",
     color: "text-blue-600",
-    icon: 
+    icon: FacebookIcon,
     bgChip: "bg-blue-50 dark:bg-blue-950/30",
   },
   instagram: {
-    label: "InstagramIcon",
+    label: "Instagram",
     color: "text-pink-500",
-    icon: 
+    icon: InstagramIcon,
     bgChip: "bg-pink-50 dark:bg-pink-950/30",
   },
 };
