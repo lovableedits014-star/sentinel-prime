@@ -350,6 +350,8 @@ export default function Eleicao() {
       rateio_estadual: p.rateio_estadual ?? 100,
       rateio_parceiro: p.rateio_parceiro ?? 0,
       status_contratacao: p.status_contratacao || "pendente",
+      participou_reuniao: !!p.participou_reuniao,
+      pre_selecionado: !!p.pre_selecionado,
     });
     setDialogOpen(true);
   }
