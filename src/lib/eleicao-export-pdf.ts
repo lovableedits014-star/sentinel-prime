@@ -336,6 +336,8 @@ export interface RaizExportOptions {
   filtros?: { label: string; value: string }[];
   fileNameSuffix?: string;
   mode?: "save" | "print";
+  apenasReuniao?: boolean;
+  apenasNaoReuniao?: boolean;
 }
 
 interface EquipeNode {
