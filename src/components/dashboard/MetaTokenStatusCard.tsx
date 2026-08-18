@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
-import { ShieldCheck, ShieldAlert, ShieldX, Clock, Instagram as Instagram as InstagramIcon, Facebook as Facebook as FacebookIcon, Info } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ShieldX, Clock, Instagram as InstagramIcon, Facebook as FacebookIcon, Info } from "lucide-react";
 
 interface Props {
   clientId: string;
