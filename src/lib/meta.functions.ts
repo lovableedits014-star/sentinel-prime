@@ -31,13 +31,17 @@ export const publishMetaContent = createServerFn({ method: "POST" })
 
     // Helper to get Page Access Token
     async function getPageAccessToken(pId: string, accessToken: string) {
-        const resp = await fetch(`https://graph.facebook.com/v21.0/${pId}?fields=access_token&access_token=${accessToken}`);
-        const d = await resp.json();
-        if (d.access_token) return d.access_token;
+        try {
+            const resp = await fetch(`https://graph.facebook.com/v21.0/${pId}?fields=access_token&access_token=${accessToken}`);
+            const d = await resp.json();
+            if (d.access_token) return d.access_token;
+        } catch (e) {
+            console.error("Erro ao obter token da página:", e);
+        }
         return accessToken;
     }
 
-    const pageToken = await getPageAccessToken(pageId, storedToken);
+    const pageToken = await getPageAccessToken(pageId || "", storedToken);
 
     // --- INSTAGRAM ---
     if ((platform === 'instagram' || platform === 'both') && integration.meta_instagram_id) {
