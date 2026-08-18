@@ -119,6 +119,7 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
         escopo,
         tipo,
         funcionario_id: funcionarioId,
+        parent_id: parentId || null,
       } as any);
       error = r.error;
     }
