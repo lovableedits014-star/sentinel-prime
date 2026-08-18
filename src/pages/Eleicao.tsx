@@ -312,6 +312,8 @@ export default function Eleicao() {
       rateio_estadual: 100,
       rateio_parceiro: 0,
       status_contratacao: "pendente" as "pendente" | "em_negociacao" | "confirmado",
+      participou_reuniao: false,
+      pre_selecionado: false,
       ...presets,
     });
     setDialogOpen(true);
