@@ -1079,8 +1079,12 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-7 w-full max-w-6xl">
+        <TabsList className="grid grid-cols-8 w-full max-w-6xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
+          <TabsTrigger value="funnel" className="gap-1.5">
+            <Handshake className="w-3.5 h-3.5" />
+            Funil / Reunião
+          </TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
             {stats.semValor > 0 && (
@@ -1105,6 +1109,19 @@ export default function Eleicao() {
 
       {view === "custos" ? (
         <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
+      ) : view === "funnel" ? (
+        <FunnelManagement 
+          pessoas={escopoList} 
+          onEdit={openEdit} 
+          onQuickUpdate={async (id, data) => {
+            const { error } = await supabase.from("eleicao_pessoas" as any).update(data).eq("id", id);
+            if (error) toast.error(error.message);
+            else {
+              toast.success("Atualizado!");
+              load();
+            }
+          }}
+        />
       ) : view === "pendentes" ? (
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
       ) : view === "indicacoes" ? (
@@ -2160,6 +2177,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={cn("text-sm truncate", indent === 0 ? "font-semibold" : "font-medium")}>{p.nome}</span>
+          {p.pre_selecionado && <Badge variant="outline" className="h-5 bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px] gap-1 px-1"><Star className="w-2.5 h-2.5 fill-current" /> Pré</Badge>}
+          {p.participou_reuniao && <Badge variant="outline" className="h-5 bg-blue-500/10 text-blue-600 border-blue-500/20 text-[9px] gap-1 px-1"><Users className="w-2.5 h-2.5" /> Reunião</Badge>}
           {p.tipo === "coordenador" && p.escopo === "campo_grande" && p.regiao && (
             <FavoritoToggle pessoa={p} />
           )}
