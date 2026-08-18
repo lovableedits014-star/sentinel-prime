@@ -1372,6 +1372,36 @@ export default function Eleicao() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                <Checkbox
+                  checked={form.participou_reuniao}
+                  onCheckedChange={(c) => setForm(f => ({ ...f, participou_reuniao: !!c }))}
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-blue-500" />
+                    Participou da Reunião
+                  </span>
+                  <p className="text-[10px] text-muted-foreground line-clamp-1">Marcar presença física</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
+                <Checkbox
+                  checked={form.pre_selecionado}
+                  onCheckedChange={(c) => setForm(f => ({ ...f, pre_selecionado: !!c }))}
+                />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    <Star className="w-3.5 h-3.5 text-amber-500" />
+                    Pré-selecionado
+                  </span>
+                  <p className="text-[10px] text-muted-foreground line-clamp-1">Interesse imediato</p>
+                </div>
+              </label>
+            </div>
+
             {form.escopo === "campo_grande" ? (
               <div>
                 <Label>Região *</Label>
