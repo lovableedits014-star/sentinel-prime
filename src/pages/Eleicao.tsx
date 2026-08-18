@@ -1406,19 +1406,7 @@ export default function Eleicao() {
                 </div>
               </label>
 
-              <label className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
-                <Checkbox
-                  checked={form.pre_selecionado}
-                  onCheckedChange={(c) => setForm(f => ({ ...f, pre_selecionado: !!c }))}
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium flex items-center gap-1.5">
-                    <Star className="w-3.5 h-3.5 text-amber-500" />
-                    Pré-selecionado
-                  </span>
-                  <p className="text-[10px] text-muted-foreground line-clamp-1">Interesse imediato</p>
-                </div>
-              </label>
+              {/* Checkbox de pré-selecionado removida conforme plano */}
             </div>
 
             {form.escopo === "campo_grande" ? (
