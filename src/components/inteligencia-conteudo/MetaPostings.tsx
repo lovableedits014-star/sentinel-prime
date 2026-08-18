@@ -89,10 +89,57 @@ export default function MetaPostings() {
     enabled: !!clientId && activeTab === "history"
   });
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 100 * 1024 * 1024) { // 100MB limit for video
+      return toast.error("Arquivo muito grande. Limite de 100MB.");
+    }
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${clientId}/${Date.now()}.${fileExt}`;
+      const isVideo = file.type.startsWith('video/');
+      
+      const { data, error } = await supabase.storage
+        .from('meta-media')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('meta-media')
+        .getPublicUrl(fileName);
+
+      setMediaUrl(publicUrl);
+      setMediaType(isVideo ? 'video' : 'image');
+      toast.success("Mídia carregada!");
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast.error("Falha ao subir arquivo");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handlePublish = async () => {
     if (!clientId) return toast.error("Cliente não identificado");
     if (!content && !mediaUrl) return toast.error("Adicione conteúdo ou uma imagem");
     if (!platform.fb && !platform.ig) return toast.error("Selecione pelo menos uma plataforma");
+
+    let scheduledFor: string | undefined = undefined;
+    if (isScheduled) {
+      const [hours, minutes] = scheduledTime.split(':').map(Number);
+      const combinedDate = new Date(scheduledDate);
+      combinedDate.setHours(hours, minutes, 0, 0);
+      scheduledFor = combinedDate.toISOString();
+      
+      if (combinedDate.getTime() < Date.now() + 15 * 60 * 1000) {
+        return toast.error("O agendamento deve ser pelo menos 15 minutos no futuro.");
+      }
+    }
 
     setIsPublishing(true);
     try {
@@ -102,9 +149,10 @@ export default function MetaPostings() {
         data: {
           clientId,
           platform: selectedPlatform,
-          type: 'feed',
+          type: postType,
           content,
           mediaUrl: mediaUrl || undefined,
+          scheduledFor
         }
       });
 
@@ -113,9 +161,12 @@ export default function MetaPostings() {
         if (errors.length > 0) {
           errors.forEach((err: any) => toast.error(`Erro no ${err.platform}: ${err.error}`));
         } else {
-          toast.success("Publicado com sucesso!");
-          setContent("");
-          setMediaUrl("");
+          toast.success(isScheduled ? "Agendado com sucesso!" : "Publicado com sucesso!");
+          if (!isScheduled) {
+            setContent("");
+            setMediaUrl("");
+            setMediaType(null);
+          }
           queryClient.invalidateQueries({ queryKey: ["meta-history", clientId] });
         }
       }
