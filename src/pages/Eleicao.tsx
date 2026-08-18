@@ -1115,7 +1115,7 @@ export default function Eleicao() {
         <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
       ) : view === "funnel" ? (
         <FunnelManagement 
-          pessoas={escopoList} 
+          pessoas={pessoas as any} 
           onEdit={openEdit} 
           onQuickUpdate={async (id, data) => {
             const { error } = await supabase.from("eleicao_pessoas" as any).update(data).eq("id", id);
