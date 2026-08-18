@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  ArrowLeft, Check, FacebookIcon, InstagramIcon, Link2, Search, Sparkles, UserPlus,
+  ArrowLeft, Check, Facebook as FacebookIcon, Instagram as InstagramIcon, Link2, Search, Sparkles, UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { extractHandleFromUrl } from "@/lib/social-url";
@@ -186,7 +186,7 @@ export default function CadastrarPerfilDialog({
       setSelected({ ...selected, facebook_key: handle });
       onSaved();
     } catch (e) {
-      toast.error("Erro ao salvar FacebookIcon: " + (e as Error).message);
+      toast.error("Erro ao salvar Facebook as FacebookIcon: " + (e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -204,7 +204,7 @@ export default function CadastrarPerfilDialog({
         a.author_profile_picture,
       );
       toast.success(
-        `${a.platform === "facebook" ? "FacebookIcon" : "InstagramIcon"} vinculado a ${pessoa.nome}` +
+        `${a.platform === "facebook" ? "Facebook as FacebookIcon" : "Instagram as InstagramIcon"} vinculado a ${pessoa.nome}` +
           (relinked > 0 ? ` — ${relinked} interações reaproveitadas` : ""),
       );
       setAuthors((prev) =>
@@ -243,7 +243,7 @@ export default function CadastrarPerfilDialog({
           </DialogTitle>
           <DialogDescription>
             {selected
-              ? `Cadastre o InstagramIcon e vincule o FacebookIcon de ${selected.nome}.`
+              ? `Cadastre o Instagram as InstagramIcon e vincule o Facebook as FacebookIcon de ${selected.nome}.`
               : "Digite o nome — a busca varre todo o time (CRM, funcionários, estrutura, contratados e portal) e também quem já comentou nas redes."}
           </DialogDescription>
         </DialogHeader>
@@ -329,7 +329,7 @@ export default function CadastrarPerfilDialog({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium">{a.author_name || "Sem nome"}</p>
                             <p className="text-xs text-muted-foreground">
-                              {a.platform === "facebook" ? "FacebookIcon" : "InstagramIcon"} · {a.total_comments}{" "}
+                              {a.platform === "facebook" ? "Facebook as FacebookIcon" : "Instagram as InstagramIcon"} · {a.total_comments}{" "}
                               comentário(s)
                             </p>
                           </div>
@@ -384,8 +384,8 @@ export default function CadastrarPerfilDialog({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="flex items-center gap-2 text-sm">
-                    <InstagramIcon className="h-4 w-4 text-pink-600" />
-                    InstagramIcon
+                    <Instagram as InstagramIcon className="h-4 w-4 text-pink-600" />
+                    Instagram as InstagramIcon
                   </Label>
                   {selected.instagram_handle ? (
                     <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 border-emerald-200">
@@ -411,8 +411,8 @@ export default function CadastrarPerfilDialog({
                       onClick={() => window.open(`https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(selected.nome)}`, "_blank")}
                     >
                       <Search className="h-4 w-4 text-pink-600" />
-                      <span className="flex-1 text-left text-xs">Pesquisar "{selected.nome}" no InstagramIcon</span>
-                      <InstagramIcon className="h-4 w-4 opacity-50" />
+                      <span className="flex-1 text-left text-xs">Pesquisar "{selected.nome}" no Instagram as InstagramIcon</span>
+                      <Instagram as InstagramIcon className="h-4 w-4 opacity-50" />
                     </Button>
 
                     <div className="space-y-1">
@@ -493,8 +493,8 @@ export default function CadastrarPerfilDialog({
               <div className="space-y-2 pt-2 border-t">
                 <div className="flex items-center justify-between">
                   <Label className="flex items-center gap-2 text-sm">
-                    <FacebookIcon className="h-4 w-4 text-blue-600" />
-                    FacebookIcon
+                    <Facebook as FacebookIcon className="h-4 w-4 text-blue-600" />
+                    Facebook as FacebookIcon
                   </Label>
                   {selected.facebook_key ? (
                     <Badge variant="secondary" className="bg-blue-50 text-blue-700 dark:bg-blue-950/30 border-blue-200">
@@ -520,8 +520,8 @@ export default function CadastrarPerfilDialog({
                       onClick={() => window.open(`https://www.facebook.com/search/people/?q=${encodeURIComponent(selected.nome)}`, "_blank")}
                     >
                       <Search className="h-4 w-4 text-blue-600" />
-                      <span className="flex-1 text-left text-xs">Pesquisar "{selected.nome}" no FacebookIcon</span>
-                      <FacebookIcon className="h-4 w-4 opacity-50" />
+                      <span className="flex-1 text-left text-xs">Pesquisar "{selected.nome}" no Facebook as FacebookIcon</span>
+                      <Facebook as FacebookIcon className="h-4 w-4 opacity-50" />
                     </Button>
 
                     <div className="space-y-1">

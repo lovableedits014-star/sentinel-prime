@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Users, RefreshCw, Award, Crown, Medal, Trophy, Star, ThumbsUp, ThumbsDown, Minus, FacebookIcon, InstagramIcon,
+  Users, RefreshCw, Award, Crown, Medal, Trophy, Star, ThumbsUp, ThumbsDown, Minus, Facebook as FacebookIcon, Instagram as InstagramIcon,
 } from "lucide-react";
 import { Wand2, Activity } from "lucide-react";
 import { toast } from "sonner";
@@ -87,7 +87,7 @@ const PlatformBadges = ({
   <div className="flex flex-wrap gap-1">
     {platforms.map((p) => {
       const b = breakdown[p];
-      const Icon = p === "instagram" ? InstagramIcon : FacebookIcon;
+      const Icon = p === "instagram" ? Instagram as InstagramIcon : Facebook as FacebookIcon;
       const url = urls[p];
       const pic = pictures[p];
       const content = (
@@ -111,7 +111,7 @@ const PlatformBadges = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            title={`Abrir perfil no ${p === "instagram" ? "InstagramIcon" : "FacebookIcon"}`}
+            title={`Abrir perfil no ${p === "instagram" ? "Instagram as InstagramIcon" : "Facebook as FacebookIcon"}`}
           >
             <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 hover:bg-accent hover:border-primary cursor-pointer transition-colors">
               {content}
@@ -515,7 +515,7 @@ export default function InfluenciadoresTab({ clientId }: { clientId: string }) {
       }
     }
 
-    // Agrupa por supporterId (unifica FacebookIcon + InstagramIcon)
+    // Agrupa por supporterId (unifica Facebook as FacebookIcon + Instagram as InstagramIcon)
     const map = new Map<string, Influencer>();
     for (const c of allComments) {
       if (!c.platform_user_id) continue;
@@ -738,7 +738,7 @@ export default function InfluenciadoresTab({ clientId }: { clientId: string }) {
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
-          <Button variant="outline" size="sm" onClick={handleResolveProfiles} disabled={resolving} title="Converte usernames e links de share em IDs numéricos do FacebookIcon para que o engajamento passe a contar">
+          <Button variant="outline" size="sm" onClick={handleResolveProfiles} disabled={resolving} title="Converte usernames e links de share em IDs numéricos do Facebook as FacebookIcon para que o engajamento passe a contar">
             <Wand2 className={`w-4 h-4 mr-2 ${resolving ? "animate-pulse" : ""}`} />
             Resolver IDs
           </Button>

@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  FacebookIcon,
-  InstagramIcon,
+  Facebook as FacebookIcon,
+  Instagram as InstagramIcon,
   ClipboardPaste,
   Loader2,
   CheckCircle2,
@@ -42,17 +42,17 @@ interface Props {
 
 type Step = "paste" | "tutorial" | "previewing" | "confirm";
 
-const PLATFORM_META: Record<Platform, { label: string; color: string; icon: typeof FacebookIcon; bgChip: string }> = {
+const PLATFORM_META: Record<Platform, { label: string; color: string; icon: typeof Facebook as FacebookIcon; bgChip: string }> = {
   facebook: {
-    label: "FacebookIcon",
+    label: "Facebook as FacebookIcon",
     color: "text-blue-600",
-    icon: FacebookIcon,
+    icon: Facebook as FacebookIcon,
     bgChip: "bg-blue-50 dark:bg-blue-950/30",
   },
   instagram: {
-    label: "InstagramIcon",
+    label: "Instagram as InstagramIcon",
     color: "text-pink-500",
-    icon: InstagramIcon,
+    icon: Instagram as InstagramIcon,
     bgChip: "bg-pink-50 dark:bg-pink-950/30",
   },
 };

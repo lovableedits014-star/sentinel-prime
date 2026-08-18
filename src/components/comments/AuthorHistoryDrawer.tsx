@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Minus, Calendar, Facebook as FacebookIcon, Instagram as InstagramIcon, Loader2, ExternalLink, Ban, ShieldOff } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calendar, Facebook as FacebookIcon as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as InstagramIcon, Loader2, ExternalLink, Ban, ShieldOff } from "lucide-react";
 import { MilitantBadge } from "./MilitantBadge";
 import { Button } from "@/components/ui/button";
 import { getSocialProfileUrl } from "@/lib/social-url";
@@ -105,8 +105,8 @@ export function AuthorHistoryDrawer({
                   </Badge>
                 )}
                 {isInstagram
-                  ? <InstagramIcon className="w-4 h-4 text-pink-500 shrink-0" />
-                  : <FacebookIcon className="w-4 h-4 text-blue-600 shrink-0" />}
+                  ? <Instagram as InstagramIcon className="w-4 h-4 text-pink-500 shrink-0" />
+                  : <Facebook as FacebookIcon className="w-4 h-4 text-blue-600 shrink-0" />}
               </SheetTitle>
               <SheetDescription className="text-xs">
                 Últimos comentários nesta rede
@@ -159,8 +159,8 @@ export function AuthorHistoryDrawer({
                   <AlertDialogTitle>Bloquear {authorName || "este usuário"}?</AlertDialogTitle>
                   <AlertDialogDescription>
                     {isInstagram
-                      ? "O InstagramIcon não permite bloqueio via API. Você será notificado e precisará bloquear manualmente pelo app do InstagramIcon."
-                      : "O usuário será bloqueado da sua página no FacebookIcon e não poderá mais comentar ou interagir. O comentário mais recente também será ocultado."}
+                      ? "O Instagram as InstagramIcon não permite bloqueio via API. Você será notificado e precisará bloquear manualmente pelo app do Instagram as InstagramIcon."
+                      : "O usuário será bloqueado da sua página no Facebook as FacebookIcon e não poderá mais comentar ou interagir. O comentário mais recente também será ocultado."}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

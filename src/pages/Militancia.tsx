@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Search, FacebookIcon, InstagramIcon, TrendingUp, TrendingDown,
+  Search, Facebook as FacebookIcon, Instagram as InstagramIcon, TrendingUp, TrendingDown,
   Users, Calendar, Loader2, MessageSquare, Eye, BarChart3, FileText, ExternalLink,
   Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus, ShieldOff, Unlock, RefreshCw, User,
 } from "lucide-react";
@@ -112,7 +112,7 @@ function MilitantList({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                title={`Abrir perfil no ${m.platform === 'instagram' ? 'InstagramIcon' : 'FacebookIcon'}`}
+                title={`Abrir perfil no ${m.platform === 'instagram' ? 'Instagram as InstagramIcon' : 'Facebook as FacebookIcon'}`}
                 className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ExternalLink className="w-4 h-4" />
@@ -206,7 +206,7 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
     }
   }
 
-  // Auto-sync once on first mount if there are no FacebookIcon records yet
+  // Auto-sync once on first mount if there are no Facebook as FacebookIcon records yet
   useEffect(() => {
     if (autoSyncedRef.current || isLoading || !clientId) return;
     const hasFb = blocked.some(b => b.platform === "facebook");
@@ -245,8 +245,8 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
           <div className="text-sm">
             <p className="font-semibold text-amber-700 dark:text-amber-400 mb-1">Usuários bloqueados</p>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Lista de todos os perfis bloqueados na sua página do FacebookIcon (sincronizados automaticamente) e bloqueios manuais do InstagramIcon.
-              Use <strong>Sincronizar</strong> para atualizar com o que está no FacebookIcon agora.
+              Lista de todos os perfis bloqueados na sua página do Facebook as FacebookIcon (sincronizados automaticamente) e bloqueios manuais do Instagram as InstagramIcon.
+              Use <strong>Sincronizar</strong> para atualizar com o que está no Facebook as FacebookIcon agora.
             </p>
           </div>
         </div>
@@ -266,7 +266,7 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
           {syncing
             ? <Loader2 className="w-4 h-4 animate-spin" />
             : <RefreshCw className="w-4 h-4" />}
-          Sincronizar do FacebookIcon
+          Sincronizar do Facebook as FacebookIcon
         </Button>
       </div>
 
@@ -299,8 +299,8 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-sm truncate">{b.author_name || "Sem nome"}</p>
                   {b.platform === 'instagram'
-                    ? <InstagramIcon className="w-3.5 h-3.5 text-pink-500 shrink-0" />
-                    : <FacebookIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                    ? <Instagram as InstagramIcon className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                    : <Facebook as FacebookIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Bloqueado em {new Date(b.blocked_at).toLocaleString("pt-BR")}
@@ -320,8 +320,8 @@ function BlockedUsersTab({ clientId }: { clientId: string }) {
                     <AlertDialogTitle>Desbloquear {b.author_name || "este usuário"}?</AlertDialogTitle>
                     <AlertDialogDescription>
                       {b.platform === 'instagram'
-                        ? "O InstagramIcon não permite desbloqueio via API. O registro será removido daqui, mas você precisa desbloquear manualmente pelo app."
-                        : "O usuário voltará a poder comentar e interagir com sua página no FacebookIcon."}
+                        ? "O Instagram as InstagramIcon não permite desbloqueio via API. O registro será removido daqui, mas você precisa desbloquear manualmente pelo app."
+                        : "O usuário voltará a poder comentar e interagir com sua página no Facebook as FacebookIcon."}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -465,8 +465,8 @@ function NegativeRanking({
   const handleBlock = async (m: MilitantRow, profileUrl?: string | null) => {
     if (!clientId) return;
 
-    // InstagramIcon: API da Meta não permite bloqueio. Abrimos o perfil/comentário
-    // no InstagramIcon (para o usuário bloquear manualmente pelo app) e registramos
+    // Instagram as InstagramIcon: API da Meta não permite bloqueio. Abrimos o perfil/comentário
+    // no Instagram as InstagramIcon (para o usuário bloquear manualmente pelo app) e registramos
     // localmente em blocked_users para histórico.
     if (m.platform === 'instagram') {
       if (profileUrl) {
@@ -483,7 +483,7 @@ function NegativeRanking({
           if (error) console.warn("[block instagram local]", error.message);
         }
         toast.success(
-          "Abrimos o InstagramIcon para você bloquear manualmente. Registrado aqui para histórico.",
+          "Abrimos o Instagram as InstagramIcon para você bloquear manualmente. Registrado aqui para histórico.",
           { duration: 6000 },
         );
         queryClient.invalidateQueries({ queryKey: ["blocked-users-ids", clientId] });
@@ -563,7 +563,7 @@ function NegativeRanking({
           ? "Perfil direto"
           : best?.kind === "comment"
           ? "Comentário exato"
-          : "Buscar no FacebookIcon";
+          : "Buscar no Facebook as FacebookIcon";
         const openTitle = best?.kind === "comment"
           ? "A Meta não entrega o link direto deste perfil. Abrimos o comentário exato; clique no nome/foto do autor lá para cair no perfil certo."
           : best?.kind === "search"
@@ -606,8 +606,8 @@ function NegativeRanking({
                       </Badge>
                     )}
                     {m.platform === 'facebook'
-                      ? <FacebookIcon className="w-3.5 h-3.5 text-blue-600" />
-                      : <InstagramIcon className="w-3.5 h-3.5 text-pink-500" />}
+                      ? <Facebook as FacebookIcon className="w-3.5 h-3.5 text-blue-600" />
+                      : <Instagram as InstagramIcon className="w-3.5 h-3.5 text-pink-500" />}
                   </div>
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
                     <span className="inline-flex items-center gap-1 text-destructive font-semibold">
@@ -638,7 +638,7 @@ function NegativeRanking({
                   size="sm"
                   variant="outline"
                   className="shrink-0 h-8 gap-1.5"
-                  title={`Abrir o perfil da pessoa no ${isInstagram ? 'InstagramIcon' : 'FacebookIcon'} em nova aba`}
+                  title={`Abrir o perfil da pessoa no ${isInstagram ? 'Instagram as InstagramIcon' : 'Facebook as FacebookIcon'} em nova aba`}
                 >
                   <a href={profileUrl!} target="_blank" rel="noopener noreferrer">
                     <User className="w-3.5 h-3.5" />
@@ -655,7 +655,7 @@ function NegativeRanking({
                 title={isBlocked
                   ? "Este perfil já está bloqueado"
                   : isInstagram
-                  ? "InstagramIcon não permite bloqueio via API. Abre o InstagramIcon para você bloquear manualmente e registra aqui para histórico."
+                  ? "Instagram as InstagramIcon não permite bloqueio via API. Abre o Instagram as InstagramIcon para você bloquear manualmente e registra aqui para histórico."
                   : "Bloquear autor da página"}
               >
                 {blocking === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isBlocked ? <ShieldOff className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
@@ -877,13 +877,13 @@ const Militancia = () => {
       <Tabs defaultValue="facebook">
         <TabsList>
           <TabsTrigger value="facebook" className="gap-1.5">
-            <FacebookIcon className="w-4 h-4 text-blue-600" />
-            <span>FacebookIcon</span>
+            <Facebook as FacebookIcon className="w-4 h-4 text-blue-600" />
+            <span>Facebook as FacebookIcon</span>
             <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] text-[10px] px-1.5">{fbStats.total}</Badge>
           </TabsTrigger>
           <TabsTrigger value="instagram" className="gap-1.5">
-            <InstagramIcon className="w-4 h-4 text-pink-500" />
-            <span>InstagramIcon</span>
+            <Instagram as InstagramIcon className="w-4 h-4 text-pink-500" />
+            <span>Instagram as InstagramIcon</span>
             <Badge variant="secondary" className="ml-1 h-5 min-w-[20px] text-[10px] px-1.5">{igStats.total}</Badge>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="gap-1.5">
@@ -906,7 +906,7 @@ const Militancia = () => {
 
         <TabsContent value="facebook" className="space-y-4 mt-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard icon={<Users className="w-4 h-4" />} label="Perfis FacebookIcon" value={fbStats.total} />
+            <StatCard icon={<Users className="w-4 h-4" />} label="Perfis Facebook as FacebookIcon" value={fbStats.total} />
             <StatCard icon={<TrendingUp className="w-4 h-4" />} label="Defensores" value={fbStats.defensores} accent="bg-green-500/10 text-green-700" />
             <StatCard icon={<TrendingDown className="w-4 h-4" />} label="Críticos/Haters" value={fbStats.haters} accent="bg-destructive/10 text-destructive" />
             <StatCard icon={<Users className="w-4 h-4" />} label="Novos rostos" value={fbStats.novos} accent="bg-cyan-500/10 text-cyan-700" />
@@ -916,7 +916,7 @@ const Militancia = () => {
 
         <TabsContent value="instagram" className="space-y-4 mt-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard icon={<Users className="w-4 h-4" />} label="Perfis InstagramIcon" value={igStats.total} accent="bg-pink-500/10 text-pink-600" />
+            <StatCard icon={<Users className="w-4 h-4" />} label="Perfis Instagram as InstagramIcon" value={igStats.total} accent="bg-pink-500/10 text-pink-600" />
             <StatCard icon={<TrendingUp className="w-4 h-4" />} label="Defensores" value={igStats.defensores} accent="bg-green-500/10 text-green-700" />
             <StatCard icon={<TrendingDown className="w-4 h-4" />} label="Críticos/Haters" value={igStats.haters} accent="bg-destructive/10 text-destructive" />
             <StatCard icon={<Users className="w-4 h-4" />} label="Novos rostos" value={igStats.novos} accent="bg-cyan-500/10 text-cyan-700" />
@@ -927,8 +927,8 @@ const Militancia = () => {
         <TabsContent value="analytics" className="space-y-4 mt-4">
           <Tabs defaultValue="fb-charts">
             <TabsList>
-              <TabsTrigger value="fb-charts" className="gap-1.5"><FacebookIcon className="w-3.5 h-3.5 text-blue-600" /> FacebookIcon</TabsTrigger>
-              <TabsTrigger value="ig-charts" className="gap-1.5"><InstagramIcon className="w-3.5 h-3.5 text-pink-500" /> InstagramIcon</TabsTrigger>
+              <TabsTrigger value="fb-charts" className="gap-1.5"><Facebook as FacebookIcon className="w-3.5 h-3.5 text-blue-600" /> Facebook as FacebookIcon</TabsTrigger>
+              <TabsTrigger value="ig-charts" className="gap-1.5"><Instagram as InstagramIcon className="w-3.5 h-3.5 text-pink-500" /> Instagram as InstagramIcon</TabsTrigger>
             </TabsList>
             <TabsContent value="fb-charts" className="mt-4">
               <MilitanciaCharts militants={militants} platform="facebook" />
@@ -946,7 +946,7 @@ const Militancia = () => {
               <div className="text-sm">
                 <p className="font-semibold text-destructive mb-1">Quem mais ataca a campanha</p>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Ranking dos perfis com mais comentários negativos. <strong>Perfil direto</strong> aparece só quando a Meta entrega username público; quando não entrega, <strong>Comentário exato</strong> abre o comentário da pessoa para você clicar no nome/foto correto. <strong>Bloquear</strong> remove a permissão de comentar no <strong>FacebookIcon</strong>; no <strong>InstagramIcon</strong> a Meta não permite bloqueio via API — abrimos o perfil para você bloquear pelo app e registramos aqui para histórico.
+                  Ranking dos perfis com mais comentários negativos. <strong>Perfil direto</strong> aparece só quando a Meta entrega username público; quando não entrega, <strong>Comentário exato</strong> abre o comentário da pessoa para você clicar no nome/foto correto. <strong>Bloquear</strong> remove a permissão de comentar no <strong>Facebook as FacebookIcon</strong>; no <strong>Instagram as InstagramIcon</strong> a Meta não permite bloqueio via API — abrimos o perfil para você bloquear pelo app e registramos aqui para histórico.
                 </p>
               </div>
             </div>

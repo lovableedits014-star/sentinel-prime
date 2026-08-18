@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, Send,
-  InstagramIcon, FacebookIcon, Calendar, AlertTriangle, ExternalLink,
+  Instagram as InstagramIcon, Facebook as FacebookIcon, Calendar, AlertTriangle, ExternalLink,
   Trash2, EyeOff, Eye, Ban, Loader2, PenLine, X, Repeat, UserCheck,
   ThumbsUp, SkipForward, Undo2,
 } from "lucide-react";
@@ -82,8 +82,8 @@ export interface CommentItemProps {
 }
 
 function getPlatformIcon(platform: string) {
-  if (platform === "instagram") return <InstagramIcon className="w-4 h-4 text-pink-500" />;
-  return <FacebookIcon className="w-4 h-4 text-blue-600" />;
+  if (platform === "instagram") return <Instagram as InstagramIcon className="w-4 h-4 text-pink-500" />;
+  return <Facebook as FacebookIcon className="w-4 h-4 text-blue-600" />;
 }
 
 function getSentimentIcon(sentiment: string) {
@@ -219,7 +219,7 @@ export const CommentItem = memo(function CommentItem({
       if (handle) return `https://www.instagram.com/${handle}/`;
       return null;
     }
-    // FacebookIcon
+    // Facebook as FacebookIcon
     if (comment.author_id) return `https://www.facebook.com/${comment.author_id}`;
     if (comment.platform_user_id) return `https://www.facebook.com/${comment.platform_user_id}`;
     return null;
@@ -302,7 +302,7 @@ export const CommentItem = memo(function CommentItem({
                 {comment.author_unavailable ? (
                   <p className="text-xs">{comment.author_unavailable_reason || 'Dados não fornecidos'}</p>
                 ) : comment.platform === 'instagram' ? (
-                  <p className="text-xs">InstagramIcon limita dados de perfil</p>
+                  <p className="text-xs">Instagram as InstagramIcon limita dados de perfil</p>
                 ) : (
                   <p className="text-xs">Perfil identificado</p>
                 )}
