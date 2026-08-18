@@ -50,18 +50,19 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport 
       if (regiaoFilter !== "all" && p.regiao !== regiaoFilter) return false;
       
       if (avulsosOnly) {
-        // Avulsos: Líderes ou Cabos sem parent_id
+        // Avulsos: Qualquer pessoa sem parent_id (Líderes ou Cabos avulsos)
         if (p.tipo === "coordenador") return false;
         if (p.parent_id) return false;
       } else if (coordenadorFilter !== "all") {
-        // Filtrar por time do coordenador
-        // A pessoa é o coordenador ou tem o coordenador como pai (ou avô se for cabo de um líder desse coordenador)
+        // Filtrar por time do coordenador (Hierarquia Unificada)
+        // A pessoa é o próprio coordenador, OU é um filho direto do coordenador (líder ou cabo),
+        // OU é um neto (cabo de um líder que por sua vez é filho do coordenador).
         const isSelf = p.id === coordenadorFilter;
         const isChild = p.parent_id === coordenadorFilter;
         
-        // Para cabos, precisamos ver se o pai deles (um líder) tem o coordenador como pai
         let isGrandchild = false;
-        if (p.tipo === "cabo" && p.parent_id) {
+        if (p.parent_id && !isChild) {
+          // Se não for filho direto, verificamos se o pai dessa pessoa é filho do coordenador
           const pai = pessoas.find(prev => prev.id === p.parent_id);
           if (pai && pai.parent_id === coordenadorFilter) {
             isGrandchild = true;
