@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Brain, Trash2, ExternalLink, Loader2, Search, Sparkles, FileText,
   MapPin, Users, Megaphone, Quote, Hash, Flag, Calendar, FileAudio, BookOpen,
-  AlertTriangle, RefreshCw, Instagram as InstagramIcon, Facebook as FacebookIcon, MessageSquare, TrendingUp, TrendingDown, Minus,
+  AlertTriangle, RefreshCw, InstagramIcon, FacebookIcon, MessageSquare, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { exportLivroDeCampanha } from "./exportLivroCampanha";

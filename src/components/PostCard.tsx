@@ -2,7 +2,7 @@ import { useState, useMemo, memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   MessageSquare, TrendingUp, TrendingDown, Minus,
-  Instagram as InstagramIcon, Facebook as FacebookIcon, ExternalLink, Image as ImageIcon, Play,
+  InstagramIcon, FacebookIcon, ExternalLink, Image as ImageIcon, Play,
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { CommentItem, type CommentData, type AuthorStatsMap } from "@/components/CommentItem";

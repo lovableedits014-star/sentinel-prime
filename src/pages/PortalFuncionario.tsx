@@ -8,8 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Users2, LogOut, CheckCircle2, Loader2, ExternalLink, Facebook as FacebookIcon,
-  Instagram as InstagramIcon, CalendarCheck, UserPlus, Eye, EyeOff, Target, Users,
+  Users2, LogOut, CheckCircle2, Loader2, ExternalLink, FacebookIcon,
+  InstagramIcon, CalendarCheck, UserPlus, Eye, EyeOff, Target, Users,
   Plus, Copy, Crown, Trophy, ClipboardList, MapPin,
 } from "lucide-react";
 import { toast } from "sonner";

@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Users, RefreshCw, Award, Crown, Medal, Trophy, Star, ThumbsUp, ThumbsDown, Minus, Facebook as FacebookIcon, Instagram as InstagramIcon,
+  Users, RefreshCw, Award, Crown, Medal, Trophy, Star, ThumbsUp, ThumbsDown, Minus, FacebookIcon, InstagramIcon,
 } from "lucide-react";
 import { Wand2, Activity } from "lucide-react";
 import { toast } from "sonner";

@@ -10,8 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import WhatsAppGate from "@/components/portal/WhatsAppGate";
 import {
-  Shield, LogOut, CheckCircle2, Loader2, ExternalLink, Facebook as FacebookIcon,
-  Instagram as InstagramIcon, CalendarCheck, UserPlus, Eye, EyeOff, Edit2, Save, X,
+  Shield, LogOut, CheckCircle2, Loader2, ExternalLink, FacebookIcon,
+  InstagramIcon, CalendarCheck, UserPlus, Eye, EyeOff, Edit2, Save, X,
   Bell, Users, MapPin, Phone
 } from "lucide-react";
 import { toast } from "sonner";

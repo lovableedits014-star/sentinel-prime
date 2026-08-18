@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import {
-  Target, Plus, Pencil, Trash2, Facebook as FacebookIcon, Instagram as InstagramIcon,
+  Target, Plus, Pencil, Trash2, FacebookIcon, InstagramIcon,
   ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X, BarChart3, Radar,
 } from "lucide-react";
 import { toast } from "sonner";

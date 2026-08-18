@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   MessageSquare, Search, TrendingUp, TrendingDown,
-  Instagram as InstagramIcon, Facebook as FacebookIcon, RefreshCw, LayoutGrid, List,
+  InstagramIcon, FacebookIcon, RefreshCw, LayoutGrid, List,
   EyeOff, Eye, Sparkles, SkipForward, Flame,
 } from "lucide-react";
 import { toast } from "sonner";

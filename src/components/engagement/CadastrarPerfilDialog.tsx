@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  ArrowLeft, Check, Facebook as FacebookIcon, Instagram as InstagramIcon, Link2, Search, Sparkles, UserPlus,
+  ArrowLeft, Check, FacebookIcon, InstagramIcon, Link2, Search, Sparkles, UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { extractHandleFromUrl } from "@/lib/social-url";

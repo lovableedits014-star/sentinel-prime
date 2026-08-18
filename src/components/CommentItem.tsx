@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   TrendingUp, TrendingDown, Minus, Sparkles, Send,
-  Instagram as InstagramIcon, Facebook as FacebookIcon, Calendar, AlertTriangle, ExternalLink,
+  InstagramIcon, FacebookIcon, Calendar, AlertTriangle, ExternalLink,
   Trash2, EyeOff, Eye, Ban, Loader2, PenLine, X, Repeat, UserCheck,
   ThumbsUp, SkipForward, Undo2,
 } from "lucide-react";
