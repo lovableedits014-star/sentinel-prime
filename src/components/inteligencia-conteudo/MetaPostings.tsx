@@ -215,7 +215,29 @@ export default function MetaPostings() {
             <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Configurar Publicação</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Configurar Publicação</CardTitle>
+                    <div className="flex bg-muted p-1 rounded-lg">
+                      <Button 
+                        variant={postType === 'feed' ? "secondary" : "ghost"} 
+                        size="sm" 
+                        className="h-8 text-xs"
+                        onClick={() => setPostType('feed')}
+                      >Feed</Button>
+                      <Button 
+                        variant={postType === 'story' ? "secondary" : "ghost"} 
+                        size="sm" 
+                        className="h-8 text-xs"
+                        onClick={() => setPostType('story')}
+                      >Story</Button>
+                      <Button 
+                        variant={postType === 'reels' ? "secondary" : "ghost"} 
+                        size="sm" 
+                        className="h-8 text-xs"
+                        onClick={() => setPostType('reels')}
+                      >Reels</Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Platform Selection */}
@@ -255,19 +277,39 @@ export default function MetaPostings() {
 
                   {/* Media */}
                   <div className="space-y-3">
-                    <Label>Mídia (URL da Imagem/Vídeo)</Label>
+                    <Label>Mídia (Upload Local ou URL)</Label>
                     <div className="flex gap-2">
                       <Input 
                         placeholder="https://exemplo.com/imagem.jpg" 
                         value={mediaUrl} 
-                        onChange={(e) => setMediaUrl(e.target.value)}
+                        onChange={(e) => {
+                          setMediaUrl(e.target.value);
+                          setMediaType(e.target.value.includes('.mp4') ? 'video' : 'image');
+                        }}
                       />
-                      <Button variant="outline" size="icon">
-                        <Upload className="w-4 h-4" />
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*,video/*"
+                        onChange={handleFileUpload}
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                       </Button>
+                      {mediaUrl && (
+                        <Button variant="ghost" size="icon" onClick={() => { setMediaUrl(""); setMediaType(null); }}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      A Meta exige uma URL pública acessível para realizar o upload.
+                      Suba uma imagem ou vídeo diretamente. Vídeos em Stories/Reels podem ter até 60s.
                     </p>
                   </div>
 
@@ -276,27 +318,74 @@ export default function MetaPostings() {
                     <Label>Legenda / Texto</Label>
                     <Textarea 
                       placeholder="O que você quer compartilhar?" 
-                      className="min-h-[150px]"
+                      className="min-h-[120px]"
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
                     />
+                  </div>
+
+                  {/* Scheduling */}
+                  <div className="space-y-4 pt-2 border-t border-dashed">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="schedule" 
+                        checked={isScheduled} 
+                        onCheckedChange={(v) => setIsScheduled(!!v)}
+                      />
+                      <Label htmlFor="schedule" className="flex items-center gap-2 cursor-pointer font-medium">
+                        <Calendar className="w-4 h-4" />
+                        Agendar para depois
+                      </Label>
+                    </div>
+
+                    {isScheduled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-muted/30 rounded-lg animate-in fade-in slide-in-from-top-1">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Data</Label>
+                          <div className="bg-card rounded-md border p-2">
+                            <ReactCalendar 
+                              onChange={(v) => setScheduledDate(v as Date)} 
+                              value={scheduledDate}
+                              minDate={new Date()}
+                              className="border-none w-full text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Horário</Label>
+                            <Input 
+                              type="time" 
+                              value={scheduledTime}
+                              onChange={(e) => setScheduledTime(e.target.value)}
+                            />
+                          </div>
+                          <div className="p-3 bg-blue-500/10 text-blue-600 rounded-md text-[10px] flex items-start gap-2">
+                            <Clock className="w-3 h-3 mt-0.5 shrink-0" />
+                            <p>
+                              Agendado para: <strong>{format(scheduledDate, "dd 'de' MMMM", { locale: ptBR })} às {scheduledTime}</strong>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end pt-4">
                     <Button 
                       className="w-full sm:w-auto px-8" 
                       onClick={handlePublish}
-                      disabled={isPublishing || (!platform.fb && !platform.ig)}
+                      disabled={isPublishing || isUploading || (!platform.fb && !platform.ig)}
                     >
                       {isPublishing ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Publicando...
+                          Processando...
                         </>
                       ) : (
                         <>
-                          <Send className="mr-2 h-4 w-4" />
-                          Publicar Agora
+                          {isScheduled ? <Calendar className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+                          {isScheduled ? "Agendar Publicação" : "Publicar Agora"}
                         </>
                       )}
                     </Button>
