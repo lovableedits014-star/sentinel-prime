@@ -121,7 +121,7 @@ export const publishMetaContent = createServerFn({ method: "POST" })
             platform: res.platform,
             post_type: type,
             content: content,
-            media_url: mediaUrl,
+            media_urls: mediaUrl ? [mediaUrl] : null,
             status: res.success ? 'published' : 'failed',
             meta_id: res.id,
             error_message: res.error,
