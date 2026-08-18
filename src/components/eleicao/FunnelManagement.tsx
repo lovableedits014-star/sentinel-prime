@@ -13,7 +13,8 @@ interface Pessoa {
   tipo: string;
   status_contratacao?: string;
   participou_reuniao?: boolean;
-  pre_selecionado?: boolean;
+  parent_id?: string | null;
+  regiao?: string | null;
 }
 
 interface FunnelManagementProps {
