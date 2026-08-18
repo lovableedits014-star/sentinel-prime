@@ -270,7 +270,6 @@ export default function Eleicao() {
     rateio_parceiro: 0 as number,
     status_contratacao: "pendente" as "pendente" | "em_negociacao" | "confirmado",
     participou_reuniao: false,
-    pre_selecionado: false,
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
