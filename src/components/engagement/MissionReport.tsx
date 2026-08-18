@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Facebook, Instagram, ExternalLink, CheckCircle2, Eye, Users, Download } from "lucide-react";
+import { Loader2, Facebook as FacebookIcon as Facebook as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as Instagram as InstagramIcon, ExternalLink, CheckCircle2, Eye, Users, Download } from "lucide-react";
 import { fmtPhoneBR } from "@/lib/phone-utils";
 
 type Props = {
@@ -181,7 +181,7 @@ export default function MissionReport({ missionId, onClose }: Props) {
   }
   const handleExportCsv = () => {
     const rows: (string | number)[][] = [
-      ["Nome", "Telefone", "Grupos", "Aberturas", "Clique Facebook", "Clique Instagram", "Clique Avulso", "Concluiu", "Primeiro registro", "Último registro"],
+      ["Nome", "Telefone", "Grupos", "Aberturas", "Clique FacebookIcon", "Clique InstagramIcon", "Clique Avulso", "Concluiu", "Primeiro registro", "Último registro"],
     ];
     for (const r of byParticipant) {
       rows.push([
@@ -193,7 +193,7 @@ export default function MissionReport({ missionId, onClose }: Props) {
     }
     rows.push([]);
     rows.push(["--- Por grupo ---"]);
-    rows.push(["Grupo", "Únicos", "Aberturas", "Facebook", "Instagram", "Avulso", "Concluíram"]);
+    rows.push(["Grupo", "Únicos", "Aberturas", "FacebookIcon", "InstagramIcon", "Avulso", "Concluíram"]);
     for (const g of byGroup) {
       rows.push([g.name, g.participants, g.open, g.click_facebook, g.click_instagram, g.click_avulso, g.declared_done]);
     }
@@ -240,8 +240,8 @@ export default function MissionReport({ missionId, onClose }: Props) {
             <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
               <StatCard icon={<Eye className="w-4 h-4" />} label="Aberturas" value={stats.open} />
               <StatCard icon={<Users className="w-4 h-4" />} label="Únicos" value={stats.unique} />
-              <StatCard icon={<Facebook className="w-4 h-4 text-blue-600" />} label="Facebook" value={stats.click_facebook} />
-              <StatCard icon={<Instagram className="w-4 h-4 text-pink-500" />} label="Instagram" value={stats.click_instagram} />
+              <StatCard icon={<FacebookIcon className="w-4 h-4 text-blue-600" />} label="FacebookIcon" value={stats.click_facebook} />
+              <StatCard icon={<InstagramIcon className="w-4 h-4 text-pink-500" />} label="InstagramIcon" value={stats.click_instagram} />
               <StatCard icon={<ExternalLink className="w-4 h-4" />} label="Link avulso" value={stats.click_avulso} />
               <StatCard icon={<CheckCircle2 className="w-4 h-4 text-emerald-600" />} label="Concluíram" value={stats.declared_done} />
             </div>

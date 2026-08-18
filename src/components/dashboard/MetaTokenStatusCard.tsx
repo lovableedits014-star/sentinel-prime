@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
-import { ShieldCheck, ShieldAlert, ShieldX, Clock, Instagram, Facebook, Info } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ShieldX, Clock, Instagram as Instagram as InstagramIcon, Facebook as Facebook as FacebookIcon, Info } from "lucide-react";
 
 interface Props {
   clientId: string;
@@ -136,11 +136,11 @@ export function MetaTokenStatusCard({ clientId }: Props) {
         <div className="space-y-1 flex-1">
           <p className="font-semibold text-foreground">Última postagem capturada do Meta</p>
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Instagram className="w-3.5 h-3.5" />
+            <InstagramIcon className="w-3.5 h-3.5" />
             <span>Instagram: <span className="font-medium text-foreground">{fmt(lastPosts.ig)}</span></span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Facebook className="w-3.5 h-3.5" />
+            <FacebookIcon className="w-3.5 h-3.5" />
             <span>Facebook: <span className="font-medium text-foreground">{fmt(lastPosts.fb)}</span></span>
           </div>
           <p className="text-xs text-muted-foreground/80 pt-1">

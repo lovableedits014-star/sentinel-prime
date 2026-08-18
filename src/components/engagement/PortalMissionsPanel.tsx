@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import {
-  Target, Plus, Pencil, Trash2, Facebook, Instagram,
+  Target, Plus, Pencil, Trash2, Facebook as FacebookIcon, Instagram as InstagramIcon,
   ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X, BarChart3, Radar,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -167,7 +167,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
     gcTime: 0,
   });
 
-  // Sync new posts from Meta (Facebook/Instagram) and then refetch the local list.
+  // Sync new posts from Meta (FacebookIcon/InstagramIcon) and then refetch the local list.
   // Necessary so that posts published just now (still without any comments) appear in the picker.
   const [isSyncing, setIsSyncing] = useState(false);
   const syncAndRefetch = async () => {
@@ -215,7 +215,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
     if (manualUrl.trim()) {
       const detected = parsePlatformFromUrl(manualUrl.trim());
       if (!detected) {
-        toast.error("URL manual: plataforma não reconhecida (cole link do Facebook ou Instagram)");
+        toast.error("URL manual: plataforma não reconhecida (cole link do FacebookIcon ou InstagramIcon)");
         return;
       }
       // Don't duplicate if same URL was already selected via picker
@@ -414,7 +414,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
             <p className="text-2xl font-bold" style={{ color: "#1877F2" }}>
               {missions.filter((m) => m.platform === "facebook" && m.is_active).length}
             </p>
-            <p className="text-xs text-muted-foreground">Facebook</p>
+            <p className="text-xs text-muted-foreground">FacebookIcon</p>
           </CardContent>
         </Card>
         <Card>
@@ -422,7 +422,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
             <p className="text-2xl font-bold" style={{ color: "#E1306C" }}>
               {missions.filter((m) => m.platform === "instagram" && m.is_active).length}
             </p>
-            <p className="text-xs text-muted-foreground">Instagram</p>
+            <p className="text-xs text-muted-foreground">InstagramIcon</p>
           </CardContent>
         </Card>
       </div>
@@ -494,7 +494,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
         <CardContent className="p-3 flex items-start gap-2">
           <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            <strong>Dica:</strong> Selecione um post do Facebook e um do Instagram antes de salvar — as duas missões são adicionadas de uma vez só.
+            <strong>Dica:</strong> Selecione um post do FacebookIcon e um do InstagramIcon antes de salvar — as duas missões são adicionadas de uma vez só.
           </p>
         </CardContent>
       </Card>
@@ -505,7 +505,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
           <DialogHeader>
             <DialogTitle>Adicionar Missões de Engajamento</DialogTitle>
             <DialogDescription>
-              Selecione posts do Facebook e/ou Instagram — clique em "Adicionar missão" para salvar todas de uma vez.
+              Selecione posts do FacebookIcon e/ou InstagramIcon — clique em "Adicionar missão" para salvar todas de uma vez.
             </DialogDescription>
           </DialogHeader>
 
@@ -518,19 +518,19 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               </Button>
             </div>
 
-            {/* Tabs for Facebook / Instagram */}
+            {/* Tabs for FacebookIcon / InstagramIcon */}
             <Tabs defaultValue="facebook">
               <TabsList className="mb-3">
                 <TabsTrigger value="facebook" className="gap-1.5 relative">
-                  <Facebook className="w-3.5 h-3.5 text-blue-600" />
-                  Facebook ({fbPosts.length})
+                  <FacebookIcon className="w-3.5 h-3.5 text-blue-600" />
+                  FacebookIcon ({fbPosts.length})
                   {selectedFb && (
                     <span className="ml-1 w-2 h-2 rounded-full bg-primary inline-block" />
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="instagram" className="gap-1.5">
-                  <Instagram className="w-3.5 h-3.5 text-pink-500" />
-                  Instagram ({igPosts.length})
+                  <InstagramIcon className="w-3.5 h-3.5 text-pink-500" />
+                  InstagramIcon ({igPosts.length})
                   {selectedIg && (
                     <span className="ml-1 w-2 h-2 rounded-full bg-primary inline-block" />
                   )}
@@ -561,7 +561,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                 <p className="text-xs font-semibold text-primary uppercase tracking-wide">Selecionados para adicionar</p>
                 {selectedFb && (
                   <div className="flex items-center gap-2">
-                    <Facebook className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <FacebookIcon className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                     <p className="text-xs flex-1 truncate">{selectedFb.post_message?.slice(0, 70) || selectedFb.post_permalink_url}</p>
                     <button type="button" onClick={() => setSelectedFb(null)} className="text-muted-foreground hover:text-foreground">
                       <X className="w-3.5 h-3.5" />
@@ -570,7 +570,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                 )}
                 {selectedIg && (
                   <div className="flex items-center gap-2">
-                    <Instagram className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                    <InstagramIcon className="w-3.5 h-3.5 text-pink-500 shrink-0" />
                     <p className="text-xs flex-1 truncate">{selectedIg.post_message?.slice(0, 70) || selectedIg.post_permalink_url}</p>
                     <button type="button" onClick={() => setSelectedIg(null)} className="text-muted-foreground hover:text-foreground">
                       <X className="w-3.5 h-3.5" />
@@ -596,8 +596,8 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               />
               {manualUrl && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  {parsePlatformFromUrl(manualUrl) === "facebook" && <><Facebook className="w-3 h-3 text-blue-600" /> Facebook detectado</>}
-                  {parsePlatformFromUrl(manualUrl) === "instagram" && <><Instagram className="w-3 h-3 text-pink-500" /> Instagram detectado</>}
+                  {parsePlatformFromUrl(manualUrl) === "facebook" && <><FacebookIcon className="w-3 h-3 text-blue-600" /> FacebookIcon detectado</>}
+                  {parsePlatformFromUrl(manualUrl) === "instagram" && <><InstagramIcon className="w-3 h-3 text-pink-500" /> InstagramIcon detectado</>}
                   {!parsePlatformFromUrl(manualUrl) && "⚠️ Plataforma não reconhecida"}
                 </p>
               )}
@@ -644,7 +644,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    O link da publicação escolhida é usado automaticamente na plataforma correspondente (Facebook/Instagram). Você pode editar cada missão depois se precisar de links diferentes.
+                    O link da publicação escolhida é usado automaticamente na plataforma correspondente (FacebookIcon/InstagramIcon). Você pode editar cada missão depois se precisar de links diferentes.
                   </p>
                 </div>
               )}
@@ -683,10 +683,10 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               </div>
               <TabsList className="mb-3">
                 <TabsTrigger value="facebook" className="gap-1.5">
-                  <Facebook className="w-3.5 h-3.5 text-blue-600" /> Facebook ({fbPosts.length})
+                  <FacebookIcon className="w-3.5 h-3.5 text-blue-600" /> FacebookIcon ({fbPosts.length})
                 </TabsTrigger>
                 <TabsTrigger value="instagram" className="gap-1.5">
-                  <Instagram className="w-3.5 h-3.5 text-pink-500" /> Instagram ({igPosts.length})
+                  <InstagramIcon className="w-3.5 h-3.5 text-pink-500" /> InstagramIcon ({igPosts.length})
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="facebook">
@@ -708,8 +708,8 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               <Input value={editForm.post_url} onChange={(e) => handleEditUrlChange(e.target.value)} placeholder="https://..." required />
               {editForm.post_url && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  {parsePlatformFromUrl(editForm.post_url) === "facebook" && <><Facebook className="w-3 h-3 text-blue-600" /> Facebook detectado</>}
-                  {parsePlatformFromUrl(editForm.post_url) === "instagram" && <><Instagram className="w-3 h-3 text-pink-500" /> Instagram detectado</>}
+                  {parsePlatformFromUrl(editForm.post_url) === "facebook" && <><FacebookIcon className="w-3 h-3 text-blue-600" /> FacebookIcon detectado</>}
+                  {parsePlatformFromUrl(editForm.post_url) === "instagram" && <><InstagramIcon className="w-3 h-3 text-pink-500" /> InstagramIcon detectado</>}
                   {!parsePlatformFromUrl(editForm.post_url) && "⚠️ Plataforma não reconhecida"}
                 </p>
               )}
@@ -746,11 +746,11 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               {editForm.tracking_enabled && (
                 <div className="space-y-3 pt-2 border-t">
                   <div className="space-y-1.5">
-                    <Label className="text-xs flex items-center gap-1"><Facebook className="w-3 h-3 text-blue-600" /> Link do Facebook</Label>
+                    <Label className="text-xs flex items-center gap-1"><FacebookIcon className="w-3 h-3 text-blue-600" /> Link do FacebookIcon</Label>
                     <Input value={editForm.link_facebook} onChange={(e) => setEditForm(f => ({ ...f, link_facebook: e.target.value }))} placeholder="https://www.facebook.com/..." />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs flex items-center gap-1"><Instagram className="w-3 h-3 text-pink-500" /> Link do Instagram</Label>
+                    <Label className="text-xs flex items-center gap-1"><InstagramIcon className="w-3 h-3 text-pink-500" /> Link do InstagramIcon</Label>
                     <Input value={editForm.link_instagram} onChange={(e) => setEditForm(f => ({ ...f, link_instagram: e.target.value }))} placeholder="https://www.instagram.com/p/..." />
                   </div>
                   <div className="space-y-1.5">
@@ -823,7 +823,7 @@ function PostPickerList({
   if (posts.length === 0) {
     return (
       <div className="text-center py-6 text-muted-foreground border rounded-lg bg-muted/20">
-        <p className="text-sm">Nenhuma publicação {platform === "facebook" ? "do Facebook" : "do Instagram"} sincronizada</p>
+        <p className="text-sm">Nenhuma publicação {platform === "facebook" ? "do FacebookIcon" : "do InstagramIcon"} sincronizada</p>
         <p className="text-xs mt-1">Sincronize seus comentários primeiro, ou cole um link manualmente abaixo</p>
       </div>
     );
@@ -859,8 +859,8 @@ function PostPickerList({
                 platform === "instagram" ? "bg-pink-500/10" : "bg-blue-500/10"
               }`}>
                 {platform === "instagram"
-                  ? <Instagram className="w-5 h-5 text-pink-500" />
-                  : <Facebook className="w-5 h-5 text-blue-600" />}
+                  ? <InstagramIcon className="w-5 h-5 text-pink-500" />
+                  : <FacebookIcon className="w-5 h-5 text-blue-600" />}
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -905,8 +905,8 @@ function MissionCard({
         mission.platform === "instagram" ? "bg-pink-500/10" : "bg-blue-500/10"
       }`}>
         {mission.platform === "instagram"
-          ? <Instagram className="w-4 h-4 text-pink-500" />
-          : <Facebook className="w-4 h-4 text-blue-600" />}
+          ? <InstagramIcon className="w-4 h-4 text-pink-500" />
+          : <FacebookIcon className="w-4 h-4 text-blue-600" />}
       </div>
 
       <div className="flex-1 min-w-0">

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Facebook, Instagram, Edit2, Plus, Trash2, Save, X, Loader2, CheckCircle2, ExternalLink,
+  Facebook as FacebookIcon, Instagram as InstagramIcon, Edit2, Plus, Trash2, Save, X, Loader2, CheckCircle2, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { extractHandleFromUrl, getSocialProfileUrl } from "@/lib/social-url";
@@ -29,14 +29,14 @@ interface Props {
 }
 
 const PLATFORM_OPTIONS = [
-  { value: "instagram", label: "Instagram" },
-  { value: "facebook", label: "Facebook" },
+  { value: "instagram", label: "InstagramIcon" },
+  { value: "facebook", label: "FacebookIcon" },
   { value: "tiktok", label: "TikTok" },
 ];
 
 function PlatformIcon({ p }: { p: string }) {
-  if (p === "instagram") return <Instagram className="w-4 h-4 text-pink-500" />;
-  if (p === "facebook") return <Facebook className="w-4 h-4 text-blue-600" />;
+  if (p === "instagram") return <InstagramIcon className="w-4 h-4 text-pink-500" />;
+  if (p === "facebook") return <FacebookIcon className="w-4 h-4 text-blue-600" />;
   if (p === "tiktok") return <span className="text-sm leading-none">🎵</span>;
   return null;
 }

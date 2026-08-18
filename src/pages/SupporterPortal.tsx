@@ -10,8 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import WhatsAppGate from "@/components/portal/WhatsAppGate";
 import {
-  Shield, LogOut, CheckCircle2, Loader2, ExternalLink, Facebook,
-  Instagram, CalendarCheck, UserPlus, Eye, EyeOff, Edit2, Save, X,
+  Shield, LogOut, CheckCircle2, Loader2, ExternalLink, FacebookIcon as Facebook as FacebookIcon,
+  InstagramIcon as Instagram as InstagramIcon, CalendarCheck, UserPlus, Eye, EyeOff, Edit2, Save, X,
   Bell, Users, MapPin, Phone
 } from "lucide-react";
 import { toast } from "sonner";
@@ -323,12 +323,12 @@ export default function SupporterPortal() {
       const newIg = parseField(editInstagram, "instagram");
 
       if (editFacebook.trim() && !newFb) {
-        toast.error("Não consegui identificar o usuário do Facebook. Cole a URL do seu perfil.");
+        toast.error("Não consegui identificar o usuário do FacebookIcon. Cole a URL do seu perfil.");
         setSavingProfile(false);
         return;
       }
       if (editInstagram.trim() && !newIg) {
-        toast.error("Não consegui identificar o usuário do Instagram. Cole a URL do seu perfil.");
+        toast.error("Não consegui identificar o usuário do InstagramIcon. Cole a URL do seu perfil.");
         setSavingProfile(false);
         return;
       }
@@ -774,8 +774,8 @@ export default function SupporterPortal() {
                         mission.platform === "instagram" ? "bg-pink-500/10" : "bg-blue-500/10"
                       }`}>
                         {mission.platform === "instagram"
-                          ? <Instagram className="w-4 h-4 text-pink-500" />
-                          : <Facebook className="w-4 h-4 text-blue-600" />
+                          ? <InstagramIcon className="w-4 h-4 text-pink-500" />
+                          : <FacebookIcon className="w-4 h-4 text-blue-600" />
                         }
                       </div>
                       <div className="flex-1 min-w-0">
@@ -856,13 +856,13 @@ export default function SupporterPortal() {
                     <div className="flex flex-wrap gap-2 pt-1">
                       {account?.facebook_username && (
                         <Badge variant="outline" className="text-xs gap-1">
-                          <Facebook className="w-3 h-3 text-blue-600" />
+                          <FacebookIcon className="w-3 h-3 text-blue-600" />
                           @{account.facebook_username}
                         </Badge>
                       )}
                       {account?.instagram_username && (
                         <Badge variant="outline" className="text-xs gap-1">
-                          <Instagram className="w-3 h-3 text-pink-500" />
+                          <InstagramIcon className="w-3 h-3 text-pink-500" />
                           @{account.instagram_username}
                         </Badge>
                       )}
@@ -885,14 +885,14 @@ export default function SupporterPortal() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs flex items-center gap-1">
-                        <Facebook className="w-3 h-3 text-blue-600" /> Facebook (username)
+                        <FacebookIcon className="w-3 h-3 text-blue-600" /> FacebookIcon (username)
                       </Label>
                       <Input value={editFacebook} onChange={(e) => setEditFacebook(e.target.value)} placeholder="joaosilva ou cole a URL do perfil" />
                       <p className="text-xs text-muted-foreground">Pode colar a URL completa (ex: facebook.com/joaosilva) que extraímos automaticamente.</p>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs flex items-center gap-1">
-                        <Instagram className="w-3 h-3 text-pink-500" /> Instagram (username)
+                        <InstagramIcon className="w-3 h-3 text-pink-500" /> InstagramIcon (username)
                       </Label>
                       <Input value={editInstagram} onChange={(e) => setEditInstagram(e.target.value)} placeholder="joaosilva ou cole a URL do perfil" />
                       <p className="text-xs text-muted-foreground">Pode colar a URL completa (ex: instagram.com/joaosilva) que extraímos automaticamente.</p>

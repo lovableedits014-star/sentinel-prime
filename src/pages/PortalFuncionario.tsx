@@ -8,8 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Users2, LogOut, CheckCircle2, Loader2, ExternalLink, Facebook,
-  Instagram, CalendarCheck, UserPlus, Eye, EyeOff, Target, Users,
+  Users2, LogOut, CheckCircle2, Loader2, ExternalLink, Facebook as FacebookIcon,
+  Instagram as InstagramIcon, CalendarCheck, UserPlus, Eye, EyeOff, Target, Users,
   Plus, Copy, Crown, Trophy, ClipboardList, MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -297,8 +297,8 @@ export default function PortalFuncionario() {
   };
 
   const getPlatformIcon = (p: string) => {
-    if (p === "instagram") return <Instagram className="w-5 h-5 text-pink-500" />;
-    if (p === "facebook") return <Facebook className="w-5 h-5 text-blue-600" />;
+    if (p === "instagram") return <InstagramIcon className="w-5 h-5 text-pink-500" />;
+    if (p === "facebook") return <FacebookIcon className="w-5 h-5 text-blue-600" />;
     return <ExternalLink className="w-5 h-5" />;
   };
 

@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Facebook, Instagram, CheckCircle2, Loader2, UserPlus, Phone, FileText, AlertCircle, Mail, Lock, Eye, EyeOff, LogIn, MapPin, Users, IdCard, Cake } from "lucide-react";
+import { Facebook as Facebook as FacebookIcon, Instagram as Instagram as InstagramIcon, CheckCircle2, Loader2, UserPlus, Phone, FileText, AlertCircle, Mail, Lock, Eye, EyeOff, LogIn, MapPin, Users, IdCard, Cake } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { DateInputBr } from "@/components/ui/date-input-br";
 import { formatCpf, cpfDigits, isValidCpf } from "@/lib/cpf-mask";
@@ -319,9 +319,9 @@ export default function SupporterRegister() {
                 {linkedProfiles.map((p, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     {p.platform === "facebook" ? (
-                      <Facebook className="w-4 h-4 text-blue-600 shrink-0" />
+                      <FacebookIcon className="w-4 h-4 text-blue-600 shrink-0" />
                     ) : (
-                      <Instagram className="w-4 h-4 text-pink-500 shrink-0" />
+                      <InstagramIcon className="w-4 h-4 text-pink-500 shrink-0" />
                     )}
                     <span className="font-medium capitalize">{p.platform}:</span>
                     <span className="text-muted-foreground">

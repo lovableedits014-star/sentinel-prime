@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Facebook, Instagram, ExternalLink, CheckCircle2, Loader2, UserCog } from "lucide-react";
+import { Facebook as FacebookIcon as Facebook as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as Instagram as InstagramIcon, ExternalLink, CheckCircle2, Loader2, UserCog } from "lucide-react";
 import { normalizeBRPhone, isValidBRPhone } from "@/lib/phone-utils";
 
 type MissionConfig = {
@@ -311,8 +311,8 @@ export default function MissaoPublica() {
                       className="w-full justify-start gap-2"
                       onClick={() => handleExternal(linkFb, "click_facebook")}
                     >
-                      <Facebook className="w-4 h-4 text-blue-600" />
-                      Abrir no Facebook
+                      <FacebookIcon className="w-4 h-4 text-blue-600" />
+                      Abrir no FacebookIcon
                       <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
                     </Button>
                   )}
@@ -322,8 +322,8 @@ export default function MissaoPublica() {
                       className="w-full justify-start gap-2"
                       onClick={() => handleExternal(linkIg, "click_instagram")}
                     >
-                      <Instagram className="w-4 h-4 text-pink-500" />
-                      Abrir no Instagram
+                      <InstagramIcon className="w-4 h-4 text-pink-500" />
+                      Abrir no InstagramIcon
                       <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
                     </Button>
                   )}
