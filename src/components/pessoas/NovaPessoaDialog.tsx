@@ -48,8 +48,19 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
 
   useEffect(() => {
     if (open && initialNome) setNome(initialNome);
+    if (open && ["coordenador", "lider", "cabo"].includes(tipo)) {
+      loadPessoas();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialNome]);
+  }, [open, initialNome, tipo]);
+
+  async function loadPessoas() {
+    const { data } = await supabase
+      .from("eleicao_pessoas" as any)
+      .select("id, nome, tipo, regiao, cidade, escopo")
+      .eq("client_id", clientId);
+    if (data) setPessoas(data);
+  }
 
 
 
