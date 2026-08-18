@@ -177,6 +177,9 @@ interface Pessoa {
   rateio_parceiro?: number | null;
   status_contratacao?: "pendente" | "em_negociacao" | "confirmado";
   confirmado_em?: string | null;
+  participou_reuniao?: boolean;
+  reuniao_em?: string | null;
+  pre_selecionado?: boolean;
   created_at: string;
 }
 
