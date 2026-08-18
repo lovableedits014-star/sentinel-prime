@@ -833,6 +833,15 @@ export default function Eleicao() {
     // Base: respeita escopo + busca atual (filtros de tela), mas IGNORA tipoFilter
     // pois o dialog tem seu próprio filtro de tipos.
     let base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p));
+    
+    // Filtro de reunião se vier do dialog
+    if (cfg.apenasReuniao) {
+      base = base.filter(p => !!p.participou_reuniao);
+    }
+    if (cfg.apenasNaoReuniao) {
+      base = base.filter(p => !p.participou_reuniao);
+    }
+
     if (cfg.regiao) {
       base = base.filter(p =>
         escopo === "interior" ? p.cidade === cfg.regiao : p.regiao === cfg.regiao
@@ -906,6 +915,8 @@ export default function Eleicao() {
         const coordNome = byId.get(cfg.coordenadorId) || "";
         f.push({ label: "Equipe", value: coordNome });
       }
+      if (cfg.apenasReuniao) f.push({ label: "Reunião", value: "Apenas quem participou" });
+      if (cfg.apenasNaoReuniao) f.push({ label: "Reunião", value: "Apenas quem NÃO participou" });
       return f;
     };
 
@@ -933,6 +944,8 @@ export default function Eleicao() {
           email: p.email,
           observacoes: p.observacoes,
           valor_contratacao: p.valor_contratacao,
+          participou_reuniao: p.participou_reuniao,
+          reuniao_em: p.reuniao_em,
         }));
         const coordFiltro = cfg.coordenadorId
           ? { id: cfg.coordenadorId, nome: byId.get(cfg.coordenadorId) || "" }
@@ -948,6 +961,8 @@ export default function Eleicao() {
           fileNameSuffix,
           mode,
           apenasAvulsos: cfg.apenasAvulsos,
+          apenasReuniao: cfg.apenasReuniao,
+          apenasNaoReuniao: cfg.apenasNaoReuniao,
         };
         if (cfg.formato === "csv") exportEleicaoCsvRaiz(opts);
         else exportEleicaoPdfRaiz(opts);
@@ -968,6 +983,8 @@ export default function Eleicao() {
         email: p.email,
         observacoes: p.observacoes,
         valor_contratacao: p.valor_contratacao,
+        participou_reuniao: p.participou_reuniao,
+        reuniao_em: p.reuniao_em,
         parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
       }));
       const mode: "save" | "print" = cfg.formato === "print" ? "print" : "save";
@@ -1021,11 +1038,31 @@ export default function Eleicao() {
       }
     }
     const qtd = rodarExport(listaTipada, lista, dobradinhaLabel, sufixo);
+    
+    // Config para exportação simples
+    const exportOpts = {
+      clientName: "", // pode ser preenchido se tivermos o nome do cliente
+      escopoLabel: escopo === "campo_grande" ? "Campo Grande" : "Interior",
+      pessoas: listaTipada.map(p => ({
+        ...p,
+        parent_nome: p.parent_id ? (pessoas.find(px => px.id === p.parent_id)?.nome || null) : null
+      })) as any,
+      filtros: baseFiltros(),
+      fileNameSuffix: sufixo,
+      mode: cfg.formato === "print" ? ("print" as const) : ("save" as const),
+      apenasAvulsos: cfg.apenasAvulsos,
+      apenasReuniao: cfg.apenasReuniao,
+      apenasNaoReuniao: cfg.apenasNaoReuniao,
+    };
+
     if (cfg.formato === "csv") {
+      exportEleicaoCsv(exportOpts);
       toast.success(`CSV exportado (${qtd} registros)`);
     } else if (cfg.formato === "print") {
+      exportEleicaoPdf(exportOpts);
       toast.success("PDF aberto para impressão em nova aba.");
     } else {
+      exportEleicaoPdf(exportOpts);
       toast.success(`PDF exportado (${qtd} registros)`);
     }
   }
@@ -1113,6 +1150,10 @@ export default function Eleicao() {
         <FunnelManagement 
           pessoas={pessoas as any} 
           onEdit={openEdit} 
+          onOpenExport={(reuniao, semReuniao) => {
+            // Aqui poderíamos passar presets para o dialog, mas o dialog já tem o campo de reunião agora.
+            setExportDialogOpen(true);
+          }}
           onQuickUpdate={async (id, data) => {
             const { error } = await supabase.from("eleicao_pessoas" as any).update(data).eq("id", id);
             if (error) toast.error(error.message);

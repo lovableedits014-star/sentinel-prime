@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Users, Edit2, Search, Filter, MapPin, UserCheck, Crown, X } from "lucide-react";
+import { AlertCircle, Users, Edit2, Search, Filter, MapPin, UserCheck, Crown, X, FileDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Pessoa {
@@ -22,9 +22,10 @@ interface FunnelManagementProps {
   pessoas: Pessoa[];
   onEdit: (p: Pessoa) => void;
   onQuickUpdate: (id: string, data: any) => Promise<void>;
+  onOpenExport?: (reuniaoOnly?: boolean, semReuniaoOnly?: boolean) => void;
 }
 
-export function FunnelManagement({ pessoas, onEdit, onQuickUpdate }: FunnelManagementProps) {
+export function FunnelManagement({ pessoas, onEdit, onQuickUpdate, onOpenExport }: FunnelManagementProps) {
   const [regiaoFilter, setRegiaoFilter] = useState<string>("all");
   const [coordenadorFilter, setCoordenadorFilter] = useState<string>("all");
   const [avulsosOnly, setAvulsosOnly] = useState<boolean>(false);
@@ -230,6 +231,18 @@ export function FunnelManagement({ pessoas, onEdit, onQuickUpdate }: FunnelManag
               <X className="w-3 h-3" /> Limpar
             </Button>
           )}
+
+          <div className="flex-1" />
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-9 gap-1.5"
+            onClick={() => onOpenExport?.()}
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            Exportar Funil
+          </Button>
 
           {stats && (
             <div className="ml-auto bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg flex items-center gap-3">
