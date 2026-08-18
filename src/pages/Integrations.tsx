@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Facebook as FacebookIcon as Facebook as FacebookIcon, Brain, Save, AlertCircle, Zap, Check, Loader2, ShieldCheck, ShieldAlert, RefreshCw, Instagram as InstagramIcon as Instagram as InstagramIcon, MessageSquareText } from "lucide-react";
+import { Facebook as FacebookIcon as Facebook as Facebook as FacebookIcon, Brain, Save, AlertCircle, Zap, Check, Loader2, ShieldCheck, ShieldAlert, RefreshCw, Instagram as InstagramIcon as Instagram as Instagram as InstagramIcon, MessageSquareText } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";

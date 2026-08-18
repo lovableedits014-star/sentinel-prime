@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  FacebookIcon,
-  InstagramIcon,
+  Facebook as FacebookIcon,
+  Instagram as InstagramIcon,
   ClipboardPaste,
   Loader2,
   CheckCircle2,

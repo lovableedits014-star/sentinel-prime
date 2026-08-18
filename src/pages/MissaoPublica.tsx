@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Facebook as FacebookIcon as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as InstagramIcon, ExternalLink, CheckCircle2, Loader2, UserCog } from "lucide-react";
+import { Facebook as FacebookIcon as Facebook as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as Instagram as InstagramIcon, ExternalLink, CheckCircle2, Loader2, UserCog } from "lucide-react";
 import { normalizeBRPhone, isValidBRPhone } from "@/lib/phone-utils";
 
 type MissionConfig = {

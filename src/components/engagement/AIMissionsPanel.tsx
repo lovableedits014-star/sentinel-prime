@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Sparkles, RefreshCw, Target, FacebookIcon, InstagramIcon, Globe,
+  Sparkles, RefreshCw, Target, Facebook as FacebookIcon, Instagram as InstagramIcon, Globe,
   ArrowUp, ArrowRight, ArrowDown, CheckCircle2, X,
 } from "lucide-react";
 import { toast } from "sonner";

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Search, FacebookIcon, InstagramIcon, TrendingUp, TrendingDown,
+  Search, Facebook as FacebookIcon, Instagram as InstagramIcon, TrendingUp, TrendingDown,
   Users, Calendar, Loader2, MessageSquare, Eye, BarChart3, FileText, ExternalLink,
   Flame, Ban, ChevronDown, ChevronRight, ThumbsUp, Minus, ShieldOff, Unlock, RefreshCw, User,
 } from "lucide-react";

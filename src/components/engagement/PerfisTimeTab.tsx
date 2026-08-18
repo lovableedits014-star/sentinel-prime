@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table as TableIcon,
   Check,
-  FacebookIcon,
-  InstagramIcon,
+  Facebook as FacebookIcon,
+  Instagram as InstagramIcon,
   Link2,
   Plus,
   RefreshCw,

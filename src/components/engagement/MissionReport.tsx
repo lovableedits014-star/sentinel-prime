@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Facebook as FacebookIcon as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as InstagramIcon, ExternalLink, CheckCircle2, Eye, Users, Download } from "lucide-react";
+import { Loader2, Facebook as FacebookIcon as Facebook as Facebook as FacebookIcon, Instagram as InstagramIcon as Instagram as Instagram as InstagramIcon, ExternalLink, CheckCircle2, Eye, Users, Download } from "lucide-react";
 import { fmtPhoneBR } from "@/lib/phone-utils";
 
 type Props = {
