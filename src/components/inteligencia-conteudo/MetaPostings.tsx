@@ -123,8 +123,9 @@ export default function MetaPostings() {
       setMediaType(isVideo ? 'video' : 'image');
       toast.success("Mídia carregada!");
     } catch (error: any) {
-      console.error("Upload error:", error);
-      toast.error("Falha ao subir arquivo");
+      console.error("Upload error full object:", error);
+      const errorMessage = error.message || error.error_description || "Falha ao subir arquivo";
+      toast.error(`${errorMessage}`);
     } finally {
       setIsUploading(false);
     }
