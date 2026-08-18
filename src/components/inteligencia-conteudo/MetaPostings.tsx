@@ -399,18 +399,30 @@ export default function MetaPostings() {
                <Card className="overflow-hidden border-primary/10">
                 <CardHeader className="bg-muted/30 py-3">
                   <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <ImageIcon className="w-3 h-3" />
-                    Preview {platform.ig ? "InstagramIcon" : "FacebookIcon"}
+                    {mediaType === 'video' ? <Video className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
+                    Preview {platform.ig ? "Instagram" : "Facebook"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="aspect-square bg-muted flex items-center justify-center relative overflow-hidden">
                     {mediaUrl ? (
-                      <img src={mediaUrl} alt="Preview" className="w-full h-full object-cover" />
+                      mediaType === 'video' ? (
+                        <video src={mediaUrl} className="w-full h-full object-cover" controls />
+                      ) : (
+                        <img src={mediaUrl} alt="Preview" className="w-full h-full object-cover" />
+                      )
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <ImageIcon className="w-8 h-8 opacity-20" />
+                        {postType === 'feed' ? <ImageIcon className="w-8 h-8 opacity-20" /> : <Video className="w-8 h-8 opacity-20" />}
                         <span className="text-xs">Sem mídia</span>
+                      </div>
+                    )}
+                    {postType !== 'feed' && (
+                      <div className="absolute inset-0 border-4 border-black/20 pointer-events-none rounded-sm">
+                        <div className="absolute top-4 left-4 flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-white/20 backdrop-blur-sm" />
+                          <div className="w-16 h-2 bg-white/20 backdrop-blur-sm rounded-full" />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -421,12 +433,16 @@ export default function MetaPostings() {
                         <span className="text-xs font-bold leading-none">
                           {platform.ig ? (metaStatus?.instagram?.username || "usuario") : (metaStatus?.page_name || "Pagina")}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">Agora mesmo</span>
+                        <span className="text-[10px] text-muted-foreground">{isScheduled ? format(scheduledDate, "dd/MM/yyyy") : "Agora mesmo"}</span>
                       </div>
                     </div>
                     <p className="text-sm whitespace-pre-wrap line-clamp-4">
                       {content || <span className="text-muted-foreground italic">Sua legenda aparecerá aqui...</span>}
                     </p>
+                    <div className="flex items-center gap-1 pt-1">
+                      <Badge variant="outline" className="text-[9px] uppercase">{postType}</Badge>
+                      {isScheduled && <Badge variant="outline" className="text-[9px] uppercase border-blue-500/30 text-blue-600">Agendado</Badge>}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
