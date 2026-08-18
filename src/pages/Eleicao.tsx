@@ -721,6 +721,8 @@ export default function Eleicao() {
     if (statusFilter === "pendente") return p.status_contratacao === "pendente" || !p.status_contratacao;
     if (statusFilter === "em_negociacao") return p.status_contratacao === "em_negociacao";
     if (statusFilter === "confirmado") return p.status_contratacao === "confirmado";
+    if (statusFilter === "reuniao") return !!p.participou_reuniao;
+    if (statusFilter === "pre_selecionado") return !!p.pre_selecionado;
     return true;
   };
   const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
