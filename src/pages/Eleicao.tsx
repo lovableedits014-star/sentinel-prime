@@ -961,6 +961,8 @@ export default function Eleicao() {
           fileNameSuffix,
           mode,
           apenasAvulsos: cfg.apenasAvulsos,
+          apenasReuniao: cfg.apenasReuniao,
+          apenasNaoReuniao: cfg.apenasNaoReuniao,
         };
         if (cfg.formato === "csv") exportEleicaoCsvRaiz(opts);
         else exportEleicaoPdfRaiz(opts);
@@ -981,6 +983,8 @@ export default function Eleicao() {
         email: p.email,
         observacoes: p.observacoes,
         valor_contratacao: p.valor_contratacao,
+        participou_reuniao: p.participou_reuniao,
+        reuniao_em: p.reuniao_em,
         parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
       }));
       const mode: "save" | "print" = cfg.formato === "print" ? "print" : "save";
