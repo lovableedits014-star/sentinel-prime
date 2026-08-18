@@ -181,14 +181,38 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <Label>Tipo *</Label>
-              <Select value={tipo} onValueChange={setTipo}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TIPO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Tipo *</Label>
+                <Select value={tipo} onValueChange={(v) => { setTipo(v); setParentId(""); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPO_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {["lider", "cabo"].includes(tipo) && (
+                <div>
+                  <Label>Superior (Opcional)</Label>
+                  <Select value={parentId || "none"} onValueChange={(v) => setParentId(v === "none" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum (Avulso)</SelectItem>
+                      {pessoas
+                        .filter(p => {
+                          if (tipo === "lider") return p.tipo === "coordenador";
+                          if (tipo === "cabo") return p.tipo === "lider" || p.tipo === "coordenador";
+                          return false;
+                        })
+                        .sort((a, b) => a.nome.localeCompare(b.nome))
+                        .map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.nome} ({p.tipo})</SelectItem>
+                        ))
+                      }
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div>
