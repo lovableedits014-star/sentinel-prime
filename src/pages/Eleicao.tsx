@@ -180,6 +180,7 @@ interface Pessoa {
   confirmado_em?: string | null;
   participou_reuniao?: boolean;
   reuniao_em?: string | null;
+  // pre_selecionado depreciado, mantido no tipo apenas para compatibilidade de leitura se necessário
   pre_selecionado?: boolean;
   created_at: string;
 }
@@ -269,7 +270,6 @@ export default function Eleicao() {
     rateio_parceiro: 0 as number,
     status_contratacao: "pendente" as "pendente" | "em_negociacao" | "confirmado",
     participou_reuniao: false,
-    pre_selecionado: false,
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
@@ -314,7 +314,6 @@ export default function Eleicao() {
       rateio_parceiro: 0,
       status_contratacao: "pendente" as "pendente" | "em_negociacao" | "confirmado",
       participou_reuniao: false,
-      pre_selecionado: false,
       ...presets,
     });
     setDialogOpen(true);
@@ -352,7 +351,6 @@ export default function Eleicao() {
       rateio_parceiro: p.rateio_parceiro ?? 0,
       status_contratacao: p.status_contratacao || "pendente",
       participou_reuniao: !!p.participou_reuniao,
-      pre_selecionado: !!p.pre_selecionado,
     });
     setDialogOpen(true);
   }
@@ -415,7 +413,6 @@ export default function Eleicao() {
       confirmado_em: form.status_contratacao === "confirmado" ? new Date().toISOString() : (editing?.confirmado_em || null),
       participou_reuniao: form.participou_reuniao,
       reuniao_em: form.participou_reuniao && !editing?.participou_reuniao ? new Date().toISOString() : (editing?.reuniao_em || null),
-      pre_selecionado: form.pre_selecionado,
     };
 
     // Dobradinha:
@@ -710,7 +707,7 @@ export default function Eleicao() {
 
   const [view, setView] = useState<"cadastros" | "funnel" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos" | "pendente" | "em_negociacao" | "confirmado" | "reuniao" | "pre_selecionado">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos" | "pendente" | "em_negociacao" | "confirmado" | "reuniao">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
   const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
 
@@ -722,7 +719,6 @@ export default function Eleicao() {
     if (statusFilter === "em_negociacao") return p.status_contratacao === "em_negociacao";
     if (statusFilter === "confirmado") return p.status_contratacao === "confirmado";
     if (statusFilter === "reuniao") return !!p.participou_reuniao;
-    if (statusFilter === "pre_selecionado") return !!p.pre_selecionado;
     return true;
   };
   const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
@@ -1114,7 +1110,7 @@ export default function Eleicao() {
         <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
       ) : view === "funnel" ? (
         <FunnelManagement 
-          pessoas={escopoList} 
+          pessoas={pessoas as any} 
           onEdit={openEdit} 
           onQuickUpdate={async (id, data) => {
             const { error } = await supabase.from("eleicao_pessoas" as any).update(data).eq("id", id);
@@ -1184,7 +1180,7 @@ export default function Eleicao() {
                 <SelectItem value="em_negociacao">🤝 Status: Em Negociação</SelectItem>
                 <SelectItem value="confirmado">✅ Status: Confirmado</SelectItem>
                 <SelectItem value="reuniao">👥 Participou da Reunião</SelectItem>
-                <SelectItem value="pre_selecionado">⭐ Pré-selecionado</SelectItem>
+                {/* Item Pré-selecionado removido */}
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
@@ -1409,19 +1405,7 @@ export default function Eleicao() {
                 </div>
               </label>
 
-              <label className="flex items-center gap-2 p-3 rounded-md border border-border bg-muted/20 cursor-pointer hover:bg-muted/30 transition-colors">
-                <Checkbox
-                  checked={form.pre_selecionado}
-                  onCheckedChange={(c) => setForm(f => ({ ...f, pre_selecionado: !!c }))}
-                />
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium flex items-center gap-1.5">
-                    <Star className="w-3.5 h-3.5 text-amber-500" />
-                    Pré-selecionado
-                  </span>
-                  <p className="text-[10px] text-muted-foreground line-clamp-1">Interesse imediato</p>
-                </div>
-              </label>
+              {/* Checkbox de pré-selecionado removida conforme plano */}
             </div>
 
             {form.escopo === "campo_grande" ? (
@@ -2182,7 +2166,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={cn("text-sm truncate", indent === 0 ? "font-semibold" : "font-medium")}>{p.nome}</span>
-          {p.pre_selecionado && <Badge variant="outline" className="h-5 bg-amber-500/10 text-amber-600 border-amber-500/20 text-[9px] gap-1 px-1"><Star className="w-2.5 h-2.5 fill-current" /> Pré</Badge>}
+          {/* Badge de pré-selecionado removida conforme plano */}
           {p.participou_reuniao && <Badge variant="outline" className="h-5 bg-blue-500/10 text-blue-600 border-blue-500/20 text-[9px] gap-1 px-1"><Users className="w-2.5 h-2.5" /> Reunião</Badge>}
           {p.tipo === "coordenador" && p.escopo === "campo_grande" && p.regiao && (
             <FavoritoToggle pessoa={p} />
