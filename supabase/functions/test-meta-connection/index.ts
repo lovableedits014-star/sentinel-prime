@@ -162,6 +162,8 @@ Deno.serve(async (req) => {
             'instagram_basic',
             'instagram_manage_comments',
             'public_profile',
+            'pages_manage_posts',
+            'instagram_content_publish',
           ];
 
           permissions = requiredPerms.map((name) => ({
