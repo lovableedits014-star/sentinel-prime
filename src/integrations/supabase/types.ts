@@ -3411,12 +3411,15 @@ export type Database = {
           operador_nome: string | null
           parceiro_id: string | null
           parent_id: string | null
+          participou_reuniao: boolean | null
           pode_cadastrar_cabo: boolean
           pode_cadastrar_lider: boolean
+          pre_selecionado: boolean | null
           proxima_tentativa_em: string | null
           rateio_estadual: number
           rateio_parceiro: number
           regiao: string | null
+          reuniao_em: string | null
           rua: string | null
           status_contratacao: string | null
           supporter_id: string | null
@@ -3461,12 +3464,15 @@ export type Database = {
           operador_nome?: string | null
           parceiro_id?: string | null
           parent_id?: string | null
+          participou_reuniao?: boolean | null
           pode_cadastrar_cabo?: boolean
           pode_cadastrar_lider?: boolean
+          pre_selecionado?: boolean | null
           proxima_tentativa_em?: string | null
           rateio_estadual?: number
           rateio_parceiro?: number
           regiao?: string | null
+          reuniao_em?: string | null
           rua?: string | null
           status_contratacao?: string | null
           supporter_id?: string | null
@@ -3511,12 +3517,15 @@ export type Database = {
           operador_nome?: string | null
           parceiro_id?: string | null
           parent_id?: string | null
+          participou_reuniao?: boolean | null
           pode_cadastrar_cabo?: boolean
           pode_cadastrar_lider?: boolean
+          pre_selecionado?: boolean | null
           proxima_tentativa_em?: string | null
           rateio_estadual?: number
           rateio_parceiro?: number
           regiao?: string | null
+          reuniao_em?: string | null
           rua?: string | null
           status_contratacao?: string | null
           supporter_id?: string | null
@@ -10048,12 +10057,15 @@ export type Database = {
           operador_nome: string | null
           parceiro_id: string | null
           parent_id: string | null
+          participou_reuniao: boolean | null
           pode_cadastrar_cabo: boolean
           pode_cadastrar_lider: boolean
+          pre_selecionado: boolean | null
           proxima_tentativa_em: string | null
           rateio_estadual: number
           rateio_parceiro: number
           regiao: string | null
+          reuniao_em: string | null
           rua: string | null
           status_contratacao: string | null
           supporter_id: string | null
