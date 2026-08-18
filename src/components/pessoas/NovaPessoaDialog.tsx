@@ -66,7 +66,7 @@ export default function NovaPessoaDialog({ open, onOpenChange, clientId, initial
 
   function resetForm() {
     setNome(""); setEmail(""); setTelefone(""); setCpf("");
-    setCidade("Campo Grande"); setBairro(""); setTipo("apoiador");
+    setCidade("Campo Grande"); setBairro(""); setTipo("apoiador"); setParentId("");
   }
 
   async function doInsert(funcionarioId: string | null) {
