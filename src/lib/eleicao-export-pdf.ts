@@ -16,6 +16,8 @@ export interface ExportPessoa {
   observacoes?: string | null;
   valor_contratacao?: number | null;
   parent_nome?: string | null;
+  participou_reuniao?: boolean;
+  reuniao_em?: string | null;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -61,6 +63,8 @@ export interface ExportOptions {
   fileNameSuffix?: string;
   mode?: "save" | "print";
   apenasAvulsos?: boolean;
+  apenasReuniao?: boolean;
+  apenasNaoReuniao?: boolean;
 }
 
 function outputPdf(doc: jsPDF, filename: string, mode: "save" | "print" = "save") {
@@ -171,6 +175,12 @@ export function exportEleicaoPdf(opts: ExportOptions) {
     let grupo = opts.pessoas.filter((p) => p.tipo === tipo);
     if (opts.apenasAvulsos && tipo === "lider") {
       grupo = grupo.filter(p => !p.parent_id);
+    }
+    if (opts.apenasReuniao) {
+      grupo = grupo.filter(p => !!p.participou_reuniao);
+    }
+    if (opts.apenasNaoReuniao) {
+      grupo = grupo.filter(p => !p.participou_reuniao);
     }
     if (grupo.length === 0) continue;
 
@@ -342,14 +352,20 @@ function montarEquipes(opts: RaizExportOptions): EquipeNode[] {
   for (const p of pessoas) if (p.id) byId.set(p.id, p);
 
   const filterTipo = (p: ExportPessoa) => !tipos || tipos.includes(p.tipo);
+  const filterReuniao = (p: ExportPessoa) => {
+    if (opts.apenasReuniao) return !!p.participou_reuniao;
+    if (opts.apenasNaoReuniao) return !p.participou_reuniao;
+    return true;
+  };
 
   const coords = apenasAvulsos 
     ? [] 
     : pessoas.filter(p => p.tipo === "coordenador")
       .filter(c => !coordenadorFiltro || c.id === coordenadorFiltro.id)
-      .filter(filterTipo);
-  const lideres = pessoas.filter(p => p.tipo === "lider").filter(filterTipo);
-  const cabos = apenasAvulsos ? [] : pessoas.filter(p => p.tipo === "cabo").filter(filterTipo);
+      .filter(filterTipo)
+      .filter(filterReuniao);
+  const lideres = pessoas.filter(p => p.tipo === "lider").filter(filterTipo).filter(filterReuniao);
+  const cabos = apenasAvulsos ? [] : pessoas.filter(p => p.tipo === "cabo").filter(filterTipo).filter(filterReuniao);
 
   const lideresPorCoord = new Map<string, ExportPessoa[]>();
   const avulsos: ExportPessoa[] = [];

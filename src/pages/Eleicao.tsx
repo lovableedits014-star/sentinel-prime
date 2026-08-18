@@ -833,6 +833,15 @@ export default function Eleicao() {
     // Base: respeita escopo + busca atual (filtros de tela), mas IGNORA tipoFilter
     // pois o dialog tem seu próprio filtro de tipos.
     let base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p));
+    
+    // Filtro de reunião se vier do dialog
+    if (cfg.apenasReuniao) {
+      base = base.filter(p => !!p.participou_reuniao);
+    }
+    if (cfg.apenasNaoReuniao) {
+      base = base.filter(p => !p.participou_reuniao);
+    }
+
     if (cfg.regiao) {
       base = base.filter(p =>
         escopo === "interior" ? p.cidade === cfg.regiao : p.regiao === cfg.regiao
@@ -906,6 +915,8 @@ export default function Eleicao() {
         const coordNome = byId.get(cfg.coordenadorId) || "";
         f.push({ label: "Equipe", value: coordNome });
       }
+      if (cfg.apenasReuniao) f.push({ label: "Reunião", value: "Apenas quem participou" });
+      if (cfg.apenasNaoReuniao) f.push({ label: "Reunião", value: "Apenas quem NÃO participou" });
       return f;
     };
 
@@ -933,6 +944,8 @@ export default function Eleicao() {
           email: p.email,
           observacoes: p.observacoes,
           valor_contratacao: p.valor_contratacao,
+          participou_reuniao: p.participou_reuniao,
+          reuniao_em: p.reuniao_em,
         }));
         const coordFiltro = cfg.coordenadorId
           ? { id: cfg.coordenadorId, nome: byId.get(cfg.coordenadorId) || "" }
@@ -1113,6 +1126,10 @@ export default function Eleicao() {
         <FunnelManagement 
           pessoas={pessoas as any} 
           onEdit={openEdit} 
+          onOpenExport={(reuniao, semReuniao) => {
+            // Aqui poderíamos passar presets para o dialog, mas o dialog já tem o campo de reunião agora.
+            setExportDialogOpen(true);
+          }}
           onQuickUpdate={async (id, data) => {
             const { error } = await supabase.from("eleicao_pessoas" as any).update(data).eq("id", id);
             if (error) toast.error(error.message);

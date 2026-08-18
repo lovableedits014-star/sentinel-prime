@@ -28,6 +28,8 @@ export interface ExportConfig {
   parceiroId: string | null; // null = todas as dobradinhas; "__none" = sem dobradinha
   porParceiro: boolean; // gerar um arquivo por dobradinha
   apenasAvulsos?: boolean;
+  apenasReuniao?: boolean;
+  apenasNaoReuniao?: boolean;
 }
 
 interface CoordOption { id: string; nome: string; regiao?: string | null }
@@ -56,6 +58,7 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const [incluirAvulsos, setIncluirAvulsos] = useState(true);
   const [parceiroSel, setParceiroSel] = useState<string>("__all"); // "__all" | "__none" | uuid
   const [porParceiro, setPorParceiro] = useState(false);
+  const [reuniaoFilter, setReuniaoFilter] = useState<"todos" | "reuniao" | "sem_reuniao">("todos");
 
   const toggleTipo = (t: ExportTipo) => {
     setTipos(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
@@ -109,6 +112,8 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
       parceiroId,
       porParceiro: podePorParceiro && porParceiro,
       apenasAvulsos: apenasAvulsos,
+      apenasReuniao: reuniaoFilter === "reuniao",
+      apenasNaoReuniao: reuniaoFilter === "sem_reuniao",
     });
     onOpenChange(false);
   }
@@ -258,6 +263,22 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
               )}
             </div>
           )}
+
+          {/* Funil de Reunião */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+              <Handshake className="w-3.5 h-3.5 text-blue-500" />
+              Filtrar por Reunião
+            </Label>
+            <Select value={reuniaoFilter} onValueChange={(v: any) => setReuniaoFilter(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos (independente de reunião)</SelectItem>
+                <SelectItem value="reuniao">Apenas quem participou da reunião</SelectItem>
+                <SelectItem value="sem_reuniao">Apenas quem NÃO participou</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Coordenador específico */}
           {(incluiLideresOuCabos || modo === "raiz") && coordsOrdenados.length > 0 && (
