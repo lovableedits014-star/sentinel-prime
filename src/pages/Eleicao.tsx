@@ -1034,11 +1034,31 @@ export default function Eleicao() {
       }
     }
     const qtd = rodarExport(listaTipada, lista, dobradinhaLabel, sufixo);
+    
+    // Config para exportação simples
+    const exportOpts = {
+      clientName: "", // pode ser preenchido se tivermos o nome do cliente
+      escopoLabel: escopo === "campo_grande" ? "Campo Grande" : "Interior",
+      pessoas: listaTipada.map(p => ({
+        ...p,
+        parent_nome: p.parent_id ? (pessoas.find(px => px.id === p.parent_id)?.nome || null) : null
+      })) as any,
+      filtros: baseFiltros(),
+      fileNameSuffix: sufixo,
+      mode: cfg.formato === "print" ? ("print" as const) : ("save" as const),
+      apenasAvulsos: cfg.apenasAvulsos,
+      apenasReuniao: cfg.apenasReuniao,
+      apenasNaoReuniao: cfg.apenasNaoReuniao,
+    };
+
     if (cfg.formato === "csv") {
+      exportEleicaoCsv(exportOpts);
       toast.success(`CSV exportado (${qtd} registros)`);
     } else if (cfg.formato === "print") {
+      exportEleicaoPdf(exportOpts);
       toast.success("PDF aberto para impressão em nova aba.");
     } else {
+      exportEleicaoPdf(exportOpts);
       toast.success(`PDF exportado (${qtd} registros)`);
     }
   }
