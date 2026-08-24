@@ -30,8 +30,13 @@ export interface PessoaContratada {
   rua?: string | null;
   numero?: string | null;
   bairro?: string | null;
+  cep?: string | null;
+  cpf?: string | null;
+  rg?: string | null;
+  rg_orgao_expedidor?: string | null;
   vigencia_inicio?: string | null;
   vigencia_fim?: string | null;
+
 }
 
 export interface ContractTemplate {
