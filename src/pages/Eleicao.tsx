@@ -171,6 +171,8 @@ interface Pessoa {
   email: string | null;
   user_id: string | null;
   valor_contratacao: number | null;
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
   is_favorito_regiao?: boolean | null;
   pode_cadastrar_lider?: boolean | null;
   pode_cadastrar_cabo?: boolean | null;
@@ -266,6 +268,8 @@ export default function Eleicao() {
     password: "",
     send_access: true,
     valor_contratacao: "" as string,
+    vigencia_inicio: "" as string,
+    vigencia_fim: "" as string,
     parceiro_id: "" as string,
     rateio_estadual: 100 as number,
     rateio_parceiro: 0 as number,
@@ -310,6 +314,8 @@ export default function Eleicao() {
       parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
+      vigencia_inicio: "",
+      vigencia_fim: "",
       parceiro_id: "",
       rateio_estadual: 100,
       rateio_parceiro: 0,
@@ -347,6 +353,8 @@ export default function Eleicao() {
       password: "",
       send_access: false,
       valor_contratacao: p.valor_contratacao != null ? String(p.valor_contratacao) : "",
+      vigencia_inicio: p.vigencia_inicio ? String(p.vigencia_inicio).slice(0, 10) : "",
+      vigencia_fim: p.vigencia_fim ? String(p.vigencia_fim).slice(0, 10) : "",
       parceiro_id: p.parceiro_id || "",
       rateio_estadual: p.rateio_estadual ?? 100,
       rateio_parceiro: p.rateio_parceiro ?? 0,
@@ -410,6 +418,8 @@ export default function Eleicao() {
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
+      vigencia_inicio: form.vigencia_inicio || null,
+      vigencia_fim: form.vigencia_fim || null,
       status_contratacao: form.status_contratacao,
       confirmado_em: form.status_contratacao === "confirmado" ? new Date().toISOString() : (editing?.confirmado_em || null),
       participou_reuniao: form.participou_reuniao,
@@ -1714,10 +1724,33 @@ export default function Eleicao() {
               );
             })()}
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Início do contrato</Label>
+                <Input
+                  type="date"
+                  value={form.vigencia_inicio}
+                  onChange={e => setForm(f => ({ ...f, vigencia_inicio: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Término do contrato</Label>
+                <Input
+                  type="date"
+                  value={form.vigencia_fim}
+                  onChange={e => setForm(f => ({ ...f, vigencia_fim: e.target.value }))}
+                />
+              </div>
+              <p className="col-span-2 text-[11px] text-muted-foreground -mt-1">
+                Usado na Cláusula Segunda do contrato. Se ficar vazio, sai em branco para preencher à mão.
+              </p>
+            </div>
+
             <div>
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} />
             </div>
+
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
@@ -2335,18 +2368,26 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <DropdownMenuSeparator />
           <EnviarFluxoMenu pessoa={p as any} />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            disabled={semValor}
-            title={semValor ? "Defina o valor em 'Pendentes de valor' para liberar o contrato" : "Gerar contrato em .docx"}
-            onClick={async () => {
-              try {
-                await gerarContratoIndividual(p as any, p.client_id);
-                toast.success("Contrato gerado!");
-              } catch (e: any) { toast.error(e.message); }
-            }}
-          >
-            <FileDown className="w-3.5 h-3.5 mr-2" />Baixar contrato (.docx){semValor && <span className="ml-auto text-[10px] opacity-60">sem valor</span>}
-          </DropdownMenuItem>
+          {([
+            { modo: "ambos" as const, label: "Baixar contrato + distrato (.docx)" },
+            { modo: "contrato" as const, label: "Baixar somente contrato (.docx)" },
+            { modo: "distrato" as const, label: "Baixar somente distrato (.docx)" },
+          ]).map(opt => (
+            <DropdownMenuItem
+              key={opt.modo}
+              disabled={semValor}
+              title={semValor ? "Defina o valor em 'Pendentes de valor' para liberar o contrato" : opt.label}
+              onClick={async () => {
+                try {
+                  await gerarContratoIndividual(p as any, p.client_id, opt.modo);
+                  toast.success("Documento(s) gerado(s)!");
+                } catch (e: any) { toast.error(e.message); }
+              }}
+            >
+              <FileDown className="w-3.5 h-3.5 mr-2" />{opt.label}{semValor && <span className="ml-auto text-[10px] opacity-60">sem valor</span>}
+            </DropdownMenuItem>
+          ))}
+
           {p.tipo === "coordenador" && onSend && (
             <>
               <DropdownMenuSeparator />

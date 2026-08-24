@@ -13,6 +13,8 @@ import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 
 export type EleicaoTipo = "coordenador" | "lider" | "cabo";
+export type DocKind = "contrato" | "distrato";
+export type DocModo = "contrato" | "distrato" | "ambos";
 
 export interface PessoaContratada {
   id: string;
@@ -25,6 +27,11 @@ export interface PessoaContratada {
   parent_id: string | null;
   valor_contratacao: number | null;
   is_voluntario?: boolean | null;
+  rua?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
 }
 
 export interface ContractTemplate {
@@ -33,6 +40,7 @@ export interface ContractTemplate {
   titulo: string;
   conteudo: string;
 }
+
 
 const fmtBRL = (n: number) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -89,19 +97,40 @@ export function renderTemplate(
     pessoa.tipo === "cabo" && parent?.tipo === "lider" && parent.parent_id
       ? (parents.get(parent.parent_id)?.nome ?? "—") : "—";
 
+  const LINHA = "____________________";
+  const hoje = new Date();
+  const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const fmtData = (s?: string | null) => {
+    if (!s) return LINHA;
+    const d = new Date(`${String(s).slice(0, 10)}T12:00:00`);
+    return isNaN(d.getTime()) ? LINHA : d.toLocaleDateString("pt-BR");
+  };
+
   const replacements: Record<string, string> = {
     nome: pessoa.nome,
     tipo: pessoa.tipo,
     telefone: pessoa.telefone || "—",
-    endereco: pessoa.endereco || "—",
-    cidade: pessoa.cidade || "—",
+    endereco: pessoa.endereco || LINHA,
+    rua: pessoa.rua || pessoa.endereco || LINHA,
+    numero: pessoa.numero || "S/N",
+    bairro: pessoa.bairro || LINHA,
+    cidade: pessoa.cidade || LINHA,
+    cidade_uf: pessoa.cidade ? `${pessoa.cidade}/MS` : `${LINHA}/MS`,
     regiao: pessoa.regiao ? (REGIAO_LABEL[pessoa.regiao] ?? pessoa.regiao) : "—",
     lider, coordenador,
     valor: fmtBRL(valor),
     valor_extenso: valorPorExtenso(valor),
     contratante,
-    data: new Date().toLocaleDateString("pt-BR"),
+    data: hoje.toLocaleDateString("pt-BR"),
+    dia: String(hoje.getDate()).padStart(2, "0"),
+    mes: MESES[hoje.getMonth()],
+    ano: String(hoje.getFullYear()),
+    vigencia_inicio: fmtData(pessoa.vigencia_inicio),
+    vigencia_fim: fmtData(pessoa.vigencia_fim),
+    linha: LINHA,
   };
+
 
   return template.conteudo.replace(/\{(\w+)\}/g, (_m, k) => replacements[k] ?? `{${k}}`);
 }
@@ -178,11 +207,13 @@ const TIPO_THEME: Record<EleicaoTipo, Theme> = {
   },
 };
 
-function fileNameFor(pessoa: PessoaContratada): string {
+function fileNameFor(pessoa: PessoaContratada, kind: DocKind = "contrato"): string {
   const t = TIPO_THEME[pessoa.tipo];
   const safe = pessoa.nome.replace(/[^\w\s-]/g, "").trim();
-  return `${t.prefix} ${safe}.docx`;
+  const suf = kind === "distrato" ? "Distrato" : "Contrato";
+  return `${t.prefix} ${safe} - ${suf}.docx`;
 }
+
 
 export async function gerarContratoDocxBlob(
   template: ContractTemplate,
@@ -303,17 +334,26 @@ export function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function tipoToTemplateKey(tipo: EleicaoTipo): string {
-  return `eleicao_${tipo}`;
+export const TEMPLATE_KEYS = [
+  "eleicao_coordenador", "eleicao_lider", "eleicao_cabo",
+  "eleicao_distrato_coordenador", "eleicao_distrato_lider", "eleicao_distrato_cabo",
+] as const;
+
+export function tipoToTemplateKey(tipo: EleicaoTipo, kind: DocKind = "contrato"): string {
+  return kind === "distrato" ? `eleicao_distrato_${tipo}` : `eleicao_${tipo}`;
+}
+
+function kindsFor(modo: DocModo): DocKind[] {
+  return modo === "ambos" ? ["contrato", "distrato"] : [modo];
 }
 
 export async function fetchTemplatesAndContext(clientId: string) {
   const [tplRes, clientRes, peopleRes] = await Promise.all([
     supabase.from("contract_templates").select("id,tipo,titulo,conteudo")
       .eq("client_id", clientId)
-      .in("tipo", ["eleicao_coordenador", "eleicao_lider", "eleicao_cabo"]),
+      .in("tipo", TEMPLATE_KEYS as unknown as string[]),
     supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
-    supabase.from("eleicao_pessoas" as any).select("id,nome,tipo,telefone,endereco,cidade,regiao,parent_id,valor_contratacao,is_voluntario")
+    supabase.from("eleicao_pessoas" as any).select("id,nome,tipo,telefone,endereco,rua,numero,bairro,cidade,regiao,parent_id,valor_contratacao,is_voluntario,vigencia_inicio,vigencia_fim")
       .eq("client_id", clientId),
   ]);
 
@@ -321,29 +361,38 @@ export async function fetchTemplatesAndContext(clientId: string) {
   const tplByTipo = new Map<string, ContractTemplate>();
   for (const t of templates) tplByTipo.set(t.tipo, t);
   const parents = new Map<string, PessoaContratada>();
-  for (const p of (peopleRes.data || []) as any[]) parents.set(p.id, p);
+  const byId = new Map<string, PessoaContratada>();
+  for (const p of (peopleRes.data || []) as any[]) { parents.set(p.id, p); byId.set(p.id, p); }
 
   return {
     templates,
     tplByTipo,
     contratante: clientRes.data?.name || "Campanha",
     parents,
+    byId,
   };
 }
 
 export async function gerarLoteZip(
   pessoas: PessoaContratada[],
   clientId: string,
+  modo: DocModo = "ambos",
 ): Promise<{ blob: Blob; pulados: string[] }> {
-  const { tplByTipo, contratante, parents } = await fetchTemplatesAndContext(clientId);
+  const { tplByTipo, contratante, parents, byId } = await fetchTemplatesAndContext(clientId);
   const zip = new JSZip();
   const pulados: string[] = [];
   for (const p of pessoas) {
     if (p.is_voluntario) continue;
-    const tpl = tplByTipo.get(tipoToTemplateKey(p.tipo));
-    if (!tpl) { pulados.push(p.nome); continue; }
-    const blob = await gerarContratoDocxBlob(tpl, p, contratante, parents);
-    zip.file(fileNameFor(p), blob);
+    const full = { ...(byId.get(p.id) ?? {}), ...p } as PessoaContratada;
+    let ok = false;
+    for (const kind of kindsFor(modo)) {
+      const tpl = tplByTipo.get(tipoToTemplateKey(full.tipo, kind));
+      if (!tpl) continue;
+      const blob = await gerarContratoDocxBlob(tpl, full, contratante, parents);
+      zip.file(fileNameFor(full, kind), blob);
+      ok = true;
+    }
+    if (!ok) pulados.push(p.nome);
   }
   const blob = await zip.generateAsync({ type: "blob" });
   return { blob, pulados };
@@ -352,11 +401,19 @@ export async function gerarLoteZip(
 export async function gerarContratoIndividual(
   pessoa: PessoaContratada,
   clientId: string,
+  modo: DocModo = "ambos",
 ): Promise<void> {
-  const { tplByTipo, contratante, parents } = await fetchTemplatesAndContext(clientId);
+  const { tplByTipo, contratante, parents, byId } = await fetchTemplatesAndContext(clientId);
   if (pessoa.is_voluntario) throw new Error(`${pessoa.nome} é voluntário(a) e não gera contrato de custo.`);
-  const tpl = tplByTipo.get(tipoToTemplateKey(pessoa.tipo));
-  if (!tpl) throw new Error(`Modelo de contrato não encontrado para tipo ${pessoa.tipo}`);
-  const blob = await gerarContratoDocxBlob(tpl, pessoa, contratante, parents);
-  downloadBlob(blob, fileNameFor(pessoa));
+  const full = { ...(byId.get(pessoa.id) ?? {}), ...pessoa } as PessoaContratada;
+  const kinds = kindsFor(modo);
+  let gerados = 0;
+  for (const kind of kinds) {
+    const tpl = tplByTipo.get(tipoToTemplateKey(full.tipo, kind));
+    if (!tpl) continue;
+    const blob = await gerarContratoDocxBlob(tpl, full, contratante, parents);
+    downloadBlob(blob, fileNameFor(full, kind));
+    gerados++;
+  }
+  if (gerados === 0) throw new Error(`Modelo não encontrado para ${full.tipo}. Crie o modelo em "Modelos de contrato".`);
 }

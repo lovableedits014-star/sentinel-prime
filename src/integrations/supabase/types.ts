@@ -3440,6 +3440,8 @@ export type Database = {
           updated_at: string
           user_id: string | null
           valor_contratacao: number
+          vigencia_fim: string | null
+          vigencia_inicio: string | null
           voluntario_marcado_em: string | null
           voluntario_obs: string | null
           vota_candidato: string | null
@@ -3494,6 +3496,8 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           valor_contratacao?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
           voluntario_marcado_em?: string | null
           voluntario_obs?: string | null
           vota_candidato?: string | null
@@ -3548,6 +3552,8 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           valor_contratacao?: number
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
           voluntario_marcado_em?: string | null
           voluntario_obs?: string | null
           vota_candidato?: string | null
@@ -10359,6 +10365,8 @@ export type Database = {
           updated_at: string
           user_id: string | null
           valor_contratacao: number
+          vigencia_fim: string | null
+          vigencia_inicio: string | null
           voluntario_marcado_em: string | null
           voluntario_obs: string | null
           vota_candidato: string | null
