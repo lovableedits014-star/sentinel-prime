@@ -17,13 +17,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
+import ReunioesPanel from "@/components/eleicao/ReunioesPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
 import EnviarFluxoMenu from "@/components/eleicao/EnviarFluxoMenu";
 import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog";
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
-import { FileDown, Package, FileText, Printer } from "lucide-react";
+import { FileDown, Package, FileText, Printer, CalendarDays } from "lucide-react";
 import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
 import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/ExportEleicaoDialog";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
@@ -705,7 +706,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "funnel" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
+  const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos" | "pendente" | "em_negociacao" | "confirmado" | "reuniao">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
@@ -1116,11 +1117,15 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-8 w-full max-w-6xl">
+        <TabsList className="grid grid-cols-9 w-full max-w-6xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="funnel" className="gap-1.5">
             <Handshake className="w-3.5 h-3.5" />
             Funil / Reunião
+          </TabsTrigger>
+          <TabsTrigger value="reunioes" className="gap-1.5">
+            <CalendarDays className="w-3.5 h-3.5" />
+            Reuniões
           </TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
@@ -1144,7 +1149,9 @@ export default function Eleicao() {
         </TabsList>
       </Tabs>
 
-      {view === "custos" ? (
+      {view === "reunioes" ? (
+        clientId ? <ReunioesPanel clientId={clientId} /> : null
+      ) : view === "custos" ? (
         <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
       ) : view === "funnel" ? (
         <FunnelManagement 

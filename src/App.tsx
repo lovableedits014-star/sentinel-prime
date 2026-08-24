@@ -72,6 +72,7 @@ const FotosCampanha = lazy(() => import("./pages/FotosCampanha"));
 const GaleriaPublica = lazy(() => import("./pages/GaleriaPublica"));
 const GaleriaEvento = lazy(() => import("./pages/GaleriaEvento"));
 const MissaoPublica = lazy(() => import("./pages/MissaoPublica"));
+const ReuniaoPublica = lazy(() => import("./pages/ReuniaoPublica"));
 const TrafegoPago = lazy(() => import("./pages/TrafegoPago"));
 
 // Wrappers de redirect para preservar links antigos
@@ -141,6 +142,7 @@ const RoutesWithBoundary = () => {
             <Route path="/g/:clientSlug" element={<GaleriaPublica />} />
             <Route path="/g/:clientSlug/:gallerySlug" element={<GaleriaEvento />} />
             <Route path="/missao/:missionId" element={<MissaoPublica />} />
+            <Route path="/reuniao/:token" element={<ReuniaoPublica />} />
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/comments" element={<Comments />} />

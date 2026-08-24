@@ -7227,6 +7227,213 @@ export type Database = {
           },
         ]
       }
+      reuniao_inscricoes: {
+        Row: {
+          checkin_em: string | null
+          created_at: string
+          eleicao_pessoa_id: string | null
+          id: string
+          link_id: string | null
+          nome: string
+          presenca: string | null
+          reuniao_id: string
+          sessao_id: string
+          status: string
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          checkin_em?: string | null
+          created_at?: string
+          eleicao_pessoa_id?: string | null
+          id?: string
+          link_id?: string | null
+          nome: string
+          presenca?: string | null
+          reuniao_id: string
+          sessao_id: string
+          status?: string
+          telefone: string
+          updated_at?: string
+        }
+        Update: {
+          checkin_em?: string | null
+          created_at?: string
+          eleicao_pessoa_id?: string | null
+          id?: string
+          link_id?: string | null
+          nome?: string
+          presenca?: string | null
+          reuniao_id?: string
+          sessao_id?: string
+          status?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reuniao_inscricoes_eleicao_pessoa_id_fkey"
+            columns: ["eleicao_pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "eleicao_pessoas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reuniao_inscricoes_eleicao_pessoa_id_fkey"
+            columns: ["eleicao_pessoa_id"]
+            isOneToOne: false
+            referencedRelation: "v_eleicao_indicadores_cobranca"
+            referencedColumns: ["indicador_id"]
+          },
+          {
+            foreignKeyName: "reuniao_inscricoes_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "reuniao_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reuniao_inscricoes_reuniao_id_fkey"
+            columns: ["reuniao_id"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reuniao_inscricoes_sessao_id_fkey"
+            columns: ["sessao_id"]
+            isOneToOne: false
+            referencedRelation: "reuniao_sessoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reuniao_links: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          label: string
+          reuniao_id: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          label: string
+          reuniao_id: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          label?: string
+          reuniao_id?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reuniao_links_reuniao_id_fkey"
+            columns: ["reuniao_id"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reuniao_sessoes: {
+        Row: {
+          created_at: string
+          hora_fim: string | null
+          hora_inicio: string | null
+          id: string
+          label: string
+          ordem: number
+          reuniao_id: string
+          updated_at: string
+          vagas: number
+        }
+        Insert: {
+          created_at?: string
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          label: string
+          ordem?: number
+          reuniao_id: string
+          updated_at?: string
+          vagas?: number
+        }
+        Update: {
+          created_at?: string
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          label?: string
+          ordem?: number
+          reuniao_id?: string
+          updated_at?: string
+          vagas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reuniao_sessoes_reuniao_id_fkey"
+            columns: ["reuniao_id"]
+            isOneToOne: false
+            referencedRelation: "reunioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reunioes: {
+        Row: {
+          client_id: string
+          created_at: string
+          data_reuniao: string
+          id: string
+          local: string | null
+          observacoes: string | null
+          status: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          data_reuniao: string
+          id?: string
+          local?: string | null
+          observacoes?: string | null
+          status?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          data_reuniao?: string
+          id?: string
+          local?: string | null
+          observacoes?: string | null
+          status?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reunioes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       security_events: {
         Row: {
           at: string
@@ -10520,6 +10727,28 @@ export type Database = {
         Returns: string
       }
       resume_stuck_whatsapp_dispatches: { Args: never; Returns: undefined }
+      reuniao_client_can_access: {
+        Args: { _client_id: string }
+        Returns: boolean
+      }
+      reuniao_info_token: { Args: { _token: string }; Returns: Json }
+      reuniao_inscrever_token: {
+        Args: {
+          _nome: string
+          _sessao_id: string
+          _telefone: string
+          _token: string
+        }
+        Returns: Json
+      }
+      reuniao_minha_inscricao_token: {
+        Args: { _telefone: string; _token: string }
+        Returns: Json
+      }
+      reuniao_user_can_access: {
+        Args: { _reuniao_id: string }
+        Returns: boolean
+      }
       snapshot_monthly_scores: {
         Args: { p_client_id: string }
         Returns: number
