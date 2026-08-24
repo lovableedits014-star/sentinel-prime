@@ -207,8 +207,10 @@ export default function AtribuicoesDialog({
         <DialogHeader>
           <DialogTitle>Designações · {campanhaNome}</DialogTitle>
           <DialogDescription>
-            Atribua contatos a operadores específicos, distribua em lote ou libere de volta ao pool.
-            Contatos "no pool livre" podem ser puxados por qualquer operador da campanha.
+            Aqui você decide quem liga para quem. Selecione contatos na lista abaixo e escolha uma ação:
+            <strong> atribuir</strong> a um operador (só ele verá o contato), <strong> distribuir</strong> igualmente
+            entre vários, <strong> liberar</strong> para o pool livre (qualquer operador da fila pode puxar) ou
+            <strong> remover da fila</strong> (o contato continua cadastrado, apenas sai desta fila).
           </DialogDescription>
         </DialogHeader>
 
