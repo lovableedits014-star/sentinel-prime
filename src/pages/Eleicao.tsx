@@ -430,6 +430,11 @@ export default function Eleicao() {
       nome: form.nome.trim(),
       telefone: form.telefone.trim(),
       rua, numero: numero || null, bairro,
+      cep: form.cep.replace(/\D/g, "") || null,
+      cpf: form.cpf.replace(/\D/g, "") || null,
+      rg: form.rg.trim() || null,
+      rg_orgao_expedidor: form.rg_orgao_expedidor.trim() || null,
+
       endereco: enderecoConcat,
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
