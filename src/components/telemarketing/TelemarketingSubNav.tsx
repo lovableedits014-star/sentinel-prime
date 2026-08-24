@@ -16,8 +16,11 @@ const items = [
 ];
 
 export default function TelemarketingSubNav() {
+  const { pathname } = useLocation();
+  const help = getTeleTabHelp(pathname);
   return (
-    <nav className="flex items-center gap-1 border-b -mx-4 md:-mx-6 px-4 md:px-6 mb-6 overflow-x-auto">
+    <>
+    <nav className="flex items-center gap-1 border-b -mx-4 md:-mx-6 px-4 md:px-6 overflow-x-auto">
       {items.map((it) => (
         <NavLink
           key={it.to}
