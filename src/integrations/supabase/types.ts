@@ -3395,9 +3395,11 @@ export type Database = {
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
+          cep: string | null
           cidade: string | null
           client_id: string
           confirmado_em: string | null
+          cpf: string | null
           created_at: string
           created_by: string | null
           email: string | null
@@ -3431,6 +3433,8 @@ export type Database = {
           rateio_parceiro: number
           regiao: string | null
           reuniao_em: string | null
+          rg: string | null
+          rg_orgao_expedidor: string | null
           rua: string | null
           status_contratacao: string | null
           supporter_id: string | null
@@ -3451,9 +3455,11 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          cep?: string | null
           cidade?: string | null
           client_id: string
           confirmado_em?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -3487,6 +3493,8 @@ export type Database = {
           rateio_parceiro?: number
           regiao?: string | null
           reuniao_em?: string | null
+          rg?: string | null
+          rg_orgao_expedidor?: string | null
           rua?: string | null
           status_contratacao?: string | null
           supporter_id?: string | null
@@ -3507,9 +3515,11 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          cep?: string | null
           cidade?: string | null
           client_id?: string
           confirmado_em?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -3543,6 +3553,8 @@ export type Database = {
           rateio_parceiro?: number
           regiao?: string | null
           reuniao_em?: string | null
+          rg?: string | null
+          rg_orgao_expedidor?: string | null
           rua?: string | null
           status_contratacao?: string | null
           supporter_id?: string | null
@@ -10320,9 +10332,11 @@ export type Database = {
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
+          cep: string | null
           cidade: string | null
           client_id: string
           confirmado_em: string | null
+          cpf: string | null
           created_at: string
           created_by: string | null
           email: string | null
@@ -10356,6 +10370,8 @@ export type Database = {
           rateio_parceiro: number
           regiao: string | null
           reuniao_em: string | null
+          rg: string | null
+          rg_orgao_expedidor: string | null
           rua: string | null
           status_contratacao: string | null
           supporter_id: string | null
