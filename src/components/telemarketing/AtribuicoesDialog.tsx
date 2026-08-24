@@ -281,9 +281,11 @@ export default function AtribuicoesDialog({
             <Button size="sm" variant="outline" onClick={liberar} disabled={busy}>
               <Unlock className="w-3.5 h-3.5 mr-1" />Liberar
             </Button>
+            <TeleHelp text={TELE_HELP.liberar} />
             <Button size="sm" variant="outline" className="text-destructive" onClick={removerDaFila} disabled={busy}>
               <Trash2 className="w-3.5 h-3.5 mr-1" />Remover da fila
             </Button>
+            <TeleHelp text={TELE_HELP.removerDaFila} />
 
           </div>
         )}
