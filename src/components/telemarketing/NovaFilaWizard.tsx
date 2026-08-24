@@ -224,18 +224,62 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     return true;
   };
 
+  const buildFiltros = () => ({
+    cidade: cidade.trim(),
+    bairro: bairro.trim(),
+    tipo: tipo === "__all__" ? "" : tipo,
+    indicador_id: indicadorId === "__all__" ? "" : indicadorId,
+    apenas_pendentes: apenasPendentes,
+    substituir,
+  });
+
+  // Prévia unificada (passo 6)
+  const [preview, setPreview] = useState<{ total: number; pendentes: number; ja_em_outra_fila: number } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  useEffect(() => {
+    if (!open || step !== 6 || !clientId) return;
+    let cancel = false;
+    setPreviewing(true);
+    setPreview(null);
+    supabase
+      .rpc("tele_preview_fila" as any, {
+        _client_id: clientId,
+        _origem: origem,
+        _filtros: buildFiltros(),
+        _csv_count: origem === "csv" ? csvRows.length : 0,
+      })
+      .then(({ data, error }) => {
+        if (cancel) return;
+        setPreviewing(false);
+        if (error) { toast.error("Não foi possível calcular a prévia: " + error.message); return; }
+        const r = (data as any) || {};
+        setPreview({
+          total: Number(r.total || 0),
+          pendentes: Number(r.pendentes || 0),
+          ja_em_outra_fila: Number(r.ja_em_outra_fila || 0),
+        });
+      });
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, step, clientId, origem, cidade, bairro, tipo, indicadorId, apenasPendentes, substituir, csvRows.length]);
+
+  const previewEntrarao = preview
+    ? (apenasPendentes ? preview.pendentes : preview.total) - (substituir ? 0 : preview.ja_em_outra_fila)
+    : 0;
+
   const finish = async () => {
+    if (origem !== "csv" && preview && Math.max(0, previewEntrarao) === 0) {
+      toast.error("Nenhum contato atende a esses filtros.", {
+        description: "Ajuste os filtros no passo 3 antes de criar a fila — ela ficaria vazia.",
+      });
+      return;
+    }
     setBusy(true);
     const perguntasArr = perguntas.split("\n").map(s => s.trim()).filter(Boolean);
     const tagsArr = tags.split("\n").map(s => s.trim()).filter(Boolean);
-    const filtros: any = {
-      cidade: cidade.trim() ? `%${cidade.trim()}%` : "",
-      bairro: bairro.trim() ? `%${bairro.trim()}%` : "",
-      tipo: tipo === "__all__" ? "" : tipo,
-      indicador_id: indicadorId === "__all__" ? "" : indicadorId,
-      apenas_pendentes: apenasPendentes,
-      substituir,
-    };
+    const filtros: any = buildFiltros();
+
 
     // Se origem é CSV/Excel, criamos a fila SEM contatos (envia [] para o wizard) e depois importamos
     // com dedup pelo tele_import_contato_avulso_batch. Se for outra origem, o wizard já popula.
