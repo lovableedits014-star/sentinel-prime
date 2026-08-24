@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
 interface ContatoTele {
   id: string;
@@ -718,8 +719,8 @@ export default function Telemarketing() {
             <CardContent className="space-y-4">
               {/* Phone + WhatsApp */}
               {(() => {
-                const digits = (current.telefone || "").replace(/\D/g, "");
-                const wa = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+                const wa = toWhatsAppBR(current.telefone);
+                const telLink = wa ? `+${wa}` : (current.telefone || "");
                 const template = current.campanha_id ? scripts.find(s => s.id === current.campanha_id)?.whatsapp_template : null;
                 const msg = template ? String(template).replace(/\{\{\s*nome\s*\}\}/gi, current.nome || "").replace(/\{\{\s*operador\s*\}\}/gi, operadorNome.trim()) : "";
                 const waUrl = `https://wa.me/${wa}${msg ? `?text=${encodeURIComponent(msg)}` : ""}`;
@@ -727,20 +728,28 @@ export default function Telemarketing() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg">
                       <Phone className="w-5 h-5 text-primary" />
-                      <span className="text-lg font-bold text-primary">{current.telefone}</span>
+                      <span className="text-lg font-bold text-primary">{fmtPhoneBR(wa || current.telefone)}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
-                        asChild
+                        asChild={!!wa}
+                        disabled={!wa}
+                        title={wa ? undefined : "Telefone inválido — corrija o cadastro"}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white h-11"
                       >
+                        {wa ? (
                         <a href={waUrl} target="_blank" rel="noopener noreferrer" aria-label="Abrir conversa no WhatsApp">
+
                           <svg viewBox="0 0 24 24" className="w-4 h-4 mr-1 fill-current"><path d="M20.5 3.5A11 11 0 0 0 3.6 17.3L2 22l4.8-1.6a11 11 0 0 0 16.7-9.3 11 11 0 0 0-3-7.6ZM12 20.1a9 9 0 0 1-4.6-1.3l-.3-.2-2.8.9.9-2.8-.2-.3A9.1 9.1 0 1 1 12 20Zm5-6.7c-.3-.1-1.7-.8-2-1-.3-.1-.5-.1-.7.2l-1 1.2c-.2.2-.4.3-.7.1a7.4 7.4 0 0 1-3.6-3.2c-.3-.5.3-.4.8-1.4.1-.2 0-.4-.1-.5l-1-2.4c-.2-.5-.5-.4-.7-.4H7c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.2.2 2 3.1 5 4.3.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3Z"/></svg>
                           WhatsApp
                         </a>
+                        ) : (
+                          <span className="flex items-center">WhatsApp</span>
+                        )}
                       </Button>
+
                       <Button asChild variant="outline" className="h-11">
-                        <a href={`tel:${current.telefone}`} aria-label="Ligar por telefone">
+                        <a href={`tel:${telLink}`} aria-label="Ligar por telefone">
                           <Phone className="w-4 h-4 mr-1" />
                           Ligar
                         </a>
