@@ -97,19 +97,40 @@ export function renderTemplate(
     pessoa.tipo === "cabo" && parent?.tipo === "lider" && parent.parent_id
       ? (parents.get(parent.parent_id)?.nome ?? "—") : "—";
 
+  const LINHA = "____________________";
+  const hoje = new Date();
+  const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  const fmtData = (s?: string | null) => {
+    if (!s) return LINHA;
+    const d = new Date(`${String(s).slice(0, 10)}T12:00:00`);
+    return isNaN(d.getTime()) ? LINHA : d.toLocaleDateString("pt-BR");
+  };
+
   const replacements: Record<string, string> = {
     nome: pessoa.nome,
     tipo: pessoa.tipo,
     telefone: pessoa.telefone || "—",
-    endereco: pessoa.endereco || "—",
-    cidade: pessoa.cidade || "—",
+    endereco: pessoa.endereco || LINHA,
+    rua: pessoa.rua || pessoa.endereco || LINHA,
+    numero: pessoa.numero || "S/N",
+    bairro: pessoa.bairro || LINHA,
+    cidade: pessoa.cidade || LINHA,
+    cidade_uf: pessoa.cidade ? `${pessoa.cidade}/MS` : `${LINHA}/MS`,
     regiao: pessoa.regiao ? (REGIAO_LABEL[pessoa.regiao] ?? pessoa.regiao) : "—",
     lider, coordenador,
     valor: fmtBRL(valor),
     valor_extenso: valorPorExtenso(valor),
     contratante,
-    data: new Date().toLocaleDateString("pt-BR"),
+    data: hoje.toLocaleDateString("pt-BR"),
+    dia: String(hoje.getDate()).padStart(2, "0"),
+    mes: MESES[hoje.getMonth()],
+    ano: String(hoje.getFullYear()),
+    vigencia_inicio: fmtData(pessoa.vigencia_inicio),
+    vigencia_fim: fmtData(pessoa.vigencia_fim),
+    linha: LINHA,
   };
+
 
   return template.conteudo.replace(/\{(\w+)\}/g, (_m, k) => replacements[k] ?? `{${k}}`);
 }
