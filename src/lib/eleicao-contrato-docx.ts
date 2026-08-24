@@ -375,7 +375,7 @@ export async function fetchTemplatesAndContext(clientId: string) {
       .eq("client_id", clientId)
       .in("tipo", TEMPLATE_KEYS as unknown as string[]),
     supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
-    supabase.from("eleicao_pessoas" as any).select("id,nome,tipo,telefone,endereco,rua,numero,bairro,cidade,regiao,parent_id,valor_contratacao,is_voluntario,vigencia_inicio,vigencia_fim")
+    supabase.from("eleicao_pessoas" as any).select("id,nome,tipo,telefone,endereco,rua,numero,bairro,cep,cpf,rg,rg_orgao_expedidor,cidade,regiao,parent_id,valor_contratacao,is_voluntario,vigencia_inicio,vigencia_fim")
       .eq("client_id", clientId),
   ]);
 
