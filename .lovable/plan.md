@@ -26,16 +26,8 @@ Rota `/reuniao/:token`:
 - Contadores: vagas ocupadas/restantes, taxa de comparecimento, faltas por coordenador.
 - Exportação Excel/PDF da lista de inscritos e do relatório de presença (mesmo padrão dos outros relatórios).
 
-## 4. Melhorias sugeridas
-
-- **Lista de espera**: quando a sessão lota, o inscrito entra em espera e é promovido automaticamente se alguém cancelar.
-- **Fechamento automático**: encerrar inscrições em data/hora definida ou ao lotar tudo.
-- **Lembrete no WhatsApp**: disparo em massa para os inscritos (véspera e manhã do dia) usando a Central WhatsApp já existente.
-- **QR Code do link** para projetar/imprimir, e QR de check-in na porta.
-- **Cobrança de ausentes**: um clique gera a lista de quem se inscreveu e não compareceu para disparo/cobrança pelo coordenador.
-
 ## Detalhes técnicos
 
-- Tabelas novas: `reunioes` (client_id, título, data, local, status, encerra_em), `reuniao_sessoes` (reuniao_id, label, início, fim, vagas), `reuniao_links` (token único, label do grupo, ativo), `reuniao_inscricoes` (sessão, nome, telefone normalizado, link de origem, eleicao_pessoa_id opcional, status: confirmado/espera/cancelado, presença + horário do check-in). GRANTs + RLS: escrita/leitura restrita ao cliente autenticado; o público não acessa as tabelas diretamente.
-- Acesso público via RPCs `security definer` por token (padrão já usado em indicações/missões): uma para ler config + vagas restantes, outra para inscrever com verificação transacional de lotação (evita estouro em cliques simultâneos) e entrada em lista de espera.
+- Tabelas novas: `reunioes` (client_id, título, data, local, status), `reuniao_sessoes` (reuniao_id, label, início, fim, vagas), `reuniao_links` (token único, label do grupo, ativo), `reuniao_inscricoes` (sessão, nome, telefone normalizado, link de origem, eleicao_pessoa_id opcional, status: confirmado/cancelado, presença + horário do check-in). GRANTs + RLS: escrita/leitura restrita ao cliente autenticado; o público não acessa as tabelas diretamente.
+- Acesso público via RPCs `security definer` por token (padrão já usado em indicações/missões): uma para ler config + vagas restantes, outra para inscrever com verificação transacional de lotação (evita estouro em cliques simultâneos).
 - Front: `src/pages/ReuniaoPublica.tsx` + rota pública em `App.tsx`; painel em `src/components/eleicao/ReunioesPanel.tsx` com dialogs de criação, links e check-in. Telefone via `toWhatsAppBR` de `src/lib/phone-utils.ts`; check-in grava também `participou_reuniao`/`reuniao_em` em `eleicao_pessoas` quando houver vínculo.
