@@ -8,7 +8,7 @@ export const CONTRATO_PADRAO = `CONTRATO DE PRESTAÇÃO DE SERVIÇOS NA CAMPANHA
 
 CONTRATANTE: ELEIÇÃO 2026 ADEMAR VIEIRA JUNIOR DEPUTADO ESTADUAL, inscrita no CNPJ: 68.499.966/0001-59, com seu Comitê instalado à Rua Genciana, Nº 300 – Bairro Jardim Nova Jerusalém, em Campo Grande - MS, na qualidade de candidato a Deputado Estadual pelo Partido MDB.
 
-CONTRATADO (A): {nome}, brasileiro (a), regularmente inscrito(a) no CPF sob o nº. _____________________, e no RG _____________________, expedido por ____________, residente e domiciliado a {rua}, {numero} – {bairro} – CEP ______________, Cidade: {cidade}; Mato Grosso do Sul.
+CONTRATADO (A): {nome}, brasileiro (a), regularmente inscrito(a) no CPF sob o nº. {cpf}, e no RG {rg}, expedido por {orgao_expedidor}, residente e domiciliado a {rua}, {numero} – {bairro} – CEP {cep}, Cidade: {cidade}; Mato Grosso do Sul.
 
 Têm entre si justos e acertados os serviços abaixo descritos, sob disciplina da Resolução TSE nº. 23.607/2019, e conforme as cláusulas a seguir estabelecidas:
 
@@ -47,11 +47,11 @@ CNPJ: 68.499.966/0001-59
 
 _______________________________________
 {nome}
-CPF: _____________________`;
+CPF: {cpf}`;
 
 export const DISTRATO_PADRAO = `DISTRATO DE PRESTAÇÃO DE SERVIÇOS DE CABO ELEITORAL
 
-Pelo presente instrumento e em virtude do Contrato de Prestação de Serviços de Cabo Eleitoral, firmado entre ELEIÇÃO 2026 ADEMAR VIEIRA JUNIOR DEPUTADO ESTADUAL, portador do CNPJ Nº 68.499.966/0001-59, situado à Rua Genciana, Nº 300 – Bairro Jardim Nova Jerusalém, nesta Capital, na qualidade de candidato a Deputado Estadual pelo MDB, e {nome}, portador do CPF: _____________________, resolvem, neste ato, de comum acordo, rescindi-lo, como de fato rescindido fica a partir da presente data.
+Pelo presente instrumento e em virtude do Contrato de Prestação de Serviços de Cabo Eleitoral, firmado entre ELEIÇÃO 2026 ADEMAR VIEIRA JUNIOR DEPUTADO ESTADUAL, portador do CNPJ Nº 68.499.966/0001-59, situado à Rua Genciana, Nº 300 – Bairro Jardim Nova Jerusalém, nesta Capital, na qualidade de candidato a Deputado Estadual pelo MDB, e {nome}, portador do CPF: {cpf}, resolvem, neste ato, de comum acordo, rescindi-lo, como de fato rescindido fica a partir da presente data.
 
 As partes dão plena quitação, para nada mais reclamarem a qualquer tempo ou a qualquer título e em virtude do referido contrato de prestação de serviços.
 
@@ -68,4 +68,4 @@ CNPJ: 68.499.966/0001-59
 
 _______________________________________
 {nome}
-CPF: _____________________`;
+CPF: {cpf}`;

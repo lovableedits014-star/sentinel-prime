@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { formatCPF } from "@/lib/cpf";
+
+const formatCEP = (v: string) => {
+  const d = onlyDigits(v).slice(0, 8);
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+};
+
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -166,6 +173,11 @@ interface Pessoa {
   rua: string | null;
   numero: string | null;
   bairro: string | null;
+  cep?: string | null;
+  cpf?: string | null;
+  rg?: string | null;
+  rg_orgao_expedidor?: string | null;
+
   parent_id: string | null;
   observacoes: string | null;
   email: string | null;
@@ -261,6 +273,11 @@ export default function Eleicao() {
     rua: "",
     numero: "",
     bairro: "",
+    cep: "",
+    cpf: "",
+    rg: "",
+    rg_orgao_expedidor: "",
+
     parent_id: "" as string,
     liderAvulso: false,
     observacoes: "",
@@ -311,6 +328,8 @@ export default function Eleicao() {
       tipo: "coordenador", escopo, regiao: "centro",
       cidade: escopo === "campo_grande" ? "Campo Grande" : "",
       nome: "", telefone: "", rua: "", numero: "", bairro: "",
+      cep: "", cpf: "", rg: "", rg_orgao_expedidor: "",
+
       parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
@@ -346,6 +365,11 @@ export default function Eleicao() {
       rua: p.rua || ruaFallback,
       numero: p.numero || "",
       bairro: p.bairro || "",
+      cep: p.cep || "",
+      cpf: p.cpf || "",
+      rg: p.rg || "",
+      rg_orgao_expedidor: p.rg_orgao_expedidor || "",
+
       parent_id: p.parent_id || "",
       liderAvulso: p.tipo === "lider" && !p.parent_id,
       observacoes: p.observacoes || "",
@@ -413,6 +437,11 @@ export default function Eleicao() {
       nome: form.nome.trim(),
       telefone: form.telefone.trim(),
       rua, numero: numero || null, bairro,
+      cep: form.cep.replace(/\D/g, "") || null,
+      cpf: form.cpf.replace(/\D/g, "") || null,
+      rg: form.rg.trim() || null,
+      rg_orgao_expedidor: form.rg_orgao_expedidor.trim() || null,
+
       endereco: enderecoConcat,
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
@@ -1597,6 +1626,53 @@ export default function Eleicao() {
               <Label>Bairro *</Label>
               <Input value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: e.target.value }))} placeholder="Centro" />
             </div>
+
+            <div className="rounded-md border p-3 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Documentos (usados no contrato e distrato)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>CPF</Label>
+                  <Input
+                    value={formatCPF(form.cpf)}
+                    onChange={e => setForm(f => ({ ...f, cpf: onlyDigits(e.target.value).slice(0, 11) }))}
+                    placeholder="000.000.000-00"
+                    inputMode="numeric"
+                    maxLength={14}
+                  />
+                </div>
+                <div>
+                  <Label>CEP</Label>
+                  <Input
+                    value={formatCEP(form.cep)}
+                    onChange={e => setForm(f => ({ ...f, cep: onlyDigits(e.target.value).slice(0, 8) }))}
+                    placeholder="79000-000"
+                    inputMode="numeric"
+                    maxLength={9}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>RG</Label>
+                  <Input value={form.rg} onChange={e => setForm(f => ({ ...f, rg: e.target.value }))} placeholder="0000000" maxLength={30} />
+                </div>
+                <div>
+                  <Label>Órgão expedidor</Label>
+                  <Input
+                    value={form.rg_orgao_expedidor}
+                    onChange={e => setForm(f => ({ ...f, rg_orgao_expedidor: e.target.value }))}
+                    placeholder="SEJUSP/MS"
+                    maxLength={30}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Vigência, dados bancários e a data do contrato ficam em branco no documento para preencher à mão.
+              </p>
+            </div>
+
 
 
 
