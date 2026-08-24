@@ -200,7 +200,14 @@ export default function TelemarketingAdminFilas() {
                           <Badge variant={f.ativo ? "default" : "secondary"} className="text-[10px]">
                             {f.ativo ? "Ativa" : "Pausada"}
                           </Badge>
+                          {fonteMap[f.campanha_id]?.fonte && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {ORIGEM_LABEL[fonteMap[f.campanha_id].fonte as string] || fonteMap[f.campanha_id].fonte}
+                              {fonteMap[f.campanha_id]?.filtro?.cidade ? ` · ${fonteMap[f.campanha_id].filtro.cidade}` : ""}
+                            </Badge>
+                          )}
                         </div>
+
                         {f.descricao && <p className="text-xs text-muted-foreground truncate">{f.descricao}</p>}
                       </div>
                       <div className="flex gap-1 shrink-0">
