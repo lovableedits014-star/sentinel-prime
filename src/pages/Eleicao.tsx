@@ -1148,7 +1148,9 @@ export default function Eleicao() {
         </TabsList>
       </Tabs>
 
-      {view === "custos" ? (
+      {view === "reunioes" ? (
+        clientId ? <ReunioesPanel clientId={clientId} /> : null
+      ) : view === "custos" ? (
         <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
       ) : view === "funnel" ? (
         <FunnelManagement 
