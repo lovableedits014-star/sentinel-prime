@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, UserCheck, Users, Unlock, Shuffle } from "lucide-react";
+import { Loader2, Search, UserCheck, Users, Unlock, Shuffle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Operador { id: string; nome: string; ativo?: boolean }
