@@ -217,7 +217,9 @@ export default function AtribuicoesDialog({
         <div className="flex gap-2 flex-wrap text-xs">
           <Badge variant="outline">{counts.total} total</Badge>
           <Badge variant="secondary">{counts.pend} pendentes</Badge>
-          <Badge variant="outline">{counts.livres} no pool livre</Badge>
+          <Badge variant="outline" className="gap-1">
+            {counts.livres} no pool livre <TeleHelp text={TELE_HELP.poolLivre} />
+          </Badge>
           <Badge variant="default">{counts.atribuidos} atribuídos</Badge>
         </div>
 
@@ -255,6 +257,7 @@ export default function AtribuicoesDialog({
           <Button size="sm" variant="outline" onClick={redistribuirFila} disabled={busy}>
             <Shuffle className="w-3.5 h-3.5 mr-1" />Redistribuir fila
           </Button>
+          <TeleHelp text={TELE_HELP.redistribuirFila} />
         </div>
 
 
