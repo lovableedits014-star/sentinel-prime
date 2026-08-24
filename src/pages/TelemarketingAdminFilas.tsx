@@ -12,6 +12,8 @@ import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
 import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
 import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
 import AdicionarContatosDialog from "@/components/telemarketing/AdicionarContatosDialog";
+import TeleHelp from "@/components/telemarketing/TeleHelp";
+import { TELE_HELP } from "@/components/telemarketing/telemarketing-help";
 
 const ORIGEM_LABEL: Record<string, string> = {
   csv: "Planilha",
