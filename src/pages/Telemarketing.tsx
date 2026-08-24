@@ -978,7 +978,7 @@ export default function Telemarketing() {
                 <div className="flex gap-2 pt-2">
                   <Button
                     onClick={handleSave}
-                    disabled={saving || !ligacaoStatus || (ligacaoStatus === "reagendou" && !proximaTentativa)}
+                    disabled={saving || !ligacaoStatus || (ligacaoStatus === "reagendou" && !proximaTentativa) || (ligacaoStatus === "atendeu" && votaCandidato === "nao" && !candidatoAlt.trim())}
                     className="flex-1"
                   >
                     {saving ? "Salvando..." : "Salvar e Próximo"}
