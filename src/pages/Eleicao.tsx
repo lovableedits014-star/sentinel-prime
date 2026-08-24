@@ -2335,18 +2335,26 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <DropdownMenuSeparator />
           <EnviarFluxoMenu pessoa={p as any} />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            disabled={semValor}
-            title={semValor ? "Defina o valor em 'Pendentes de valor' para liberar o contrato" : "Gerar contrato em .docx"}
-            onClick={async () => {
-              try {
-                await gerarContratoIndividual(p as any, p.client_id);
-                toast.success("Contrato gerado!");
-              } catch (e: any) { toast.error(e.message); }
-            }}
-          >
-            <FileDown className="w-3.5 h-3.5 mr-2" />Baixar contrato (.docx){semValor && <span className="ml-auto text-[10px] opacity-60">sem valor</span>}
-          </DropdownMenuItem>
+          {([
+            { modo: "ambos" as const, label: "Baixar contrato + distrato (.docx)" },
+            { modo: "contrato" as const, label: "Baixar somente contrato (.docx)" },
+            { modo: "distrato" as const, label: "Baixar somente distrato (.docx)" },
+          ]).map(opt => (
+            <DropdownMenuItem
+              key={opt.modo}
+              disabled={semValor}
+              title={semValor ? "Defina o valor em 'Pendentes de valor' para liberar o contrato" : opt.label}
+              onClick={async () => {
+                try {
+                  await gerarContratoIndividual(p as any, p.client_id, opt.modo);
+                  toast.success("Documento(s) gerado(s)!");
+                } catch (e: any) { toast.error(e.message); }
+              }}
+            >
+              <FileDown className="w-3.5 h-3.5 mr-2" />{opt.label}{semValor && <span className="ml-auto text-[10px] opacity-60">sem valor</span>}
+            </DropdownMenuItem>
+          ))}
+
           {p.tipo === "coordenador" && onSend && (
             <>
               <DropdownMenuSeparator />
