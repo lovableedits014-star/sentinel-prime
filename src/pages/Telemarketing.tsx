@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock } from "lucide-react";
+import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock, Search } from "lucide-react";
 import { toast } from "sonner";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
