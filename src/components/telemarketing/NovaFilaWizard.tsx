@@ -11,6 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, Check, Database, FileSpreadsheet, Megaphone, Upload, Users2, Vote, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import TeleHelp from "./TeleHelp";
+import IndicadorCombobox from "./IndicadorCombobox";
+import { TELE_HELP } from "./telemarketing-help";
 
 type Origem = "csv" | "estrutura" | "indicados_eleicao" | "contratados" | "indicados_contratados";
 type ModoDesignacao = "pool" | "um" | "dividir";
