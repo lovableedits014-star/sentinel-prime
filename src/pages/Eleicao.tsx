@@ -266,6 +266,11 @@ export default function Eleicao() {
     rua: "",
     numero: "",
     bairro: "",
+    cep: "",
+    cpf: "",
+    rg: "",
+    rg_orgao_expedidor: "",
+
     parent_id: "" as string,
     liderAvulso: false,
     observacoes: "",
