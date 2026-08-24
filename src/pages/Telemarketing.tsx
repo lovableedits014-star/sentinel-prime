@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
 interface ContatoTele {
   id: string;
@@ -718,8 +719,8 @@ export default function Telemarketing() {
             <CardContent className="space-y-4">
               {/* Phone + WhatsApp */}
               {(() => {
-                const digits = (current.telefone || "").replace(/\D/g, "");
-                const wa = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+                const wa = toWhatsAppBR(current.telefone);
+                const telLink = wa ? `+${wa}` : (current.telefone || "");
                 const template = current.campanha_id ? scripts.find(s => s.id === current.campanha_id)?.whatsapp_template : null;
                 const msg = template ? String(template).replace(/\{\{\s*nome\s*\}\}/gi, current.nome || "").replace(/\{\{\s*operador\s*\}\}/gi, operadorNome.trim()) : "";
                 const waUrl = `https://wa.me/${wa}${msg ? `?text=${encodeURIComponent(msg)}` : ""}`;
@@ -727,7 +728,7 @@ export default function Telemarketing() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg">
                       <Phone className="w-5 h-5 text-primary" />
-                      <span className="text-lg font-bold text-primary">{current.telefone}</span>
+                      <span className="text-lg font-bold text-primary">{fmtPhoneBR(wa || current.telefone)}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
@@ -740,7 +741,7 @@ export default function Telemarketing() {
                         </a>
                       </Button>
                       <Button asChild variant="outline" className="h-11">
-                        <a href={`tel:${current.telefone}`} aria-label="Ligar por telefone">
+                        <a href={`tel:${telLink}`} aria-label="Ligar por telefone">
                           <Phone className="w-4 h-4 mr-1" />
                           Ligar
                         </a>
