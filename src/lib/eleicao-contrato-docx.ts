@@ -417,5 +417,3 @@ export async function gerarContratoIndividual(
   }
   if (gerados === 0) throw new Error(`Modelo não encontrado para ${full.tipo}. Crie o modelo em "Modelos de contrato".`);
 }
-
-}
