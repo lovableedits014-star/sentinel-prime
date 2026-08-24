@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
+import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+
 import { 
   Database, 
   Search, 
