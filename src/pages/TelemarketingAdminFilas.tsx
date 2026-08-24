@@ -244,9 +244,26 @@ export default function TelemarketingAdminFilas() {
                       <Button size="sm" variant="default" onClick={() => abrirComoTeste(f.campanha_id)}>
                         <FlaskConical className="w-3.5 h-3.5 mr-1" /> Testar fila
                       </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAddDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
+                        <UserPlus className="w-3.5 h-3.5 mr-1" /> Adicionar contatos
+                      </Button>
+                      {fonteMap[f.campanha_id]?.fonte && fonteMap[f.campanha_id].fonte !== "csv" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={repopulando === f.campanha_id}
+                          onClick={() => repopular(f)}
+                          title="Buscar novos contatos com o mesmo filtro usado antes"
+                        >
+                          {repopulando === f.campanha_id
+                            ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                            : <RotateCw className="w-3.5 h-3.5 mr-1" />} Buscar novos
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline" onClick={() => setAtribDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
                         <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
+
                       <Button size="sm" variant="outline" asChild>
                         <a href={linkOperador(f.campanha_id)} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="w-3.5 h-3.5 mr-1" /> Abrir
