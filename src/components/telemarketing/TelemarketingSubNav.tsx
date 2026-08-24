@@ -40,5 +40,13 @@ export default function TelemarketingSubNav() {
         </NavLink>
       ))}
     </nav>
+    {help && (
+      <div className="flex items-start gap-2 rounded-lg border bg-muted/40 px-3 py-2 mt-3 mb-6 text-xs text-muted-foreground">
+        <Info className="w-4 h-4 mt-0.5 shrink-0 text-primary" />
+        <p><span className="font-medium text-foreground">{help.title}:</span> {help.text}</p>
+      </div>
+    )}
+    {!help && <div className="mb-6" />}
+    </>
   );
 }
