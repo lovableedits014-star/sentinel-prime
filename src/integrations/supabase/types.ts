@@ -9644,6 +9644,7 @@ export type Database = {
         Args: { _client_id: string; _nome: string; _senha: string }
         Returns: string
       }
+      _tele_like: { Args: { _v: string }; Returns: string }
       calculate_engagement_score: {
         Args: { p_days?: number; p_supporter_id: string }
         Returns: number
@@ -10818,8 +10819,27 @@ export type Database = {
           tabela: string
         }[]
       }
+      tele_popular_fila: {
+        Args: {
+          _campanha_id: string
+          _client_id: string
+          _csv_rows?: Json
+          _filtros?: Json
+          _origem: string
+        }
+        Returns: Json
+      }
       tele_preview_eleicao_indicados: {
         Args: { _client_id: string; _filtros: Json }
+        Returns: Json
+      }
+      tele_preview_fila: {
+        Args: {
+          _client_id: string
+          _csv_count?: number
+          _filtros?: Json
+          _origem: string
+        }
         Returns: Json
       }
       tele_proximo_contato: {
@@ -10938,6 +10958,15 @@ export type Database = {
           _campanha_id: string
           _client_id: string
           _contato_ids: string[]
+        }
+        Returns: Json
+      }
+      tele_remover_da_fila: {
+        Args: {
+          _campanha_id: string
+          _client_id: string
+          _ids: string[]
+          _tabela: string
         }
         Returns: Json
       }
