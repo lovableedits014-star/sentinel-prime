@@ -588,16 +588,14 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
                 )}
                 {origem === "indicados_eleicao" && indicadores.length > 0 && (
                   <div>
-                    <Label>Indicador específico (opcional)</Label>
-                    <Select value={indicadorId} onValueChange={setIndicadorId}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        <SelectItem value="__all__">Qualquer indicador</SelectItem>
-                        {indicadores.map(i => (
-                          <SelectItem key={i.id} value={i.id}>{i.nome} ({i.tipo})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label className="flex items-center gap-1">
+                      Indicador específico (opcional) <TeleHelp text={TELE_HELP.indicadoPor} />
+                    </Label>
+                    <IndicadorCombobox
+                      value={indicadorId}
+                      onChange={setIndicadorId}
+                      options={indicadores}
+                    />
                   </div>
                 )}
                 <div className="space-y-2 pt-2 border-t">

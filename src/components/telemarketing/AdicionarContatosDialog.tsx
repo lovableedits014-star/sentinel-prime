@@ -381,14 +381,16 @@ export default function AdicionarContatosDialog({
                   </div>
                 )}
                 <div>
-                  <Label className="text-xs">Indicado por</Label>
-                  <Select value={indicadorId} onValueChange={setIndicadorId}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL}>Todos</SelectItem>
-                      {indicadores.map(i => <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs flex items-center gap-1">
+                    Indicado por <TeleHelp text={TELE_HELP.indicadoPor} />
+                  </Label>
+                  <IndicadorCombobox
+                    value={indicadorId}
+                    onChange={setIndicadorId}
+                    options={indicadores}
+                    allValue={ALL}
+                    allLabel="Todos os indicadores"
+                  />
                 </div>
               </div>
               <label className="flex items-center gap-2 text-sm">
