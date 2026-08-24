@@ -435,7 +435,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                             ) : (
                               <Badge variant="outline" className="text-[10px] border-emerald-500/60 text-emerald-600">Meta ok</Badge>
                             )}
+                            {r.telefone && (
+                              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">
+                                {fmtTelBR(r.telefone)}
+                              </span>
+                            )}
                             {r.regiao && <span className="text-xs text-muted-foreground">{r.regiao}{r.cidade ? ` · ${r.cidade}` : ""}</span>}
+
                           </div>
                           <div className="flex items-center gap-2 mt-1.5">
                             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[200px]">
