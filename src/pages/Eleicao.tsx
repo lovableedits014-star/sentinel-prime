@@ -1724,10 +1724,33 @@ export default function Eleicao() {
               );
             })()}
 
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Início do contrato</Label>
+                <Input
+                  type="date"
+                  value={form.vigencia_inicio}
+                  onChange={e => setForm(f => ({ ...f, vigencia_inicio: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Término do contrato</Label>
+                <Input
+                  type="date"
+                  value={form.vigencia_fim}
+                  onChange={e => setForm(f => ({ ...f, vigencia_fim: e.target.value }))}
+                />
+              </div>
+              <p className="col-span-2 text-[11px] text-muted-foreground -mt-1">
+                Usado na Cláusula Segunda do contrato. Se ficar vazio, sai em branco para preencher à mão.
+              </p>
+            </div>
+
             <div>
               <Label>Observações</Label>
               <Textarea rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} />
             </div>
+
           </div>
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
