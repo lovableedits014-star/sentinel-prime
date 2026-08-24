@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.eleicao_pessoa_in_user_tree(uuid) FROM PUBLIC, anon;
