@@ -171,6 +171,8 @@ interface Pessoa {
   email: string | null;
   user_id: string | null;
   valor_contratacao: number | null;
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
   is_favorito_regiao?: boolean | null;
   pode_cadastrar_lider?: boolean | null;
   pode_cadastrar_cabo?: boolean | null;
@@ -266,6 +268,8 @@ export default function Eleicao() {
     password: "",
     send_access: true,
     valor_contratacao: "" as string,
+    vigencia_inicio: "" as string,
+    vigencia_fim: "" as string,
     parceiro_id: "" as string,
     rateio_estadual: 100 as number,
     rateio_parceiro: 0 as number,
@@ -310,6 +314,8 @@ export default function Eleicao() {
       parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
+      vigencia_inicio: "",
+      vigencia_fim: "",
       parceiro_id: "",
       rateio_estadual: 100,
       rateio_parceiro: 0,
@@ -347,6 +353,8 @@ export default function Eleicao() {
       password: "",
       send_access: false,
       valor_contratacao: p.valor_contratacao != null ? String(p.valor_contratacao) : "",
+      vigencia_inicio: p.vigencia_inicio ? String(p.vigencia_inicio).slice(0, 10) : "",
+      vigencia_fim: p.vigencia_fim ? String(p.vigencia_fim).slice(0, 10) : "",
       parceiro_id: p.parceiro_id || "",
       rateio_estadual: p.rateio_estadual ?? 100,
       rateio_parceiro: p.rateio_parceiro ?? 0,
@@ -410,6 +418,8 @@ export default function Eleicao() {
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
       valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
+      vigencia_inicio: form.vigencia_inicio || null,
+      vigencia_fim: form.vigencia_fim || null,
       status_contratacao: form.status_contratacao,
       confirmado_em: form.status_contratacao === "confirmado" ? new Date().toISOString() : (editing?.confirmado_em || null),
       participou_reuniao: form.participou_reuniao,
