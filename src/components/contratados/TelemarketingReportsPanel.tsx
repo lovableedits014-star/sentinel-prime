@@ -272,11 +272,13 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
         <div className="flex items-center gap-2">
           <Crown className="w-4 h-4 text-primary" />
           <Select value={selectedLider} onValueChange={setSelectedLider}>
-            <SelectTrigger className="w-[200px] h-9 text-xs">
+            <SelectTrigger className="w-[230px] h-9 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="geral">📊 Relatório Geral</SelectItem>
+              <SelectItem value="somente_indicados">🎯 Somente indicados</SelectItem>
+              <SelectItem value="somente_estrutura">🏛️ Somente estrutura (líderes/liderados)</SelectItem>
               {lideres.map(l => (
                 <SelectItem key={l.id} value={l.id}>👑 {l.nome}</SelectItem>
               ))}
