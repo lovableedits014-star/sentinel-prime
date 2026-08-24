@@ -725,9 +725,34 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
                 </span>
               </div>
             </div>
+            <div className="rounded-lg border p-3 text-sm">
+              {previewing ? (
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Calculando quantos contatos vão entrar…
+                </span>
+              ) : preview ? (
+                <div className="space-y-1">
+                  <p className="font-medium flex items-center gap-2">
+                    {previewEntrarao > 0
+                      ? <><CheckCircle2 className="w-4 h-4 text-emerald-600" /> {previewEntrarao} contato(s) vão entrar nesta fila</>
+                      : <><AlertCircle className="w-4 h-4 text-amber-600" /> Nenhum contato atende a esses filtros</>}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {preview.total} encontrado(s) no total · {preview.pendentes} ainda não ligados
+                    {preview.ja_em_outra_fila > 0 && ` · ${preview.ja_em_outra_fila} já em outra fila (${substituir ? "serão movidos para cá" : "serão ignorados"})`}
+                  </p>
+                  {previewEntrarao === 0 && (
+                    <p className="text-xs text-amber-600">Volte ao passo 3 e ajuste os filtros — a fila seria criada vazia.</p>
+                  )}
+                </div>
+              ) : (
+                <span className="text-muted-foreground text-xs">Prévia indisponível.</span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Ao confirmar, a fila será criada e os contatos vinculados. Você poderá ajustar as designações depois em "Gerenciar designações".
+              Ao confirmar, a fila será criada e os contatos vinculados. Depois você pode usar "Adicionar contatos" para complementar a fila e "Gerenciar designações" para ajustar os operadores.
             </p>
+
           </div>
         )}
 
