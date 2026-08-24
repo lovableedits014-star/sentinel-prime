@@ -211,7 +211,7 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
 
   const exportPDF = () => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const liderName = selectedLider === "geral" ? "Geral" : (lideres.find(l => l.id === selectedLider)?.nome || "Líder");
+    const liderName = scopeLabel;
     doc.setFontSize(16);
     doc.text(`Relatório de Telemarketing — ${liderName}`, 40, 40);
     doc.setFontSize(10);
