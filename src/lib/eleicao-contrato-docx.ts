@@ -13,6 +13,8 @@ import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 
 export type EleicaoTipo = "coordenador" | "lider" | "cabo";
+export type DocKind = "contrato" | "distrato";
+export type DocModo = "contrato" | "distrato" | "ambos";
 
 export interface PessoaContratada {
   id: string;
@@ -25,6 +27,11 @@ export interface PessoaContratada {
   parent_id: string | null;
   valor_contratacao: number | null;
   is_voluntario?: boolean | null;
+  rua?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
 }
 
 export interface ContractTemplate {
@@ -33,6 +40,7 @@ export interface ContractTemplate {
   titulo: string;
   conteudo: string;
 }
+
 
 const fmtBRL = (n: number) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
