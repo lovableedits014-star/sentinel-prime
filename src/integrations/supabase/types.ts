@@ -10729,6 +10729,30 @@ export type Database = {
           vota_candidato: string
         }[]
       }
+      tele_indicador_report_rows: {
+        Args: { _client_id: string }
+        Returns: {
+          bairro: string
+          campanha_id: string
+          campanha_nome: string
+          candidato_alternativo: string
+          cidade: string
+          contato_id: string
+          indicador_id: string
+          indicador_nome: string
+          indicador_regiao: string
+          indicador_tipo: string
+          nome: string
+          operador_nome: string
+          proxima_tentativa_em: string
+          status_telemarketing: string
+          telefone: string
+          total_tentativas: number
+          ultima_ligacao_em: string
+          ultimo_status_ligacao: string
+          vota_candidato: string
+        }[]
+      }
       tele_indicador_scorecard: {
         Args: {
           _campanha_id?: string
