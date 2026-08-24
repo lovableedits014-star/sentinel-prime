@@ -247,6 +247,7 @@ export default function TelemarketingAdminFilas() {
                       <Button size="sm" variant="outline" onClick={() => setAddDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
                         <UserPlus className="w-3.5 h-3.5 mr-1" /> Adicionar contatos
                       </Button>
+                      <TeleHelp text={TELE_HELP.adicionarContatos} className="self-center" />
                       {fonteMap[f.campanha_id]?.fonte && fonteMap[f.campanha_id].fonte !== "csv" && (
                         <Button
                           size="sm"
