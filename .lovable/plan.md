@@ -26,13 +26,6 @@ Rota `/reuniao/:token`:
 - Contadores: vagas ocupadas/restantes, taxa de comparecimento, faltas por coordenador.
 - Exportação Excel/PDF da lista de inscritos e do relatório de presença (mesmo padrão dos outros relatórios).
 
-## 4. Melhorias sugeridas
-
-- **Lista de espera**: quando a sessão lota, o inscrito entra em espera e é promovido automaticamente se alguém cancelar.
-- **Fechamento automático**: encerrar inscrições em data/hora definida ou ao lotar tudo.
-- **Lembrete no WhatsApp**: disparo em massa para os inscritos (véspera e manhã do dia) usando a Central WhatsApp já existente.
-- **QR Code do link** para projetar/imprimir, e QR de check-in na porta.
-- **Cobrança de ausentes**: um clique gera a lista de quem se inscreveu e não compareceu para disparo/cobrança pelo coordenador.
 
 ## Detalhes técnicos
 
