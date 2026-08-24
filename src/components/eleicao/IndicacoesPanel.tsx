@@ -71,11 +71,19 @@ function buildLink(token: string) {
   return `${window.location.origin}/indicar/${token}`;
 }
 
+function fmtTelBR(tel: string | null) {
+  const d = (tel || "").replace(/\D/g, "").replace(/^55/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return tel || "—";
+}
+
 function waLink(telefone: string, msg: string) {
   const d = telefone.replace(/\D/g, "");
   const full = d.startsWith("55") ? d : `55${d}`;
   return `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
 }
+
 
 export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [tab, setTab] = useState<"cobranca" | "config" | "pagina">("cobranca");
