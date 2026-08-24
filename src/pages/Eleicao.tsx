@@ -358,6 +358,11 @@ export default function Eleicao() {
       rua: p.rua || ruaFallback,
       numero: p.numero || "",
       bairro: p.bairro || "",
+      cep: p.cep || "",
+      cpf: p.cpf || "",
+      rg: p.rg || "",
+      rg_orgao_expedidor: p.rg_orgao_expedidor || "",
+
       parent_id: p.parent_id || "",
       liderAvulso: p.tipo === "lider" && !p.parent_id,
       observacoes: p.observacoes || "",
