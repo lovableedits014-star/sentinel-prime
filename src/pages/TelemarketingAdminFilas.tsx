@@ -302,7 +302,22 @@ export default function TelemarketingAdminFilas() {
           onChanged={() => load()}
         />
       )}
+
+      {clientId && addDialog.open && (
+        <AdicionarContatosDialog
+          open={addDialog.open}
+          onOpenChange={(o) => setAddDialog(s => ({ ...s, open: o }))}
+          clientId={clientId}
+          campanhaId={addDialog.campanhaId}
+          campanhaNome={addDialog.nome}
+          fonteAnterior={fonteMap[addDialog.campanhaId]?.fonte ?? null}
+          filtroAnterior={fonteMap[addDialog.campanhaId]?.filtro}
+          operadores={operadores}
+          onChanged={() => load()}
+        />
+      )}
     </div>
   );
+
 }
 
