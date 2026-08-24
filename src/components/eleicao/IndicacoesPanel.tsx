@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye, UserPlus, Plus, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from "lucide-react";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye, UserPlus, Plus, ChevronDown, ChevronUp, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
 import CobrancaAutoConfig from "./CobrancaAutoConfig";
 import IndicarPaginaConfig from "./IndicarPaginaConfig";
 import ImportarIndicadosDialog from "./ImportarIndicadosDialog";
