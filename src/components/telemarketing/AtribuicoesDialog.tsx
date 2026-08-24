@@ -53,19 +53,23 @@ export default function AtribuicoesDialog({
 
   const load = async () => {
     setLoading(true);
-    const [{ data: contatosData, error: errC }, { data: listasData, error: errL }] = await Promise.all([
+    const [contatosRes, listasRes] = await Promise.all([
       supabase.rpc("tele_admin_listar_avulsos" as any, { _client_id: clientId, _campanha_id: campanhaId }),
-      supabase.from('telemarketing_listas').select('id, nome').eq('client_id', clientId).order('created_at', { ascending: false })
+      supabase.from('telemarketing_listas').select('id, nome').eq('client_id', clientId).order('criado_em', { ascending: false }),
     ]);
-    
-    setLoading(false);
-    if (errC) { toast.error(errC.message); return; }
-    if (errL) { toast.error(errL.message); return; }
-    
-    setContatos((contatosData as any[]) || []);
-    setListas((listasData as any[]) || []);
-    setSelected(new Set());
 
+    setLoading(false);
+    if (contatosRes.error) { toast.error(contatosRes.error.message); return; }
+
+    setContatos((contatosRes.data as any[]) || []);
+    // As listas são só um filtro auxiliar: se falharem, os contatos ainda aparecem.
+    if (listasRes.error) {
+      setListas([]);
+      toast.warning("Não foi possível carregar o filtro de listas.");
+    } else {
+      setListas((listasRes.data as any[]) || []);
+    }
+    setSelected(new Set());
   };
 
   useEffect(() => { if (open) { load(); setModoDistribuicao(false); setOpsSelecionados(new Set()); } /* eslint-disable-next-line */ }, [open, campanhaId]);
