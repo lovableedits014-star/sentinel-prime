@@ -11,6 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, Check, Database, FileSpreadsheet, Megaphone, Upload, Users2, Vote, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import TeleHelp from "./TeleHelp";
+import IndicadorCombobox from "./IndicadorCombobox";
+import { TELE_HELP } from "./telemarketing-help";
 
 type Origem = "csv" | "estrutura" | "indicados_eleicao" | "contratados" | "indicados_contratados";
 type ModoDesignacao = "pool" | "um" | "dividir";
@@ -588,16 +591,14 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
                 )}
                 {origem === "indicados_eleicao" && indicadores.length > 0 && (
                   <div>
-                    <Label>Indicador específico (opcional)</Label>
-                    <Select value={indicadorId} onValueChange={setIndicadorId}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        <SelectItem value="__all__">Qualquer indicador</SelectItem>
-                        {indicadores.map(i => (
-                          <SelectItem key={i.id} value={i.id}>{i.nome} ({i.tipo})</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label className="flex items-center gap-1">
+                      Indicador específico (opcional) <TeleHelp text={TELE_HELP.indicadoPor} />
+                    </Label>
+                    <IndicadorCombobox
+                      value={indicadorId}
+                      onChange={setIndicadorId}
+                      options={indicadores}
+                    />
                   </div>
                 )}
                 <div className="space-y-2 pt-2 border-t">

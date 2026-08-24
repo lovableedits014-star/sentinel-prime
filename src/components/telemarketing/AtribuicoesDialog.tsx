@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, UserCheck, Users, Unlock, Shuffle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import TeleHelp from "./TeleHelp";
+import { TELE_HELP } from "./telemarketing-help";
 
 interface Operador { id: string; nome: string; ativo?: boolean }
 interface Lista { id: string; nome: string; total_contatos: number }
@@ -53,19 +55,23 @@ export default function AtribuicoesDialog({
 
   const load = async () => {
     setLoading(true);
-    const [{ data: contatosData, error: errC }, { data: listasData, error: errL }] = await Promise.all([
+    const [contatosRes, listasRes] = await Promise.all([
       supabase.rpc("tele_admin_listar_avulsos" as any, { _client_id: clientId, _campanha_id: campanhaId }),
-      supabase.from('telemarketing_listas').select('id, nome').eq('client_id', clientId).order('created_at', { ascending: false })
+      supabase.from('telemarketing_listas').select('id, nome').eq('client_id', clientId).order('criado_em', { ascending: false }),
     ]);
-    
-    setLoading(false);
-    if (errC) { toast.error(errC.message); return; }
-    if (errL) { toast.error(errL.message); return; }
-    
-    setContatos((contatosData as any[]) || []);
-    setListas((listasData as any[]) || []);
-    setSelected(new Set());
 
+    setLoading(false);
+    if (contatosRes.error) { toast.error(contatosRes.error.message); return; }
+
+    setContatos((contatosRes.data as any[]) || []);
+    // As listas são só um filtro auxiliar: se falharem, os contatos ainda aparecem.
+    if (listasRes.error) {
+      setListas([]);
+      toast.warning("Não foi possível carregar o filtro de listas.");
+    } else {
+      setListas((listasRes.data as any[]) || []);
+    }
+    setSelected(new Set());
   };
 
   useEffect(() => { if (open) { load(); setModoDistribuicao(false); setOpsSelecionados(new Set()); } /* eslint-disable-next-line */ }, [open, campanhaId]);
@@ -201,15 +207,19 @@ export default function AtribuicoesDialog({
         <DialogHeader>
           <DialogTitle>Designações · {campanhaNome}</DialogTitle>
           <DialogDescription>
-            Atribua contatos a operadores específicos, distribua em lote ou libere de volta ao pool.
-            Contatos "no pool livre" podem ser puxados por qualquer operador da campanha.
+            Aqui você decide quem liga para quem. Selecione contatos na lista abaixo e escolha uma ação:
+            <strong> atribuir</strong> a um operador (só ele verá o contato), <strong> distribuir</strong> igualmente
+            entre vários, <strong> liberar</strong> para o pool livre (qualquer operador da fila pode puxar) ou
+            <strong> remover da fila</strong> (o contato continua cadastrado, apenas sai desta fila).
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex gap-2 flex-wrap text-xs">
           <Badge variant="outline">{counts.total} total</Badge>
           <Badge variant="secondary">{counts.pend} pendentes</Badge>
-          <Badge variant="outline">{counts.livres} no pool livre</Badge>
+          <Badge variant="outline" className="gap-1">
+            {counts.livres} no pool livre <TeleHelp text={TELE_HELP.poolLivre} />
+          </Badge>
           <Badge variant="default">{counts.atribuidos} atribuídos</Badge>
         </div>
 
@@ -247,6 +257,7 @@ export default function AtribuicoesDialog({
           <Button size="sm" variant="outline" onClick={redistribuirFila} disabled={busy}>
             <Shuffle className="w-3.5 h-3.5 mr-1" />Redistribuir fila
           </Button>
+          <TeleHelp text={TELE_HELP.redistribuirFila} />
         </div>
 
 
@@ -270,9 +281,11 @@ export default function AtribuicoesDialog({
             <Button size="sm" variant="outline" onClick={liberar} disabled={busy}>
               <Unlock className="w-3.5 h-3.5 mr-1" />Liberar
             </Button>
+            <TeleHelp text={TELE_HELP.liberar} />
             <Button size="sm" variant="outline" className="text-destructive" onClick={removerDaFila} disabled={busy}>
               <Trash2 className="w-3.5 h-3.5 mr-1" />Remover da fila
             </Button>
+            <TeleHelp text={TELE_HELP.removerDaFila} />
 
           </div>
         )}

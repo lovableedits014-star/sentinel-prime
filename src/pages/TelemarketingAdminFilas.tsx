@@ -12,6 +12,8 @@ import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
 import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
 import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
 import AdicionarContatosDialog from "@/components/telemarketing/AdicionarContatosDialog";
+import TeleHelp from "@/components/telemarketing/TeleHelp";
+import { TELE_HELP } from "@/components/telemarketing/telemarketing-help";
 
 const ORIGEM_LABEL: Record<string, string> = {
   csv: "Planilha",
@@ -247,6 +249,7 @@ export default function TelemarketingAdminFilas() {
                       <Button size="sm" variant="outline" onClick={() => setAddDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
                         <UserPlus className="w-3.5 h-3.5 mr-1" /> Adicionar contatos
                       </Button>
+                      <TeleHelp text={TELE_HELP.adicionarContatos} className="self-center" />
                       {fonteMap[f.campanha_id]?.fonte && fonteMap[f.campanha_id].fonte !== "csv" && (
                         <Button
                           size="sm"
@@ -260,9 +263,14 @@ export default function TelemarketingAdminFilas() {
                             : <RotateCw className="w-3.5 h-3.5 mr-1" />} Buscar novos
                         </Button>
                       )}
+                      {fonteMap[f.campanha_id]?.fonte && fonteMap[f.campanha_id].fonte !== "csv" && (
+                        <TeleHelp text={TELE_HELP.buscarNovos} className="self-center" />
+                      )}
                       <Button size="sm" variant="outline" onClick={() => setAtribDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
                         <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
+                      <TeleHelp text={TELE_HELP.gerenciarDesignacoes} className="self-center" />
+
 
                       <Button size="sm" variant="outline" asChild>
                         <a href={linkOperador(f.campanha_id)} target="_blank" rel="noopener noreferrer">

@@ -9,6 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, CheckCircle2, Database, FileSpreadsheet, Loader2, Megaphone, Upload, Users2, Vote } from "lucide-react";
 import { toast } from "sonner";
+import TeleHelp from "./TeleHelp";
+import IndicadorCombobox from "./IndicadorCombobox";
+import { TELE_HELP } from "./telemarketing-help";
 
 type Origem = "csv" | "estrutura" | "indicados_eleicao" | "contratados" | "indicados_contratados";
 type Row = Record<string, any>;
@@ -381,14 +384,16 @@ export default function AdicionarContatosDialog({
                   </div>
                 )}
                 <div>
-                  <Label className="text-xs">Indicado por</Label>
-                  <Select value={indicadorId} onValueChange={setIndicadorId}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL}>Todos</SelectItem>
-                      {indicadores.map(i => <SelectItem key={i.id} value={i.id}>{i.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-xs flex items-center gap-1">
+                    Indicado por <TeleHelp text={TELE_HELP.indicadoPor} />
+                  </Label>
+                  <IndicadorCombobox
+                    value={indicadorId}
+                    onChange={setIndicadorId}
+                    options={indicadores}
+                    allValue={ALL}
+                    allLabel="Todos os indicadores"
+                  />
                 </div>
               </div>
               <label className="flex items-center gap-2 text-sm">
