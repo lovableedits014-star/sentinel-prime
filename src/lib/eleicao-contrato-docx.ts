@@ -103,13 +103,23 @@ export function renderTemplate(
       ? (parents.get(parent.parent_id)?.nome ?? "—") : "—";
 
   const LINHA = "____________________";
-  const hoje = new Date();
+  const LINHA_CURTA = "____________";
+  const LINHA_DATA = "____/____/______";
   const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
     "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const fmtData = (s?: string | null) => {
-    if (!s) return LINHA;
+    if (!s) return LINHA_DATA;
     const d = new Date(`${String(s).slice(0, 10)}T12:00:00`);
-    return isNaN(d.getTime()) ? LINHA : d.toLocaleDateString("pt-BR");
+    return isNaN(d.getTime()) ? LINHA_DATA : d.toLocaleDateString("pt-BR");
+  };
+  const onlyDigits = (s?: string | null) => String(s ?? "").replace(/\D/g, "");
+  const fmtCPF = (s?: string | null) => {
+    const d = onlyDigits(s);
+    return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : (s?.trim() || LINHA);
+  };
+  const fmtCEP = (s?: string | null) => {
+    const d = onlyDigits(s);
+    return d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : (s?.trim() || LINHA_CURTA);
   };
 
   const replacements: Record<string, string> = {
@@ -120,6 +130,10 @@ export function renderTemplate(
     rua: pessoa.rua || pessoa.endereco || LINHA,
     numero: pessoa.numero || "S/N",
     bairro: pessoa.bairro || LINHA,
+    cep: fmtCEP(pessoa.cep),
+    cpf: fmtCPF(pessoa.cpf),
+    rg: pessoa.rg?.trim() || LINHA,
+    orgao_expedidor: pessoa.rg_orgao_expedidor?.trim() || LINHA_CURTA,
     cidade: pessoa.cidade || LINHA,
     cidade_uf: pessoa.cidade ? `${pessoa.cidade}/MS` : `${LINHA}/MS`,
     regiao: pessoa.regiao ? (REGIAO_LABEL[pessoa.regiao] ?? pessoa.regiao) : "—",
@@ -127,14 +141,17 @@ export function renderTemplate(
     valor: fmtBRL(valor),
     valor_extenso: valorPorExtenso(valor),
     contratante,
-    data: hoje.toLocaleDateString("pt-BR"),
-    dia: String(hoje.getDate()).padStart(2, "0"),
-    mes: MESES[hoje.getMonth()],
-    ano: String(hoje.getFullYear()),
+    // Data do documento é preenchida à mão (linhas em branco)
+    data: LINHA_DATA,
+    dia: "______",
+    mes: "____________________",
+    ano: "______",
+    mes_extenso_lista: MESES.join(", "),
     vigencia_inicio: fmtData(pessoa.vigencia_inicio),
     vigencia_fim: fmtData(pessoa.vigencia_fim),
     linha: LINHA,
   };
+
 
 
   return template.conteudo.replace(/\{(\w+)\}/g, (_m, k) => replacements[k] ?? `{${k}}`);
