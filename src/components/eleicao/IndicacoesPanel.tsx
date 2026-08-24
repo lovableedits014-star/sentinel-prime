@@ -341,6 +341,93 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     }
   }
 
+  // ===== Exportação (Excel / PDF) =====
+  function exportRows() {
+    return filtered.map((r) => {
+      const faltam = Math.max(0, (r.meta || 0) - (r.total_indicacoes || 0));
+      return {
+        Nome: r.nome,
+        Cargo: tipoLabel[r.tipo],
+        Telefone: fmtTelBR(r.telefone),
+        Regiao: r.regiao || "",
+        Cidade: r.cidade || "",
+        Indicacoes: r.total_indicacoes || 0,
+        Meta: r.meta || 0,
+        Faltam: faltam,
+        Status: faltam > 0 ? (r.total_indicacoes === 0 ? "Sem indicações" : "Abaixo da meta") : "Meta cumprida",
+        Cobrancas: r.cobrancas_enviadas || 0,
+        UltimaCobranca: r.ultima_cobranca_em ? new Date(r.ultima_cobranca_em).toLocaleString("pt-BR") : "",
+        UltimoAcesso: r.ultimo_acesso_em ? new Date(r.ultimo_acesso_em).toLocaleString("pt-BR") : "",
+        Link: r.token ? buildLink(r.token) : "",
+      };
+    });
+  }
+
+  async function exportarExcel() {
+    const data = exportRows();
+    if (!data.length) { toast.error("Nenhum indicador no filtro atual."); return; }
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = [
+      { wch: 28 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 18 },
+      { wch: 11 }, { wch: 8 }, { wch: 8 }, { wch: 16 }, { wch: 10 },
+      { wch: 20 }, { wch: 20 }, { wch: 45 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Indicacoes");
+    XLSX.writeFile(wb, `indicacoes-cobranca-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Excel exportado (${data.length} indicadores)`);
+  }
+
+  async function exportarPDF() {
+    const data = exportRows();
+    if (!data.length) { toast.error("Nenhum indicador no filtro atual."); return; }
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    const filtroDesc = [
+      filtroTipo === "all" ? "Todos os cargos" : tipoLabel[filtroTipo as Tipo],
+      filtroStatus === "all" ? "Todos os status"
+        : filtroStatus === "zerados" ? "Sem indicações"
+        : filtroStatus === "abaixo" ? "Abaixo da meta" : "Meta cumprida",
+      busca ? `Busca: "${busca}"` : null,
+    ].filter(Boolean).join(" · ");
+
+    doc.setFontSize(15);
+    doc.text("Relatório de Indicações — Cobrança", 40, 40);
+    doc.setFontSize(9);
+    doc.text(`${candidatoNome || ""}${candidatoNome ? " · " : ""}${filtroDesc}`, 40, 56);
+    const faltantes = data.filter((d) => d.Faltam > 0).length;
+    const totalInd = data.reduce((s, d) => s + d.Indicacoes, 0);
+    const totalMeta = data.reduce((s, d) => s + d.Meta, 0);
+    doc.text(
+      `${data.length} indicadores · ${faltantes} fora da meta · ${totalInd} de ${totalMeta} indicações · Gerado em ${new Date().toLocaleString("pt-BR")}`,
+      40, 70,
+    );
+
+    autoTable(doc, {
+      startY: 84,
+      head: [["Nome", "Cargo", "Telefone", "Região / Cidade", "Ind.", "Meta", "Faltam", "Status", "Última cobrança"]],
+      body: data.map((d) => [
+        d.Nome, d.Cargo, d.Telefone,
+        [d.Regiao, d.Cidade].filter(Boolean).join(" · "),
+        String(d.Indicacoes), String(d.Meta), String(d.Faltam), d.Status, d.UltimaCobranca || "—",
+      ]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [16, 122, 87], textColor: 255 },
+      didParseCell: (hook: any) => {
+        if (hook.section === "body" && Number(data[hook.row.index]?.Faltam) > 0) {
+          hook.cell.styles.textColor = [180, 40, 20];
+        }
+      },
+    });
+
+    doc.save(`indicacoes-cobranca-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success(`PDF exportado (${data.length} indicadores)`);
+  }
+
+
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
