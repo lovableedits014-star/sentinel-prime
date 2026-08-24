@@ -49,13 +49,22 @@ export default function TelemarketingAdminListas() {
   const [dupes, setDupes] = useState<any[]>([]);
   const [loadingDupes, setLoadingDupes] = useState(false);
   const { toast } = useToast();
+  const { clientId, isLoading: ctxLoading } = useActiveClientId();
+  const navigate = useNavigate();
 
   const fetchListas = async () => {
+    if (!clientId) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('tele_admin_resumo_listas');
+      const { data, error } = await supabase.rpc('tele_admin_resumo_listas' as any, { _client_id: clientId });
       if (error) throw error;
-      setListas(data || []);
+      const rows = (data as any[] | null) || [];
+      setListas(rows.map((r: any) => ({
+        ...r,
+        total_contatos: Number(r.total ?? r.total_contatos ?? 0),
+        concluidos: Number(r.ligados ?? r.concluidos ?? 0),
+        created_at: r.criado_em ?? r.created_at ?? null,
+      })));
     } catch (err: any) {
       toast({
         title: "Erro ao carregar listas",
@@ -68,8 +77,11 @@ export default function TelemarketingAdminListas() {
   };
 
   useEffect(() => {
+    if (ctxLoading) return;
+    if (!clientId) { setLoading(false); return; }
     fetchListas();
-  }, []);
+  }, [clientId, ctxLoading]);
+
 
   const openDupes = async (lista: any) => {
     setSelectedLista(lista);
