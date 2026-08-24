@@ -227,6 +227,16 @@ export default function TelemarketingIndicadorScorecard({ clientId }: { clientId
   };
 
   const selectedRows = selected ? filtered.filter((r) => r.indicador_id === selected.indicadorId) : [];
+  const metricCards = totals ? [
+    { label: "Indicados", value: totals.total, Icon: Users },
+    { label: "Trabalhados", value: totals.trabalhados, Icon: Phone },
+    { label: "Tentativas", value: totals.tentativas, Icon: RefreshCw },
+    { label: "Atendidos", value: totals.atendidos, Icon: UserCheck },
+    { label: "Sim", value: totals.sim, Icon: CheckCircle2 },
+    { label: "Não", value: totals.nao, Icon: Vote },
+    { label: "Indecisos", value: totals.indecisos, Icon: Vote },
+    { label: "Não atendeu", value: totals.naoAtendeu, Icon: Phone },
+  ] : [];
 
   return (
     <Card className="border-primary/30">
@@ -264,11 +274,7 @@ export default function TelemarketingIndicadorScorecard({ clientId }: { clientId
 
         {loading ? <div className="flex justify-center py-12"><Loader2 className="size-7 animate-spin text-primary" /></div> : !totals ? <p className="py-10 text-center text-sm text-muted-foreground">Nenhum resultado encontrado para os filtros selecionados.</p> : <>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
-            {[
-              ["Indicados", totals.total, Users], ["Trabalhados", totals.trabalhados, Phone], ["Tentativas", totals.tentativas, RefreshCw],
-              ["Atendidos", totals.atendidos, UserCheck], ["Sim", totals.sim, CheckCircle2], ["Não", totals.nao, Vote],
-              ["Indecisos", totals.indecisos, Vote], ["Não atendeu", totals.naoAtendeu, Phone],
-            ].map(([label, value, Icon]) => <div key={String(label)} className="rounded-md border p-3"><div className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground"><Icon className="size-3" />{label}</div><p className="mt-1 text-xl font-bold">{value as number}</p></div>)}
+            {metricCards.map(({ label, value, Icon }) => <div key={label} className="rounded-md border p-3"><div className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground"><Icon className="size-3" />{label}</div><p className="mt-1 text-xl font-bold">{value}</p></div>)}
           </div>
 
           <div className="grid gap-4 md:grid-cols-4">
