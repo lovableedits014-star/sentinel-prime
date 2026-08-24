@@ -1,6 +1,7 @@
-import { NavLink } from "react-router-dom";
-import { LayoutDashboard, ListChecks, BarChart3, Users, Settings as SettingsIcon, Phone, Megaphone, Trophy, Database } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import { LayoutDashboard, ListChecks, BarChart3, Users, Settings as SettingsIcon, Phone, Megaphone, Trophy, Database, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getTeleTabHelp } from "./telemarketing-help";
 
 const items = [
   { to: "/telemarketing-admin", label: "Visão geral", icon: LayoutDashboard, end: true },
