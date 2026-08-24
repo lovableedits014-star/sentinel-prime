@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
+import ReunioesPanel from "@/components/eleicao/ReunioesPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
 import EnviarFluxoMenu from "@/components/eleicao/EnviarFluxoMenu";
 import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog";
