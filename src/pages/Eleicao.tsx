@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
-import { formatCPF, onlyDigits } from "@/lib/cpf";
+import { formatCPF } from "@/lib/cpf";
 
 const formatCEP = (v: string) => {
   const d = onlyDigits(v).slice(0, 8);
