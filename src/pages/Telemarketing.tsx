@@ -743,7 +743,11 @@ export default function Telemarketing() {
                           <svg viewBox="0 0 24 24" className="w-4 h-4 mr-1 fill-current"><path d="M20.5 3.5A11 11 0 0 0 3.6 17.3L2 22l4.8-1.6a11 11 0 0 0 16.7-9.3 11 11 0 0 0-3-7.6ZM12 20.1a9 9 0 0 1-4.6-1.3l-.3-.2-2.8.9.9-2.8-.2-.3A9.1 9.1 0 1 1 12 20Zm5-6.7c-.3-.1-1.7-.8-2-1-.3-.1-.5-.1-.7.2l-1 1.2c-.2.2-.4.3-.7.1a7.4 7.4 0 0 1-3.6-3.2c-.3-.5.3-.4.8-1.4.1-.2 0-.4-.1-.5l-1-2.4c-.2-.5-.5-.4-.7-.4H7c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.2.2 2 3.1 5 4.3.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3Z"/></svg>
                           WhatsApp
                         </a>
+                        ) : (
+                          <span className="flex items-center">WhatsApp</span>
+                        )}
                       </Button>
+
                       <Button asChild variant="outline" className="h-11">
                         <a href={`tel:${telLink}`} aria-label="Ligar por telefone">
                           <Phone className="w-4 h-4 mr-1" />
