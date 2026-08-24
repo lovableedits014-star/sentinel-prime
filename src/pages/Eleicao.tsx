@@ -1620,6 +1620,53 @@ export default function Eleicao() {
               <Input value={form.bairro} onChange={e => setForm(f => ({ ...f, bairro: e.target.value }))} placeholder="Centro" />
             </div>
 
+            <div className="rounded-md border p-3 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Documentos (usados no contrato e distrato)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>CPF</Label>
+                  <Input
+                    value={formatCPF(form.cpf)}
+                    onChange={e => setForm(f => ({ ...f, cpf: onlyDigits(e.target.value).slice(0, 11) }))}
+                    placeholder="000.000.000-00"
+                    inputMode="numeric"
+                    maxLength={14}
+                  />
+                </div>
+                <div>
+                  <Label>CEP</Label>
+                  <Input
+                    value={formatCEP(form.cep)}
+                    onChange={e => setForm(f => ({ ...f, cep: onlyDigits(e.target.value).slice(0, 8) }))}
+                    placeholder="79000-000"
+                    inputMode="numeric"
+                    maxLength={9}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>RG</Label>
+                  <Input value={form.rg} onChange={e => setForm(f => ({ ...f, rg: e.target.value }))} placeholder="0000000" maxLength={30} />
+                </div>
+                <div>
+                  <Label>Órgão expedidor</Label>
+                  <Input
+                    value={form.rg_orgao_expedidor}
+                    onChange={e => setForm(f => ({ ...f, rg_orgao_expedidor: e.target.value }))}
+                    placeholder="SEJUSP/MS"
+                    maxLength={30}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Vigência, dados bancários e a data do contrato ficam em branco no documento para preencher à mão.
+              </p>
+            </div>
+
+
 
 
             {(() => {
