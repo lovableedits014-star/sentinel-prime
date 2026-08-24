@@ -705,7 +705,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "funnel" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
+  const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos" | "pendente" | "em_negociacao" | "confirmado" | "reuniao">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
