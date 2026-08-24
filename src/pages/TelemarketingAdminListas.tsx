@@ -111,22 +111,29 @@ export default function TelemarketingAdminListas() {
     l.nome?.toLowerCase().includes(filtro.toLowerCase())
   );
 
-  const totalContatos = listas.reduce((acc, curr) => acc + curr.total_contatos, 0);
+  const totalContatos = listas.reduce((acc, curr) => acc + (curr.total_contatos || 0), 0);
   const totalConcluidos = listas.reduce((acc, curr) => acc + (curr.concluidos || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
+      <TelemarketingSubNav />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <div className="space-y-2">
+          <Button variant="ghost" size="sm" className="gap-1 -ml-2" onClick={() => navigate("/telemarketing-admin")}>
+            <ArrowLeft className="w-4 h-4" /> Voltar
+          </Button>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Database className="w-6 h-6 text-primary" />
             Gerenciamento de Listas
           </h2>
-          <p className="text-muted-foreground">
-            Visualize o progresso e gerencie os lotes de contatos importados.
+          <p className="text-muted-foreground max-w-2xl">
+            Cada lista é um lote de contatos importado (planilha, indicados, estrutura). Aqui você acompanha
+            quantos contatos entraram, quanto já foi ligado e quais números foram ignorados por duplicidade.
           </p>
         </div>
       </div>
+
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
