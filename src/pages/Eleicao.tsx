@@ -23,7 +23,7 @@ import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog"
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
-import { FileDown, Package, FileText, Printer } from "lucide-react";
+import { FileDown, Package, FileText, Printer, CalendarDays } from "lucide-react";
 import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
 import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/ExportEleicaoDialog";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
