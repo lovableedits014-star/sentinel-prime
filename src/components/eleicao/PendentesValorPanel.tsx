@@ -15,6 +15,7 @@ import {
   gerarLoteZip,
   downloadBlob,
   type PessoaContratada,
+  type DocModo,
 } from "@/lib/eleicao-contrato-docx";
 
 type Tipo = "coordenador" | "lider" | "cabo";
@@ -64,6 +65,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
   const [presets, setPresets] = useState<Record<Tipo, number>>(DEFAULT_PRESETS);
   const [savingBulk, setSavingBulk] = useState(false);
   const [generatingZip, setGeneratingZip] = useState(false);
+  const [modoDoc, setModoDoc] = useState<DocModo>("ambos");
 
   // load presets
   useEffect(() => {
@@ -213,7 +215,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
       toast.error("Defina o valor antes de gerar o contrato.");
       return;
     }
-    try { await gerarContratoIndividual(p, clientId); toast.success("Contrato gerado!"); }
+    try { await gerarContratoIndividual(p, clientId, modoDoc); toast.success("Documento(s) gerado(s)!"); }
     catch (e: any) { toast.error(e.message); }
   }
 
@@ -222,7 +224,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
     if (comValor.length === 0) { toast.error("Defina o valor antes de gerar contratos."); return; }
     setGeneratingZip(true);
     try {
-      const { blob, pulados } = await gerarLoteZip(comValor, clientId);
+      const { blob, pulados } = await gerarLoteZip(comValor, clientId, modoDoc);
       downloadBlob(blob, `Contratos-Eleicao-${new Date().toISOString().slice(0, 10)}.zip`);
       if (pulados.length > 0) toast.warning(`${pulados.length} sem modelo de contrato`);
       else toast.success(`${comValor.length} contrato(s) gerados`);
@@ -346,9 +348,17 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                 >
                   <Heart className="w-3.5 h-3.5 mr-1" /> Marcar como voluntários
                 </Button>
+                <Select value={modoDoc} onValueChange={(v) => setModoDoc(v as DocModo)}>
+                  <SelectTrigger className="h-8 w-[190px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ambos">Contrato + Distrato</SelectItem>
+                    <SelectItem value="contrato">Somente Contrato</SelectItem>
+                    <SelectItem value="distrato">Somente Distrato</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button size="sm" variant="outline" onClick={gerarLote} disabled={generatingZip}>
                   {generatingZip ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <FileDown className="w-3.5 h-3.5 mr-1" />}
-                  Gerar contratos (.zip)
+                  Gerar documentos (.zip)
                 </Button>
               </>
             ) : (
