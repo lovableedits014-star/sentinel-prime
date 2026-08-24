@@ -321,6 +321,8 @@ export default function Eleicao() {
       tipo: "coordenador", escopo, regiao: "centro",
       cidade: escopo === "campo_grande" ? "Campo Grande" : "",
       nome: "", telefone: "", rua: "", numero: "", bairro: "",
+      cep: "", cpf: "", rg: "", rg_orgao_expedidor: "",
+
       parent_id: "", liderAvulso: false, observacoes: "",
       email: "", password: genLocalPassword(), send_access: true,
       valor_contratacao: "",
