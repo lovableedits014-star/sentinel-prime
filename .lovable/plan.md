@@ -30,5 +30,5 @@ Rota `/reuniao/:token`:
 ## Detalhes técnicos
 
 - Tabelas novas: `reunioes` (client_id, título, data, local, status, encerra_em), `reuniao_sessoes` (reuniao_id, label, início, fim, vagas), `reuniao_links` (token único, label do grupo, ativo), `reuniao_inscricoes` (sessão, nome, telefone normalizado, link de origem, eleicao_pessoa_id opcional, status: confirmado/espera/cancelado, presença + horário do check-in). GRANTs + RLS: escrita/leitura restrita ao cliente autenticado; o público não acessa as tabelas diretamente.
-- Acesso público via RPCs `security definer` por token (padrão já usado em indicações/missões): uma para ler config + vagas restantes, outra para inscrever com verificação transacional de lotação (evita estouro em cliques simultâneos) e entrada em lista de espera.
+- Acesso público via RPCs `security definer` por token (padrão já usado em indicações/missões): uma para ler config + vagas restantes, outra para inscrever com verificação transacional de lotação (evita estouro em cliques simultâneos).
 - Front: `src/pages/ReuniaoPublica.tsx` + rota pública em `App.tsx`; painel em `src/components/eleicao/ReunioesPanel.tsx` com dialogs de criação, links e check-in. Telefone via `toWhatsAppBR` de `src/lib/phone-utils.ts`; check-in grava também `participou_reuniao`/`reuniao_em` em `eleicao_pessoas` quando houver vínculo.
