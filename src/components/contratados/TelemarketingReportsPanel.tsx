@@ -185,7 +185,7 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const liderName = selectedLider === "geral" ? "geral" : lideres.find(l => l.id === selectedLider)?.nome || "lider";
+    const liderName = scopeLabel;
     a.download = `relatorio-telemarketing-${liderName.replace(/\s/g, "_")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
