@@ -493,6 +493,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-1.5" />Atualizar</Button>
+            <Button variant="outline" size="sm" onClick={exportarExcel} title="Exportar a lista filtrada (com telefones) para Excel">
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" />Excel
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportarPDF} title="Exportar a lista filtrada (com telefones) em PDF para cobrança presencial">
+              <FileText className="w-4 h-4 mr-1.5" />PDF
+            </Button>
+
             <Button size="sm" onClick={abrirMass} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
               <Send className="w-4 h-4" />
               Enviar cobrança em massa
