@@ -72,6 +72,7 @@ const FotosCampanha = lazy(() => import("./pages/FotosCampanha"));
 const GaleriaPublica = lazy(() => import("./pages/GaleriaPublica"));
 const GaleriaEvento = lazy(() => import("./pages/GaleriaEvento"));
 const MissaoPublica = lazy(() => import("./pages/MissaoPublica"));
+const ReuniaoPublica = lazy(() => import("./pages/ReuniaoPublica"));
 const TrafegoPago = lazy(() => import("./pages/TrafegoPago"));
 
 // Wrappers de redirect para preservar links antigos
