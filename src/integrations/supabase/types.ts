@@ -3062,6 +3062,7 @@ export type Database = {
       }
       eleicao_indicados: {
         Row: {
+          assigned_operador_id: string | null
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
@@ -3089,6 +3090,7 @@ export type Database = {
           vota_candidato: string | null
         }
         Insert: {
+          assigned_operador_id?: string | null
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
@@ -3116,6 +3118,7 @@ export type Database = {
           vota_candidato?: string | null
         }
         Update: {
+          assigned_operador_id?: string | null
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
@@ -3143,6 +3146,13 @@ export type Database = {
           vota_candidato?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "eleicao_indicados_assigned_operador_id_fkey"
+            columns: ["assigned_operador_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_operadores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "eleicao_indicados_campanha_id_fkey"
             columns: ["campanha_id"]
@@ -3381,6 +3391,7 @@ export type Database = {
       }
       eleicao_pessoas: {
         Row: {
+          assigned_operador_id: string | null
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
@@ -3434,6 +3445,7 @@ export type Database = {
           vota_candidato: string | null
         }
         Insert: {
+          assigned_operador_id?: string | null
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
@@ -3487,6 +3499,7 @@ export type Database = {
           vota_candidato?: string | null
         }
         Update: {
+          assigned_operador_id?: string | null
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
@@ -3540,6 +3553,13 @@ export type Database = {
           vota_candidato?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "eleicao_pessoas_assigned_operador_id_fkey"
+            columns: ["assigned_operador_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_operadores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "eleicao_pessoas_campanha_id_fkey"
             columns: ["campanha_id"]
@@ -10083,6 +10103,7 @@ export type Database = {
       get_eleicao_pessoas_for_client: {
         Args: { _client_id: string }
         Returns: {
+          assigned_operador_id: string | null
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
