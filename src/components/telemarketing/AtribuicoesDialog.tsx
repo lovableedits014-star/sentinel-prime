@@ -150,7 +150,32 @@ export default function AtribuicoesDialog({
     load();
   };
 
+  const removerDaFila = async () => {
+    if (!selected.size) return;
+    if (!confirm(`Remover ${selected.size} contato(s) desta fila? Eles continuam cadastrados, apenas saem da fila e ficam sem operador.`)) return;
+    setBusy(true);
+    // Agrupa por tabela de origem (quando informada pela RPC)
+    const grupos: Record<string, string[]> = {};
+    contatos.filter(c => selected.has(c.id)).forEach(c => {
+      const tab = (c as any).origem_tabela || "telemarketing_contatos_avulsos";
+      (grupos[tab] ||= []).push(c.id);
+    });
+    let removidos = 0;
+    for (const [tabela, ids] of Object.entries(grupos)) {
+      const { data, error } = await supabase.rpc("tele_remover_da_fila" as any, {
+        _client_id: clientId, _campanha_id: campanhaId, _tabela: tabela, _ids: ids,
+      });
+      if (error) { setBusy(false); toast.error(error.message); return; }
+      removidos += Number((data as any)?.removidos || 0);
+    }
+    setBusy(false);
+    toast.success(`${removidos} contato(s) removido(s) da fila`);
+    onChanged?.();
+    load();
+  };
+
   const redistribuirFila = async () => {
+
     const ativos = operadores.filter(o => o.ativo !== false);
     if (ativos.length < 1) { toast.error("Cadastre operadores ativos antes de redistribuir"); return; }
     const escolhidos = opsSelecionados.size > 0
