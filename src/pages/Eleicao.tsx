@@ -1116,11 +1116,15 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-8 w-full max-w-6xl">
+        <TabsList className="grid grid-cols-9 w-full max-w-6xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="funnel" className="gap-1.5">
             <Handshake className="w-3.5 h-3.5" />
             Funil / Reunião
+          </TabsTrigger>
+          <TabsTrigger value="reunioes" className="gap-1.5">
+            <CalendarDays className="w-3.5 h-3.5" />
+            Reuniões
           </TabsTrigger>
           <TabsTrigger value="pendentes" className="gap-1.5">
             Pendentes de valor
