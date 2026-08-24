@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog } from "lucide-react";
+import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,16 @@ import { toast } from "sonner";
 import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
 import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
 import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
+import AdicionarContatosDialog from "@/components/telemarketing/AdicionarContatosDialog";
+
+const ORIGEM_LABEL: Record<string, string> = {
+  csv: "Planilha",
+  estrutura: "Estrutura eleitoral",
+  indicados_eleicao: "Indicados (eleição)",
+  contratados: "Contratados",
+  indicados_contratados: "Indicados de contratados",
+};
+
 
 interface OpCount { operador_id: string | null; operador_nome: string; pendentes: number; ligados: number }
 
@@ -34,7 +44,10 @@ export default function TelemarketingAdminFilas() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [countsMap, setCountsMap] = useState<Record<string, OpCount[]>>({});
   const [atribDialog, setAtribDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
+  const [addDialog, setAddDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
   const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
+  const [fonteMap, setFonteMap] = useState<Record<string, { fonte: string | null; filtro: any }>>({});
+  const [repopulando, setRepopulando] = useState<string | null>(null);
 
 
   const load = async () => {
@@ -48,6 +61,15 @@ export default function TelemarketingAdminFilas() {
       pendentes: Number(r.pendentes || 0), confirmados: Number(r.confirmados || 0),
     }));
     setFilas(list);
+    // Origem/filtros registrados em cada fila
+    const { data: camps } = await supabase.from("telemarketing_campanhas" as any)
+      .select("id, filtros").eq("client_id", clientId);
+    const fmap: Record<string, { fonte: string | null; filtro: any }> = {};
+    ((camps as any[]) || []).forEach(c => {
+      const f = (c.filtros || {}) as any;
+      fmap[c.id] = { fonte: f.fonte || null, filtro: f.ultimo_filtro || {} };
+    });
+    setFonteMap(fmap);
     // Carrega contagem por operador em cada fila
     const map: Record<string, OpCount[]> = {};
     await Promise.all(list.map(async (f) => {
@@ -62,6 +84,27 @@ export default function TelemarketingAdminFilas() {
     setCountsMap(map);
     setLoading(false);
   };
+
+  const repopular = async (f: FilaResumo) => {
+    const info = fonteMap[f.campanha_id];
+    if (!clientId || !info?.fonte || info.fonte === "csv") return;
+    setRepopulando(f.campanha_id);
+    const { data, error } = await supabase.rpc("tele_popular_fila" as any, {
+      _client_id: clientId,
+      _campanha_id: f.campanha_id,
+      _origem: info.fonte,
+      _filtros: info.filtro || {},
+      _csv_rows: [],
+    });
+    setRepopulando(null);
+    if (error) { toast.error(error.message); return; }
+    const total = Number((data as any)?.total || 0);
+    toast[total > 0 ? "success" : "info"](
+      total > 0 ? `${total} novo(s) contato(s) adicionado(s)` : "Nenhum contato novo encontrado com o mesmo filtro"
+    );
+    load();
+  };
+
 
   const loadOperadores = async () => {
     if (!clientId) return;
@@ -157,7 +200,14 @@ export default function TelemarketingAdminFilas() {
                           <Badge variant={f.ativo ? "default" : "secondary"} className="text-[10px]">
                             {f.ativo ? "Ativa" : "Pausada"}
                           </Badge>
+                          {fonteMap[f.campanha_id]?.fonte && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {ORIGEM_LABEL[fonteMap[f.campanha_id].fonte as string] || fonteMap[f.campanha_id].fonte}
+                              {fonteMap[f.campanha_id]?.filtro?.cidade ? ` · ${fonteMap[f.campanha_id].filtro.cidade}` : ""}
+                            </Badge>
+                          )}
                         </div>
+
                         {f.descricao && <p className="text-xs text-muted-foreground truncate">{f.descricao}</p>}
                       </div>
                       <div className="flex gap-1 shrink-0">
@@ -194,9 +244,26 @@ export default function TelemarketingAdminFilas() {
                       <Button size="sm" variant="default" onClick={() => abrirComoTeste(f.campanha_id)}>
                         <FlaskConical className="w-3.5 h-3.5 mr-1" /> Testar fila
                       </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAddDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
+                        <UserPlus className="w-3.5 h-3.5 mr-1" /> Adicionar contatos
+                      </Button>
+                      {fonteMap[f.campanha_id]?.fonte && fonteMap[f.campanha_id].fonte !== "csv" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={repopulando === f.campanha_id}
+                          onClick={() => repopular(f)}
+                          title="Buscar novos contatos com o mesmo filtro usado antes"
+                        >
+                          {repopulando === f.campanha_id
+                            ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                            : <RotateCw className="w-3.5 h-3.5 mr-1" />} Buscar novos
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline" onClick={() => setAtribDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
                         <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
+
                       <Button size="sm" variant="outline" asChild>
                         <a href={linkOperador(f.campanha_id)} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="w-3.5 h-3.5 mr-1" /> Abrir
@@ -235,7 +302,22 @@ export default function TelemarketingAdminFilas() {
           onChanged={() => load()}
         />
       )}
+
+      {clientId && addDialog.open && (
+        <AdicionarContatosDialog
+          open={addDialog.open}
+          onOpenChange={(o) => setAddDialog(s => ({ ...s, open: o }))}
+          clientId={clientId}
+          campanhaId={addDialog.campanhaId}
+          campanhaNome={addDialog.nome}
+          fonteAnterior={fonteMap[addDialog.campanhaId]?.fonte ?? null}
+          filtroAnterior={fonteMap[addDialog.campanhaId]?.filtro}
+          operadores={operadores}
+          onChanged={() => load()}
+        />
+      )}
     </div>
   );
+
 }
 
