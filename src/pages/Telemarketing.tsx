@@ -73,6 +73,13 @@ export default function Telemarketing() {
   const [saving, setSaving] = useState(false);
   const [scripts, setScripts] = useState<CampanhaScript[]>([]);
 
+  // Busca de contato (retorno de ligação)
+  const [buscaTermo, setBuscaTermo] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [buscaResultados, setBuscaResultados] = useState<ContatoTele[]>([]);
+  const [buscouVazio, setBuscouVazio] = useState(false);
+
+
   useEffect(() => {
     // Force anon role to ensure RLS anon policies apply
     supabase.auth.signOut().then(() => {
