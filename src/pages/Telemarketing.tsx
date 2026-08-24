@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock } from "lucide-react";
+import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock, Search } from "lucide-react";
 import { toast } from "sonner";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
@@ -72,6 +72,13 @@ export default function Telemarketing() {
   const [proximaTentativa, setProximaTentativa] = useState("");
   const [saving, setSaving] = useState(false);
   const [scripts, setScripts] = useState<CampanhaScript[]>([]);
+
+  // Busca de contato (retorno de ligação)
+  const [buscaTermo, setBuscaTermo] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [buscaResultados, setBuscaResultados] = useState<ContatoTele[]>([]);
+  const [buscouVazio, setBuscouVazio] = useState(false);
+
 
   useEffect(() => {
     // Force anon role to ensure RLS anon policies apply
@@ -499,6 +506,65 @@ export default function Telemarketing() {
     await jumpToProximoDisponivel();
   };
 
+  const mapRow = (r: any): ContatoTele => ({
+    id: r.id, nome: r.nome, telefone: r.telefone,
+    cidade: r.cidade, bairro: r.bairro,
+    ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
+    candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
+    ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
+    tabela: r.tabela as ContatoTele["tabela"],
+    proxima_tentativa_em: r.proxima_tentativa_em ?? null,
+    tentativas_count: r.tentativas_count ?? 0,
+    observacao_tele: r.observacao_tele ?? null,
+    locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
+    campanha_id: r.campanha_id ?? null,
+    indicador_nome: r.indicador_nome ?? null,
+    indicador_tipo: r.indicador_tipo ?? null,
+    lista_id: r.lista_id ?? null,
+  });
+
+  const handleBuscar = async () => {
+    const termo = buscaTermo.trim();
+    if (termo.length < 3) {
+      toast.error("Digite ao menos 3 caracteres (nome ou telefone)");
+      return;
+    }
+    if (!clientId) return;
+    setBuscando(true);
+    setBuscouVazio(false);
+    const { data, error } = await supabase.rpc("tele_buscar_contato" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _termo: termo,
+      _campanha_id: selectedCampanhaId,
+      _limite: 30,
+    });
+    setBuscando(false);
+    if (error) {
+      toast.error("Erro na busca: " + error.message);
+      return;
+    }
+    const rows = ((data as any[]) || []).map(mapRow);
+    setBuscaResultados(rows);
+    setBuscouVazio(rows.length === 0);
+  };
+
+  const abrirContatoBuscado = (row: ContatoTele) => {
+    setFiltroTipo("todos");
+    setContatos((prev) => {
+      const rest = prev.filter((c) => !(c.id === row.id && c.tabela === row.tabela));
+      return [row, ...rest];
+    });
+    setCurrentIndex(0);
+    resetForm();
+    setBuscaResultados([]);
+    setBuscaTermo("");
+    setBuscouVazio(false);
+    toast.success(`Contato aberto: ${row.nome}`);
+  };
+
+
   const tipoLabel = (tipo: string) => {
     if (tipo === "lider") return "Líder";
     if (tipo === "liderado") return "Liderado";
@@ -656,7 +722,55 @@ export default function Telemarketing() {
         </div>
       </div>
 
+      {/* Busca de contato (retorno de ligação) */}
+      <Card>
+        <CardContent className="p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Buscar por nome ou telefone (retornou a ligação?)"
+              value={buscaTermo}
+              onChange={(e) => setBuscaTermo(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleBuscar()}
+              className="h-9 text-sm"
+            />
+            <Button size="sm" className="h-9" onClick={handleBuscar} disabled={buscando}>
+              <Search className="w-3.5 h-3.5 mr-1" />
+              {buscando ? "..." : "Buscar"}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            Use quando a pessoa retornar a ligação: localize o contato (mesmo já trabalhado ou agendado) e registre o resultado da pesquisa.
+          </p>
+          {buscaResultados.length > 0 && (
+            <div className="space-y-1 pt-1">
+              {buscaResultados.map((r) => (
+                <button
+                  key={`${r.tabela}-${r.id}`}
+                  type="button"
+                  onClick={() => abrirContatoBuscado(r)}
+                  className="w-full text-left border rounded-md px-2 py-1.5 hover:bg-muted/60 transition"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium truncate">{r.nome}</span>
+                    <Badge variant="outline" className="text-[10px] shrink-0">{tipoLabel(r.tipo)}</Badge>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {fmtPhoneBR(toWhatsAppBR(r.telefone) || r.telefone)}
+                    {r.cidade ? ` · ${r.cidade}` : ""}
+                    {r.ligacao_status && r.ligacao_status !== "pendente" ? ` · ${r.ligacao_status}` : " · pendente"}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          {buscouVazio && (
+            <p className="text-[11px] text-muted-foreground">Nenhum contato encontrado na sua carteira.</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Type filter */}
+
       {!current?.lista_id && (
         <div className="flex gap-2 flex-wrap">
         {(["todos", "lider", "liderado", "indicado", "avulso", "eleicao_indicado", "estrutura"] as const).map((f) => (
@@ -860,14 +974,15 @@ export default function Telemarketing() {
                     size="sm"
                     onClick={() => {
                       setLigacaoStatus("nao_atendeu");
-                      const d = new Date(Date.now() + 60 * 60 * 1000);
+                      const d = new Date(Date.now() + 6 * 60 * 60 * 1000);
                       const pad = (n: number) => String(n).padStart(2, "0");
                       setProximaTentativa(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                     }}
                     className="text-xs"
                   >
                     <PhoneOff className="w-3.5 h-3.5 mr-1" />
-                    Não atendeu (+1h)
+                    Não atendeu (+6h)
+
                   </Button>
                   <Button
                     variant={ligacaoStatus === "recusou" ? "destructive" : "outline"}
@@ -943,16 +1058,24 @@ export default function Telemarketing() {
                     {(votaCandidato === "nao" || votaCandidato === "indeciso") && (
                       <div>
                         <label className="text-xs font-medium mb-1.5 block">
-                          Candidato que apoia (opcional)
+                          Candidato que apoia {votaCandidato === "nao" ? (
+                            <span className="text-destructive">(obrigatório)</span>
+                          ) : "(opcional)"}
                         </label>
                         <Input
                           placeholder="Nome do candidato..."
                           value={candidatoAlt}
                           onChange={(e) => setCandidatoAlt(e.target.value)}
-                          className="h-9 text-sm"
+                          className={`h-9 text-sm ${votaCandidato === "nao" && !candidatoAlt.trim() ? "border-destructive" : ""}`}
                         />
+                        {votaCandidato === "nao" && !candidatoAlt.trim() && (
+                          <p className="text-[11px] text-destructive mt-1">
+                            Informe em quem a pessoa disse que vota para salvar.
+                          </p>
+                        )}
                       </div>
                     )}
+
                   </div>
                 )}
 
@@ -970,7 +1093,7 @@ export default function Telemarketing() {
                 <div className="flex gap-2 pt-2">
                   <Button
                     onClick={handleSave}
-                    disabled={saving || !ligacaoStatus || (ligacaoStatus === "reagendou" && !proximaTentativa)}
+                    disabled={saving || !ligacaoStatus || (ligacaoStatus === "reagendou" && !proximaTentativa) || (ligacaoStatus === "atendeu" && votaCandidato === "nao" && !candidatoAlt.trim())}
                     className="flex-1"
                   >
                     {saving ? "Salvando..." : "Salvar e Próximo"}

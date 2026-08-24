@@ -10594,6 +10594,39 @@ export type Database = {
         }
         Returns: Json
       }
+      tele_buscar_contato: {
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _limite?: number
+          _nome: string
+          _senha: string
+          _termo: string
+        }
+        Returns: {
+          bairro: string
+          campanha_id: string
+          candidato_alternativo: string
+          cidade: string
+          id: string
+          indicador_nome: string
+          indicador_tipo: string
+          ligacao_em: string
+          ligacao_status: string
+          lista_id: string
+          locked_by: string
+          locked_until: string
+          nome: string
+          observacao_tele: string
+          operador_nome: string
+          proxima_tentativa_em: string
+          tabela: string
+          telefone: string
+          tentativas_count: number
+          tipo: string
+          vota_candidato: string
+        }[]
+      }
       tele_capture_snapshot: {
         Args: { _campanha_id?: string; _client_id: string; _rotulo: string }
         Returns: string
