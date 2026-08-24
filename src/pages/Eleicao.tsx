@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import { formatCPF, onlyDigits } from "@/lib/cpf";
+
+const formatCEP = (v: string) => {
+  const d = onlyDigits(v).slice(0, 8);
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+};
+
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
