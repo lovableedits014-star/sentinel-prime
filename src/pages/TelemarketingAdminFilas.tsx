@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog } from "lucide-react";
+import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,16 @@ import { toast } from "sonner";
 import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
 import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
 import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
+import AdicionarContatosDialog from "@/components/telemarketing/AdicionarContatosDialog";
+
+const ORIGEM_LABEL: Record<string, string> = {
+  csv: "Planilha",
+  estrutura: "Estrutura eleitoral",
+  indicados_eleicao: "Indicados (eleição)",
+  contratados: "Contratados",
+  indicados_contratados: "Indicados de contratados",
+};
+
 
 interface OpCount { operador_id: string | null; operador_nome: string; pendentes: number; ligados: number }
 
