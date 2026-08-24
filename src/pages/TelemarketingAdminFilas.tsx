@@ -263,9 +263,14 @@ export default function TelemarketingAdminFilas() {
                             : <RotateCw className="w-3.5 h-3.5 mr-1" />} Buscar novos
                         </Button>
                       )}
+                      {fonteMap[f.campanha_id]?.fonte && fonteMap[f.campanha_id].fonte !== "csv" && (
+                        <TeleHelp text={TELE_HELP.buscarNovos} className="self-center" />
+                      )}
                       <Button size="sm" variant="outline" onClick={() => setAtribDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
                         <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
+                      <TeleHelp text={TELE_HELP.gerenciarDesignacoes} className="self-center" />
+
 
                       <Button size="sm" variant="outline" asChild>
                         <a href={linkOperador(f.campanha_id)} target="_blank" rel="noopener noreferrer">
