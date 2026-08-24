@@ -166,6 +166,11 @@ interface Pessoa {
   rua: string | null;
   numero: string | null;
   bairro: string | null;
+  cep?: string | null;
+  cpf?: string | null;
+  rg?: string | null;
+  rg_orgao_expedidor?: string | null;
+
   parent_id: string | null;
   observacoes: string | null;
   email: string | null;
