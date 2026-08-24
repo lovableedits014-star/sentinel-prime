@@ -860,14 +860,15 @@ export default function Telemarketing() {
                     size="sm"
                     onClick={() => {
                       setLigacaoStatus("nao_atendeu");
-                      const d = new Date(Date.now() + 60 * 60 * 1000);
+                      const d = new Date(Date.now() + 6 * 60 * 60 * 1000);
                       const pad = (n: number) => String(n).padStart(2, "0");
                       setProximaTentativa(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
                     }}
                     className="text-xs"
                   >
                     <PhoneOff className="w-3.5 h-3.5 mr-1" />
-                    Não atendeu (+1h)
+                    Não atendeu (+6h)
+
                   </Button>
                   <Button
                     variant={ligacaoStatus === "recusou" ? "destructive" : "outline"}
