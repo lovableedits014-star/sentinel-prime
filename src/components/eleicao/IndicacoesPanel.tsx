@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye, UserPlus, Plus, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from "lucide-react";
+import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye, UserPlus, Plus, ChevronDown, ChevronUp, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
 import CobrancaAutoConfig from "./CobrancaAutoConfig";
 import IndicarPaginaConfig from "./IndicarPaginaConfig";
 import ImportarIndicadosDialog from "./ImportarIndicadosDialog";
@@ -71,11 +71,19 @@ function buildLink(token: string) {
   return `${window.location.origin}/indicar/${token}`;
 }
 
+function fmtTelBR(tel: string | null) {
+  const d = (tel || "").replace(/\D/g, "").replace(/^55/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return tel || "—";
+}
+
 function waLink(telefone: string, msg: string) {
   const d = telefone.replace(/\D/g, "");
   const full = d.startsWith("55") ? d : `55${d}`;
   return `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
 }
+
 
 export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [tab, setTab] = useState<"cobranca" | "config" | "pagina">("cobranca");
@@ -333,6 +341,93 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     }
   }
 
+  // ===== Exportação (Excel / PDF) =====
+  function exportRows() {
+    return filtered.map((r) => {
+      const faltam = Math.max(0, (r.meta || 0) - (r.total_indicacoes || 0));
+      return {
+        Nome: r.nome,
+        Cargo: tipoLabel[r.tipo],
+        Telefone: fmtTelBR(r.telefone),
+        Regiao: r.regiao || "",
+        Cidade: r.cidade || "",
+        Indicacoes: r.total_indicacoes || 0,
+        Meta: r.meta || 0,
+        Faltam: faltam,
+        Status: faltam > 0 ? (r.total_indicacoes === 0 ? "Sem indicações" : "Abaixo da meta") : "Meta cumprida",
+        Cobrancas: r.cobrancas_enviadas || 0,
+        UltimaCobranca: r.ultima_cobranca_em ? new Date(r.ultima_cobranca_em).toLocaleString("pt-BR") : "",
+        UltimoAcesso: r.ultimo_acesso_em ? new Date(r.ultimo_acesso_em).toLocaleString("pt-BR") : "",
+        Link: r.token ? buildLink(r.token) : "",
+      };
+    });
+  }
+
+  async function exportarExcel() {
+    const data = exportRows();
+    if (!data.length) { toast.error("Nenhum indicador no filtro atual."); return; }
+    const XLSX = await import("xlsx");
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws["!cols"] = [
+      { wch: 28 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 18 },
+      { wch: 11 }, { wch: 8 }, { wch: 8 }, { wch: 16 }, { wch: 10 },
+      { wch: 20 }, { wch: 20 }, { wch: 45 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Indicacoes");
+    XLSX.writeFile(wb, `indicacoes-cobranca-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`Excel exportado (${data.length} indicadores)`);
+  }
+
+  async function exportarPDF() {
+    const data = exportRows();
+    if (!data.length) { toast.error("Nenhum indicador no filtro atual."); return; }
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    const filtroDesc = [
+      filtroTipo === "all" ? "Todos os cargos" : tipoLabel[filtroTipo as Tipo],
+      filtroStatus === "all" ? "Todos os status"
+        : filtroStatus === "zerados" ? "Sem indicações"
+        : filtroStatus === "abaixo" ? "Abaixo da meta" : "Meta cumprida",
+      busca ? `Busca: "${busca}"` : null,
+    ].filter(Boolean).join(" · ");
+
+    doc.setFontSize(15);
+    doc.text("Relatório de Indicações — Cobrança", 40, 40);
+    doc.setFontSize(9);
+    doc.text(`${candidatoNome || ""}${candidatoNome ? " · " : ""}${filtroDesc}`, 40, 56);
+    const faltantes = data.filter((d) => d.Faltam > 0).length;
+    const totalInd = data.reduce((s, d) => s + d.Indicacoes, 0);
+    const totalMeta = data.reduce((s, d) => s + d.Meta, 0);
+    doc.text(
+      `${data.length} indicadores · ${faltantes} fora da meta · ${totalInd} de ${totalMeta} indicações · Gerado em ${new Date().toLocaleString("pt-BR")}`,
+      40, 70,
+    );
+
+    autoTable(doc, {
+      startY: 84,
+      head: [["Nome", "Cargo", "Telefone", "Região / Cidade", "Ind.", "Meta", "Faltam", "Status", "Última cobrança"]],
+      body: data.map((d) => [
+        d.Nome, d.Cargo, d.Telefone,
+        [d.Regiao, d.Cidade].filter(Boolean).join(" · "),
+        String(d.Indicacoes), String(d.Meta), String(d.Faltam), d.Status, d.UltimaCobranca || "—",
+      ]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [16, 122, 87], textColor: 255 },
+      didParseCell: (hook: any) => {
+        if (hook.section === "body" && Number(data[hook.row.index]?.Faltam) > 0) {
+          hook.cell.styles.textColor = [180, 40, 20];
+        }
+      },
+    });
+
+    doc.save(`indicacoes-cobranca-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success(`PDF exportado (${data.length} indicadores)`);
+  }
+
+
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
@@ -398,6 +493,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-1.5" />Atualizar</Button>
+            <Button variant="outline" size="sm" onClick={exportarExcel} title="Exportar a lista filtrada (com telefones) para Excel">
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" />Excel
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportarPDF} title="Exportar a lista filtrada (com telefones) em PDF para cobrança presencial">
+              <FileText className="w-4 h-4 mr-1.5" />PDF
+            </Button>
+
             <Button size="sm" onClick={abrirMass} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
               <Send className="w-4 h-4" />
               Enviar cobrança em massa
@@ -435,7 +537,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                             ) : (
                               <Badge variant="outline" className="text-[10px] border-emerald-500/60 text-emerald-600">Meta ok</Badge>
                             )}
+                            {r.telefone && (
+                              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">
+                                {fmtTelBR(r.telefone)}
+                              </span>
+                            )}
                             {r.regiao && <span className="text-xs text-muted-foreground">{r.regiao}{r.cidade ? ` · ${r.cidade}` : ""}</span>}
+
                           </div>
                           <div className="flex items-center gap-2 mt-1.5">
                             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[200px]">
