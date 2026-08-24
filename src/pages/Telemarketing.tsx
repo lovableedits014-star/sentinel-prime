@@ -943,16 +943,24 @@ export default function Telemarketing() {
                     {(votaCandidato === "nao" || votaCandidato === "indeciso") && (
                       <div>
                         <label className="text-xs font-medium mb-1.5 block">
-                          Candidato que apoia (opcional)
+                          Candidato que apoia {votaCandidato === "nao" ? (
+                            <span className="text-destructive">(obrigatório)</span>
+                          ) : "(opcional)"}
                         </label>
                         <Input
                           placeholder="Nome do candidato..."
                           value={candidatoAlt}
                           onChange={(e) => setCandidatoAlt(e.target.value)}
-                          className="h-9 text-sm"
+                          className={`h-9 text-sm ${votaCandidato === "nao" && !candidatoAlt.trim() ? "border-destructive" : ""}`}
                         />
+                        {votaCandidato === "nao" && !candidatoAlt.trim() && (
+                          <p className="text-[11px] text-destructive mt-1">
+                            Informe em quem a pessoa disse que vota para salvar.
+                          </p>
+                        )}
                       </div>
                     )}
+
                   </div>
                 )}
 
