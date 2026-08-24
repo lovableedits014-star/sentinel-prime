@@ -506,6 +506,65 @@ export default function Telemarketing() {
     await jumpToProximoDisponivel();
   };
 
+  const mapRow = (r: any): ContatoTele => ({
+    id: r.id, nome: r.nome, telefone: r.telefone,
+    cidade: r.cidade, bairro: r.bairro,
+    ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
+    candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
+    ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
+    tabela: r.tabela as ContatoTele["tabela"],
+    proxima_tentativa_em: r.proxima_tentativa_em ?? null,
+    tentativas_count: r.tentativas_count ?? 0,
+    observacao_tele: r.observacao_tele ?? null,
+    locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
+    campanha_id: r.campanha_id ?? null,
+    indicador_nome: r.indicador_nome ?? null,
+    indicador_tipo: r.indicador_tipo ?? null,
+    lista_id: r.lista_id ?? null,
+  });
+
+  const handleBuscar = async () => {
+    const termo = buscaTermo.trim();
+    if (termo.length < 3) {
+      toast.error("Digite ao menos 3 caracteres (nome ou telefone)");
+      return;
+    }
+    if (!clientId) return;
+    setBuscando(true);
+    setBuscouVazio(false);
+    const { data, error } = await supabase.rpc("tele_buscar_contato" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _termo: termo,
+      _campanha_id: selectedCampanhaId,
+      _limite: 30,
+    });
+    setBuscando(false);
+    if (error) {
+      toast.error("Erro na busca: " + error.message);
+      return;
+    }
+    const rows = ((data as any[]) || []).map(mapRow);
+    setBuscaResultados(rows);
+    setBuscouVazio(rows.length === 0);
+  };
+
+  const abrirContatoBuscado = (row: ContatoTele) => {
+    setFiltroTipo("todos");
+    setContatos((prev) => {
+      const rest = prev.filter((c) => !(c.id === row.id && c.tabela === row.tabela));
+      return [row, ...rest];
+    });
+    setCurrentIndex(0);
+    resetForm();
+    setBuscaResultados([]);
+    setBuscaTermo("");
+    setBuscouVazio(false);
+    toast.success(`Contato aberto: ${row.nome}`);
+  };
+
+
   const tipoLabel = (tipo: string) => {
     if (tipo === "lider") return "Líder";
     if (tipo === "liderado") return "Liderado";
