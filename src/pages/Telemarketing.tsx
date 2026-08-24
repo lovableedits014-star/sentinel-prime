@@ -656,7 +656,55 @@ export default function Telemarketing() {
         </div>
       </div>
 
+      {/* Busca de contato (retorno de ligação) */}
+      <Card>
+        <CardContent className="p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Buscar por nome ou telefone (retornou a ligação?)"
+              value={buscaTermo}
+              onChange={(e) => setBuscaTermo(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleBuscar()}
+              className="h-9 text-sm"
+            />
+            <Button size="sm" className="h-9" onClick={handleBuscar} disabled={buscando}>
+              <Search className="w-3.5 h-3.5 mr-1" />
+              {buscando ? "..." : "Buscar"}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            Use quando a pessoa retornar a ligação: localize o contato (mesmo já trabalhado ou agendado) e registre o resultado da pesquisa.
+          </p>
+          {buscaResultados.length > 0 && (
+            <div className="space-y-1 pt-1">
+              {buscaResultados.map((r) => (
+                <button
+                  key={`${r.tabela}-${r.id}`}
+                  type="button"
+                  onClick={() => abrirContatoBuscado(r)}
+                  className="w-full text-left border rounded-md px-2 py-1.5 hover:bg-muted/60 transition"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium truncate">{r.nome}</span>
+                    <Badge variant="outline" className="text-[10px] shrink-0">{tipoLabel(r.tipo)}</Badge>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {fmtPhoneBR(toWhatsAppBR(r.telefone) || r.telefone)}
+                    {r.cidade ? ` · ${r.cidade}` : ""}
+                    {r.ligacao_status && r.ligacao_status !== "pendente" ? ` · ${r.ligacao_status}` : " · pendente"}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          {buscouVazio && (
+            <p className="text-[11px] text-muted-foreground">Nenhum contato encontrado na sua carteira.</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Type filter */}
+
       {!current?.lista_id && (
         <div className="flex gap-2 flex-wrap">
         {(["todos", "lider", "liderado", "indicado", "avulso", "eleicao_indicado", "estrutura"] as const).map((f) => (
