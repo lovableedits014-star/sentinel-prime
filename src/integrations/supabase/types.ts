@@ -9819,10 +9819,9 @@ export type Database = {
           ultimo_canal: string
         }[]
       }
-      eleicao_pessoa_in_user_tree: {
-        Args: { _pessoa_id: string; _user_id: string }
-        Returns: boolean
-      }
+      eleicao_pessoa_in_user_tree:
+        | { Args: { _pessoa_id: string }; Returns: boolean }
+        | { Args: { _pessoa_id: string; _user_id: string }; Returns: boolean }
       eleicao_remover_indicacao_token: {
         Args: { _indicado_id: string; _token: string }
         Returns: Json
