@@ -87,9 +87,11 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
     ];
   }, [contratados, indicados]);
 
-  // Filter by selected leader
+  // Filter by selected scope / leader
   const filtered = useMemo(() => {
     if (selectedLider === "geral") return allContacts;
+    if (selectedLider === "somente_indicados") return allContacts.filter(c => c.tipo === "indicado");
+    if (selectedLider === "somente_estrutura") return allContacts.filter(c => c.tipo !== "indicado");
     // Get liderados of this leader + indicados of those liderados + the leader itself
     const liderMembros = contratados.filter(c => c.lider_id === selectedLider).map(c => c.id);
     const leaderIds = new Set([selectedLider, ...liderMembros]);
@@ -99,6 +101,14 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
       return false;
     });
   }, [allContacts, selectedLider, contratados]);
+
+  const scopeLabel = useMemo(() => {
+    if (selectedLider === "geral") return "Geral";
+    if (selectedLider === "somente_indicados") return "Somente indicados";
+    if (selectedLider === "somente_estrutura") return "Somente estrutura";
+    return lideres.find(l => l.id === selectedLider)?.nome || "Líder";
+  }, [selectedLider, lideres]);
+
 
   // Stats
   const total = filtered.length;
