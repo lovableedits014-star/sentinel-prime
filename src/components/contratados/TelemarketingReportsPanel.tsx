@@ -87,9 +87,11 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
     ];
   }, [contratados, indicados]);
 
-  // Filter by selected leader
+  // Filter by selected scope / leader
   const filtered = useMemo(() => {
     if (selectedLider === "geral") return allContacts;
+    if (selectedLider === "somente_indicados") return allContacts.filter(c => c.tipo === "indicado");
+    if (selectedLider === "somente_estrutura") return allContacts.filter(c => c.tipo !== "indicado");
     // Get liderados of this leader + indicados of those liderados + the leader itself
     const liderMembros = contratados.filter(c => c.lider_id === selectedLider).map(c => c.id);
     const leaderIds = new Set([selectedLider, ...liderMembros]);
@@ -99,6 +101,14 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
       return false;
     });
   }, [allContacts, selectedLider, contratados]);
+
+  const scopeLabel = useMemo(() => {
+    if (selectedLider === "geral") return "Geral";
+    if (selectedLider === "somente_indicados") return "Somente indicados";
+    if (selectedLider === "somente_estrutura") return "Somente estrutura";
+    return lideres.find(l => l.id === selectedLider)?.nome || "Líder";
+  }, [selectedLider, lideres]);
+
 
   // Stats
   const total = filtered.length;
@@ -175,7 +185,7 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const liderName = selectedLider === "geral" ? "geral" : lideres.find(l => l.id === selectedLider)?.nome || "lider";
+    const liderName = scopeLabel;
     a.download = `relatorio-telemarketing-${liderName.replace(/\s/g, "_")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
@@ -201,7 +211,7 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
 
   const exportPDF = () => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const liderName = selectedLider === "geral" ? "Geral" : (lideres.find(l => l.id === selectedLider)?.nome || "Líder");
+    const liderName = scopeLabel;
     doc.setFontSize(16);
     doc.text(`Relatório de Telemarketing — ${liderName}`, 40, 40);
     doc.setFontSize(10);
@@ -262,11 +272,13 @@ export default function TelemarketingReportsPanel({ contratados, indicados }: Pr
         <div className="flex items-center gap-2">
           <Crown className="w-4 h-4 text-primary" />
           <Select value={selectedLider} onValueChange={setSelectedLider}>
-            <SelectTrigger className="w-[200px] h-9 text-xs">
+            <SelectTrigger className="w-[230px] h-9 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="geral">📊 Relatório Geral</SelectItem>
+              <SelectItem value="somente_indicados">🎯 Somente indicados</SelectItem>
+              <SelectItem value="somente_estrutura">🏛️ Somente estrutura (líderes/liderados)</SelectItem>
               {lideres.map(l => (
                 <SelectItem key={l.id} value={l.id}>👑 {l.nome}</SelectItem>
               ))}
