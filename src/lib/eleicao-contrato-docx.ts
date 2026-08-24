@@ -207,11 +207,13 @@ const TIPO_THEME: Record<EleicaoTipo, Theme> = {
   },
 };
 
-function fileNameFor(pessoa: PessoaContratada): string {
+function fileNameFor(pessoa: PessoaContratada, kind: DocKind = "contrato"): string {
   const t = TIPO_THEME[pessoa.tipo];
   const safe = pessoa.nome.replace(/[^\w\s-]/g, "").trim();
-  return `${t.prefix} ${safe}.docx`;
+  const suf = kind === "distrato" ? "Distrato" : "Contrato";
+  return `${t.prefix} ${safe} - ${suf}.docx`;
 }
+
 
 export async function gerarContratoDocxBlob(
   template: ContractTemplate,
