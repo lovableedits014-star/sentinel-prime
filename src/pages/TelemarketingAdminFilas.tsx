@@ -44,7 +44,10 @@ export default function TelemarketingAdminFilas() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [countsMap, setCountsMap] = useState<Record<string, OpCount[]>>({});
   const [atribDialog, setAtribDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
+  const [addDialog, setAddDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
   const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
+  const [fonteMap, setFonteMap] = useState<Record<string, { fonte: string | null; filtro: any }>>({});
+  const [repopulando, setRepopulando] = useState<string | null>(null);
 
 
   const load = async () => {
@@ -58,6 +61,15 @@ export default function TelemarketingAdminFilas() {
       pendentes: Number(r.pendentes || 0), confirmados: Number(r.confirmados || 0),
     }));
     setFilas(list);
+    // Origem/filtros registrados em cada fila
+    const { data: camps } = await supabase.from("telemarketing_campanhas" as any)
+      .select("id, filtros").eq("client_id", clientId);
+    const fmap: Record<string, { fonte: string | null; filtro: any }> = {};
+    ((camps as any[]) || []).forEach(c => {
+      const f = (c.filtros || {}) as any;
+      fmap[c.id] = { fonte: f.fonte || null, filtro: f.ultimo_filtro || {} };
+    });
+    setFonteMap(fmap);
     // Carrega contagem por operador em cada fila
     const map: Record<string, OpCount[]> = {};
     await Promise.all(list.map(async (f) => {
@@ -72,6 +84,27 @@ export default function TelemarketingAdminFilas() {
     setCountsMap(map);
     setLoading(false);
   };
+
+  const repopular = async (f: FilaResumo) => {
+    const info = fonteMap[f.campanha_id];
+    if (!clientId || !info?.fonte || info.fonte === "csv") return;
+    setRepopulando(f.campanha_id);
+    const { data, error } = await supabase.rpc("tele_popular_fila" as any, {
+      _client_id: clientId,
+      _campanha_id: f.campanha_id,
+      _origem: info.fonte,
+      _filtros: info.filtro || {},
+      _csv_rows: [],
+    });
+    setRepopulando(null);
+    if (error) { toast.error(error.message); return; }
+    const total = Number((data as any)?.total || 0);
+    toast[total > 0 ? "success" : "info"](
+      total > 0 ? `${total} novo(s) contato(s) adicionado(s)` : "Nenhum contato novo encontrado com o mesmo filtro"
+    );
+    load();
+  };
+
 
   const loadOperadores = async () => {
     if (!clientId) return;
