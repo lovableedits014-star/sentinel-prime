@@ -224,7 +224,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5"><Plus className="h-4 w-4" /> Nova missão de uma publicação</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Escolher a publicação da missão</DialogTitle>
           <DialogDescription>
