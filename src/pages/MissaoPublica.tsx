@@ -32,10 +32,18 @@ type MissionConfig = {
     legacy_post_url: string | null;
     legacy_platform: string | null;
   };
+  links?: MissionLink[] | null;
   client_name: string | null;
   distribution_valid: boolean;
   group_name: string | null;
   participant: Participant | null;
+};
+
+type MissionLink = {
+  id: string;
+  label: string;
+  url: string;
+  kind: string | null;
 };
 
 const TOKEN_KEY_PREFIX = "sm_client_token_";
