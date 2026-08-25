@@ -42,6 +42,9 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
   const [fb, setFb] = useState<PostOption | null>(null);
   const [ig, setIg] = useState<PostOption | null>(null);
   const [manualUrl, setManualUrl] = useState("");
+  const [extraLabel, setExtraLabel] = useState("");
+  const [extraUrl, setExtraUrl] = useState("");
+  const [extraLinks, setExtraLinks] = useState<{ label: string; url: string }[]>([]);
   const [titulo, setTitulo] = useState("");
   const [instrucoes, setInstrucoes] = useState("");
   const [saving, setSaving] = useState(false);
