@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { fmtPhoneBR, toWhatsAppBR } from "@/lib/phone-utils";
 import MissionPessoaHistorico from "./MissionPessoaHistorico";
+import MissionCheckinCharts from "./MissionCheckinCharts";
+import MissionCheckinAlerts from "./MissionCheckinAlerts";
 
 type Props = {
   clientId: string;
