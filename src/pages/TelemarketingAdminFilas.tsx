@@ -50,6 +50,24 @@ export default function TelemarketingAdminFilas() {
   const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
   const [fonteMap, setFonteMap] = useState<Record<string, { fonte: string | null; filtro: any }>>({});
   const [repopulando, setRepopulando] = useState<string | null>(null);
+  const [resetando, setResetando] = useState<string | null>(null);
+
+  const resetarFila = async (f: FilaResumo) => {
+    if (!clientId) return;
+    if (!confirm(`Resetar a fila "${f.nome}"? Os contatos que não atenderam ou pediram retorno voltam agora para a fila, sem esperar as 6h.`)) return;
+    setResetando(f.campanha_id);
+    const { data, error } = await supabase.rpc("tele_resetar_fila" as any, {
+      _client_id: clientId, _campanha_id: f.campanha_id,
+    });
+    setResetando(null);
+    if (error) { toast.error(error.message); return; }
+    const n = Number((data as any)?.reabertos || 0);
+    toast[n > 0 ? "success" : "info"](
+      n > 0 ? `${n} contato(s) devolvido(s) para a fila` : "Nenhum contato aguardando retorno nesta fila"
+    );
+    load();
+  };
+
 
 
   const load = async () => {
