@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw } from "lucide-react";
+import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw, RefreshCcw } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
