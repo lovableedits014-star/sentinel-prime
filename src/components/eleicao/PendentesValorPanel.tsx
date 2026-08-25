@@ -212,6 +212,19 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
     return true;
   }
 
+  async function limparValor(p: PessoaRow) {
+    const { error } = await supabase
+      .from("eleicao_pessoas" as any)
+      .update({ valor_contratacao: 0 })
+      .eq("id", p.id);
+    if (error) { toast.error(error.message); return false; }
+    toast.success(`Valor removido — ${p.nome} voltou para pendentes`);
+    onChanged?.();
+    load();
+    return true;
+
+  }
+
   async function gerarContrato(p: PessoaRow) {
     if (!p.valor_contratacao || p.valor_contratacao <= 0) {
       toast.error("Defina o valor antes de gerar o contrato.");
