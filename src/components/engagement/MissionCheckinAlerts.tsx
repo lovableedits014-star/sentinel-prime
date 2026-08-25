@@ -25,16 +25,26 @@ type NaoIdentificado = {
   grupo: string | null;
 };
 
+type AbertoSemConfirmar = {
+  pessoa_id: string;
+  nome: string;
+  telefone: string | null;
+  cargo: string | null;
+  regiao: string | null;
+};
+
 export default function MissionCheckinAlerts({
   clientId,
   missionId,
   missionTitle,
   missionLink,
+  abertosSemConfirmar = [],
 }: {
   clientId: string;
   missionId: string;
   missionTitle: string | null;
   missionLink: string | null;
+  abertosSemConfirmar?: AbertoSemConfirmar[];
 }) {
   const { data: reincidentes = [], isLoading: loadingR } = useQuery<Reincidente[]>({
     queryKey: ["mission-checkin-reincidentes", clientId],
