@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { toast } from "sonner";
 import {
   Loader2, Search, Download, FileText, CheckCircle2, Eye, XCircle, Users,
-  MessageCircle, History, TrendingUp, ChevronDown,
+  MessageCircle, History, TrendingUp,
 } from "lucide-react";
 import { fmtPhoneBR, toWhatsAppBR } from "@/lib/phone-utils";
 import MissionPessoaHistorico from "./MissionPessoaHistorico";
