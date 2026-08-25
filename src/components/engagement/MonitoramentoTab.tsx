@@ -61,7 +61,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
   const [regraEdit, setRegraEdit] = useState<Partial<Regra> | null>(null);
   const [missaoEdit, setMissaoEdit] = useState<MissaoMonitorada | null>(null);
   const [grupos, setGrupos] = useState<PublicoGrupo[]>([]);
-  const [previaPublico, setPreviaPublico] = useState<number | null>(null);
+  const [previaPublico, setPreviaPublico] = useState<PreviaPublico | null>(null);
   const [semProva, setSemProva] = useState<Set<string>>(new Set());
 
   const load = async () => {
