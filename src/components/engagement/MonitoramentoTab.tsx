@@ -13,12 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertTriangle, ArrowDown, ArrowUp, FileDown, Gauge, ListChecks, Megaphone,
-  Plus, RefreshCw, Search, Settings2, Target, Trash2, TrendingUp,
+  Plus, RefreshCw, Search, Settings2, Target, Trash2, TrendingUp, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import PublicoMonitoradoTab from "@/components/engagement/PublicoMonitoradoTab";
 import {
+  contarPublicoDaRegra, fetchGrupos, type PublicoGrupo,
   atualizarMissaoMonitoramento, casarInteracoes, excluirRegra, fetchAdesao, fetchHistoricoPessoa,
   fetchMissoes, fetchMonitorOverview, fetchRanking, fetchRegras, gerarObrigacoes, recalcularIndices,
   registrarCobranca, salvarRegra, dispensarObrigacao,
@@ -58,17 +60,21 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
 
   const [regraEdit, setRegraEdit] = useState<Partial<Regra> | null>(null);
   const [missaoEdit, setMissaoEdit] = useState<MissaoMonitorada | null>(null);
+  const [grupos, setGrupos] = useState<PublicoGrupo[]>([]);
+  const [previaPublico, setPreviaPublico] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [o, r, a, g, m] = await Promise.all([
+      const [o, r, a, g, m, gr] = await Promise.all([
         fetchMonitorOverview(clientId),
         fetchRanking(clientId),
         fetchAdesao(clientId),
         fetchRegras(clientId),
         fetchMissoes(clientId),
+        fetchGrupos(clientId),
       ]);
+      setGrupos(gr);
       setOverview(o);
       setRanking(r);
       setAdesao(a);
@@ -184,6 +190,17 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
     }
   };
 
+  useEffect(() => {
+    const regra = regras.find((r) => r.id === missaoEdit?.regra_id);
+    if (!missaoEdit || !regra) { setPreviaPublico(null); return; }
+    let cancel = false;
+    contarPublicoDaRegra(clientId, regra)
+      .then((n) => { if (!cancel) setPreviaPublico(n); })
+      .catch(() => { if (!cancel) setPreviaPublico(null); });
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missaoEdit?.regra_id, regras, clientId]);
+
   const salvarMissaoAtual = async () => {
     if (!missaoEdit) return;
     try {
@@ -291,6 +308,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
           <TabsTrigger value="ranking" className="gap-1.5 text-xs sm:text-sm"><TrendingUp className="h-4 w-4" /> Ranking</TabsTrigger>
           <TabsTrigger value="publicacoes" className="gap-1.5 text-xs sm:text-sm"><Megaphone className="h-4 w-4" /> Publicações</TabsTrigger>
           <TabsTrigger value="regras" className="gap-1.5 text-xs sm:text-sm"><Target className="h-4 w-4" /> Regras</TabsTrigger>
+          <TabsTrigger value="publico" className="gap-1.5 text-xs sm:text-sm"><Users className="h-4 w-4" /> Público monitorado</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ranking">
@@ -495,6 +513,9 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="publico">
+          <PublicoMonitoradoTab clientId={clientId} />
+        </TabsContent>
       </Tabs>
 
       {/* Regra dialog */}
@@ -526,8 +547,30 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
                 <Input type="number" min={1} value={regraEdit?.prazo_horas ?? 48} onChange={(e) => setRegraEdit({ ...regraEdit, prazo_horas: Number(e.target.value) })} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Como montar o público</Label>
+                <Select value={regraEdit?.modo_publico || "automatico"} onValueChange={(v) => setRegraEdit({ ...regraEdit, modo_publico: v as Regra["modo_publico"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="automatico">Automático (cargo/região)</SelectItem>
+                    <SelectItem value="manual">Lista manual (grupo)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Grupo</Label>
+                <Select value={regraEdit?.grupo_id || ""} onValueChange={(v) => setRegraEdit({ ...regraEdit, grupo_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                  <SelectContent>
+                    {grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
+                    {grupos.length === 0 && <SelectItem value="" disabled>Crie um grupo em “Público monitorado”</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="space-y-1">
-              <Label className="text-xs">Cargos cobrados (vazio = todos)</Label>
+              <Label className="text-xs">Cargos cobrados (vazio = todos) — usados no modo automático</Label>
               <div className="flex flex-wrap gap-2">
                 {CARGOS.map((c) => {
                   const on = (regraEdit?.cargos || []).includes(c);
@@ -604,6 +647,12 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
               <Label className="text-xs">ID do post no Instagram (opcional)</Label>
               <Input value={missaoEdit?.post_id_instagram || ""} onChange={(e) => setMissaoEdit(missaoEdit ? { ...missaoEdit, post_id_instagram: e.target.value || null } : null)} />
             </div>
+            {previaPublico !== null && (
+              <p className="text-xs rounded-md border bg-muted/40 p-2">
+                <strong>{previaPublico}</strong> pessoa(s) serão cobradas por esta publicação, conforme a regra
+                selecionada. Confira as pendências de cadastro em “Público monitorado → Faltam dados”.
+              </p>
+            )}
             <p className="text-[11px] text-muted-foreground flex gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
               Sem o ID do post, o cumprimento por comentário não pode ser comprovado — restam o clique no link
