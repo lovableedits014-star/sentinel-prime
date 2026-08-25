@@ -124,9 +124,10 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 px-3 sm:px-6">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 text-center">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 text-center">
           {[
             ["No público", totals.total],
+            ["Prontos p/ cobrar", totals.prontas],
             ["Sem Instagram", totals.semIg],
             ["Sem Facebook", totals.semFb],
             ["Sem telefone", totals.semTel],
@@ -138,6 +139,7 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
             </div>
           ))}
         </div>
+
 
         <div className="flex flex-wrap gap-2">
           <div className="relative flex-1 min-w-[180px]">
