@@ -334,6 +334,9 @@ export default function Telemarketing() {
     setLigacaoStatus("");
     setVotaCandidato("");
     setCandidatoAlt("");
+    setCandFederal(""); setFederalNQ(false);
+    setCandSenador(""); setSenadorNQ(false);
+    setCandGovernador(""); setGovernadorNQ(false);
     setCidade("");
     setBairro("");
     setObservacao("");
