@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck } from "lucide-react";
+import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
 type Participant = {
