@@ -12,33 +12,37 @@ Hoje o operador tem 4 botões (Atendeu / Não atendeu / Recusou / Reagendar) e u
 
 **Passo 1 — Deputado Estadual (nosso candidato oficial)**
 
-Quatro opções fixas:
-
 | Opção | O que acontece |
 |---|---|
-| Vota | segue para o federal |
-| Não vota | abre campo obrigatório "Vota em quem?" (nome do estadual que ela citou) e segue para o federal |
-| Indeciso | segue para o federal (campo de nome citado fica opcional) |
-| Não quis opinar | **encerra o atendimento** — não pergunta federal, salva direto |
+| Vota | já confirma o voto no nosso estadual e segue para os demais cargos |
+| Não vota | abre campo **obrigatório** "Qual estadual vota?" — informado o nome, segue para os demais cargos |
+| Indeciso | segue para os demais cargos (campo de nome citado fica opcional) |
+| Não quis opinar | **encerra tudo** — nenhum outro cargo é perguntado, salva direto |
 
-**Passo 2 — Deputado Federal (sempre perguntado, exceto em "Não quis opinar")**
+Se em "Não vota" a pessoa não quiser dizer o nome, o operador usa **Não quis opinar**, que encerra o atendimento. Não existe mais texto livre tipo "não quis citar".
 
-- Campo de nome do federal **obrigatório**, OU
-- Botão/checkbox **"Não quis responder"** — que preenche o registro de forma padronizada e libera o salvamento.
+**Passo 2 — Federal, Senador e Governador (sempre que o passo 1 não foi "Não quis opinar")**
 
-Enquanto o passo obrigatório não estiver resolvido, o botão Salvar fica bloqueado com aviso claro (mesmo padrão já usado hoje no "não vota").
+Três blocos iguais, um para cada cargo:
+
+- **Deputado Federal** — nome obrigatório OU botão "Não quis responder"
+- **Senador** — nome obrigatório OU botão "Não quis responder"
+- **Governador** — nome obrigatório OU botão "Não quis responder"
+
+Cada bloco só é considerado resolvido com nome preenchido ou com "Não quis responder" marcado. Enquanto houver bloco em aberto, o botão Salvar fica bloqueado com aviso claro (mesmo padrão já usado hoje no "não vota").
 
 ## 3. Anti-lixo nos dados
 
-- Sugestões de nomes já registrados (autocomplete a partir dos candidatos citados anteriormente do mesmo cliente), para evitar "Paulo Duarte" vs "paulo duarte".
+- Sugestões de nomes já registrados (autocomplete por cargo, a partir do que já foi citado no mesmo cliente), para evitar "Paulo Duarte" vs "paulo duarte".
 - Normalização ao salvar: trim, espaços duplicados e capitalização consistente.
 - Frases como "não sabe", "não quis citar", "nenhum" deixam de ser digitadas: existem as opções fixas para isso.
 
 ## 4. Relatórios
 
-- Novas colunas/blocos: **Voto Estadual** (Vota / Não vota / Indeciso / Não quis opinar) e **Voto Federal** (nome, ou "Não quis responder").
-- "Candidatos Alternativos Mencionados" passa a ter dois rankings limpos: alternativos do estadual e citações do federal, com "Não quis responder" agrupado num único item em vez de dez variações.
-- Excel e PDF incluem as duas dimensões.
+- Novos blocos/colunas por cargo: **Estadual** (Vota / Não vota + nome / Indeciso / Não quis opinar), **Federal**, **Senador** e **Governador** (nome ou "Não quis responder").
+- "Candidatos Alternativos Mencionados" passa a ter um ranking limpo por cargo, com "Não quis responder" agrupado em um único item em vez de dez variações.
+- Excel e PDF incluem as quatro dimensões, e os filtros por cargo/nome ficam disponíveis para cobrança por indicador.
+
 
 ## Detalhes técnicos
 
