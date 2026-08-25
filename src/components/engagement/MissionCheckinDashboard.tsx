@@ -59,6 +59,9 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
   const [incluirSemValor, setIncluirSemValor] = useState(false);
   const [incluirFuncionarios, setIncluirFuncionarios] = useState(false);
   const [somenteFaltantes, setSomenteFaltantes] = useState(false);
+  const [statusFiltro, setStatusFiltro] = useState<string>("todos");
+  const [obrigacaoFiltro, setObrigacaoFiltro] = useState<string>("todos");
+  const [cadastroFiltro, setCadastroFiltro] = useState<string>("todos");
   const [cargoFiltro, setCargoFiltro] = useState<string>("todos");
   const [regiaoFiltro, setRegiaoFiltro] = useState<string>("todas");
   const [search, setSearch] = useState("");
