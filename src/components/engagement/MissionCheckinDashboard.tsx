@@ -352,6 +352,7 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                     <th className="p-2 text-left">Telefone</th>
                     <th className="p-2 text-left">Indicador</th>
                     <th className="p-2 text-left">Status</th>
+                    <th className="p-2 text-left">Links abertos</th>
                     <th className="p-2 text-left">Check-in</th>
                     <th className="p-2 text-right">Ações</th>
                   </tr>
