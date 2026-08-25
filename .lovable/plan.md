@@ -1,4 +1,4 @@
-# Padronização das respostas no Telemarketing (estadual + federal)
+# Padronização das respostas no Telemarketing (estadual, federal, senador e governador)
 
 Hoje o operador tem 4 botões (Atendeu / Não atendeu / Recusou / Reagendar) e um único campo livre "Candidato que apoia" — por isso os relatórios mostram dezenas de variações do mesmo "não quis responder". O objetivo é fechar o fluxo em opções padronizadas e separar Deputado Estadual (nosso oficial) de Deputado Federal.
 
