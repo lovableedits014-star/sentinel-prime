@@ -95,6 +95,18 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
 
   const reset = () => {
     setFb(null); setIg(null); setManualUrl(""); setTitulo(""); setInstrucoes("");
+    setExtraLabel(""); setExtraUrl(""); setExtraLinks([]);
+  };
+
+  const addExtraLink = () => {
+    const u = extraUrl.trim();
+    if (!isValidHttpUrl(u)) {
+      toast.error("Informe um endereço começando com https://");
+      return;
+    }
+    setExtraLinks((prev) => [...prev, { label: extraLabel.trim() || "Abrir link", url: u }]);
+    setExtraLabel("");
+    setExtraUrl("");
   };
 
   const criar = async () => {
