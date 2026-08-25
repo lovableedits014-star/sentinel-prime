@@ -527,9 +527,6 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="publico">
-          <PublicoMonitoradoTab clientId={clientId} />
-        </TabsContent>
       </Tabs>
 
       {/* Regra dialog */}

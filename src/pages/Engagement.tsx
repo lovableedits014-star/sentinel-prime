@@ -23,6 +23,8 @@ import InfluenciadoresTab from "@/components/engagement/InfluenciadoresTab";
 import PerfisTimeTab from "@/components/engagement/PerfisTimeTab";
 import CobrancaTimeTab from "@/components/engagement/CobrancaTimeTab";
 import MonitoramentoTab from "@/components/engagement/MonitoramentoTab";
+import PublicoMonitoradoTab from "@/components/engagement/PublicoMonitoradoTab";
+
 
 
 type EngagementConfig = {
