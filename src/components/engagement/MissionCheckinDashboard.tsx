@@ -93,6 +93,11 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (somenteFaltantes && r.status === "cumpriu") return false;
+      if (statusFiltro !== "todos" && r.status !== statusFiltro) return false;
+      if (obrigacaoFiltro === "voluntarios" && !r.is_voluntario) return false;
+      if (obrigacaoFiltro === "contrato" && !r.tem_contrato) return false;
+      if (cadastroFiltro === "com" && r.tem_cadastro === false) return false;
+      if (cadastroFiltro === "sem" && r.tem_cadastro !== false) return false;
       if (cargoFiltro !== "todos" && (r.cargo || "") !== cargoFiltro) return false;
       if (regiaoFiltro !== "todas" && (r.regiao || "") !== regiaoFiltro) return false;
       if (q) {
