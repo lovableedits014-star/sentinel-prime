@@ -446,6 +446,11 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                     </Button>
                   ) : (
                     <>
+                      {(p.valor_contratacao || 0) > 0 && (
+                        <Badge variant="outline" className="h-6 text-[11px] font-medium">
+                          R$ {Number(p.valor_contratacao).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </Badge>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -454,9 +459,15 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                       >
                         <Heart className="w-3 h-3" /> Voluntário
                       </Button>
-                      <DefinirValorPopover pessoa={p} onSave={aplicarValorIndividual} suggestion={presets[p.tipo]} />
+                      <DefinirValorPopover
+                        pessoa={p}
+                        onSave={aplicarValorIndividual}
+                        onClear={limparValor}
+                        suggestion={Number(p.valor_contratacao) > 0 ? Number(p.valor_contratacao) : presets[p.tipo]}
+                      />
                     </>
                   )}
+
                 </div>
               );
             })}
