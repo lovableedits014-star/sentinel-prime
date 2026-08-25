@@ -271,6 +271,23 @@ export default function TelemarketingAdminFilas() {
                       </Button>
                       <TeleHelp text={TELE_HELP.gerenciarDesignacoes} className="self-center" />
 
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={resetando === f.campanha_id}
+                        onClick={() => resetarFila(f)}
+                        title="Devolve agora à fila quem não atendeu ou reagendou, sem esperar as 6h"
+                      >
+                        {resetando === f.campanha_id
+                          ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          : <RefreshCcw className="w-3.5 h-3.5 mr-1" />} Resetar fila
+                      </Button>
+                      <TeleHelp
+                        text="Traz de volta imediatamente para a fila os contatos marcados como 'não atendeu' ou 'reagendou'. Normalmente eles voltam sozinhos após 6h; use este botão para adiantar. Quem já foi concluído não é afetado."
+                        className="self-center"
+                      />
+
+
 
                       <Button size="sm" variant="outline" asChild>
                         <a href={linkOperador(f.campanha_id)} target="_blank" rel="noopener noreferrer">
