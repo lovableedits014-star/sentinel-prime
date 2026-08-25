@@ -58,7 +58,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<Tipo | "all">("all");
   const [regiaoFilter, setRegiaoFilter] = useState<string>("all");
-  const [view, setView] = useState<"pendentes" | "voluntarios">("pendentes");
+  const [view, setView] = useState<"pendentes" | "definidos" | "voluntarios">("pendentes");
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkValor, setBulkValor] = useState("");
