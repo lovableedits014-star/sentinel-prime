@@ -9,6 +9,7 @@ import { Loader2, Target, ExternalLink } from "lucide-react";
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { resolvePublicBaseUrl } from "@/lib/public-base-url";
 import MissionLinksPanel from "./MissionLinksPanel";
+import MissionLinksEditor from "./MissionLinksEditor";
 import MissionCheckinDashboard from "./MissionCheckinDashboard";
 import MissionFromPostDialog from "./MissionFromPostDialog";
 
