@@ -11,8 +11,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
-import { Check, Loader2, Plus, RefreshCw } from "lucide-react";
+import { Check, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { detectLinkKind, isValidHttpUrl } from "@/lib/mission-link-kind";
 
 type PostOption = {
   post_id: string;
