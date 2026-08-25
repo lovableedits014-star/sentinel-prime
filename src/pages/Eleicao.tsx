@@ -936,6 +936,17 @@ export default function Eleicao() {
       listaTipada = listaTipada.filter(p => p.tipo === "lider" && !p.parent_id);
     }
 
+    // Filtro de voluntários (relatório separado)
+    const volMode = cfg.voluntarios || "todos";
+    if (volMode === "apenas") {
+      listaTipada = listaTipada.filter(p => !!(p as any).is_voluntario);
+      lista = lista.filter(p => !!(p as any).is_voluntario);
+    } else if (volMode === "excluir") {
+      listaTipada = listaTipada.filter(p => !(p as any).is_voluntario);
+      lista = lista.filter(p => !(p as any).is_voluntario);
+    }
+
+
     if (listaTipada.length === 0) {
       toast.error("Nenhum cadastro para exportar com os filtros escolhidos.");
       return;
@@ -961,7 +972,10 @@ export default function Eleicao() {
       }
       if (cfg.apenasReuniao) f.push({ label: "Reunião", value: "Apenas quem participou" });
       if (cfg.apenasNaoReuniao) f.push({ label: "Reunião", value: "Apenas quem NÃO participou" });
+      if (volMode === "apenas") f.push({ label: "Voluntários", value: "Apenas voluntários" });
+      if (volMode === "excluir") f.push({ label: "Voluntários", value: "Excluídos (só remunerados)" });
       return f;
+
     };
 
     const rodarExport = (
@@ -1081,7 +1095,9 @@ export default function Eleicao() {
         sufixo = parc.nome;
       }
     }
+    if (volMode === "apenas") sufixo = [sufixo, "voluntarios"].filter(Boolean).join("-");
     const qtd = rodarExport(listaTipada, lista, dobradinhaLabel, sufixo);
+
     
     // Config para exportação simples
     const exportOpts = {
@@ -1321,7 +1337,24 @@ export default function Eleicao() {
             >
               Todas <span className="opacity-70 ml-1">{search ? matchedIds.size : escopoList.length}</span>
             </button>
+            {(() => {
+              const avulsosCount = pessoas.filter(p => p.escopo === escopo && p.tipo === "lider" && !p.parent_id && (!search || matchedIds.has(p.id))).length;
+              const active = statusFilter === "avulsos";
+              return (
+                <button
+                  onClick={() => { setStatusFilter(active ? "todos" : "avulsos"); setRegiaoFilter("all"); }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
+                    active ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300",
+                    avulsosCount === 0 && !active && "opacity-50"
+                  )}
+                >
+                  ⚡ Avulsos <span className="opacity-70 ml-1">{avulsosCount}</span>
+                </button>
+              );
+            })()}
             {REGIOES.map(r => {
+
               const count = search
                 ? escopoList.filter(p => p.regiao === r.value && matchedIds.has(p.id)).length
                 : escopoList.filter(p => p.regiao === r.value).length;

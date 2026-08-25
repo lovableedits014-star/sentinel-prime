@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { FileText, Printer, Package, Network, List as ListIcon, Handshake } from "lucide-react";
+import { FileText, Printer, Package, Network, List as ListIcon, Handshake, Heart } from "lucide-react";
 
 export type ExportTipo = "coordenador" | "lider" | "cabo";
 export type ExportFormato = "pdf" | "csv" | "print";
@@ -30,6 +30,8 @@ export interface ExportConfig {
   apenasAvulsos?: boolean;
   apenasReuniao?: boolean;
   apenasNaoReuniao?: boolean;
+  voluntarios?: "todos" | "apenas" | "excluir";
+
 }
 
 interface CoordOption { id: string; nome: string; regiao?: string | null }
@@ -59,6 +61,8 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const [parceiroSel, setParceiroSel] = useState<string>("__all"); // "__all" | "__none" | uuid
   const [porParceiro, setPorParceiro] = useState(false);
   const [reuniaoFilter, setReuniaoFilter] = useState<"todos" | "reuniao" | "sem_reuniao">("todos");
+  const [voluntarios, setVoluntarios] = useState<"todos" | "apenas" | "excluir">("todos");
+
 
   const toggleTipo = (t: ExportTipo) => {
     setTipos(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
@@ -114,6 +118,8 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
       apenasAvulsos: apenasAvulsos,
       apenasReuniao: reuniaoFilter === "reuniao",
       apenasNaoReuniao: reuniaoFilter === "sem_reuniao",
+      voluntarios,
+
     });
     onOpenChange(false);
   }
@@ -278,6 +284,23 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
                 <SelectItem value="sem_reuniao">Apenas quem NÃO participou</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Voluntários */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+              <Heart className="w-3.5 h-3.5 text-emerald-500" />
+              Voluntários
+            </Label>
+            <Select value={voluntarios} onValueChange={(v: any) => setVoluntarios(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos (remunerados + voluntários)</SelectItem>
+                <SelectItem value="apenas">Apenas voluntários</SelectItem>
+                <SelectItem value="excluir">Apenas remunerados (sem voluntários)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Use "Apenas voluntários" para gerar um relatório separado de gestão dos voluntários.</p>
           </div>
 
           {/* Coordenador específico */}
