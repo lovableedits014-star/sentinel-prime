@@ -1030,7 +1030,7 @@ export default function Telemarketing() {
               <div className="border-t pt-4 space-y-3">
                 <p className="font-medium text-sm">Resultado da ligação</p>
 
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Button
                     variant={ligacaoStatus === "atendeu" ? "default" : "outline"}
                     size="sm"
