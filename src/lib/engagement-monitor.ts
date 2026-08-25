@@ -437,3 +437,59 @@ export async function contarPublicoDaRegra(clientId: string, regra: Regra): Prom
   );
   return rows.length;
 }
+
+/** Prévia de quem será cobrado: total, prontos e bloqueados por falta de dados. */
+export async function fetchPrevia(
+  clientId: string,
+  regraId?: string | null,
+  grupoId?: string | null,
+): Promise<PreviaPublico> {
+  const rows = unwrap<PreviaPublico>(
+    await db.rpc("engagement_publico_previa", {
+      p_client_id: clientId,
+      p_regra_id: regraId ?? null,
+      p_grupo_id: grupoId ?? null,
+    }),
+  );
+  return rows[0] ?? { total: 0, prontas: 0, sem_rede: 0, sem_telefone: 0, sem_dados: 0 };
+}
+
+/** Cadastra uma pessoa "avulsa" (que não existe em nenhum cadastro) direto no público monitorado. */
+export async function criarPessoaManual(
+  clientId: string,
+  input: {
+    nome: string;
+    telefone?: string | null;
+    cargo?: string | null;
+    regiao?: string | null;
+    cidade?: string | null;
+    grupoId?: string | null;
+    instagram?: string | null;
+    facebook?: string | null;
+    observacao?: string | null;
+  },
+): Promise<{ ref_id: string }> {
+  const { data, error } = await db.rpc("engagement_publico_criar_manual", {
+    p_client_id: clientId,
+    p_nome: input.nome.trim(),
+    p_telefone: input.telefone || null,
+    p_cargo: input.cargo || null,
+    p_regiao: input.regiao || null,
+    p_cidade: input.cidade || null,
+    p_grupo_id: input.grupoId ?? null,
+    p_instagram: input.instagram || null,
+    p_facebook: input.facebook || null,
+    p_observacao: input.observacao || null,
+  });
+  if (error) throw new Error(error.message);
+  return (data ?? {}) as { ref_id: string };
+}
+
+export async function excluirPessoaManual(clientId: string, refId: string): Promise<void> {
+  const { error } = await db.rpc("engagement_publico_excluir_manual", {
+    p_client_id: clientId,
+    p_ref_id: refId,
+  });
+  if (error) throw new Error(error.message);
+}
+
