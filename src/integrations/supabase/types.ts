@@ -11600,6 +11600,9 @@ export type Database = {
           concluido_em: string
           indicador_nome: string
           is_voluntario: boolean
+          links_clicados: string[]
+          missoes_cumpridas: number
+          missoes_recentes: number
           nome: string
           origem: string
           pessoa_id: string
@@ -11607,7 +11610,19 @@ export type Database = {
           regiao: string
           status: string
           telefone: string
+          tem_cadastro: boolean
           tem_contrato: boolean
+        }[]
+      }
+      mission_checkin_evolucao: {
+        Args: { p_client_id: string; p_limit?: number }
+        Returns: {
+          adesao: number
+          cumpriram: number
+          mission_id: string
+          participantes: number
+          quando: string
+          title: string
         }[]
       }
       mission_checkin_pessoa_historico: {
@@ -11621,6 +11636,28 @@ export type Database = {
           title: string
         }[]
       }
+      mission_checkin_reincidentes: {
+        Args: { p_client_id: string; p_janela?: number }
+        Returns: {
+          cargo: string
+          faltas: number
+          is_voluntario: boolean
+          janela: number
+          nome: string
+          pessoa_id: string
+          regiao: string
+          telefone: string
+          tem_contrato: boolean
+        }[]
+      }
+      mission_checkin_series: {
+        Args: { p_client_id: string; p_mission_id: string }
+        Returns: {
+          acessos: number
+          conclusoes: number
+          hora: string
+        }[]
+      }
       mission_generate_short_code: { Args: never; Returns: string }
       mission_link_generate: {
         Args: {
@@ -11631,6 +11668,17 @@ export type Database = {
         Returns: Json
       }
       mission_norm_phone: { Args: { p: string }; Returns: string }
+      mission_participantes_nao_identificados: {
+        Args: { p_client_id: string; p_mission_id?: string }
+        Returns: {
+          missoes: number
+          nome: string
+          participant_id: string
+          primeiro_acesso_em: string
+          telefone: string
+          ultimo_acesso_em: string
+        }[]
+      }
       mission_phone_key: { Args: { p: string }; Returns: string }
       mission_resolve_identity: {
         Args: { p_client_id: string; p_phone: string }
@@ -11707,18 +11755,32 @@ export type Database = {
         Args: { p_code: string; p_mission_id: string; p_token: string }
         Returns: Json
       }
-      public_mission_event: {
-        Args: {
-          p_code: string
-          p_device: string
-          p_is_bot: boolean
-          p_mission_id: string
-          p_token: string
-          p_type: string
-          p_user_agent: string
-        }
-        Returns: Json
-      }
+      public_mission_event:
+        | {
+            Args: {
+              p_code: string
+              p_device: string
+              p_is_bot: boolean
+              p_mission_id: string
+              p_token: string
+              p_type: string
+              p_user_agent: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_code: string
+              p_device: string
+              p_is_bot: boolean
+              p_link_id?: string
+              p_mission_id: string
+              p_token: string
+              p_type: string
+              p_user_agent: string
+            }
+            Returns: Json
+          }
       public_mission_identify: {
         Args: {
           p_code: string

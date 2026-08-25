@@ -9,6 +9,7 @@ import { Loader2, Target, ExternalLink } from "lucide-react";
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { resolvePublicBaseUrl } from "@/lib/public-base-url";
 import MissionLinksPanel from "./MissionLinksPanel";
+import MissionLinksEditor from "./MissionLinksEditor";
 import MissionCheckinDashboard from "./MissionCheckinDashboard";
 import MissionFromPostDialog from "./MissionFromPostDialog";
 
@@ -165,6 +166,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
 
       {missionId && (
         <>
+          <MissionLinksEditor clientId={clientId} missionId={missionId} />
           <MissionLinksPanel clientId={clientId} missionId={missionId} missionTitle={mission?.title ?? null} />
           <MissionCheckinDashboard
             clientId={clientId}

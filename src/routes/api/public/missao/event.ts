@@ -10,7 +10,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const ALLOWED = new Set(["open", "click_facebook", "click_instagram", "click_avulso", "declared_done"]);
+const ALLOWED = new Set([
+  "open",
+  "click_facebook",
+  "click_instagram",
+  "click_avulso",
+  "click_link",
+  "declared_done",
+]);
 
 function detectBot(ua: string | null): boolean {
   if (!ua) return false;
@@ -54,6 +61,7 @@ export const Route = createFileRoute("/api/public/missao/event")({
           const code = String(body.code || "").trim();
           const token = String(body.token || "").trim();
           const type = String(body.type || "").trim();
+          const linkId = String(body.linkId || "").trim();
 
           if (!missionId || !ALLOWED.has(type)) {
             return Response.json({ error: "Dados inválidos" }, { status: 400, headers: corsHeaders });
@@ -69,6 +77,7 @@ export const Route = createFileRoute("/api/public/missao/event")({
             p_user_agent: ua,
             p_device: detectDevice(ua),
             p_is_bot: detectBot(ua),
+            p_link_id: linkId || null,
           });
           if (error) return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
           const payload: any = data || {};

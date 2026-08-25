@@ -11,8 +11,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
-import { Check, Loader2, Plus, RefreshCw } from "lucide-react";
+import { Check, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { detectLinkKind, isValidHttpUrl } from "@/lib/mission-link-kind";
 
 type PostOption = {
   post_id: string;
@@ -41,6 +42,9 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
   const [fb, setFb] = useState<PostOption | null>(null);
   const [ig, setIg] = useState<PostOption | null>(null);
   const [manualUrl, setManualUrl] = useState("");
+  const [extraLabel, setExtraLabel] = useState("");
+  const [extraUrl, setExtraUrl] = useState("");
+  const [extraLinks, setExtraLinks] = useState<{ label: string; url: string }[]>([]);
   const [titulo, setTitulo] = useState("");
   const [instrucoes, setInstrucoes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -91,6 +95,18 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
 
   const reset = () => {
     setFb(null); setIg(null); setManualUrl(""); setTitulo(""); setInstrucoes("");
+    setExtraLabel(""); setExtraUrl(""); setExtraLinks([]);
+  };
+
+  const addExtraLink = () => {
+    const u = extraUrl.trim();
+    if (!isValidHttpUrl(u)) {
+      toast.error("Informe um endereço começando com https://");
+      return;
+    }
+    setExtraLinks((prev) => [...prev, { label: extraLabel.trim() || "Abrir link", url: u }]);
+    setExtraLabel("");
+    setExtraUrl("");
   };
 
   const criar = async () => {
@@ -104,11 +120,11 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       if (det === "facebook" && !extraFb) extraFb = manual;
       if (det === "instagram" && !extraIg) extraIg = manual;
     }
-    if (!extraFb && !extraIg) {
-      toast.error("Escolha uma publicação (Facebook e/ou Instagram) ou cole o link");
+    if (!extraFb && !extraIg && extraLinks.length === 0) {
+      toast.error("Escolha uma publicação, cole o link do post ou adicione ao menos um link externo");
       return;
     }
-    const platform: "facebook" | "instagram" = extraFb ? "facebook" : "instagram";
+    const platform: "facebook" | "instagram" = extraIg && !extraFb ? "instagram" : "facebook";
     const autoTitle =
       titulo.trim() ||
       (fb?.post_message || ig?.post_message || "").slice(0, 60).trim() ||
@@ -121,7 +137,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         .insert({
           client_id: clientId,
           platform,
-          post_url: extraFb || extraIg,
+          post_url: extraFb || extraIg || extraLinks[0]?.url || null,
           title: autoTitle,
           description: null,
           display_order: 0,
@@ -135,6 +151,19 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         .select("id")
         .single();
       if (error) throw error;
+      if (extraLinks.length > 0) {
+        const { error: linkErr } = await (supabase as any).from("portal_mission_links").insert(
+          extraLinks.map((l, i) => ({
+            mission_id: data.id,
+            client_id: clientId,
+            label: l.label,
+            url: l.url,
+            kind: detectLinkKind(l.url),
+            display_order: i,
+          })),
+        );
+        if (linkErr) throw linkErr;
+      }
       qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
       qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
       toast.success("Missão criada com rastreamento — gere o link abaixo e envie no grupo.");
@@ -195,7 +224,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5"><Plus className="h-4 w-4" /> Nova missão de uma publicação</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Escolher a publicação da missão</DialogTitle>
           <DialogDescription>
@@ -237,6 +266,38 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
             <Label className="text-xs">Ou cole o link da publicação</Label>
             <Input value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} placeholder="https://facebook.com/..." />
           </div>
+        </div>
+
+        <div className="space-y-2 rounded-lg border p-3">
+          <div>
+            <Label className="text-xs font-medium">Links da missão (opcional, quantos quiser)</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Qualquer link externo — site, notícia, YouTube, TikTok, formulário. Dá para criar a missão só com
+              links, sem publicação da Meta.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+            <Input value={extraLabel} onChange={(e) => setExtraLabel(e.target.value)} placeholder="Nome do botão" />
+            <Input value={extraUrl} onChange={(e) => setExtraUrl(e.target.value)} placeholder="https://..." />
+            <Button type="button" variant="outline" className="gap-1.5" onClick={addExtraLink} disabled={!extraUrl.trim()}>
+              <Plus className="h-4 w-4" /> Adicionar link
+            </Button>
+          </div>
+          {extraLinks.length > 0 && (
+            <div className="space-y-1.5">
+              {extraLinks.map((l, i) => (
+                <div key={`${l.url}-${i}`} className="flex items-center gap-2 rounded border px-2 py-1 text-xs">
+                  <Badge variant="secondary" className="text-[10px]">{detectLinkKind(l.url)}</Badge>
+                  <span className="font-medium">{l.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">{l.url}</span>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive"
+                    onClick={() => setExtraLinks((prev) => prev.filter((_, idx) => idx !== i))}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-1.5">

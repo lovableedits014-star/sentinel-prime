@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { fmtPhoneBR, toWhatsAppBR } from "@/lib/phone-utils";
 import MissionPessoaHistorico from "./MissionPessoaHistorico";
+import MissionCheckinCharts from "./MissionCheckinCharts";
+import MissionCheckinAlerts from "./MissionCheckinAlerts";
 
 type Props = {
   clientId: string;
@@ -39,6 +41,8 @@ type Row = {
   primeiro_acesso_em: string | null;
   concluido_em: string | null;
   clicks: number;
+  tem_cadastro?: boolean;
+  links_clicados?: string[] | null;
 };
 
 const CARGO_LABEL: Record<string, string> = {
@@ -57,6 +61,9 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
   const [incluirSemValor, setIncluirSemValor] = useState(false);
   const [incluirFuncionarios, setIncluirFuncionarios] = useState(false);
   const [somenteFaltantes, setSomenteFaltantes] = useState(false);
+  const [statusFiltro, setStatusFiltro] = useState<string>("todos");
+  const [obrigacaoFiltro, setObrigacaoFiltro] = useState<string>("todos");
+  const [cadastroFiltro, setCadastroFiltro] = useState<string>("todos");
   const [cargoFiltro, setCargoFiltro] = useState<string>("todos");
   const [regiaoFiltro, setRegiaoFiltro] = useState<string>("todas");
   const [search, setSearch] = useState("");
@@ -88,6 +95,11 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (somenteFaltantes && r.status === "cumpriu") return false;
+      if (statusFiltro !== "todos" && r.status !== statusFiltro) return false;
+      if (obrigacaoFiltro === "voluntarios" && !r.is_voluntario) return false;
+      if (obrigacaoFiltro === "contrato" && !r.tem_contrato) return false;
+      if (cadastroFiltro === "com" && r.tem_cadastro === false) return false;
+      if (cadastroFiltro === "sem" && r.tem_cadastro !== false) return false;
       if (cargoFiltro !== "todos" && (r.cargo || "") !== cargoFiltro) return false;
       if (regiaoFiltro !== "todas" && (r.regiao || "") !== regiaoFiltro) return false;
       if (q) {
@@ -96,7 +108,7 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
       }
       return true;
     });
-  }, [rows, somenteFaltantes, cargoFiltro, regiaoFiltro, search]);
+  }, [rows, somenteFaltantes, statusFiltro, obrigacaoFiltro, cadastroFiltro, cargoFiltro, regiaoFiltro, search]);
 
   const kpis = useMemo(() => {
     const total = rows.length;
@@ -274,6 +286,31 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                 className="pl-8"
               />
             </div>
+            <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                <SelectItem value="cumpriu">Entrou e concluiu</SelectItem>
+                <SelectItem value="abriu">Entrou e não concluiu</SelectItem>
+                <SelectItem value="nao_abriu">Não entrou no link</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={obrigacaoFiltro} onValueChange={setObrigacaoFiltro}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Obrigados (todos)</SelectItem>
+                <SelectItem value="contrato">Somente com contrato</SelectItem>
+                <SelectItem value="voluntarios">Somente voluntários</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={cadastroFiltro} onValueChange={setCadastroFiltro}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Com e sem cadastro</SelectItem>
+                <SelectItem value="com">Com cadastro no sistema</SelectItem>
+                <SelectItem value="sem">Sem cadastro</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={cargoFiltro} onValueChange={setCargoFiltro}>
               <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -317,6 +354,7 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                     <th className="p-2 text-left">Telefone</th>
                     <th className="p-2 text-left">Indicador</th>
                     <th className="p-2 text-left">Status</th>
+                    <th className="p-2 text-left">Links abertos</th>
                     <th className="p-2 text-left">Check-in</th>
                     <th className="p-2 text-right">Ações</th>
                   </tr>
@@ -347,6 +385,17 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                           <Badge variant="secondary" className="gap-1 text-[10px]"><Eye className="h-3 w-3" /> Abriu</Badge>
                         ) : (
                           <Badge variant="destructive" className="gap-1 text-[10px]"><XCircle className="h-3 w-3" /> Não abriu</Badge>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {(r.links_clicados || []).length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {(r.links_clicados || []).map((l, i) => (
+                              <Badge key={`${l}-${i}`} variant="outline" className="text-[10px]">{l}</Badge>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td className="p-2 text-xs text-muted-foreground">
@@ -397,6 +446,15 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
           )}
         </CardContent>
       </Card>
+
+      <MissionCheckinCharts clientId={clientId} missionId={missionId} rows={filtered} />
+
+      <MissionCheckinAlerts
+        clientId={clientId}
+        missionId={missionId}
+        missionTitle={missionTitle}
+        missionLink={missionLink}
+      />
 
       <MissionPessoaHistorico
         clientId={clientId}

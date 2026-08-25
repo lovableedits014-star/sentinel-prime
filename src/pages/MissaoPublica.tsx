@@ -32,10 +32,18 @@ type MissionConfig = {
     legacy_post_url: string | null;
     legacy_platform: string | null;
   };
+  links?: MissionLink[] | null;
   client_name: string | null;
   distribution_valid: boolean;
   group_name: string | null;
   participant: Participant | null;
+};
+
+type MissionLink = {
+  id: string;
+  label: string;
+  url: string;
+  kind: string | null;
 };
 
 const TOKEN_KEY_PREFIX = "sm_client_token_";
@@ -150,13 +158,22 @@ export default function MissaoPublica() {
   }, [missionId, code]);
 
   const registerEvent = useCallback(
-    async (type: "open" | "click_facebook" | "click_instagram" | "click_avulso" | "declared_done") => {
+    async (
+      type:
+        | "open"
+        | "click_facebook"
+        | "click_instagram"
+        | "click_avulso"
+        | "click_link"
+        | "declared_done",
+      linkId?: string,
+    ) => {
       if (!missionId) return;
       try {
         await fetch(api("/api/public/missao/event"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ missionId, code, token, type }),
+          body: JSON.stringify({ missionId, code, token, type, linkId: linkId || null }),
         });
       } catch {
         // silencioso — não bloqueia o clique
@@ -227,9 +244,10 @@ export default function MissaoPublica() {
 
   const handleExternal = async (
     url: string,
-    type: "click_facebook" | "click_instagram" | "click_avulso",
+    type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link",
+    linkId?: string,
   ) => {
-    await registerEvent(type);
+    await registerEvent(type, linkId);
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -272,6 +290,7 @@ export default function MissaoPublica() {
   const linkFb = m.link_facebook || (m.legacy_platform === "facebook" ? m.legacy_post_url : null);
   const linkIg = m.link_instagram || (m.legacy_platform === "instagram" ? m.legacy_post_url : null);
   const linkAv = m.link_avulso || null;
+  const extraLinks = config.links || [];
   const cargoLabel = p?.cargo ? CARGO_LABEL[p.cargo] || p.cargo : null;
 
   return (
@@ -404,6 +423,24 @@ export default function MissaoPublica() {
                       <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
                     </Button>
                   )}
+                  {extraLinks.map((l) => (
+                    <Button
+                      key={l.id}
+                      variant="outline"
+                      className="w-full justify-start gap-2"
+                      onClick={() => handleExternal(l.url, "click_link", l.id)}
+                    >
+                      {l.kind === "facebook" ? (
+                        <FacebookIcon className="w-4 h-4 text-blue-600" />
+                      ) : l.kind === "instagram" ? (
+                        <InstagramIcon className="w-4 h-4 text-pink-500" />
+                      ) : (
+                        <ExternalLink className="w-4 h-4" />
+                      )}
+                      <span className="truncate">{l.label}</span>
+                      <ExternalLink className="w-3 h-3 ml-auto opacity-60 shrink-0" />
+                    </Button>
+                  ))}
                 </div>
 
                 <Button
