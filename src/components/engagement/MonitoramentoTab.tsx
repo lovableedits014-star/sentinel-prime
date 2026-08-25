@@ -20,7 +20,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import PublicoMonitoradoTab from "@/components/engagement/PublicoMonitoradoTab";
 import {
-  contarPublicoDaRegra, fetchGrupos, type PublicoGrupo,
+  contarPublicoDaRegra, fetchGrupos, fetchPendencias, type PublicoGrupo,
   atualizarMissaoMonitoramento, casarInteracoes, excluirRegra, fetchAdesao, fetchHistoricoPessoa,
   fetchMissoes, fetchMonitorOverview, fetchRanking, fetchRegras, gerarObrigacoes, recalcularIndices,
   registrarCobranca, salvarRegra, dispensarObrigacao,
@@ -62,6 +62,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
   const [missaoEdit, setMissaoEdit] = useState<MissaoMonitorada | null>(null);
   const [grupos, setGrupos] = useState<PublicoGrupo[]>([]);
   const [previaPublico, setPreviaPublico] = useState<number | null>(null);
+  const [semProva, setSemProva] = useState<Set<string>>(new Set());
 
   const load = async () => {
     setLoading(true);
@@ -75,6 +76,12 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
         fetchGrupos(clientId),
       ]);
       setGrupos(gr);
+      try {
+        const pend = await fetchPendencias(clientId, null);
+        setSemProva(new Set(pend.filter((x) => x.sem_prova).map((x) => `${x.origem}:${x.ref_id}`)));
+      } catch {
+        setSemProva(new Set());
+      }
       setOverview(o);
       setRanking(r);
       setAdesao(a);
@@ -367,7 +374,14 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
                     {filtered.map((r) => (
                       <TableRow key={`${r.origem}-${r.ref_id}`} className="cursor-pointer" onClick={() => abrirPessoa(r)}>
                         <TableCell>
-                          <div className="font-medium">{r.nome}</div>
+                          <div className="font-medium flex items-center gap-1.5">
+                            {r.nome}
+                            {semProva.has(`${r.origem}:${r.ref_id}`) && (
+                              <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
+                                sem cadastro p/ comprovar
+                              </Badge>
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground">{fmtPhone(r.telefone)} · {cap(r.regiao || r.cidade) || "—"}</div>
                         </TableCell>
                         <TableCell className="text-xs">{cap(r.cargo)}</TableCell>
