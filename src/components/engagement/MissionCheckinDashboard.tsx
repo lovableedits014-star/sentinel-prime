@@ -287,15 +287,15 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
 
       <Accordion type="single" collapsible defaultValue="lista" className="w-full">
         <AccordionItem value="lista" className="border rounded-lg bg-card">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline">
-            <div className="flex flex-1 items-center justify-between pr-4 text-left">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline [&>svg]:ml-3">
+            <div className="flex flex-1 items-center text-left">
               <div>
                 <p className="text-sm font-medium">Quem é obrigado a interagir</p>
                 <p className="text-xs text-muted-foreground">
                   Por padrão, o público são todos com contrato gerado (valor definido) mais os voluntários.
                 </p>
               </div>
-              <Badge variant="secondary" className="ml-3 shrink-0">
+              <Badge variant="secondary" className="ml-auto shrink-0">
                 {filtered.length} pessoa{filtered.length !== 1 ? "s" : ""}
               </Badge>
             </div>
