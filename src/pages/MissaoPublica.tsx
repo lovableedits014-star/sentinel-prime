@@ -423,6 +423,24 @@ export default function MissaoPublica() {
                       <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
                     </Button>
                   )}
+                  {extraLinks.map((l) => (
+                    <Button
+                      key={l.id}
+                      variant="outline"
+                      className="w-full justify-start gap-2"
+                      onClick={() => handleExternal(l.url, "click_link", l.id)}
+                    >
+                      {l.kind === "facebook" ? (
+                        <FacebookIcon className="w-4 h-4 text-blue-600" />
+                      ) : l.kind === "instagram" ? (
+                        <InstagramIcon className="w-4 h-4 text-pink-500" />
+                      ) : (
+                        <ExternalLink className="w-4 h-4" />
+                      )}
+                      <span className="truncate">{l.label}</span>
+                      <ExternalLink className="w-3 h-3 ml-auto opacity-60 shrink-0" />
+                    </Button>
+                  ))}
                 </div>
 
                 <Button
