@@ -297,7 +297,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           </Button>
         </div>
 
-        </div>
+
 
 
         {/* Presets editáveis */}
