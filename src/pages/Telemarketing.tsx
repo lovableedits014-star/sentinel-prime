@@ -1104,15 +1104,18 @@ export default function Telemarketing() {
                 {ligacaoStatus === "atendeu" && (
                   <div className="space-y-3 bg-muted/50 p-3 rounded-lg">
                     <div>
-                      <label className="text-xs font-medium mb-1.5 block">Vota no candidato?</label>
+                      <label className="text-xs font-medium mb-1.5 block">
+                        1. Deputado Estadual (nosso candidato) <span className="text-destructive">*</span>
+                      </label>
                       <Select value={votaCandidato} onValueChange={setVotaCandidato}>
                         <SelectTrigger className="h-9 text-sm">
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="sim">✅ Sim, vota</SelectItem>
+                          <SelectItem value="sim">✅ Vota (confirmado)</SelectItem>
                           <SelectItem value="nao">❌ Não vota</SelectItem>
                           <SelectItem value="indeciso">🤔 Indeciso</SelectItem>
+                          <SelectItem value="nao_quis_opinar">🚫 Não quis opinar (encerra)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1120,26 +1123,70 @@ export default function Telemarketing() {
                     {(votaCandidato === "nao" || votaCandidato === "indeciso") && (
                       <div>
                         <label className="text-xs font-medium mb-1.5 block">
-                          Candidato que apoia {votaCandidato === "nao" ? (
+                          Qual estadual vota? {votaCandidato === "nao" ? (
                             <span className="text-destructive">(obrigatório)</span>
                           ) : "(opcional)"}
                         </label>
                         <Input
-                          placeholder="Nome do candidato..."
+                          placeholder="Nome do deputado estadual..."
                           value={candidatoAlt}
                           onChange={(e) => setCandidatoAlt(e.target.value)}
                           className={`h-9 text-sm ${votaCandidato === "nao" && !candidatoAlt.trim() ? "border-destructive" : ""}`}
                         />
                         {votaCandidato === "nao" && !candidatoAlt.trim() && (
                           <p className="text-[11px] text-destructive mt-1">
-                            Informe em quem a pessoa disse que vota para salvar.
+                            Informe o nome. Se a pessoa não quiser dizer, use "Não quis opinar".
                           </p>
                         )}
                       </div>
                     )}
 
+                    {votaCandidato === "nao_quis_opinar" && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Atendimento encerrado: os demais cargos não são perguntados.
+                      </p>
+                    )}
+
+                    {perguntarDemaisCargos && (
+                      <div className="space-y-3 border-t pt-3">
+                        {([
+                          { key: "federal", label: "2. Deputado Federal", value: candFederal, setValue: setCandFederal, nq: federalNQ, setNq: setFederalNQ },
+                          { key: "senador", label: "3. Senador", value: candSenador, setValue: setCandSenador, nq: senadorNQ, setNq: setSenadorNQ },
+                          { key: "governador", label: "4. Governador", value: candGovernador, setValue: setCandGovernador, nq: governadorNQ, setNq: setGovernadorNQ },
+                        ] as const).map((c) => {
+                          const pendente = !c.value.trim() && !c.nq;
+                          return (
+                            <div key={c.key}>
+                              <label className="text-xs font-medium mb-1.5 block">
+                                {c.label} <span className="text-destructive">*</span>
+                              </label>
+                              <Input
+                                placeholder="Nome do candidato..."
+                                value={c.value}
+                                onChange={(e) => { c.setValue(e.target.value); if (e.target.value.trim()) c.setNq(false); }}
+                                disabled={c.nq}
+                                className={`h-9 text-sm ${pendente ? "border-destructive" : ""}`}
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={c.nq ? "secondary" : "ghost"}
+                                className="h-7 text-[11px] mt-1"
+                                onClick={() => { c.setNq(!c.nq); if (!c.nq) c.setValue(""); }}
+                              >
+                                {c.nq ? "✔ Não quis responder" : "Não quis responder"}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        <p className="text-[11px] text-muted-foreground">
+                          Preencha o nome ou marque "Não quis responder" nos três cargos para salvar.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
+
 
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Observação (opcional)</label>
