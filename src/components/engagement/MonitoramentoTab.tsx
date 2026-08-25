@@ -315,7 +315,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
           <TabsTrigger value="ranking" className="gap-1.5 text-xs sm:text-sm"><TrendingUp className="h-4 w-4" /> Ranking</TabsTrigger>
           <TabsTrigger value="publicacoes" className="gap-1.5 text-xs sm:text-sm"><Megaphone className="h-4 w-4" /> Publicações</TabsTrigger>
           <TabsTrigger value="regras" className="gap-1.5 text-xs sm:text-sm"><Target className="h-4 w-4" /> Regras</TabsTrigger>
-          <TabsTrigger value="publico" className="gap-1.5 text-xs sm:text-sm"><Users className="h-4 w-4" /> Público monitorado</TabsTrigger>
+          
         </TabsList>
 
         <TabsContent value="ranking">
