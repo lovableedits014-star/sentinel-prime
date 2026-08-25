@@ -13,14 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertTriangle, ArrowDown, ArrowUp, FileDown, Gauge, ListChecks, Megaphone,
-  Plus, RefreshCw, Search, Settings2, Target, Trash2, TrendingUp, Users,
+  Plus, RefreshCw, Search, Settings2, Target, Trash2, TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import PublicoMonitoradoTab from "@/components/engagement/PublicoMonitoradoTab";
 import {
-  contarPublicoDaRegra, fetchGrupos, fetchPendencias, type PublicoGrupo,
+  fetchGrupos, fetchPendencias, fetchPrevia, type PreviaPublico, type PublicoGrupo,
   atualizarMissaoMonitoramento, casarInteracoes, excluirRegra, fetchAdesao, fetchHistoricoPessoa,
   fetchMissoes, fetchMonitorOverview, fetchRanking, fetchRegras, gerarObrigacoes, recalcularIndices,
   registrarCobranca, salvarRegra, dispensarObrigacao,
@@ -28,6 +27,7 @@ import {
   type AdesaoRow, type HistoricoRow, type MissaoMonitorada, type MonitorOverview,
   type RankingRow, type Regra,
 } from "@/lib/engagement-monitor";
+
 
 const CARGOS = ["coordenador", "lider", "cabo", "contratado", "funcionario", "portal", "apoiador"];
 
