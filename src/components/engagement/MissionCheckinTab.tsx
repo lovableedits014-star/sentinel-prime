@@ -4,12 +4,24 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Target } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Target, ExternalLink } from "lucide-react";
+import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { resolvePublicBaseUrl } from "@/lib/public-base-url";
 import MissionLinksPanel from "./MissionLinksPanel";
 import MissionCheckinDashboard from "./MissionCheckinDashboard";
+import MissionFromPostDialog from "./MissionFromPostDialog";
 
-type Mission = { id: string; title: string | null; created_at: string; publicado_em: string | null };
+type Mission = {
+  id: string;
+  title: string | null;
+  created_at: string;
+  publicado_em: string | null;
+  post_url: string | null;
+  link_facebook: string | null;
+  link_instagram: string | null;
+  instructions: string | null;
+};
 
 export default function MissionCheckinTab({ clientId }: { clientId: string }) {
   const [missionId, setMissionId] = useState<string>("");
@@ -32,7 +44,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("portal_missions")
-        .select("id, title, created_at, publicado_em")
+        .select("id, title, created_at, publicado_em, post_url, link_facebook, link_instagram, instructions")
         .eq("client_id", clientId)
         .is("archived_at", null)
         .order("created_at", { ascending: false })
@@ -50,6 +62,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
   const mission = useMemo(() => missions.find((m) => m.id === missionId) || null, [missions, missionId]);
   const base = useMemo(() => resolvePublicBaseUrl(client), [client]);
   const missionLink = mission ? `${base.url}/missao/${mission.id}` : null;
+
 
   if (isLoading) {
     return (
