@@ -96,9 +96,11 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
 
-  const pendentes = useMemo(() => rows.filter(r => !r.is_voluntario), [rows]);
+  const pendentes = useMemo(() => rows.filter(r => !r.is_voluntario && (!r.valor_contratacao || r.valor_contratacao <= 0)), [rows]);
+  const definidos = useMemo(() => rows.filter(r => !r.is_voluntario && (r.valor_contratacao || 0) > 0), [rows]);
   const voluntarios = useMemo(() => rows.filter(r => r.is_voluntario), [rows]);
-  const base = view === "pendentes" ? pendentes : voluntarios;
+  const base = view === "pendentes" ? pendentes : view === "definidos" ? definidos : voluntarios;
+
 
   const regiaoOptions = useMemo(() => {
     const map = new Map<string, { key: string; label: string; total: number }>();
