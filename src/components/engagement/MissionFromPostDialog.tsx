@@ -120,11 +120,11 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       if (det === "facebook" && !extraFb) extraFb = manual;
       if (det === "instagram" && !extraIg) extraIg = manual;
     }
-    if (!extraFb && !extraIg) {
-      toast.error("Escolha uma publicação (Facebook e/ou Instagram) ou cole o link");
+    if (!extraFb && !extraIg && extraLinks.length === 0) {
+      toast.error("Escolha uma publicação, cole o link do post ou adicione ao menos um link externo");
       return;
     }
-    const platform: "facebook" | "instagram" = extraFb ? "facebook" : "instagram";
+    const platform: "facebook" | "instagram" = extraIg && !extraFb ? "instagram" : "facebook";
     const autoTitle =
       titulo.trim() ||
       (fb?.post_message || ig?.post_message || "").slice(0, 60).trim() ||
