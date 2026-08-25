@@ -1286,9 +1286,10 @@ export default function Eleicao() {
               <SelectContent>
                 <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="sem_valor">⚠ Sem valor</SelectItem>
-                <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
-                <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
-                <SelectItem value="pendente">⏳ Status: Pendente</SelectItem>
+                  <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
+                  <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
+                  <SelectItem value="voluntarios">❤️ Voluntários</SelectItem>
+                  <SelectItem value="pendente">⏳ Status: Pendente</SelectItem>
                 <SelectItem value="em_negociacao">🤝 Status: Em Negociação</SelectItem>
                 <SelectItem value="confirmado">✅ Status: Confirmado</SelectItem>
                 <SelectItem value="reuniao">👥 Participou da Reunião</SelectItem>
