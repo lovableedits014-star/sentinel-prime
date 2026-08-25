@@ -158,13 +158,22 @@ export default function MissaoPublica() {
   }, [missionId, code]);
 
   const registerEvent = useCallback(
-    async (type: "open" | "click_facebook" | "click_instagram" | "click_avulso" | "declared_done") => {
+    async (
+      type:
+        | "open"
+        | "click_facebook"
+        | "click_instagram"
+        | "click_avulso"
+        | "click_link"
+        | "declared_done",
+      linkId?: string,
+    ) => {
       if (!missionId) return;
       try {
         await fetch(api("/api/public/missao/event"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ missionId, code, token, type }),
+          body: JSON.stringify({ missionId, code, token, type, linkId: linkId || null }),
         });
       } catch {
         // silencioso — não bloqueia o clique
