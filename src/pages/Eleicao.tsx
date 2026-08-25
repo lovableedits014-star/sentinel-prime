@@ -841,19 +841,23 @@ export default function Eleicao() {
 
   const stats = useMemo(() => {
     const f = pessoas.filter(p => p.escopo === escopo);
-    const valorTotal = f.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
-    const semValor = f.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
-    const avulsos = f.filter(p => p.tipo === "lider" && !p.parent_id).length;
+    const isVol = (p: any) => !!p.is_voluntario;
+    const remunerados = f.filter(p => !isVol(p));
+    const valorTotal = remunerados.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+    const semValor = remunerados.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
+    const avulsos = remunerados.filter(p => p.tipo === "lider" && !p.parent_id).length;
     return {
-      coord: f.filter(p => p.tipo === "coordenador").length,
-      lider: f.filter(p => p.tipo === "lider").length,
-      cabo: f.filter(p => p.tipo === "cabo").length,
+      coord: remunerados.filter(p => p.tipo === "coordenador").length,
+      lider: remunerados.filter(p => p.tipo === "lider").length,
+      cabo: remunerados.filter(p => p.tipo === "cabo").length,
+      voluntarios: f.filter(isVol).length,
       total: f.length,
       valorTotal,
       semValor,
       avulsos,
     };
   }, [pessoas, escopo]);
+
 
   // potential parents for the form
   const possibleParents = useMemo(() => {
