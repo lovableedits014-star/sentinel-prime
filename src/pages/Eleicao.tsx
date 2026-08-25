@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star, BellRing, RefreshCw, Handshake } from "lucide-react";
+import { Crown, Users, UserCheck, Plus, Trash2, ChevronRight, MapPin, Phone, Search, Edit2, KeyRound, CheckCircle2, ChevronDown, MoreHorizontal, Send, Copy, Loader2, MessageCircle, DollarSign, AlertCircle, List, Network, ArrowUpDown, X, Star, BellRing, RefreshCw, Handshake, Heart } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -841,19 +841,23 @@ export default function Eleicao() {
 
   const stats = useMemo(() => {
     const f = pessoas.filter(p => p.escopo === escopo);
-    const valorTotal = f.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
-    const semValor = f.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
-    const avulsos = f.filter(p => p.tipo === "lider" && !p.parent_id).length;
+    const isVol = (p: any) => !!p.is_voluntario;
+    const remunerados = f.filter(p => !isVol(p));
+    const valorTotal = remunerados.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
+    const semValor = remunerados.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
+    const avulsos = remunerados.filter(p => p.tipo === "lider" && !p.parent_id).length;
     return {
-      coord: f.filter(p => p.tipo === "coordenador").length,
-      lider: f.filter(p => p.tipo === "lider").length,
-      cabo: f.filter(p => p.tipo === "cabo").length,
+      coord: remunerados.filter(p => p.tipo === "coordenador").length,
+      lider: remunerados.filter(p => p.tipo === "lider").length,
+      cabo: remunerados.filter(p => p.tipo === "cabo").length,
+      voluntarios: f.filter(isVol).length,
       total: f.length,
       valorTotal,
       semValor,
       avulsos,
     };
   }, [pessoas, escopo]);
+
 
   // potential parents for the form
   const possibleParents = useMemo(() => {
@@ -1227,13 +1231,15 @@ export default function Eleicao() {
         </TabsList>
 
         {/* KPIs com cards visuais */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
           <KpiCard label="Total" value={stats.total} icon={Users} tone="neutral" />
           <KpiCard label="Coordenadores" value={stats.coord} icon={Crown} tone="red" />
           <KpiCard label="Líderes" value={stats.lider} icon={Users} tone="blue" />
           <KpiCard label="Cabos" value={stats.cabo} icon={UserCheck} tone="green" />
+          <KpiCard label="Voluntários" value={stats.voluntarios} icon={Heart} tone="emerald" />
           <KpiCard label="Avulsos" value={stats.avulsos} icon={Star} tone="amber" />
           <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" small />
+
         </div>
 
         {/* Toolbar: busca + tipo + status + ordenação + layout */}

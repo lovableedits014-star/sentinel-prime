@@ -348,7 +348,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
         <Card className="p-3 border-primary/40 bg-primary/5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{selected.size} selecionado(s)</Badge>
-            {view === "pendentes" ? (
+            {view !== "voluntarios" ? (
               <>
                 <div className="flex items-center gap-1.5">
                   <DollarSign className="w-4 h-4 text-muted-foreground" />
@@ -412,8 +412,9 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           <p className="text-center text-sm text-muted-foreground py-10">Carregando…</p>
         ) : filtered.length === 0 ? (
           <p className="text-center text-sm text-muted-foreground py-10">
-            Nenhum cadastro pendente. 🎉
+            {view === "pendentes" ? "Nenhum cadastro pendente. 🎉" : view === "definidos" ? "Nenhum valor definido ainda." : "Nenhum voluntário marcado."}
           </p>
+
         ) : (
           <div className="divide-y">
             {filtered.map(p => {
@@ -445,6 +446,11 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                     </Button>
                   ) : (
                     <>
+                      {(p.valor_contratacao || 0) > 0 && (
+                        <Badge variant="outline" className="h-6 text-[11px] font-medium">
+                          R$ {Number(p.valor_contratacao).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </Badge>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -453,9 +459,15 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                       >
                         <Heart className="w-3 h-3" /> Voluntário
                       </Button>
-                      <DefinirValorPopover pessoa={p} onSave={aplicarValorIndividual} suggestion={presets[p.tipo]} />
+                      <DefinirValorPopover
+                        pessoa={p}
+                        onSave={aplicarValorIndividual}
+                        onClear={limparValor}
+                        suggestion={Number(p.valor_contratacao) > 0 ? Number(p.valor_contratacao) : presets[p.tipo]}
+                      />
                     </>
                   )}
+
                 </div>
               );
             })}
@@ -470,21 +482,24 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
 function DefinirValorPopover({
   pessoa,
   onSave,
+  onClear,
   suggestion,
 }: {
   pessoa: PessoaRow;
   onSave: (p: PessoaRow, valor: string) => Promise<boolean>;
+  onClear: (p: PessoaRow) => Promise<boolean>;
   suggestion: number;
 }) {
   const [open, setOpen] = useState(false);
   const [v, setV] = useState(String(suggestion || ""));
   const [saving, setSaving] = useState(false);
+  const jaTemValor = Number(pessoa.valor_contratacao || 0) > 0;
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setV(String(suggestion || "")); }}>
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
           <DollarSign className="w-3 h-3" />
-          Definir valor
+          {jaTemValor ? "Alterar valor" : "Definir valor"}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56" align="end">
@@ -510,7 +525,24 @@ function DefinirValorPopover({
         >
           {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}Salvar
         </Button>
+        {jaTemValor && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="w-full mt-1 text-xs text-destructive"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              const ok = await onClear(pessoa);
+              setSaving(false);
+              if (ok) setOpen(false);
+            }}
+          >
+            Remover valor
+          </Button>
+        )}
       </PopoverContent>
     </Popover>
   );
 }
+
