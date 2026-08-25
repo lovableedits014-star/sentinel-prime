@@ -255,10 +255,10 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           <div>
             <h3 className="font-semibold flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600" />
-              Cadastros pendentes de valor
+              Valores de contrato
             </h3>
             <p className="text-xs text-muted-foreground">
-              Pessoas cadastradas pelos coordenadores que ainda não têm valor de contrato definido.
+              Defina os valores pendentes, altere valores já definidos ou marque voluntários (sem custo).
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -281,12 +281,22 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           </Button>
           <Button
             size="sm"
+            variant={view === "definidos" ? "default" : "outline"}
+            className="h-7 text-xs"
+            onClick={() => { setView("definidos"); setSelected(new Set()); }}
+          >
+            <DollarSign className="w-3 h-3 mr-1" /> Com valor ({definidos.length})
+          </Button>
+          <Button
+            size="sm"
             variant={view === "voluntarios" ? "default" : "outline"}
             className="h-7 text-xs"
             onClick={() => { setView("voluntarios"); setSelected(new Set()); }}
           >
             <Heart className="w-3 h-3 mr-1" /> Voluntários ({voluntarios.length})
           </Button>
+        </div>
+
         </div>
 
 
