@@ -10,7 +10,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-const ALLOWED = new Set(["open", "click_facebook", "click_instagram", "click_avulso", "declared_done"]);
+const ALLOWED = new Set([
+  "open",
+  "click_facebook",
+  "click_instagram",
+  "click_avulso",
+  "click_link",
+  "declared_done",
+]);
 
 function detectBot(ua: string | null): boolean {
   if (!ua) return false;
