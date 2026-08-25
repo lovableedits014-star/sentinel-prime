@@ -3833,14 +3833,75 @@ export type Database = {
           },
         ]
       }
+      engagement_cobrancas: {
+        Row: {
+          canal: string
+          client_id: string
+          created_at: string
+          id: string
+          indice_no_momento: number | null
+          nome: string
+          origem: string
+          periodo_dias: number
+          ref_id: string
+          registrado_por: string | null
+          resultado: string
+          texto: string | null
+          updated_at: string
+        }
+        Insert: {
+          canal?: string
+          client_id: string
+          created_at?: string
+          id?: string
+          indice_no_momento?: number | null
+          nome: string
+          origem: string
+          periodo_dias?: number
+          ref_id: string
+          registrado_por?: string | null
+          resultado?: string
+          texto?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canal?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          indice_no_momento?: number | null
+          nome?: string
+          origem?: string
+          periodo_dias?: number
+          ref_id?: string
+          registrado_por?: string | null
+          resultado?: string
+          texto?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_cobrancas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engagement_config: {
         Row: {
           client_id: string
           comment_points: number
           created_at: string
+          exigir_evidencia_share: boolean
+          faixa_atencao: number
+          faixa_baixo: number
+          faixa_excelente: number
           id: string
           inactivity_days: number
           like_points: number
+          prazo_horas_default: number
           reaction_points: number
           share_points: number
           updated_at: string
@@ -3849,9 +3910,14 @@ export type Database = {
           client_id: string
           comment_points?: number
           created_at?: string
+          exigir_evidencia_share?: boolean
+          faixa_atencao?: number
+          faixa_baixo?: number
+          faixa_excelente?: number
           id?: string
           inactivity_days?: number
           like_points?: number
+          prazo_horas_default?: number
           reaction_points?: number
           share_points?: number
           updated_at?: string
@@ -3860,9 +3926,14 @@ export type Database = {
           client_id?: string
           comment_points?: number
           created_at?: string
+          exigir_evidencia_share?: boolean
+          faixa_atencao?: number
+          faixa_baixo?: number
+          faixa_excelente?: number
           id?: string
           inactivity_days?: number
           like_points?: number
+          prazo_horas_default?: number
           reaction_points?: number
           share_points?: number
           updated_at?: string
@@ -3872,6 +3943,95 @@ export type Database = {
             foreignKeyName: "engagement_config_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_indices_diarios: {
+        Row: {
+          cargo: string | null
+          cidade: string | null
+          client_id: string
+          created_at: string
+          cumpridas: number
+          cumprimento: number
+          dia: string
+          faixa: string
+          id: string
+          indice: number
+          nao_cumpridas: number
+          nome: string
+          obrigacoes: number
+          origem: string
+          periodo_dias: number
+          pontualidade: number
+          qualidade: number
+          ref_id: string
+          regiao: string | null
+          regularidade: number
+          reincidencia: number
+          telefone: string | null
+          tendencia: number
+          ultima_interacao: string | null
+        }
+        Insert: {
+          cargo?: string | null
+          cidade?: string | null
+          client_id: string
+          created_at?: string
+          cumpridas?: number
+          cumprimento?: number
+          dia?: string
+          faixa?: string
+          id?: string
+          indice?: number
+          nao_cumpridas?: number
+          nome: string
+          obrigacoes?: number
+          origem: string
+          periodo_dias?: number
+          pontualidade?: number
+          qualidade?: number
+          ref_id: string
+          regiao?: string | null
+          regularidade?: number
+          reincidencia?: number
+          telefone?: string | null
+          tendencia?: number
+          ultima_interacao?: string | null
+        }
+        Update: {
+          cargo?: string | null
+          cidade?: string | null
+          client_id?: string
+          created_at?: string
+          cumpridas?: number
+          cumprimento?: number
+          dia?: string
+          faixa?: string
+          id?: string
+          indice?: number
+          nao_cumpridas?: number
+          nome?: string
+          obrigacoes?: number
+          origem?: string
+          periodo_dias?: number
+          pontualidade?: number
+          qualidade?: number
+          ref_id?: string
+          regiao?: string | null
+          regularidade?: number
+          reincidencia?: number
+          telefone?: string | null
+          tendencia?: number
+          ultima_interacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_indices_diarios_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
@@ -3911,6 +4071,177 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "engagement_metas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_obrigacoes: {
+        Row: {
+          atraso_horas: number | null
+          cargo: string | null
+          cidade: string | null
+          client_id: string
+          created_at: string
+          cumprida_em: string | null
+          esperado: number
+          evidencia_nivel: string | null
+          evidencia_url: string | null
+          evidencia_validada: boolean
+          facebook_key: string | null
+          id: string
+          instagram_handle: string | null
+          justificativa: string | null
+          mission_id: string
+          nome: string
+          origem: string
+          phone_norm: string | null
+          pontos: number
+          pontos_possiveis: number
+          prazo_em: string | null
+          ref_id: string
+          regiao: string | null
+          regra_id: string | null
+          status: string
+          telefone: string | null
+          tipo_obrigacao: string
+          updated_at: string
+        }
+        Insert: {
+          atraso_horas?: number | null
+          cargo?: string | null
+          cidade?: string | null
+          client_id: string
+          created_at?: string
+          cumprida_em?: string | null
+          esperado?: number
+          evidencia_nivel?: string | null
+          evidencia_url?: string | null
+          evidencia_validada?: boolean
+          facebook_key?: string | null
+          id?: string
+          instagram_handle?: string | null
+          justificativa?: string | null
+          mission_id: string
+          nome: string
+          origem: string
+          phone_norm?: string | null
+          pontos?: number
+          pontos_possiveis?: number
+          prazo_em?: string | null
+          ref_id: string
+          regiao?: string | null
+          regra_id?: string | null
+          status?: string
+          telefone?: string | null
+          tipo_obrigacao?: string
+          updated_at?: string
+        }
+        Update: {
+          atraso_horas?: number | null
+          cargo?: string | null
+          cidade?: string | null
+          client_id?: string
+          created_at?: string
+          cumprida_em?: string | null
+          esperado?: number
+          evidencia_nivel?: string | null
+          evidencia_url?: string | null
+          evidencia_validada?: boolean
+          facebook_key?: string | null
+          id?: string
+          instagram_handle?: string | null
+          justificativa?: string | null
+          mission_id?: string
+          nome?: string
+          origem?: string
+          phone_norm?: string | null
+          pontos?: number
+          pontos_possiveis?: number
+          prazo_em?: string | null
+          ref_id?: string
+          regiao?: string | null
+          regra_id?: string | null
+          status?: string
+          telefone?: string | null
+          tipo_obrigacao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_obrigacoes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_obrigacoes_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "portal_missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_obrigacoes_regra_id_fkey"
+            columns: ["regra_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_regras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_regras: {
+        Row: {
+          ativo: boolean
+          cargos: string[]
+          cidades: string[]
+          client_id: string
+          created_at: string
+          descricao: string | null
+          esperado: number
+          id: string
+          nome: string
+          prazo_horas: number
+          regioes: string[]
+          tipo_obrigacao: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cargos?: string[]
+          cidades?: string[]
+          client_id: string
+          created_at?: string
+          descricao?: string | null
+          esperado?: number
+          id?: string
+          nome: string
+          prazo_horas?: number
+          regioes?: string[]
+          tipo_obrigacao?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cargos?: string[]
+          cidades?: string[]
+          client_id?: string
+          created_at?: string
+          descricao?: string | null
+          esperado?: number
+          id?: string
+          nome?: string
+          prazo_horas?: number
+          regioes?: string[]
+          tipo_obrigacao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_regras_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
@@ -6779,8 +7110,14 @@ export type Database = {
           link_avulso: string | null
           link_facebook: string | null
           link_instagram: string | null
+          monitorada: boolean
           platform: string
+          post_id_facebook: string | null
+          post_id_instagram: string | null
           post_url: string
+          prazo_horas: number | null
+          publicado_em: string | null
+          regra_id: string | null
           title: string | null
           tracking_enabled: boolean
           updated_at: string
@@ -6797,8 +7134,14 @@ export type Database = {
           link_avulso?: string | null
           link_facebook?: string | null
           link_instagram?: string | null
+          monitorada?: boolean
           platform: string
+          post_id_facebook?: string | null
+          post_id_instagram?: string | null
           post_url: string
+          prazo_horas?: number | null
+          publicado_em?: string | null
+          regra_id?: string | null
           title?: string | null
           tracking_enabled?: boolean
           updated_at?: string
@@ -6815,8 +7158,14 @@ export type Database = {
           link_avulso?: string | null
           link_facebook?: string | null
           link_instagram?: string | null
+          monitorada?: boolean
           platform?: string
+          post_id_facebook?: string | null
+          post_id_instagram?: string | null
           post_url?: string
+          prazo_horas?: number | null
+          publicado_em?: string | null
+          regra_id?: string | null
           title?: string | null
           tracking_enabled?: boolean
           updated_at?: string
@@ -6827,6 +7176,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_missions_regra_id_fkey"
+            columns: ["regra_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_regras"
             referencedColumns: ["id"]
           },
         ]
@@ -10072,6 +10428,21 @@ export type Database = {
         Args: { _indicado_id: string; _token: string }
         Returns: Json
       }
+      engagement_adesao_publicacoes: {
+        Args: { p_client_id: string; p_limit?: number }
+        Returns: {
+          adesao: number
+          cumpridas: number
+          mission_id: string
+          nao_cumpridas: number
+          obrigacoes: number
+          pendentes: number
+          plataforma: string
+          prazo_em: string
+          publicado_em: string
+          titulo: string
+        }[]
+      }
       engagement_alterar_cargo: {
         Args: {
           p_cidade?: string
@@ -10097,6 +10468,13 @@ export type Database = {
           regiao: string
           supporter_id: string
           telefone: string
+        }[]
+      }
+      engagement_casar_interacoes: {
+        Args: { p_client_id: string; p_mission_id?: string }
+        Returns: {
+          atualizadas: number
+          nao_cumpridas: number
         }[]
       }
       engagement_cobranca_overview: {
@@ -10157,6 +10535,35 @@ export type Database = {
         }
         Returns: Json
       }
+      engagement_gerar_obrigacoes: {
+        Args: { p_client_id: string; p_mission_id: string; p_regra_id?: string }
+        Returns: number
+      }
+      engagement_historico_pessoa: {
+        Args: {
+          p_client_id: string
+          p_limit?: number
+          p_origem: string
+          p_ref_id: string
+        }
+        Returns: {
+          atraso_horas: number
+          cumprida_em: string
+          evidencia_nivel: string
+          evidencia_url: string
+          justificativa: string
+          mission_id: string
+          obrigacao_id: string
+          plataforma: string
+          pontos: number
+          post_url: string
+          prazo_em: string
+          publicado_em: string
+          status: string
+          tipo_obrigacao: string
+          titulo: string
+        }[]
+      }
       engagement_link_author: {
         Args: {
           p_author_name?: string
@@ -10166,6 +10573,23 @@ export type Database = {
           p_platform_user_id: string
         }
         Returns: Json
+      }
+      engagement_monitor_overview: {
+        Args: { p_client_id: string }
+        Returns: {
+          atencao: number
+          baixo: number
+          critico: number
+          cumpridas: number
+          cumprimento_geral: number
+          excelente: number
+          indice_medio: number
+          nao_cumpridas: number
+          obrigacoes: number
+          pendentes: number
+          publicacoes_monitoradas: number
+          total_pessoas: number
+        }[]
       }
       engagement_perfis_overview: {
         Args: { p_client_id: string; p_days?: number }
@@ -10183,6 +10607,66 @@ export type Database = {
           telefone: string
           tipo_pessoa: string
         }[]
+      }
+      engagement_publico_alvo: {
+        Args: {
+          p_cargos?: string[]
+          p_cidades?: string[]
+          p_client_id: string
+          p_regioes?: string[]
+        }
+        Returns: {
+          cargo: string
+          cidade: string
+          facebook_key: string
+          instagram_handle: string
+          nome: string
+          origem: string
+          phone_norm: string
+          ref_id: string
+          regiao: string
+          telefone: string
+        }[]
+      }
+      engagement_ranking: {
+        Args: { p_client_id: string; p_limit?: number }
+        Returns: {
+          cargo: string
+          cidade: string
+          cumpridas: number
+          cumprimento: number
+          faixa: string
+          indice: number
+          indice_anterior: number
+          nao_cumpridas: number
+          nome: string
+          obrigacoes: number
+          origem: string
+          pontualidade: number
+          qualidade: number
+          ref_id: string
+          regiao: string
+          regularidade: number
+          telefone: string
+          tendencia: number
+          ultima_interacao: string
+          variacao: number
+        }[]
+      }
+      engagement_recalcular_indices: {
+        Args: { p_client_id: string; p_dias?: number }
+        Returns: number
+      }
+      engagement_registrar_cobranca: {
+        Args: {
+          p_canal?: string
+          p_client_id: string
+          p_origem: string
+          p_ref_id: string
+          p_resultado?: string
+          p_texto?: string
+        }
+        Returns: string
       }
       engagement_remove_social: {
         Args: { p_pessoa_id: string; p_plataforma: string }
