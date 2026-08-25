@@ -1995,11 +1995,16 @@ export type Database = {
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
+          candidato_federal: string | null
+          candidato_governador: string | null
+          candidato_senador: string | null
           cidade: string | null
           client_id: string
           contratado_id: string
           created_at: string
           endereco: string | null
+          federal_status: string | null
+          governador_status: string | null
           id: string
           ligacao_em: string | null
           ligacao_status: string | null
@@ -2007,6 +2012,7 @@ export type Database = {
           observacao_tele: string | null
           operador_nome: string | null
           proxima_tentativa_em: string | null
+          senador_status: string | null
           status: string
           telefone: string
           tentativas_count: number
@@ -2018,11 +2024,16 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id: string
           contratado_id: string
           created_at?: string
           endereco?: string | null
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           ligacao_em?: string | null
           ligacao_status?: string | null
@@ -2030,6 +2041,7 @@ export type Database = {
           observacao_tele?: string | null
           operador_nome?: string | null
           proxima_tentativa_em?: string | null
+          senador_status?: string | null
           status?: string
           telefone: string
           tentativas_count?: number
@@ -2041,11 +2053,16 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id?: string
           contratado_id?: string
           created_at?: string
           endereco?: string | null
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           ligacao_em?: string | null
           ligacao_status?: string | null
@@ -2053,6 +2070,7 @@ export type Database = {
           observacao_tele?: string | null
           operador_nome?: string | null
           proxima_tentativa_em?: string | null
+          senador_status?: string | null
           status?: string
           telefone?: string
           tentativas_count?: number
@@ -2218,6 +2236,9 @@ export type Database = {
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
+          candidato_federal: string | null
+          candidato_governador: string | null
+          candidato_senador: string | null
           cidade: string | null
           client_id: string
           contrato_aceito: boolean
@@ -2226,6 +2247,8 @@ export type Database = {
           created_at: string
           email: string | null
           endereco: string | null
+          federal_status: string | null
+          governador_status: string | null
           id: string
           is_lider: boolean
           lider_id: string | null
@@ -2240,6 +2263,7 @@ export type Database = {
           quota_indicados: number
           redes_sociais: Json | null
           secao_eleitoral: string | null
+          senador_status: string | null
           status: string
           supporter_id: string | null
           telefone: string
@@ -2254,6 +2278,9 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id: string
           contrato_aceito?: boolean
@@ -2262,6 +2289,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           endereco?: string | null
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           is_lider?: boolean
           lider_id?: string | null
@@ -2276,6 +2305,7 @@ export type Database = {
           quota_indicados?: number
           redes_sociais?: Json | null
           secao_eleitoral?: string | null
+          senador_status?: string | null
           status?: string
           supporter_id?: string | null
           telefone: string
@@ -2290,6 +2320,9 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id?: string
           contrato_aceito?: boolean
@@ -2298,6 +2331,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           endereco?: string | null
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           is_lider?: boolean
           lider_id?: string | null
@@ -2312,6 +2347,7 @@ export type Database = {
           quota_indicados?: number
           redes_sociais?: Json | null
           secao_eleitoral?: string | null
+          senador_status?: string | null
           status?: string
           supporter_id?: string | null
           telefone?: string
@@ -3066,10 +3102,15 @@ export type Database = {
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
+          candidato_federal: string | null
+          candidato_governador: string | null
+          candidato_senador: string | null
           cidade: string | null
           client_id: string
           created_at: string
           criado_por_user_id: string | null
+          federal_status: string | null
+          governador_status: string | null
           id: string
           indicador_id: string
           indicador_tipo: Database["public"]["Enums"]["eleicao_tipo"]
@@ -3079,6 +3120,7 @@ export type Database = {
           operador_nome: string | null
           origem: string
           proxima_tentativa_em: string | null
+          senador_status: string | null
           status_telemarketing: string
           telefone: string
           telefone_norm: string
@@ -3094,10 +3136,15 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id: string
           created_at?: string
           criado_por_user_id?: string | null
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           indicador_id: string
           indicador_tipo: Database["public"]["Enums"]["eleicao_tipo"]
@@ -3107,6 +3154,7 @@ export type Database = {
           operador_nome?: string | null
           origem?: string
           proxima_tentativa_em?: string | null
+          senador_status?: string | null
           status_telemarketing?: string
           telefone: string
           telefone_norm: string
@@ -3122,10 +3170,15 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id?: string
           created_at?: string
           criado_por_user_id?: string | null
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           indicador_id?: string
           indicador_tipo?: Database["public"]["Enums"]["eleicao_tipo"]
@@ -3135,6 +3188,7 @@ export type Database = {
           operador_nome?: string | null
           origem?: string
           proxima_tentativa_em?: string | null
+          senador_status?: string | null
           status_telemarketing?: string
           telefone?: string
           telefone_norm?: string
@@ -3395,6 +3449,9 @@ export type Database = {
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
+          candidato_federal: string | null
+          candidato_governador: string | null
+          candidato_senador: string | null
           cep: string | null
           cidade: string | null
           client_id: string
@@ -3405,11 +3462,13 @@ export type Database = {
           email: string | null
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
+          federal_status: string | null
           funcionario_id: string | null
           geocode_endereco_hash: string | null
           geocode_precision: string | null
           geocode_status: string | null
           geocoded_at: string | null
+          governador_status: string | null
           id: string
           is_favorito_regiao: boolean
           is_voluntario: boolean
@@ -3436,6 +3495,7 @@ export type Database = {
           rg: string | null
           rg_orgao_expedidor: string | null
           rua: string | null
+          senador_status: string | null
           status_contratacao: string | null
           supporter_id: string | null
           telefone: string
@@ -3455,6 +3515,9 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cep?: string | null
           cidade?: string | null
           client_id: string
@@ -3465,11 +3528,13 @@ export type Database = {
           email?: string | null
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
+          federal_status?: string | null
           funcionario_id?: string | null
           geocode_endereco_hash?: string | null
           geocode_precision?: string | null
           geocode_status?: string | null
           geocoded_at?: string | null
+          governador_status?: string | null
           id?: string
           is_favorito_regiao?: boolean
           is_voluntario?: boolean
@@ -3496,6 +3561,7 @@ export type Database = {
           rg?: string | null
           rg_orgao_expedidor?: string | null
           rua?: string | null
+          senador_status?: string | null
           status_contratacao?: string | null
           supporter_id?: string | null
           telefone: string
@@ -3515,6 +3581,9 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cep?: string | null
           cidade?: string | null
           client_id?: string
@@ -3525,11 +3594,13 @@ export type Database = {
           email?: string | null
           endereco?: string
           escopo?: Database["public"]["Enums"]["eleicao_escopo"]
+          federal_status?: string | null
           funcionario_id?: string | null
           geocode_endereco_hash?: string | null
           geocode_precision?: string | null
           geocode_status?: string | null
           geocoded_at?: string | null
+          governador_status?: string | null
           id?: string
           is_favorito_regiao?: boolean
           is_voluntario?: boolean
@@ -3556,6 +3627,7 @@ export type Database = {
           rg?: string | null
           rg_orgao_expedidor?: string | null
           rua?: string | null
+          senador_status?: string | null
           status_contratacao?: string | null
           supporter_id?: string | null
           telefone?: string
@@ -8989,45 +9061,63 @@ export type Database = {
         Row: {
           bairro: string | null
           candidato_alternativo: string | null
+          candidato_federal: string | null
+          candidato_governador: string | null
+          candidato_senador: string | null
           cidade: string | null
           client_id: string
           contato_id: string
           created_at: string
+          federal_status: string | null
+          governador_status: string | null
           id: string
           ligacao_status: string
           observacao: string | null
           operador_nome: string
           proxima_tentativa_em: string | null
+          senador_status: string | null
           tabela: string
           vota_candidato: string | null
         }
         Insert: {
           bairro?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id: string
           contato_id: string
           created_at?: string
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           ligacao_status: string
           observacao?: string | null
           operador_nome: string
           proxima_tentativa_em?: string | null
+          senador_status?: string | null
           tabela: string
           vota_candidato?: string | null
         }
         Update: {
           bairro?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id?: string
           contato_id?: string
           created_at?: string
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           ligacao_status?: string
           observacao?: string | null
           operador_nome?: string
           proxima_tentativa_em?: string | null
+          senador_status?: string | null
           tabela?: string
           vota_candidato?: string | null
         }
@@ -9085,9 +9175,14 @@ export type Database = {
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
+          candidato_federal: string | null
+          candidato_governador: string | null
+          candidato_senador: string | null
           cidade: string | null
           client_id: string
           created_at: string
+          federal_status: string | null
+          governador_status: string | null
           id: string
           ligacao_em: string | null
           ligacao_status: string | null
@@ -9096,6 +9191,7 @@ export type Database = {
           observacao_tele: string | null
           operador_nome: string | null
           proxima_tentativa_em: string | null
+          senador_status: string | null
           telefone: string
           tentativas_count: number
           vota_candidato: string | null
@@ -9106,9 +9202,14 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id: string
           created_at?: string
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           ligacao_em?: string | null
           ligacao_status?: string | null
@@ -9117,6 +9218,7 @@ export type Database = {
           observacao_tele?: string | null
           operador_nome?: string | null
           proxima_tentativa_em?: string | null
+          senador_status?: string | null
           telefone: string
           tentativas_count?: number
           vota_candidato?: string | null
@@ -9127,9 +9229,14 @@ export type Database = {
           bairro?: string | null
           campanha_id?: string | null
           candidato_alternativo?: string | null
+          candidato_federal?: string | null
+          candidato_governador?: string | null
+          candidato_senador?: string | null
           cidade?: string | null
           client_id?: string
           created_at?: string
+          federal_status?: string | null
+          governador_status?: string | null
           id?: string
           ligacao_em?: string | null
           ligacao_status?: string | null
@@ -9138,6 +9245,7 @@ export type Database = {
           observacao_tele?: string | null
           operador_nome?: string | null
           proxima_tentativa_em?: string | null
+          senador_status?: string | null
           telefone?: string
           tentativas_count?: number
           vota_candidato?: string | null
@@ -11115,6 +11223,9 @@ export type Database = {
           bairro: string | null
           campanha_id: string | null
           candidato_alternativo: string | null
+          candidato_federal: string | null
+          candidato_governador: string | null
+          candidato_senador: string | null
           cep: string | null
           cidade: string | null
           client_id: string
@@ -11125,11 +11236,13 @@ export type Database = {
           email: string | null
           endereco: string
           escopo: Database["public"]["Enums"]["eleicao_escopo"]
+          federal_status: string | null
           funcionario_id: string | null
           geocode_endereco_hash: string | null
           geocode_precision: string | null
           geocode_status: string | null
           geocoded_at: string | null
+          governador_status: string | null
           id: string
           is_favorito_regiao: boolean
           is_voluntario: boolean
@@ -11156,6 +11269,7 @@ export type Database = {
           rg: string | null
           rg_orgao_expedidor: string | null
           rua: string | null
+          senador_status: string | null
           status_contratacao: string | null
           supporter_id: string | null
           telefone: string
@@ -11788,15 +11902,21 @@ export type Database = {
         Returns: {
           bairro: string | null
           candidato_alternativo: string | null
+          candidato_federal: string | null
+          candidato_governador: string | null
+          candidato_senador: string | null
           cidade: string | null
           client_id: string
           contato_id: string
           created_at: string
+          federal_status: string | null
+          governador_status: string | null
           id: string
           ligacao_status: string
           observacao: string | null
           operador_nome: string
           proxima_tentativa_em: string | null
+          senador_status: string | null
           tabela: string
           vota_candidato: string | null
         }[]
@@ -11950,6 +12070,7 @@ export type Database = {
           tipo: string
         }[]
       }
+      tele_norm_candidato: { Args: { _txt: string }; Returns: string }
       tele_operador_campanhas: {
         Args: { _client_id: string; _nome: string; _senha: string }
         Returns: {
@@ -12090,23 +12211,47 @@ export type Database = {
         }
         Returns: Json
       }
-      tele_registrar_ligacao: {
-        Args: {
-          _bairro: string
-          _candidato_alternativo?: string
-          _cidade: string
-          _client_id: string
-          _id: string
-          _ligacao_status: string
-          _nome: string
-          _observacao?: string
-          _proxima_tentativa_em?: string
-          _senha: string
-          _tabela: string
-          _vota_candidato?: string
-        }
-        Returns: Json
-      }
+      tele_registrar_ligacao:
+        | {
+            Args: {
+              _bairro: string
+              _candidato_alternativo?: string
+              _cidade: string
+              _client_id: string
+              _id: string
+              _ligacao_status: string
+              _nome: string
+              _observacao?: string
+              _proxima_tentativa_em?: string
+              _senha: string
+              _tabela: string
+              _vota_candidato?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _bairro: string
+              _candidato_alternativo?: string
+              _candidato_federal?: string
+              _candidato_governador?: string
+              _candidato_senador?: string
+              _cidade: string
+              _client_id: string
+              _federal_status?: string
+              _governador_status?: string
+              _id: string
+              _ligacao_status: string
+              _nome: string
+              _observacao?: string
+              _proxima_tentativa_em?: string
+              _senador_status?: string
+              _senha: string
+              _tabela: string
+              _vota_candidato?: string
+            }
+            Returns: Json
+          }
       tele_release_contato: {
         Args: {
           _client_id: string
