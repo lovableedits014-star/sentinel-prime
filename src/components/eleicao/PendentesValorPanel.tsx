@@ -348,7 +348,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
         <Card className="p-3 border-primary/40 bg-primary/5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{selected.size} selecionado(s)</Badge>
-            {view === "pendentes" ? (
+            {view !== "voluntarios" ? (
               <>
                 <div className="flex items-center gap-1.5">
                   <DollarSign className="w-4 h-4 text-muted-foreground" />
