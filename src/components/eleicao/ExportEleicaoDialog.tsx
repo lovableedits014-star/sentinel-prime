@@ -118,6 +118,8 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
       apenasAvulsos: apenasAvulsos,
       apenasReuniao: reuniaoFilter === "reuniao",
       apenasNaoReuniao: reuniaoFilter === "sem_reuniao",
+      voluntarios,
+
     });
     onOpenChange(false);
   }
