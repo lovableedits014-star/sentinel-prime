@@ -86,7 +86,39 @@ export default function MissaoPublica() {
   const [declaring, setDeclaring] = useState(false);
   const [declared, setDeclared] = useState(false);
   const [justRecognized, setJustRecognized] = useState(false);
+  const [clickedLinks, setClickedLinks] = useState<Set<string>>(new Set());
+  const [backReminder, setBackReminder] = useState(false);
   const codeInvalid = code === "invalid";
+
+  const clickedKey = missionId ? `sm_missao_clicks_${missionId}` : "";
+  const doneKey = missionId ? `sm_missao_done_${missionId}` : "";
+
+  // Restaura, no aparelho, o que a pessoa já clicou/confirmou nesta missão.
+  useEffect(() => {
+    if (!missionId) return;
+    try {
+      const raw = localStorage.getItem(`sm_missao_clicks_${missionId}`);
+      if (raw) setClickedLinks(new Set(JSON.parse(raw) as string[]));
+      if (localStorage.getItem(`sm_missao_done_${missionId}`) === "1") setDeclared(true);
+    } catch {
+      // ignora storage indisponível
+    }
+  }, [missionId]);
+
+  // Quando a pessoa volta do Facebook/Instagram, lembramos de confirmar.
+  useEffect(() => {
+    if (declared || clickedLinks.size === 0) return;
+    const onBack = () => {
+      if (document.visibilityState === "visible") setBackReminder(true);
+    };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => {
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+    };
+  }, [declared, clickedLinks.size]);
+
 
   useEffect(() => {
     document.title = "Missão da Campanha";
