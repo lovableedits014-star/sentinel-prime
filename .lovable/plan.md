@@ -34,16 +34,17 @@ Hoje a página da missão mostra os botões dos links e, logo abaixo, um botão 
 
 
 
-7. **Alerta "Abriram e não confirmaram"**
+8. **Alerta "Abriram e não confirmaram"**
    - Novo bloco de alerta destacado, com contagem e lista dessas pessoas, e botão de WhatsApp com mensagem pronta: "Vi que você abriu o link da missão X — falta só clicar em Confirmar. Link: …".
    - Ação em lote: copiar todos os telefones / abrir cobranças uma a uma.
 
-8. **KPI novo**
+9. **KPI novo**
    - Card "Abriu sem confirmar" ao lado dos existentes, para medir a queda entre abertura e confirmação.
 
 ## Detalhes técnicos
 
-- `src/pages/MissaoPublica.tsx`: estado `clickedLinks: Set<string>`, barra fixa (`fixed bottom-0`) condicional, listener `visibilitychange`/`focus` para o lembrete de retorno, `localStorage` por `missionId` guardando "clicou" e "confirmou", reordenação em passos, novos textos/estilos.
+- `src/pages/MissaoPublica.tsx`: estado `clickedLinks: Set<string>`, barra fixa (`fixed bottom-0`) condicional, listener `visibilitychange`/`focus` para o lembrete de retorno, `localStorage` por `missionId` guardando "clicou" e "confirmou", reordenação em passos, novos textos/estilos; campo de telefone com `autoComplete="off"` / `name` não padrão e valor inicial sempre vazio, além do bloco de reconhecimento com telefone mascarado e ação de trocar participante.
+
 - Sem mudança de banco: continuamos usando os eventos `open`, `click_*` e `declared_done` já existentes em `mission_events`.
 - `src/components/engagement/MissionCheckinAlerts.tsx`: nova seção derivada das linhas com status `abriu` (abriu mas sem `declared_done`), com links `wa.me` usando `toWhatsAppBR`.
 - `src/components/engagement/MissionCheckinDashboard.tsx`: novo KPI "Abriu sem confirmar" (já existe o cálculo de `abriu`, só falta expor com o texto e destaque corretos).
