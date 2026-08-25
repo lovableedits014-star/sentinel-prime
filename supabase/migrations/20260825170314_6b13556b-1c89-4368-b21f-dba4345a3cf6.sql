@@ -1,0 +1,1 @@
+ALTER VIEW public.v_eleicao_indicadores_cobranca SET (security_invoker = on);
