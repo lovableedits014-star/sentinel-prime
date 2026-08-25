@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw } from "lucide-react";
+import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw, RefreshCcw } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,6 +50,24 @@ export default function TelemarketingAdminFilas() {
   const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
   const [fonteMap, setFonteMap] = useState<Record<string, { fonte: string | null; filtro: any }>>({});
   const [repopulando, setRepopulando] = useState<string | null>(null);
+  const [resetando, setResetando] = useState<string | null>(null);
+
+  const resetarFila = async (f: FilaResumo) => {
+    if (!clientId) return;
+    if (!confirm(`Resetar a fila "${f.nome}"? Os contatos que não atenderam ou pediram retorno voltam agora para a fila, sem esperar as 6h.`)) return;
+    setResetando(f.campanha_id);
+    const { data, error } = await supabase.rpc("tele_resetar_fila" as any, {
+      _client_id: clientId, _campanha_id: f.campanha_id,
+    });
+    setResetando(null);
+    if (error) { toast.error(error.message); return; }
+    const n = Number((data as any)?.reabertos || 0);
+    toast[n > 0 ? "success" : "info"](
+      n > 0 ? `${n} contato(s) devolvido(s) para a fila` : "Nenhum contato aguardando retorno nesta fila"
+    );
+    load();
+  };
+
 
 
   const load = async () => {
@@ -270,6 +288,23 @@ export default function TelemarketingAdminFilas() {
                         <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
                       <TeleHelp text={TELE_HELP.gerenciarDesignacoes} className="self-center" />
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={resetando === f.campanha_id}
+                        onClick={() => resetarFila(f)}
+                        title="Devolve agora à fila quem não atendeu ou reagendou, sem esperar as 6h"
+                      >
+                        {resetando === f.campanha_id
+                          ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          : <RefreshCcw className="w-3.5 h-3.5 mr-1" />} Resetar fila
+                      </Button>
+                      <TeleHelp
+                        text="Traz de volta imediatamente para a fila os contatos marcados como 'não atendeu' ou 'reagendou'. Normalmente eles voltam sozinhos após 6h; use este botão para adiantar. Quem já foi concluído não é afetado."
+                        className="self-center"
+                      />
+
 
 
                       <Button size="sm" variant="outline" asChild>
