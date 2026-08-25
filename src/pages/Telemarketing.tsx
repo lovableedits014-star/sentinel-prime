@@ -44,6 +44,19 @@ interface CampanhaScript {
   whatsapp_template?: string | null;
 }
 
+// Um contato continua na fila do operador quando:
+// - nunca foi trabalhado (sem status ou "pendente"); ou
+// - foi marcado como "não atendeu"/"reagendou" e a hora do retorno já chegou.
+const isNaFila = (c: { ligacao_status: string | null; proxima_tentativa_em?: string | null }) => {
+  const st = c.ligacao_status || "pendente";
+  if (st === "pendente") return true;
+  if (st === "nao_atendeu" || st === "reagendou") {
+    if (!c.proxima_tentativa_em) return true;
+    return new Date(c.proxima_tentativa_em).getTime() <= Date.now();
+  }
+  return false;
+};
+
 
 export default function Telemarketing() {
   const { clientId } = useParams<{ clientId: string }>();
