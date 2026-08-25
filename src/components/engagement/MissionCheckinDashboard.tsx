@@ -284,6 +284,31 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                 className="pl-8"
               />
             </div>
+            <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                <SelectItem value="cumpriu">Entrou e concluiu</SelectItem>
+                <SelectItem value="abriu">Entrou e não concluiu</SelectItem>
+                <SelectItem value="nao_abriu">Não entrou no link</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={obrigacaoFiltro} onValueChange={setObrigacaoFiltro}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Obrigados (todos)</SelectItem>
+                <SelectItem value="contrato">Somente com contrato</SelectItem>
+                <SelectItem value="voluntarios">Somente voluntários</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={cadastroFiltro} onValueChange={setCadastroFiltro}>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Com e sem cadastro</SelectItem>
+                <SelectItem value="com">Com cadastro no sistema</SelectItem>
+                <SelectItem value="sem">Sem cadastro</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={cargoFiltro} onValueChange={setCargoFiltro}>
               <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
