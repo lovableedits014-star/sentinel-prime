@@ -52,6 +52,7 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
 
   const totals = useMemo(() => ({
     total: rows.length,
+    prontas: rows.filter((r) => r.pronta_para_cobranca).length,
     semIg: rows.filter((r) => r.sem_instagram).length,
     semFb: rows.filter((r) => r.sem_facebook).length,
     semTel: rows.filter((r) => r.sem_telefone).length,
@@ -63,12 +64,14 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
     return rows.filter((r) => {
       if (term && !(r.nome || "").toLowerCase().includes(term) && !(r.telefone || "").includes(term)) return false;
       if (filtro === "pendentes" && !(r.sem_instagram || r.sem_facebook || r.sem_telefone)) return false;
+      if (filtro === "bloqueadas" && r.pronta_para_cobranca) return false;
       if (filtro === "sem_prova" && !r.sem_prova) return false;
       if (filtro === "sem_telefone" && !r.sem_telefone) return false;
       if (filtro === "sem_rede" && !(r.sem_instagram && r.sem_facebook)) return false;
       return true;
     });
   }, [rows, busca, filtro]);
+
 
   const key = (r: PendenciaRow) => `${r.origem}:${r.ref_id}`;
   const setEdit = (r: PendenciaRow, patch: { ig?: string; fb?: string; tel?: string }) =>
@@ -121,9 +124,10 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 px-3 sm:px-6">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 text-center">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 text-center">
           {[
             ["No público", totals.total],
+            ["Prontos p/ cobrar", totals.prontas],
             ["Sem Instagram", totals.semIg],
             ["Sem Facebook", totals.semFb],
             ["Sem telefone", totals.semTel],
@@ -135,6 +139,7 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
             </div>
           ))}
         </div>
+
 
         <div className="flex flex-wrap gap-2">
           <div className="relative flex-1 min-w-[180px]">
@@ -152,6 +157,8 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
             <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="pendentes">Com alguma pendência</SelectItem>
+              <SelectItem value="bloqueadas">Não serão cobradas (faltam dados)</SelectItem>
+
               <SelectItem value="sem_prova">Sem meio de comprovação</SelectItem>
               <SelectItem value="sem_telefone">Sem telefone</SelectItem>
               <SelectItem value="sem_rede">Sem nenhuma rede</SelectItem>
@@ -187,13 +194,18 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
                       <div className="font-medium text-sm">{r.nome}</div>
                       <div className="text-[11px] text-muted-foreground">
                         {cap(r.cargo)} · {cap(r.regiao || r.cidade) || "sem região"}
-                        {r.sem_prova && (
+                        {r.pronta_para_cobranca ? (
+                          <Badge variant="outline" className="ml-2 bg-emerald-500/15 text-emerald-600 border-emerald-500/30">
+                            pronta p/ cobrança
+                          </Badge>
+                        ) : (
                           <Badge variant="outline" className="ml-2 bg-destructive/15 text-destructive border-destructive/30">
-                            sem comprovação
+                            {r.motivo_bloqueio || "faltam dados"}
                           </Badge>
                         )}
                       </div>
                     </TableCell>
+
                     <TableCell>
                       {r.instagram_handle ? (
                         <span className="text-xs text-emerald-600">@{r.instagram_handle}</span>

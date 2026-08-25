@@ -9,12 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Ban, Plus, RefreshCw, Search, Trash2, UserCheck, Users } from "lucide-react";
+import { Ban, Plus, RefreshCw, Search, Trash2, UserCheck, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import PendenciasDadosPanel from "@/components/engagement/PendenciasDadosPanel";
 import {
-  criarGrupo, definirPublico, excluirGrupo, fetchCandidatos, fetchGrupos,
-  type CandidatoRow, type PublicoGrupo,
+  criarGrupo, criarPessoaManual, definirPublico, excluirGrupo, excluirPessoaManual,
+  fetchCandidatos, fetchGrupos, fetchPrevia,
+  type CandidatoRow, type PreviaPublico, type PublicoGrupo,
 } from "@/lib/engagement-monitor";
 
 const cap = (s?: string | null) => (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -25,16 +26,35 @@ const fmtPhone = (s?: string | null) => {
   return s || "—";
 };
 
+type ManualForm = {
+  nome: string;
+  telefone: string;
+  cargo: string;
+  regiao: string;
+  cidade: string;
+  instagram: string;
+  facebook: string;
+};
+
+const EMPTY_MANUAL: ManualForm = {
+  nome: "", telefone: "", cargo: "apoiador", regiao: "", cidade: "", instagram: "", facebook: "",
+};
+
+const CARGOS_MANUAIS = ["apoiador", "coordenador", "lider", "cabo", "funcionario", "contratado", "voluntario", "influenciador"];
+
 export default function PublicoMonitoradoTab({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
   const [grupos, setGrupos] = useState<PublicoGrupo[]>([]);
   const [grupoId, setGrupoId] = useState<string>("geral");
   const [rows, setRows] = useState<CandidatoRow[]>([]);
+  const [previa, setPrevia] = useState<PreviaPublico | null>(null);
   const [busca, setBusca] = useState("");
   const [cargoFilter, setCargoFilter] = useState("todos");
   const [regiaoFilter, setRegiaoFilter] = useState("todas");
   const [somenteMarcados, setSomenteMarcados] = useState(false);
   const [novoGrupo, setNovoGrupo] = useState<string | null>(null);
+  const [manual, setManual] = useState<ManualForm | null>(null);
+  const [savingManual, setSavingManual] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
 
   const grupoParam = grupoId === "geral" ? null : grupoId;
@@ -45,6 +65,11 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
       const [g, c] = await Promise.all([fetchGrupos(clientId), fetchCandidatos(clientId, grupoParam)]);
       setGrupos(g);
       setRows(c);
+      try {
+        setPrevia(await fetchPrevia(clientId, null, grupoParam));
+      } catch {
+        setPrevia(null);
+      }
     } catch (e) {
       toast.error("Erro ao carregar público: " + (e as Error).message);
       setRows([]);
@@ -111,6 +136,30 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
     }
   };
 
+  const salvarManual = async () => {
+    if (!manual?.nome.trim()) return toast.error("Informe o nome da pessoa");
+    setSavingManual(true);
+    try {
+      await criarPessoaManual(clientId, {
+        nome: manual.nome,
+        telefone: manual.telefone,
+        cargo: manual.cargo,
+        regiao: manual.regiao,
+        cidade: manual.cidade,
+        grupoId: grupoParam,
+        instagram: manual.instagram,
+        facebook: manual.facebook,
+      });
+      toast.success(`${manual.nome} adicionada ao público monitorado`);
+      setManual(null);
+      await load();
+    } catch (e) {
+      toast.error("Erro ao cadastrar: " + (e as Error).message);
+    } finally {
+      setSavingManual(false);
+    }
+  };
+
   if (loading) return <Skeleton className="h-72 w-full" />;
 
   return (
@@ -122,9 +171,10 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm">
             As pessoas vêm dos cadastros que você já tem (Eleição, Contratados, Funcionários, Pessoas e contas do
-            portal) — aqui você <strong>marca quem entra no monitoramento</strong>. Use a <strong>Lista geral</strong>
-            {" "}para inclusões e dispensas que valem junto com as regras automáticas, ou crie um <strong>grupo</strong>
-            {" "}e aponte a regra para ele no modo “lista manual”.
+            portal) — aqui você <strong>marca quem entra no monitoramento</strong>. Quem não existe em nenhum cadastro
+            pode ser incluído com <strong>Adicionar pessoa</strong>, já com @ e telefone. Use a{" "}
+            <strong>Lista geral</strong> para inclusões e dispensas que valem junto com as regras automáticas, ou crie
+            um <strong>grupo</strong> e aponte a regra para ele no modo “lista manual”.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 px-3 sm:px-6">
@@ -139,6 +189,9 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
                 </SelectContent>
               </Select>
             </div>
+            <Button className="gap-2" onClick={() => setManual({ ...EMPTY_MANUAL })}>
+              <UserPlus className="h-4 w-4" /> Adicionar pessoa
+            </Button>
             <Button variant="outline" className="gap-2" onClick={() => setNovoGrupo("")}>
               <Plus className="h-4 w-4" /> Novo grupo
             </Button>
@@ -157,6 +210,16 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
             <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
               {totalMarcados} no público
             </Badge>
+            {previa && (
+              <>
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                  {previa.prontas} prontos para cobrança
+                </Badge>
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
+                  {previa.sem_dados} sem dados suficientes
+                </Badge>
+              </>
+            )}
             {totalDispensados > 0 && (
               <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
                 {totalDispensados} dispensados
@@ -199,7 +262,7 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
                   <TableHead>Cargo</TableHead>
                   <TableHead>Região</TableHead>
                   <TableHead>Redes</TableHead>
-                  <TableHead className="text-right">Dispensar</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -220,7 +283,12 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm font-medium">{r.nome}</div>
+                        <div className="text-sm font-medium flex items-center gap-1.5">
+                          {r.nome}
+                          {r.origem === "manual" && (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">avulso</Badge>
+                          )}
+                        </div>
                         <div className="text-[11px] text-muted-foreground">{fmtPhone(r.telefone)}</div>
                       </TableCell>
                       <TableCell className="text-xs">{cap(r.cargo)}</TableCell>
@@ -233,11 +301,23 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
                           ? <Badge variant="outline" className="bg-sky-500/10 text-sky-600 border-sky-500/30">FB</Badge>
                           : <Badge variant="outline" className="text-muted-foreground">sem FB</Badge>}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         <Button size="sm" variant={r.dispensado ? "secondary" : "ghost"} className="gap-1.5 text-xs"
                           onClick={() => alterar(r, false, !r.dispensado)}>
                           <Ban className="h-3.5 w-3.5" /> {r.dispensado ? "Reativar" : "Dispensar"}
                         </Button>
+                        {r.origem === "manual" && (
+                          <Button size="sm" variant="ghost" className="text-destructive" title="Excluir cadastro avulso"
+                            onClick={async () => {
+                              try {
+                                await excluirPessoaManual(clientId, r.ref_id);
+                                toast.success("Cadastro avulso excluído");
+                                await load();
+                              } catch (e) { toast.error((e as Error).message); }
+                            }}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -274,6 +354,66 @@ export default function PublicoMonitoradoTab({ clientId }: { clientId: string })
                 toast.success("Grupo criado");
               } catch (e) { toast.error((e as Error).message); }
             }}>Criar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={manual !== null} onOpenChange={(o) => !o && setManual(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Adicionar pessoa ao público monitorado</DialogTitle>
+            <DialogDescription className="text-xs">
+              Para quem não está em nenhum cadastro. Informe o @ do Instagram e/ou o perfil do Facebook para que os
+              comentários capturados pela API sejam casados automaticamente, e o telefone para cobrar por WhatsApp e
+              comprovar clique no link da missão.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Nome *</Label>
+              <Input value={manual?.nome ?? ""} onChange={(e) => setManual({ ...(manual as ManualForm), nome: e.target.value })} placeholder="Nome completo" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Telefone</Label>
+                <Input value={manual?.telefone ?? ""} onChange={(e) => setManual({ ...(manual as ManualForm), telefone: e.target.value })} placeholder="(67) 99999-9999" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cargo</Label>
+                <Select value={manual?.cargo || "apoiador"} onValueChange={(v) => setManual({ ...(manual as ManualForm), cargo: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CARGOS_MANUAIS.map((c) => <SelectItem key={c} value={c}>{cap(c)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Região</Label>
+                <Input value={manual?.regiao ?? ""} onChange={(e) => setManual({ ...(manual as ManualForm), regiao: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cidade</Label>
+                <Input value={manual?.cidade ?? ""} onChange={(e) => setManual({ ...(manual as ManualForm), cidade: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">@ do Instagram</Label>
+                <Input value={manual?.instagram ?? ""} onChange={(e) => setManual({ ...(manual as ManualForm), instagram: e.target.value })} placeholder="@usuario" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Facebook (URL ou usuário)</Label>
+                <Input value={manual?.facebook ?? ""} onChange={(e) => setManual({ ...(manual as ManualForm), facebook: e.target.value })} placeholder="facebook.com/perfil" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManual(null)}>Cancelar</Button>
+            <Button onClick={salvarManual} disabled={savingManual} className="gap-2">
+              <UserPlus className="h-4 w-4" /> Adicionar ao público
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

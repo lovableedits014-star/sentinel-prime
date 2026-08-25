@@ -13,14 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertTriangle, ArrowDown, ArrowUp, FileDown, Gauge, ListChecks, Megaphone,
-  Plus, RefreshCw, Search, Settings2, Target, Trash2, TrendingUp, Users,
+  Plus, RefreshCw, Search, Settings2, Target, Trash2, TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import PublicoMonitoradoTab from "@/components/engagement/PublicoMonitoradoTab";
 import {
-  contarPublicoDaRegra, fetchGrupos, fetchPendencias, type PublicoGrupo,
+  fetchGrupos, fetchPendencias, fetchPrevia, type PreviaPublico, type PublicoGrupo,
   atualizarMissaoMonitoramento, casarInteracoes, excluirRegra, fetchAdesao, fetchHistoricoPessoa,
   fetchMissoes, fetchMonitorOverview, fetchRanking, fetchRegras, gerarObrigacoes, recalcularIndices,
   registrarCobranca, salvarRegra, dispensarObrigacao,
@@ -28,6 +27,7 @@ import {
   type AdesaoRow, type HistoricoRow, type MissaoMonitorada, type MonitorOverview,
   type RankingRow, type Regra,
 } from "@/lib/engagement-monitor";
+
 
 const CARGOS = ["coordenador", "lider", "cabo", "contratado", "funcionario", "portal", "apoiador"];
 
@@ -61,7 +61,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
   const [regraEdit, setRegraEdit] = useState<Partial<Regra> | null>(null);
   const [missaoEdit, setMissaoEdit] = useState<MissaoMonitorada | null>(null);
   const [grupos, setGrupos] = useState<PublicoGrupo[]>([]);
-  const [previaPublico, setPreviaPublico] = useState<number | null>(null);
+  const [previaPublico, setPreviaPublico] = useState<PreviaPublico | null>(null);
   const [semProva, setSemProva] = useState<Set<string>>(new Set());
 
   const load = async () => {
@@ -201,9 +201,10 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
     const regra = regras.find((r) => r.id === missaoEdit?.regra_id);
     if (!missaoEdit || !regra) { setPreviaPublico(null); return; }
     let cancel = false;
-    contarPublicoDaRegra(clientId, regra)
-      .then((n) => { if (!cancel) setPreviaPublico(n); })
+    fetchPrevia(clientId, regra.id, regra.grupo_id)
+      .then((p) => { if (!cancel) setPreviaPublico(p); })
       .catch(() => { if (!cancel) setPreviaPublico(null); });
+
     return () => { cancel = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missaoEdit?.regra_id, regras, clientId]);
@@ -315,7 +316,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
           <TabsTrigger value="ranking" className="gap-1.5 text-xs sm:text-sm"><TrendingUp className="h-4 w-4" /> Ranking</TabsTrigger>
           <TabsTrigger value="publicacoes" className="gap-1.5 text-xs sm:text-sm"><Megaphone className="h-4 w-4" /> Publicações</TabsTrigger>
           <TabsTrigger value="regras" className="gap-1.5 text-xs sm:text-sm"><Target className="h-4 w-4" /> Regras</TabsTrigger>
-          <TabsTrigger value="publico" className="gap-1.5 text-xs sm:text-sm"><Users className="h-4 w-4" /> Público monitorado</TabsTrigger>
+          
         </TabsList>
 
         <TabsContent value="ranking">
@@ -527,9 +528,6 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="publico">
-          <PublicoMonitoradoTab clientId={clientId} />
-        </TabsContent>
       </Tabs>
 
       {/* Regra dialog */}
@@ -662,11 +660,20 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
               <Input value={missaoEdit?.post_id_instagram || ""} onChange={(e) => setMissaoEdit(missaoEdit ? { ...missaoEdit, post_id_instagram: e.target.value || null } : null)} />
             </div>
             {previaPublico !== null && (
-              <p className="text-xs rounded-md border bg-muted/40 p-2">
-                <strong>{previaPublico}</strong> pessoa(s) serão cobradas por esta publicação, conforme a regra
-                selecionada. Confira as pendências de cadastro em “Público monitorado → Faltam dados”.
-              </p>
+              <div className="text-xs rounded-md border bg-muted/40 p-2 space-y-1">
+                <p>
+                  <strong>{previaPublico.total}</strong> pessoa(s) no público desta regra —{" "}
+                  <strong className="text-emerald-600">{previaPublico.prontas}</strong> serão cobradas.
+                </p>
+                {previaPublico.sem_dados > 0 && (
+                  <p className="text-destructive">
+                    {previaPublico.sem_dados} ficam de fora por falta de cadastro ({previaPublico.sem_rede} sem rede
+                    social, {previaPublico.sem_telefone} sem telefone). Resolva em “Público monitorado → Faltam dados”.
+                  </p>
+                )}
+              </div>
             )}
+
             <p className="text-[11px] text-muted-foreground flex gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
               Sem o ID do post, o cumprimento por comentário não pode ser comprovado — restam o clique no link
