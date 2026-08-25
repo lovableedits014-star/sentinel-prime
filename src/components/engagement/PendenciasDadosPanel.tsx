@@ -157,6 +157,8 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
             <SelectTrigger className="w-[190px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="pendentes">Com alguma pendência</SelectItem>
+              <SelectItem value="bloqueadas">Não serão cobradas (faltam dados)</SelectItem>
+
               <SelectItem value="sem_prova">Sem meio de comprovação</SelectItem>
               <SelectItem value="sem_telefone">Sem telefone</SelectItem>
               <SelectItem value="sem_rede">Sem nenhuma rede</SelectItem>
