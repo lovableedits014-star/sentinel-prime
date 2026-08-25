@@ -198,7 +198,7 @@ export default function Telemarketing() {
     }));
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
-    const lista = allContatos.filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
+    const lista = allContatos.filter(isNaFila);
 
     setContatos(lista);
 
@@ -303,7 +303,7 @@ export default function Telemarketing() {
         indicador_tipo: r.indicador_tipo ?? null,
         lista_id: r.lista_id ?? null,
       }))
-      .filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
+      .filter(isNaFila);
     setContatos(lista);
   };
 
@@ -316,6 +316,9 @@ export default function Telemarketing() {
 
   const totalPendentes = filteredContatos.filter(
     (i) => !i.ligacao_status || i.ligacao_status === "pendente"
+  ).length;
+  const totalRetorno = filteredContatos.filter(
+    (i) => i.ligacao_status === "nao_atendeu" || i.ligacao_status === "reagendou"
   ).length;
   const totalLigados = filteredContatos.filter(
     (i) => i.ligacao_status && i.ligacao_status !== "pendente"
@@ -357,7 +360,7 @@ export default function Telemarketing() {
         indicador_tipo: r.indicador_tipo ?? null,
         lista_id: r.lista_id ?? null,
       }))
-      .filter(c => !c.ligacao_status || c.ligacao_status === "pendente");
+      .filter(isNaFila);
     setContatos(lista);
     if (preserveId) {
       const idx = lista.findIndex(c => c.id === preserveId.id && c.tabela === preserveId.tabela);
