@@ -2503,7 +2503,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <EnviarFluxoMenu pessoa={p as any} />
           <DropdownMenuSeparator />
           {([
-            { modo: "ambos" as const, label: "Baixar contrato + distrato (.docx)" },
+            { modo: "ambos" as const, label: "Baixar contrato + distrato (.zip)" },
             { modo: "contrato" as const, label: "Baixar somente contrato (.docx)" },
             { modo: "distrato" as const, label: "Baixar somente distrato (.docx)" },
           ]).map(opt => (
@@ -2513,11 +2513,16 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               title={semValor ? "Defina o valor em 'Pendentes de valor' para liberar o contrato" : opt.label}
               onClick={async () => {
                 try {
-                  await gerarContratoIndividual(p as any, p.client_id, opt.modo);
-                  toast.success("Documento(s) gerado(s)!");
+                  const r = await gerarContratoIndividual(p as any, p.client_id, opt.modo);
+                  if (r.faltando.length > 0) {
+                    toast.warning(`Modelo de ${r.faltando.join(" e ")} não encontrado para ${p.tipo}. Crie em "Modelos de contrato".`);
+                  } else {
+                    toast.success(r.gerados.length > 1 ? "Contrato e distrato baixados (.zip)!" : "Documento gerado!");
+                  }
                 } catch (e: any) { toast.error(e.message); }
               }}
             >
+
               <FileDown className="w-3.5 h-3.5 mr-2" />{opt.label}{semValor && <span className="ml-auto text-[10px] opacity-60">sem valor</span>}
             </DropdownMenuItem>
           ))}

@@ -424,18 +424,36 @@ export async function gerarContratoIndividual(
   pessoa: PessoaContratada,
   clientId: string,
   modo: DocModo = "ambos",
-): Promise<void> {
+): Promise<{ gerados: DocKind[]; faltando: DocKind[] }> {
   const { tplByTipo, contratante, parents, byId } = await fetchTemplatesAndContext(clientId);
   if (pessoa.is_voluntario) throw new Error(`${pessoa.nome} é voluntário(a) e não gera contrato de custo.`);
   const full = { ...(byId.get(pessoa.id) ?? {}), ...pessoa } as PessoaContratada;
   const kinds = kindsFor(modo);
-  let gerados = 0;
+
+  const feitos: { kind: DocKind; name: string; blob: Blob }[] = [];
+  const faltando: DocKind[] = [];
   for (const kind of kinds) {
     const tpl = tplByTipo.get(tipoToTemplateKey(full.tipo, kind));
-    if (!tpl) continue;
+    if (!tpl) { faltando.push(kind); continue; }
     const blob = await gerarContratoDocxBlob(tpl, full, contratante, parents);
-    downloadBlob(blob, fileNameFor(full, kind));
-    gerados++;
+    feitos.push({ kind, name: fileNameFor(full, kind), blob });
   }
-  if (gerados === 0) throw new Error(`Modelo não encontrado para ${full.tipo}. Crie o modelo em "Modelos de contrato".`);
+
+  if (feitos.length === 0) {
+    throw new Error(`Modelo não encontrado para ${full.tipo}. Crie o modelo em "Modelos de contrato".`);
+  }
+
+  if (feitos.length === 1) {
+    downloadBlob(feitos[0].blob, feitos[0].name);
+  } else {
+    // Navegadores bloqueiam múltiplos downloads seguidos: entrega os dois num único .zip
+    const zip = new JSZip();
+    for (const f of feitos) zip.file(f.name, f.blob);
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const safe = full.nome.replace(/[\\/:*?"<>|]/g, "-").trim();
+    downloadBlob(zipBlob, `${safe} — Contrato e Distrato.zip`);
+  }
+
+  return { gerados: feitos.map(f => f.kind), faltando };
 }
+
