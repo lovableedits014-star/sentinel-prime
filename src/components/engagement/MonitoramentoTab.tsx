@@ -201,9 +201,10 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
     const regra = regras.find((r) => r.id === missaoEdit?.regra_id);
     if (!missaoEdit || !regra) { setPreviaPublico(null); return; }
     let cancel = false;
-    contarPublicoDaRegra(clientId, regra)
-      .then((n) => { if (!cancel) setPreviaPublico(n); })
+    fetchPrevia(clientId, regra.id, regra.grupo_id)
+      .then((p) => { if (!cancel) setPreviaPublico(p); })
       .catch(() => { if (!cancel) setPreviaPublico(null); });
+
     return () => { cancel = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [missaoEdit?.regra_id, regras, clientId]);
