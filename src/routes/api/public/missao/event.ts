@@ -77,6 +77,7 @@ export const Route = createFileRoute("/api/public/missao/event")({
             p_user_agent: ua,
             p_device: detectDevice(ua),
             p_is_bot: detectBot(ua),
+            p_link_id: linkId || null,
           });
           if (error) return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
           const payload: any = data || {};
