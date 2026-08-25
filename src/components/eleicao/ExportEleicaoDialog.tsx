@@ -30,6 +30,8 @@ export interface ExportConfig {
   apenasAvulsos?: boolean;
   apenasReuniao?: boolean;
   apenasNaoReuniao?: boolean;
+  voluntarios?: "todos" | "apenas" | "excluir";
+
 }
 
 interface CoordOption { id: string; nome: string; regiao?: string | null }
