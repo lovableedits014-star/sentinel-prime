@@ -482,21 +482,24 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
 function DefinirValorPopover({
   pessoa,
   onSave,
+  onClear,
   suggestion,
 }: {
   pessoa: PessoaRow;
   onSave: (p: PessoaRow, valor: string) => Promise<boolean>;
+  onClear: (p: PessoaRow) => Promise<boolean>;
   suggestion: number;
 }) {
   const [open, setOpen] = useState(false);
   const [v, setV] = useState(String(suggestion || ""));
   const [saving, setSaving] = useState(false);
+  const jaTemValor = Number(pessoa.valor_contratacao || 0) > 0;
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setV(String(suggestion || "")); }}>
       <PopoverTrigger asChild>
         <Button size="sm" variant="outline" className="h-7 text-xs gap-1">
           <DollarSign className="w-3 h-3" />
-          Definir valor
+          {jaTemValor ? "Alterar valor" : "Definir valor"}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-56" align="end">
@@ -522,7 +525,24 @@ function DefinirValorPopover({
         >
           {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}Salvar
         </Button>
+        {jaTemValor && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="w-full mt-1 text-xs text-destructive"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              const ok = await onClear(pessoa);
+              setSaving(false);
+              if (ok) setOpen(false);
+            }}
+          >
+            Remover valor
+          </Button>
+        )}
       </PopoverContent>
     </Popover>
   );
 }
+
