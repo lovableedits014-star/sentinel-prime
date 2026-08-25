@@ -58,7 +58,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<Tipo | "all">("all");
   const [regiaoFilter, setRegiaoFilter] = useState<string>("all");
-  const [view, setView] = useState<"pendentes" | "voluntarios">("pendentes");
+  const [view, setView] = useState<"pendentes" | "definidos" | "voluntarios">("pendentes");
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkValor, setBulkValor] = useState("");
@@ -86,7 +86,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
       .from("eleicao_pessoas" as any)
       .select("id,client_id,nome,tipo,telefone,endereco,cidade,regiao,escopo,parent_id,valor_contratacao,is_voluntario,voluntario_obs")
       .eq("client_id", clientId)
-      .or("valor_contratacao.is.null,valor_contratacao.eq.0")
+
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro: " + error.message);
     else setRows((data as any) || []);
@@ -96,9 +96,11 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
 
-  const pendentes = useMemo(() => rows.filter(r => !r.is_voluntario), [rows]);
+  const pendentes = useMemo(() => rows.filter(r => !r.is_voluntario && (!r.valor_contratacao || r.valor_contratacao <= 0)), [rows]);
+  const definidos = useMemo(() => rows.filter(r => !r.is_voluntario && (r.valor_contratacao || 0) > 0), [rows]);
   const voluntarios = useMemo(() => rows.filter(r => r.is_voluntario), [rows]);
-  const base = view === "pendentes" ? pendentes : voluntarios;
+  const base = view === "pendentes" ? pendentes : view === "definidos" ? definidos : voluntarios;
+
 
   const regiaoOptions = useMemo(() => {
     const map = new Map<string, { key: string; label: string; total: number }>();
@@ -210,6 +212,19 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
     return true;
   }
 
+  async function limparValor(p: PessoaRow) {
+    const { error } = await supabase
+      .from("eleicao_pessoas" as any)
+      .update({ valor_contratacao: 0 })
+      .eq("id", p.id);
+    if (error) { toast.error(error.message); return false; }
+    toast.success(`Valor removido — ${p.nome} voltou para pendentes`);
+    onChanged?.();
+    load();
+    return true;
+
+  }
+
   async function gerarContrato(p: PessoaRow) {
     if (!p.valor_contratacao || p.valor_contratacao <= 0) {
       toast.error("Defina o valor antes de gerar o contrato.");
@@ -240,10 +255,10 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           <div>
             <h3 className="font-semibold flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600" />
-              Cadastros pendentes de valor
+              Valores de contrato
             </h3>
             <p className="text-xs text-muted-foreground">
-              Pessoas cadastradas pelos coordenadores que ainda não têm valor de contrato definido.
+              Defina os valores pendentes, altere valores já definidos ou marque voluntários (sem custo).
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -266,6 +281,14 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           </Button>
           <Button
             size="sm"
+            variant={view === "definidos" ? "default" : "outline"}
+            className="h-7 text-xs"
+            onClick={() => { setView("definidos"); setSelected(new Set()); }}
+          >
+            <DollarSign className="w-3 h-3 mr-1" /> Com valor ({definidos.length})
+          </Button>
+          <Button
+            size="sm"
             variant={view === "voluntarios" ? "default" : "outline"}
             className="h-7 text-xs"
             onClick={() => { setView("voluntarios"); setSelected(new Set()); }}
@@ -273,6 +296,8 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
             <Heart className="w-3 h-3 mr-1" /> Voluntários ({voluntarios.length})
           </Button>
         </div>
+
+
 
 
         {/* Presets editáveis */}
