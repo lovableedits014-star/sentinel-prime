@@ -17,10 +17,12 @@ import {
   AlertTriangle,
   UserCog,
   ClipboardCheck,
+  Gauge,
 } from "lucide-react";
 import InfluenciadoresTab from "@/components/engagement/InfluenciadoresTab";
 import PerfisTimeTab from "@/components/engagement/PerfisTimeTab";
 import CobrancaTimeTab from "@/components/engagement/CobrancaTimeTab";
+import MonitoramentoTab from "@/components/engagement/MonitoramentoTab";
 
 
 type EngagementConfig = {
@@ -114,6 +116,10 @@ export default function Engagement() {
             <ClipboardCheck className="h-4 w-4" />
             Cobrança do Time
           </TabsTrigger>
+          <TabsTrigger value="monitoramento" className="text-xs sm:text-sm gap-1.5">
+            <Gauge className="h-4 w-4" />
+            Monitoramento
+          </TabsTrigger>
           <TabsTrigger value="config" className="text-xs sm:text-sm gap-1.5">
             <Settings className="h-4 w-4" />
             Config
@@ -160,6 +166,18 @@ export default function Engagement() {
 
 
 
+
+        <TabsContent value="monitoramento">
+          {client?.id ? (
+            <MonitoramentoTab clientId={client.id} clientName={client.name || undefined} />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Nenhum cliente vinculado a este usuário.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
         <TabsContent value="config">
           <Card>
