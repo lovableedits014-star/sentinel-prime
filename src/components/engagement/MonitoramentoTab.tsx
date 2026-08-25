@@ -660,11 +660,20 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
               <Input value={missaoEdit?.post_id_instagram || ""} onChange={(e) => setMissaoEdit(missaoEdit ? { ...missaoEdit, post_id_instagram: e.target.value || null } : null)} />
             </div>
             {previaPublico !== null && (
-              <p className="text-xs rounded-md border bg-muted/40 p-2">
-                <strong>{previaPublico}</strong> pessoa(s) serão cobradas por esta publicação, conforme a regra
-                selecionada. Confira as pendências de cadastro em “Público monitorado → Faltam dados”.
-              </p>
+              <div className="text-xs rounded-md border bg-muted/40 p-2 space-y-1">
+                <p>
+                  <strong>{previaPublico.total}</strong> pessoa(s) no público desta regra —{" "}
+                  <strong className="text-emerald-600">{previaPublico.prontas}</strong> serão cobradas.
+                </p>
+                {previaPublico.sem_dados > 0 && (
+                  <p className="text-destructive">
+                    {previaPublico.sem_dados} ficam de fora por falta de cadastro ({previaPublico.sem_rede} sem rede
+                    social, {previaPublico.sem_telefone} sem telefone). Resolva em “Público monitorado → Faltam dados”.
+                  </p>
+                )}
+              </div>
             )}
+
             <p className="text-[11px] text-muted-foreground flex gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
               Sem o ID do post, o cumprimento por comentário não pode ser comprovado — restam o clique no link
