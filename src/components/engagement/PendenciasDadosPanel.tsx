@@ -52,6 +52,7 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
 
   const totals = useMemo(() => ({
     total: rows.length,
+    prontas: rows.filter((r) => r.pronta_para_cobranca).length,
     semIg: rows.filter((r) => r.sem_instagram).length,
     semFb: rows.filter((r) => r.sem_facebook).length,
     semTel: rows.filter((r) => r.sem_telefone).length,
@@ -63,12 +64,14 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
     return rows.filter((r) => {
       if (term && !(r.nome || "").toLowerCase().includes(term) && !(r.telefone || "").includes(term)) return false;
       if (filtro === "pendentes" && !(r.sem_instagram || r.sem_facebook || r.sem_telefone)) return false;
+      if (filtro === "bloqueadas" && r.pronta_para_cobranca) return false;
       if (filtro === "sem_prova" && !r.sem_prova) return false;
       if (filtro === "sem_telefone" && !r.sem_telefone) return false;
       if (filtro === "sem_rede" && !(r.sem_instagram && r.sem_facebook)) return false;
       return true;
     });
   }, [rows, busca, filtro]);
+
 
   const key = (r: PendenciaRow) => `${r.origem}:${r.ref_id}`;
   const setEdit = (r: PendenciaRow, patch: { ig?: string; fb?: string; tel?: string }) =>
