@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Loader2, MessageCircle, UserPlus } from "lucide-react";
+import { AlertTriangle, Loader2, MessageCircle, UserPlus, Eye, Copy } from "lucide-react";
 import { fmtPhoneBR, toWhatsAppBR } from "@/lib/phone-utils";
 import { toast } from "sonner";
 
