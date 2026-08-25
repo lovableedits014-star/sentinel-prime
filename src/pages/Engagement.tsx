@@ -39,7 +39,11 @@ type EngagementConfig = {
   inactivity_days: number;
 };
 
-export default function Engagement() {
+type EngagementProps = {
+  initialTab?: "publico" | "checkin" | "influenciadores" | "time" | "cobranca" | "monitoramento" | "config";
+};
+
+export default function Engagement({ initialTab = "publico" }: EngagementProps) {
   const [configForm, setConfigForm] = useState<Partial<EngagementConfig>>({});
 
   const { data: client } = useQuery({
@@ -106,7 +110,7 @@ export default function Engagement() {
         </p>
       </div>
 
-      <Tabs defaultValue="publico" className="space-y-4">
+      <Tabs defaultValue={initialTab} className="space-y-4">
         <TabsList className="w-full sm:w-auto flex-wrap h-auto">
           <TabsTrigger value="publico" className="text-xs sm:text-sm gap-1.5">
             <Users className="h-4 w-4" />

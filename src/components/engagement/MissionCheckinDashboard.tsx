@@ -95,7 +95,8 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (somenteFaltantes && r.status === "cumpriu") return false;
-      if (statusFiltro !== "todos" && r.status !== statusFiltro) return false;
+      if (statusFiltro === "entrou" && r.status === "nao_abriu") return false;
+      if (statusFiltro !== "todos" && statusFiltro !== "entrou" && r.status !== statusFiltro) return false;
       if (obrigacaoFiltro === "voluntarios" && !r.is_voluntario) return false;
       if (obrigacaoFiltro === "contrato" && !r.tem_contrato) return false;
       if (cadastroFiltro === "com" && r.tem_cadastro === false) return false;
@@ -111,16 +112,16 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
   }, [rows, somenteFaltantes, statusFiltro, obrigacaoFiltro, cadastroFiltro, cargoFiltro, regiaoFiltro, search]);
 
   const kpis = useMemo(() => {
-    const total = rows.length;
-    const cumpriu = rows.filter((r) => r.status === "cumpriu").length;
-    const abriu = rows.filter((r) => r.status === "abriu").length;
+    const total = filtered.length;
+    const cumpriu = filtered.filter((r) => r.status === "cumpriu").length;
+    const abriu = filtered.filter((r) => r.status === "abriu").length;
     const naoAbriu = total - cumpriu - abriu;
     return { total, cumpriu, abriu, naoAbriu, adesao: total ? Math.round((cumpriu / total) * 100) : 0 };
-  }, [rows]);
+  }, [filtered]);
 
   const ranking = useMemo(() => {
     const map = new Map<string, { nome: string; total: number; cumpriu: number }>();
-    for (const r of rows) {
+    for (const r of filtered) {
       const key = r.regiao || "Sem região";
       const cur = map.get(key) || { nome: key, total: 0, cumpriu: 0 };
       cur.total += 1;
@@ -130,7 +131,7 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
     return Array.from(map.values())
       .map((g) => ({ ...g, pct: g.total ? Math.round((g.cumpriu / g.total) * 100) : 0 }))
       .sort((a, b) => b.pct - a.pct || b.total - a.total);
-  }, [rows]);
+  }, [filtered]);
 
   const cobrar = (r: Row) => {
     const phone = toWhatsAppBR(r.telefone);
@@ -290,6 +291,7 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
               <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os status</SelectItem>
+                <SelectItem value="entrou">Entrou no link</SelectItem>
                 <SelectItem value="cumpriu">Entrou e concluiu</SelectItem>
                 <SelectItem value="abriu">Entrou e não concluiu</SelectItem>
                 <SelectItem value="nao_abriu">Não entrou no link</SelectItem>

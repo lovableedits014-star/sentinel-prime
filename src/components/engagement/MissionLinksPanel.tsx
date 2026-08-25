@@ -46,7 +46,7 @@ export default function MissionLinksPanel({ clientId, missionId, missionTitle }:
   const base = useMemo(() => resolvePublicBaseUrl(client), [client]);
 
   const { data: dists = [], isLoading } = useQuery<Dist[]>({
-    queryKey: ["mission-links", missionId],
+    queryKey: ["mission-distributions", missionId],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("mission_distributions")
@@ -72,7 +72,7 @@ export default function MissionLinksPanel({ clientId, missionId, missionTitle }:
     onSuccess: (res) => {
       toast.success(res.reused ? "Link já existia — reutilizado" : "Link gerado");
       setGroupName("");
-      qc.invalidateQueries({ queryKey: ["mission-links", missionId] });
+      qc.invalidateQueries({ queryKey: ["mission-distributions", missionId] });
     },
     onError: (e: any) => toast.error(e?.message || "Não foi possível gerar o link"),
   });

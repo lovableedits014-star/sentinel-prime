@@ -113,14 +113,16 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
     const linkFb = fb?.post_permalink_url || null;
     const linkIg = ig?.post_permalink_url || null;
     const manual = manualUrl.trim();
+    let linksToCreate = [...extraLinks];
     let extraFb = linkFb, extraIg = linkIg;
     if (manual) {
+      if (!isValidHttpUrl(manual)) { toast.error("Informe um endereço começando com https://"); return; }
       const det = parsePlatformFromUrl(manual);
-      if (!det) { toast.error("Link colado não reconhecido (use link do Facebook ou Instagram)"); return; }
       if (det === "facebook" && !extraFb) extraFb = manual;
       if (det === "instagram" && !extraIg) extraIg = manual;
+      if (!det) linksToCreate = [{ label: titulo.trim() || "Abrir link", url: manual }, ...linksToCreate];
     }
-    if (!extraFb && !extraIg && extraLinks.length === 0) {
+    if (!extraFb && !extraIg && linksToCreate.length === 0) {
       toast.error("Escolha uma publicação, cole o link do post ou adicione ao menos um link externo");
       return;
     }
@@ -137,7 +139,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         .insert({
           client_id: clientId,
           platform,
-          post_url: extraFb || extraIg || extraLinks[0]?.url || null,
+          post_url: extraFb || extraIg || linksToCreate[0]?.url || null,
           title: autoTitle,
           description: null,
           display_order: 0,
@@ -151,9 +153,9 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         .select("id")
         .single();
       if (error) throw error;
-      if (extraLinks.length > 0) {
+      if (linksToCreate.length > 0) {
         const { error: linkErr } = await (supabase as any).from("portal_mission_links").insert(
-          extraLinks.map((l, i) => ({
+          linksToCreate.map((l, i) => ({
             mission_id: data.id,
             client_id: clientId,
             label: l.label,
@@ -222,14 +224,14 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5"><Plus className="h-4 w-4" /> Nova missão de uma publicação</Button>
+        <Button size="sm" className="gap-1.5"><Plus className="h-4 w-4" /> Nova missão rastreada</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Escolher a publicação da missão</DialogTitle>
+          <DialogTitle>Nova missão rastreada</DialogTitle>
           <DialogDescription>
-            Selecione o post do Facebook e/ou do Instagram que as pessoas devem curtir e compartilhar. A
-            missão já nasce com rastreamento ligado — depois basta gerar o link e jogar no grupo.
+            Selecione uma publicação do Facebook/Instagram ou cadastre links externos. Depois basta gerar
+            o link de envio e jogar no grupo.
           </DialogDescription>
         </DialogHeader>
 
@@ -273,7 +275,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
             <Label className="text-xs font-medium">Links da missão (opcional, quantos quiser)</Label>
             <p className="text-[11px] text-muted-foreground">
               Qualquer link externo — site, notícia, YouTube, TikTok, formulário. Dá para criar a missão só com
-              links, sem publicação da Meta.
+              links, sem publicação da Meta. Se preferir, cole um link externo direto no campo acima.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
@@ -314,7 +316,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
           <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
           <Button onClick={criar} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Criar e gerar link
+            Criar missão rastreada
           </Button>
         </DialogFooter>
       </DialogContent>

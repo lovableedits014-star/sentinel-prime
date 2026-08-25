@@ -148,6 +148,7 @@ const RoutesWithBoundary = () => {
               <Route path="/comments" element={<Comments />} />
               <Route path="/militancia" element={<Militancia />} />
               <Route path="/engagement" element={<Engagement />} />
+              <Route path="/missoes-checkin" element={<Engagement initialTab="checkin" />} />
               <Route path="/inteligencia-conteudo" element={<InteligenciaConteudo />} />
               <Route path="/whatsapp" element={<CentralWhatsApp />} />
               <Route path="/disparos" element={<Navigate to="/whatsapp?tab=disparos" replace />} />
