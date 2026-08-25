@@ -195,6 +195,7 @@ interface Pessoa {
   confirmado_em?: string | null;
   participou_reuniao?: boolean;
   reuniao_em?: string | null;
+  is_voluntario?: boolean;
   // pre_selecionado depreciado, mantido no tipo apenas para compatibilidade de leitura se necessário
   pre_selecionado?: boolean;
   created_at: string;
@@ -747,14 +748,15 @@ export default function Eleicao() {
 
   const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos" | "pendente" | "em_negociacao" | "confirmado" | "reuniao">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos" | "voluntarios" | "pendente" | "em_negociacao" | "confirmado" | "reuniao">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
   const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
 
   const matchesStatus = (p: Pessoa) => {
     if (statusFilter === "sem_valor") return !p.valor_contratacao || p.valor_contratacao === 0;
     if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
-    if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id;
+    if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id && !p.is_voluntario;
+    if (statusFilter === "voluntarios") return !!p.is_voluntario;
     if (statusFilter === "pendente") return p.status_contratacao === "pendente" || !p.status_contratacao;
     if (statusFilter === "em_negociacao") return p.status_contratacao === "em_negociacao";
     if (statusFilter === "confirmado") return p.status_contratacao === "confirmado";
@@ -1284,9 +1286,10 @@ export default function Eleicao() {
               <SelectContent>
                 <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="sem_valor">⚠ Sem valor</SelectItem>
-                <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
-                <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
-                <SelectItem value="pendente">⏳ Status: Pendente</SelectItem>
+                  <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
+                  <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
+                  <SelectItem value="voluntarios">❤️ Voluntários</SelectItem>
+                  <SelectItem value="pendente">⏳ Status: Pendente</SelectItem>
                 <SelectItem value="em_negociacao">🤝 Status: Em Negociação</SelectItem>
                 <SelectItem value="confirmado">✅ Status: Confirmado</SelectItem>
                 <SelectItem value="reuniao">👥 Participou da Reunião</SelectItem>
@@ -1338,7 +1341,7 @@ export default function Eleicao() {
               Todas <span className="opacity-70 ml-1">{search ? matchedIds.size : escopoList.length}</span>
             </button>
             {(() => {
-              const avulsosCount = pessoas.filter(p => p.escopo === escopo && p.tipo === "lider" && !p.parent_id && (!search || matchedIds.has(p.id))).length;
+              const avulsosCount = pessoas.filter(p => p.escopo === escopo && p.tipo === "lider" && !p.parent_id && !p.is_voluntario && (!search || matchedIds.has(p.id))).length;
               const active = statusFilter === "avulsos";
               return (
                 <button
@@ -1350,6 +1353,22 @@ export default function Eleicao() {
                   )}
                 >
                   ⚡ Avulsos <span className="opacity-70 ml-1">{avulsosCount}</span>
+                </button>
+              );
+            })()}
+            {(() => {
+              const voluntariosCount = pessoas.filter(p => p.escopo === escopo && !!p.is_voluntario && (!search || matchedIds.has(p.id))).length;
+              const active = statusFilter === "voluntarios";
+              return (
+                <button
+                  onClick={() => { setStatusFilter(active ? "todos" : "voluntarios"); setRegiaoFilter("all"); }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
+                    active ? "bg-emerald-500 text-white border-emerald-500" : "bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300",
+                    voluntariosCount === 0 && !active && "opacity-50"
+                  )}
+                >
+                  ❤️ Voluntários <span className="opacity-70 ml-1">{voluntariosCount}</span>
                 </button>
               );
             })()}
