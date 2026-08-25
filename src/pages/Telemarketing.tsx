@@ -1056,15 +1056,6 @@ export default function Telemarketing() {
 
                   </Button>
                   <Button
-                    variant={ligacaoStatus === "recusou" ? "destructive" : "outline"}
-                    size="sm"
-                    onClick={() => setLigacaoStatus("recusou")}
-                    className="text-xs"
-                  >
-                    <XCircle className="w-3.5 h-3.5 mr-1" />
-                    Recusou
-                  </Button>
-                  <Button
                     variant={ligacaoStatus === "reagendou" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setLigacaoStatus("reagendou")}
