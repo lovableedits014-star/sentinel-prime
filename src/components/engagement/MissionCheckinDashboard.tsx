@@ -445,6 +445,15 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
         </CardContent>
       </Card>
 
+      <MissionCheckinCharts clientId={clientId} missionId={missionId} rows={filtered} />
+
+      <MissionCheckinAlerts
+        clientId={clientId}
+        missionId={missionId}
+        missionTitle={missionTitle}
+        missionLink={missionLink}
+      />
+
       <MissionPessoaHistorico
         clientId={clientId}
         pessoa={historicoPessoa}
