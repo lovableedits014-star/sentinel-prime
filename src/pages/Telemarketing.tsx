@@ -470,6 +470,11 @@ export default function Telemarketing() {
   }, [loggedIn, clientId]);
 
 
+  // "Não quis opinar" no estadual encerra o fluxo: não pergunta os demais cargos.
+  const perguntarDemaisCargos =
+    ligacaoStatus === "atendeu" &&
+    (votaCandidato === "sim" || votaCandidato === "nao" || votaCandidato === "indeciso");
+
   const handleSave = async () => {
     if (!ligacaoStatus) {
       toast.error("Selecione o resultado da ligação");
