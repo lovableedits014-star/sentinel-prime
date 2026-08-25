@@ -195,6 +195,7 @@ interface Pessoa {
   confirmado_em?: string | null;
   participou_reuniao?: boolean;
   reuniao_em?: string | null;
+  is_voluntario?: boolean;
   // pre_selecionado depreciado, mantido no tipo apenas para compatibilidade de leitura se necessário
   pre_selecionado?: boolean;
   created_at: string;
