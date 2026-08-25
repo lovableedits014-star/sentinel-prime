@@ -86,7 +86,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
       .from("eleicao_pessoas" as any)
       .select("id,client_id,nome,tipo,telefone,endereco,cidade,regiao,escopo,parent_id,valor_contratacao,is_voluntario,voluntario_obs")
       .eq("client_id", clientId)
-      .or("valor_contratacao.is.null,valor_contratacao.eq.0")
+
       .order("created_at", { ascending: false });
     if (error) toast.error("Erro: " + error.message);
     else setRows((data as any) || []);
