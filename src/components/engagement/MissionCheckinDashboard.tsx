@@ -235,7 +235,7 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
         </Card>
         <Card className="border-amber-500/30">
           <CardContent className="p-4">
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Eye className="h-3.5 w-3.5 text-amber-600" /> Abriram e não concluíram</p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Eye className="h-3.5 w-3.5 text-amber-600" /> Abriram sem confirmar</p>
             <p className="text-2xl font-bold text-amber-600">{kpis.abriu}</p>
           </CardContent>
         </Card>
@@ -261,7 +261,17 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
         missionId={missionId}
         missionTitle={missionTitle}
         missionLink={missionLink}
+        abertosSemConfirmar={filtered
+          .filter((r) => r.status === "abriu")
+          .map((r) => ({
+            pessoa_id: r.pessoa_id,
+            nome: r.nome,
+            telefone: r.telefone,
+            cargo: r.cargo ? CARGO_LABEL[r.cargo] || r.cargo : null,
+            regiao: r.regiao,
+          }))}
       />
+
 
       <Card>
         <CardHeader className="pb-3">

@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Loader2, MessageCircle, UserPlus } from "lucide-react";
+import { AlertTriangle, Loader2, MessageCircle, UserPlus, Eye, Copy } from "lucide-react";
 import { fmtPhoneBR, toWhatsAppBR } from "@/lib/phone-utils";
 import { toast } from "sonner";
 
@@ -25,16 +25,26 @@ type NaoIdentificado = {
   grupo: string | null;
 };
 
+type AbertoSemConfirmar = {
+  pessoa_id: string;
+  nome: string;
+  telefone: string | null;
+  cargo: string | null;
+  regiao: string | null;
+};
+
 export default function MissionCheckinAlerts({
   clientId,
   missionId,
   missionTitle,
   missionLink,
+  abertosSemConfirmar = [],
 }: {
   clientId: string;
   missionId: string;
   missionTitle: string | null;
   missionLink: string | null;
+  abertosSemConfirmar?: AbertoSemConfirmar[];
 }) {
   const { data: reincidentes = [], isLoading: loadingR } = useQuery<Reincidente[]>({
     queryKey: ["mission-checkin-reincidentes", clientId],
@@ -83,8 +93,88 @@ export default function MissionCheckinAlerts({
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
   };
 
+  const cobrarConfirmacao = (nome: string, telefone: string | null) => {
+    const phone = toWhatsAppBR(telefone);
+    if (!phone) {
+      toast.error("Telefone inválido ou ausente neste cadastro");
+      return;
+    }
+    const texto = [
+      `Olá ${nome.split(" ")[0]}, tudo bem?`,
+      "",
+      `Vi que você abriu o link da missão${missionTitle ? ` "${missionTitle}"` : ""}, mas falta só clicar em "Confirmar que cumpri" para sua participação contar.`,
+      missionLink ? `Link: ${missionLink}` : "",
+      "",
+      "Obrigado!",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(texto)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const copiarTelefones = async () => {
+    const nums = abertosSemConfirmar
+      .map((r) => fmtPhoneBR(r.telefone))
+      .filter(Boolean)
+      .join("\n");
+    if (!nums) return toast.error("Nenhum telefone disponível");
+    try {
+      await navigator.clipboard.writeText(nums);
+      toast.success("Telefones copiados");
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
+  };
+
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
+    <div className="space-y-3">
+      <Card className="border-amber-500/50">
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Eye className="h-4 w-4 text-amber-600" /> Abriram e não confirmaram
+                <Badge variant="outline" className="ml-1 text-[10px]">{abertosSemConfirmar.length}</Badge>
+              </CardTitle>
+              <CardDescription>
+                Entraram no link mas não clicaram em “Confirmar que cumpri”. Um empurrãozinho resolve.
+              </CardDescription>
+            </div>
+            {abertosSemConfirmar.length > 0 && (
+              <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={copiarTelefones}>
+                <Copy className="h-3.5 w-3.5" /> Copiar telefones
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {abertosSemConfirmar.length === 0 ? (
+            <p className="py-3 text-sm text-muted-foreground">
+              Ninguém pendente de confirmação nesta missão.
+            </p>
+          ) : (
+            <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              {abertosSemConfirmar.map((r) => (
+                <div key={r.pessoa_id} className="flex items-center gap-2 rounded-md border p-2 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{r.nome}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[r.cargo, r.regiao, fmtPhoneBR(r.telefone)].filter(Boolean).join(" · ") || "—"}
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" className="h-7 shrink-0 gap-1 px-2 text-xs"
+                    onClick={() => cobrarConfirmacao(r.nome, r.telefone)}>
+                    <MessageCircle className="h-3.5 w-3.5" /> Lembrar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+
       <Card className="border-destructive/40">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -160,6 +250,8 @@ export default function MissionCheckinAlerts({
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
+

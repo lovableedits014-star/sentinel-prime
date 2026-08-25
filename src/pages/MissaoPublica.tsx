@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck } from "lucide-react";
+import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
 type Participant = {
@@ -17,6 +17,7 @@ type Participant = {
   regiao?: string | null;
   reconhecido?: boolean;
   obrigado?: boolean;
+  telefone_mascarado?: string | null;
   concluido_em?: string | null;
 };
 
@@ -86,7 +87,39 @@ export default function MissaoPublica() {
   const [declaring, setDeclaring] = useState(false);
   const [declared, setDeclared] = useState(false);
   const [justRecognized, setJustRecognized] = useState(false);
+  const [clickedLinks, setClickedLinks] = useState<Set<string>>(new Set());
+  const [backReminder, setBackReminder] = useState(false);
   const codeInvalid = code === "invalid";
+
+  const clickedKey = missionId ? `sm_missao_clicks_${missionId}` : "";
+  const doneKey = missionId ? `sm_missao_done_${missionId}` : "";
+
+  // Restaura, no aparelho, o que a pessoa já clicou/confirmou nesta missão.
+  useEffect(() => {
+    if (!missionId) return;
+    try {
+      const raw = localStorage.getItem(`sm_missao_clicks_${missionId}`);
+      if (raw) setClickedLinks(new Set(JSON.parse(raw) as string[]));
+      if (localStorage.getItem(`sm_missao_done_${missionId}`) === "1") setDeclared(true);
+    } catch {
+      // ignora storage indisponível
+    }
+  }, [missionId]);
+
+  // Quando a pessoa volta do Facebook/Instagram, lembramos de confirmar.
+  useEffect(() => {
+    if (declared || clickedLinks.size === 0) return;
+    const onBack = () => {
+      if (document.visibilityState === "visible") setBackReminder(true);
+    };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => {
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+    };
+  }, [declared, clickedLinks.size]);
+
 
   useEffect(() => {
     document.title = "Missão da Campanha";
@@ -234,12 +267,20 @@ export default function MissaoPublica() {
       // silencioso
     }
     if (clientId) localStorage.removeItem(clientTokenKey(clientId));
+    try {
+      if (clickedKey) localStorage.removeItem(clickedKey);
+      if (doneKey) localStorage.removeItem(doneKey);
+    } catch {
+      // ignora
+    }
     setToken("");
     setConfig((prev) => (prev ? { ...prev, participant: null } : prev));
     setNome("");
     setPhone("");
     setDeclared(false);
     setJustRecognized(false);
+    setClickedLinks(new Set());
+    setBackReminder(false);
   };
 
   const handleExternal = async (
@@ -247,6 +288,17 @@ export default function MissaoPublica() {
     type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link",
     linkId?: string,
   ) => {
+    const key = linkId || type;
+    setClickedLinks((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      try {
+        if (clickedKey) localStorage.setItem(clickedKey, JSON.stringify([...next]));
+      } catch {
+        // ignora
+      }
+      return next;
+    });
     await registerEvent(type, linkId);
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -255,9 +307,16 @@ export default function MissaoPublica() {
     setDeclaring(true);
     await registerEvent("declared_done");
     setDeclared(true);
+    setBackReminder(false);
+    try {
+      if (doneKey) localStorage.setItem(doneKey, "1");
+    } catch {
+      // ignora
+    }
     setDeclaring(false);
-    toast.success("Missão marcada como concluída — valeu!");
+    toast.success("Participação confirmada — obrigado!");
   };
+
 
   if (loading) {
     return (
@@ -292,9 +351,24 @@ export default function MissaoPublica() {
   const linkAv = m.link_avulso || null;
   const extraLinks = config.links || [];
   const cargoLabel = p?.cargo ? CARGO_LABEL[p.cargo] || p.cargo : null;
+  const anyClicked = clickedLinks.size > 0;
+  const showStickyBar = !!p && !declared && anyClicked;
+  const isClicked = (key: string) => clickedLinks.has(key);
+
+  const linkBtnClass = (key: string) =>
+    `w-full justify-start gap-2 ${isClicked(key) ? "border-emerald-500/60 bg-emerald-500/5" : ""}`;
+
+  const ClickedMark = ({ k }: { k: string }) =>
+    isClicked(k) ? (
+      <CheckCircle2 className="w-4 h-4 ml-auto shrink-0 text-emerald-600" />
+    ) : (
+      <ExternalLink className="w-3 h-3 ml-auto opacity-60 shrink-0" />
+    );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-8 px-4">
+    <div
+      className={`min-h-screen bg-gradient-to-b from-background to-muted/30 py-8 px-4 ${showStickyBar ? "pb-36" : ""}`}
+    >
       <div className="max-w-md mx-auto space-y-4">
         {config.client_name && (
           <p className="text-center text-xs text-muted-foreground uppercase tracking-wide">
@@ -311,36 +385,48 @@ export default function MissaoPublica() {
           </CardHeader>
           <CardContent className="space-y-4">
             {!p ? (
-              <form onSubmit={handleIdentify} className="space-y-3">
+              <form onSubmit={handleIdentify} className="space-y-3" autoComplete="off">
                 <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground flex gap-2">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    Só desta primeira vez: informe seu nome e WhatsApp. Nas próximas missões você entra
-                    direto, sem preencher nada.
+                    Só desta primeira vez: informe seu nome e <strong>seu</strong> WhatsApp. Nas próximas
+                    missões você entra direto, sem preencher nada.
                   </span>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="nome">Nome completo</Label>
-                  <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={100} required />
+                  <Label htmlFor="missao-nome">Nome completo</Label>
+                  <Input
+                    id="missao-nome"
+                    name="missao-nome-participante"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                    maxLength={100}
+                    autoComplete="off"
+                    required
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone">WhatsApp</Label>
+                  <Label htmlFor="missao-whats">Seu WhatsApp</Label>
                   <Input
-                    id="phone"
+                    id="missao-whats"
+                    name="missao-whats-participante"
                     type="tel"
                     inputMode="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="(67) 99123-4567"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                   />
-                  {phone.trim() !== "" && (
-                    <p className="text-[11px] text-muted-foreground">
-                      {toWhatsAppBR(phone)
+                  <p className="text-[11px] text-muted-foreground">
+                    {phone.trim() === ""
+                      ? "Confira se o número é o seu — o campo começa sempre vazio."
+                      : toWhatsAppBR(phone)
                         ? `Vamos usar ${fmtPhoneBR(toWhatsAppBR(phone))}`
                         : "Digite DDD + número"}
-                    </p>
-                  )}
+                  </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={identifying}>
                   {identifying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -360,6 +446,11 @@ export default function MissaoPublica() {
                       <p className="text-sm">
                         Olá, <strong>{p.nome}</strong>.
                       </p>
+                      {p.telefone_mascarado && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          WhatsApp deste cadastro: <strong>{p.telefone_mascarado}</strong>
+                        </p>
+                      )}
                       {p.reconhecido ? (
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           {cargoLabel && <Badge variant="secondary" className="text-[10px]">{cargoLabel}</Badge>}
@@ -375,14 +466,16 @@ export default function MissaoPublica() {
                       )}
                     </div>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={handleSwitch}
-                    className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                    className="w-full gap-1.5 text-xs"
                   >
-                    <UserCog className="w-3 h-3" />
-                    Não é você? Trocar participante
-                  </button>
+                    <UserCog className="w-3.5 h-3.5" />
+                    Não sou eu — quero me identificar
+                  </Button>
                 </div>
 
                 {m.instructions && (
@@ -390,44 +483,50 @@ export default function MissaoPublica() {
                 )}
 
                 <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                      1
+                    </span>
+                    <p className="text-sm font-medium">Abra a publicação e interaja</p>
+                  </div>
                   {linkFb && (
                     <Button
                       variant="outline"
-                      className="w-full justify-start gap-2"
+                      className={linkBtnClass("click_facebook")}
                       onClick={() => handleExternal(linkFb, "click_facebook")}
                     >
                       <FacebookIcon className="w-4 h-4 text-blue-600" />
                       Abrir no Facebook
-                      <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
+                      <ClickedMark k="click_facebook" />
                     </Button>
                   )}
                   {linkIg && (
                     <Button
                       variant="outline"
-                      className="w-full justify-start gap-2"
+                      className={linkBtnClass("click_instagram")}
                       onClick={() => handleExternal(linkIg, "click_instagram")}
                     >
                       <InstagramIcon className="w-4 h-4 text-pink-500" />
                       Abrir no Instagram
-                      <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
+                      <ClickedMark k="click_instagram" />
                     </Button>
                   )}
                   {linkAv && (
                     <Button
                       variant="outline"
-                      className="w-full justify-start gap-2"
+                      className={linkBtnClass("click_avulso")}
                       onClick={() => handleExternal(linkAv, "click_avulso")}
                     >
                       <ExternalLink className="w-4 h-4" />
                       Abrir link
-                      <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
+                      <ClickedMark k="click_avulso" />
                     </Button>
                   )}
                   {extraLinks.map((l) => (
                     <Button
                       key={l.id}
                       variant="outline"
-                      className="w-full justify-start gap-2"
+                      className={linkBtnClass(l.id)}
                       onClick={() => handleExternal(l.url, "click_link", l.id)}
                     >
                       {l.kind === "facebook" ? (
@@ -438,31 +537,60 @@ export default function MissaoPublica() {
                         <ExternalLink className="w-4 h-4" />
                       )}
                       <span className="truncate">{l.label}</span>
-                      <ExternalLink className="w-3 h-3 ml-auto opacity-60 shrink-0" />
+                      <ClickedMark k={l.id} />
                     </Button>
                   ))}
                 </div>
 
-                <Button
-                  className="w-full gap-2"
-                  onClick={handleDeclare}
-                  disabled={declaring || declared}
-                >
-                  {declaring ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  {declared ? "Missão concluída — obrigado!" : "Já realizei esta missão"}
-                </Button>
+                {!declared && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/15 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                        2
+                      </span>
+                      <p className="text-sm font-medium">Confirme que você cumpriu</p>
+                    </div>
+
+                    {backReminder && (
+                      <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-xs flex gap-2 animate-pulse">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>
+                          <strong>Falta só confirmar!</strong> Toque no botão verde abaixo para sua
+                          participação ser registrada.
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-muted-foreground">
+                      Sua participação <strong>só conta depois de confirmar</strong> aqui. Abrir o link
+                      não é suficiente.
+                    </div>
+
+                    <Button
+                      className={`w-full gap-2 h-14 text-base bg-emerald-600 hover:bg-emerald-700 text-white ${anyClicked ? "animate-pulse" : ""}`}
+                      onClick={handleDeclare}
+                      disabled={declaring}
+                    >
+                      {declaring ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-5 h-5" />
+                      )}
+                      Confirmar que cumpri
+                    </Button>
+                  </div>
+                )}
 
                 {declared && (
-                  <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs flex gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>
-                      Sua participação foi registrada no nome de <strong>{p.nome}</strong>. Pode fechar
-                      esta página — na próxima missão você entra direto.
-                    </span>
+                  <div className="rounded-xl border-2 border-emerald-500/50 bg-emerald-500/10 p-4 text-center space-y-1">
+                    <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
+                    <p className="text-base font-semibold text-emerald-700 dark:text-emerald-300">
+                      Participação confirmada!
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Registrada no nome de <strong>{p.nome}</strong>. Pode fechar esta página — na
+                      próxima missão você entra direto.
+                    </p>
                   </div>
                 )}
 
@@ -474,6 +602,29 @@ export default function MissaoPublica() {
           </CardContent>
         </Card>
       </div>
+
+      {showStickyBar && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur p-3 shadow-lg">
+          <div className="max-w-md mx-auto space-y-1.5">
+            <p className="text-center text-[11px] text-muted-foreground">
+              Falta o último passo para sua participação contar
+            </p>
+            <Button
+              className="w-full gap-2 h-14 text-base bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleDeclare}
+              disabled={declaring}
+            >
+              {declaring ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5" />
+              )}
+              Confirmar que cumpri a missão
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
