@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { normalizeBRPhone } from "@/lib/phone-utils";
+import { toWhatsAppBR } from "@/lib/phone-utils";
 
 // POST /api/public/missao/identify
 // Chama RPC SECURITY DEFINER (public_mission_identify) para operar sem service role.
@@ -52,7 +52,7 @@ export const Route = createFileRoute("/api/public/missao/identify")({
           const missionId = String(body.missionId || "").trim();
           const code = String(body.code || "").trim();
           const nome = String(body.nome || "").trim().slice(0, 100);
-          const phone = normalizeBRPhone(body.phone);
+          const phone = toWhatsAppBR(body.phone);
 
           if (!missionId || !nome || !phone) {
             return Response.json({ error: "Dados inválidos" }, { status: 400, headers: corsHeaders });

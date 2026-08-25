@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck } from "lucide-react";
-import { normalizeBRPhone, isValidBRPhone, fmtPhoneBR } from "@/lib/phone-utils";
+import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
 type Participant = {
   id: string;
@@ -175,9 +175,9 @@ export default function MissaoPublica() {
   const handleIdentify = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanNome = nome.trim();
-    const cleanPhone = normalizeBRPhone(phone);
+    const cleanPhone = toWhatsAppBR(phone);
     if (!cleanNome) return toast.error("Informe seu nome");
-    if (!isValidBRPhone(cleanPhone)) return toast.error("Telefone inválido — use DDD + número");
+    if (!cleanPhone) return toast.error("Telefone inválido — use DDD + número");
     setIdentifying(true);
     try {
       const res = await fetch(api("/api/public/missao/identify"), {
@@ -317,8 +317,8 @@ export default function MissaoPublica() {
                   />
                   {phone.trim() !== "" && (
                     <p className="text-[11px] text-muted-foreground">
-                      {isValidBRPhone(phone)
-                        ? `Vamos usar ${fmtPhoneBR(normalizeBRPhone(phone))}`
+                      {toWhatsAppBR(phone)
+                        ? `Vamos usar ${fmtPhoneBR(toWhatsAppBR(phone))}`
                         : "Digite DDD + número"}
                     </p>
                   )}
