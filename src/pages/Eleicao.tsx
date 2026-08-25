@@ -1341,7 +1341,7 @@ export default function Eleicao() {
               Todas <span className="opacity-70 ml-1">{search ? matchedIds.size : escopoList.length}</span>
             </button>
             {(() => {
-              const avulsosCount = pessoas.filter(p => p.escopo === escopo && p.tipo === "lider" && !p.parent_id && (!search || matchedIds.has(p.id))).length;
+              const avulsosCount = pessoas.filter(p => p.escopo === escopo && p.tipo === "lider" && !p.parent_id && !p.is_voluntario && (!search || matchedIds.has(p.id))).length;
               const active = statusFilter === "avulsos";
               return (
                 <button
@@ -1353,6 +1353,22 @@ export default function Eleicao() {
                   )}
                 >
                   ⚡ Avulsos <span className="opacity-70 ml-1">{avulsosCount}</span>
+                </button>
+              );
+            })()}
+            {(() => {
+              const voluntariosCount = pessoas.filter(p => p.escopo === escopo && !!p.is_voluntario && (!search || matchedIds.has(p.id))).length;
+              const active = statusFilter === "voluntarios";
+              return (
+                <button
+                  onClick={() => { setStatusFilter(active ? "todos" : "voluntarios"); setRegiaoFilter("all"); }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
+                    active ? "bg-emerald-500 text-white border-emerald-500" : "bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300",
+                    voluntariosCount === 0 && !active && "opacity-50"
+                  )}
+                >
+                  ❤️ Voluntários <span className="opacity-70 ml-1">{voluntariosCount}</span>
                 </button>
               );
             })()}
