@@ -254,179 +254,14 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Quem é obrigado a interagir</CardTitle>
-          <CardDescription>
-            Por padrão, o público são todos com contrato gerado (valor definido) mais os voluntários.
-            Use as chaves abaixo para ampliar a medição.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <Switch id="sv" checked={incluirSemValor} onCheckedChange={setIncluirSemValor} />
-              <Label htmlFor="sv" className="text-xs">Incluir cadastros sem valor de contrato</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch id="fn" checked={incluirFuncionarios} onCheckedChange={setIncluirFuncionarios} />
-              <Label htmlFor="fn" className="text-xs">Incluir funcionários</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch id="ft" checked={somenteFaltantes} onCheckedChange={setSomenteFaltantes} />
-              <Label htmlFor="ft" className="text-xs">Somente faltantes</Label>
-            </div>
-          </div>
+      <MissionCheckinCharts clientId={clientId} missionId={missionId} rows={filtered} />
 
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nome, telefone ou indicador"
-                className="pl-8"
-              />
-            </div>
-            <Select value={statusFiltro} onValueChange={setStatusFiltro}>
-              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os status</SelectItem>
-                <SelectItem value="entrou">Entrou no link</SelectItem>
-                <SelectItem value="cumpriu">Entrou e concluiu</SelectItem>
-                <SelectItem value="abriu">Entrou e não concluiu</SelectItem>
-                <SelectItem value="nao_abriu">Não entrou no link</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={obrigacaoFiltro} onValueChange={setObrigacaoFiltro}>
-              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Obrigados (todos)</SelectItem>
-                <SelectItem value="contrato">Somente com contrato</SelectItem>
-                <SelectItem value="voluntarios">Somente voluntários</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={cadastroFiltro} onValueChange={setCadastroFiltro}>
-              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Com e sem cadastro</SelectItem>
-                <SelectItem value="com">Com cadastro no sistema</SelectItem>
-                <SelectItem value="sem">Sem cadastro</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={cargoFiltro} onValueChange={setCargoFiltro}>
-              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os cargos</SelectItem>
-                {Object.entries(CARGO_LABEL).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={regiaoFiltro} onValueChange={setRegiaoFiltro}>
-              <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas as regiões</SelectItem>
-                {regioes.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" className="gap-1.5" onClick={exportExcel} disabled={!filtered.length}>
-              <Download className="h-4 w-4" /> Excel
-            </Button>
-            <Button variant="outline" className="gap-1.5" onClick={exportPdf} disabled={!filtered.length}>
-              <FileText className="h-4 w-4" /> PDF
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : filtered.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Nenhuma pessoa no público com estes filtros.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-xs text-muted-foreground">
-                  <tr>
-                    <th className="p-2 text-left">Pessoa</th>
-                    <th className="p-2 text-left">Cargo</th>
-                    <th className="p-2 text-left">Região</th>
-                    <th className="p-2 text-left">Telefone</th>
-                    <th className="p-2 text-left">Indicador</th>
-                    <th className="p-2 text-left">Status</th>
-                    <th className="p-2 text-left">Links abertos</th>
-                    <th className="p-2 text-left">Check-in</th>
-                    <th className="p-2 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((r) => (
-                    <tr key={`${r.origem}-${r.pessoa_id}`} className="border-t">
-                      <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                            {r.nome.slice(0, 1).toUpperCase()}
-                          </span>
-                          <span className="font-medium">{r.nome}</span>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <Badge variant={r.is_voluntario ? "outline" : "secondary"} className="text-[10px]">
-                          {CARGO_LABEL[r.cargo || ""] || r.cargo || "—"}
-                        </Badge>
-                      </td>
-                      <td className="p-2 text-xs">{r.regiao || "—"}</td>
-                      <td className="p-2 text-xs">{fmtPhoneBR(r.telefone) || "—"}</td>
-                      <td className="p-2 text-xs">{r.indicador_nome || "—"}</td>
-                      <td className="p-2">
-                        {r.status === "cumpriu" ? (
-                          <Badge className="gap-1 bg-emerald-600 text-[10px] hover:bg-emerald-600"><CheckCircle2 className="h-3 w-3" /> Cumpriu</Badge>
-                        ) : r.status === "abriu" ? (
-                          <Badge variant="secondary" className="gap-1 text-[10px]"><Eye className="h-3 w-3" /> Abriu</Badge>
-                        ) : (
-                          <Badge variant="destructive" className="gap-1 text-[10px]"><XCircle className="h-3 w-3" /> Não abriu</Badge>
-                        )}
-                      </td>
-                      <td className="p-2">
-                        {(r.links_clicados || []).length === 0 ? (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {(r.links_clicados || []).map((l, i) => (
-                              <Badge key={`${l}-${i}`} variant="outline" className="text-[10px]">{l}</Badge>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-2 text-xs text-muted-foreground">
-                        {fmtDate(r.concluido_em || r.primeiro_acesso_em)}
-                      </td>
-                      <td className="p-2">
-                        <div className="flex justify-end gap-1">
-                          {r.origem === "eleicao" && (
-                            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs"
-                              onClick={() => setHistoricoPessoa({ id: r.pessoa_id, nome: r.nome })}>
-                              <History className="h-3.5 w-3.5" /> Histórico
-                            </Button>
-                          )}
-                          {r.status !== "cumpriu" && (
-                            <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={() => cobrar(r)}>
-                              <MessageCircle className="h-3.5 w-3.5" /> Cobrar
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <MissionCheckinAlerts
+        clientId={clientId}
+        missionId={missionId}
+        missionTitle={missionTitle}
+        missionLink={missionLink}
+      />
 
       <Card>
         <CardHeader className="pb-3">
@@ -450,14 +285,189 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
         </CardContent>
       </Card>
 
-      <MissionCheckinCharts clientId={clientId} missionId={missionId} rows={filtered} />
+      <Accordion type="single" collapsible defaultValue="lista" className="w-full">
+        <AccordionItem value="lista" className="border rounded-lg bg-card">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline">
+            <div className="flex flex-1 items-center justify-between pr-4 text-left">
+              <div>
+                <p className="text-sm font-medium">Quem é obrigado a interagir</p>
+                <p className="text-xs text-muted-foreground">
+                  Por padrão, o público são todos com contrato gerado (valor definido) mais os voluntários.
+                </p>
+              </div>
+              <Badge variant="secondary" className="ml-3 shrink-0">
+                {filtered.length} pessoa{filtered.length !== 1 ? "s" : ""}
+              </Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <Switch id="sv" checked={incluirSemValor} onCheckedChange={setIncluirSemValor} />
+                  <Label htmlFor="sv" className="text-xs">Incluir cadastros sem valor de contrato</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="fn" checked={incluirFuncionarios} onCheckedChange={setIncluirFuncionarios} />
+                  <Label htmlFor="fn" className="text-xs">Incluir funcionários</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="ft" checked={somenteFaltantes} onCheckedChange={setSomenteFaltantes} />
+                  <Label htmlFor="ft" className="text-xs">Somente faltantes</Label>
+                </div>
+              </div>
 
-      <MissionCheckinAlerts
-        clientId={clientId}
-        missionId={missionId}
-        missionTitle={missionTitle}
-        missionLink={missionLink}
-      />
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar por nome, telefone ou indicador"
+                    className="pl-8"
+                  />
+                </div>
+                <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+                  <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    <SelectItem value="entrou">Entrou no link</SelectItem>
+                    <SelectItem value="cumpriu">Entrou e concluiu</SelectItem>
+                    <SelectItem value="abriu">Entrou e não concluiu</SelectItem>
+                    <SelectItem value="nao_abriu">Não entrou no link</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={obrigacaoFiltro} onValueChange={setObrigacaoFiltro}>
+                  <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Obrigados (todos)</SelectItem>
+                    <SelectItem value="contrato">Somente com contrato</SelectItem>
+                    <SelectItem value="voluntarios">Somente voluntários</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={cadastroFiltro} onValueChange={setCadastroFiltro}>
+                  <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Com e sem cadastro</SelectItem>
+                    <SelectItem value="com">Com cadastro no sistema</SelectItem>
+                    <SelectItem value="sem">Sem cadastro</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={cargoFiltro} onValueChange={setCargoFiltro}>
+                  <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os cargos</SelectItem>
+                    {Object.entries(CARGO_LABEL).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={regiaoFiltro} onValueChange={setRegiaoFiltro}>
+                  <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as regiões</SelectItem>
+                    {regioes.map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" className="gap-1.5" onClick={exportExcel} disabled={!filtered.length}>
+                  <Download className="h-4 w-4" /> Excel
+                </Button>
+                <Button variant="outline" className="gap-1.5" onClick={exportPdf} disabled={!filtered.length}>
+                  <FileText className="h-4 w-4" /> PDF
+                </Button>
+              </div>
+
+              {isLoading ? (
+                <div className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : filtered.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Nenhuma pessoa no público com estes filtros.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="p-2 text-left">Pessoa</th>
+                        <th className="p-2 text-left">Cargo</th>
+                        <th className="p-2 text-left">Região</th>
+                        <th className="p-2 text-left">Telefone</th>
+                        <th className="p-2 text-left">Indicador</th>
+                        <th className="p-2 text-left">Status</th>
+                        <th className="p-2 text-left">Links abertos</th>
+                        <th className="p-2 text-left">Check-in</th>
+                        <th className="p-2 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((r) => (
+                        <tr key={`${r.origem}-${r.pessoa_id}`} className="border-t">
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                                {r.nome.slice(0, 1).toUpperCase()}
+                              </span>
+                              <span className="font-medium">{r.nome}</span>
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <Badge variant={r.is_voluntario ? "outline" : "secondary"} className="text-[10px]">
+                              {CARGO_LABEL[r.cargo || ""] || r.cargo || "—"}
+                            </Badge>
+                          </td>
+                          <td className="p-2 text-xs">{r.regiao || "—"}</td>
+                          <td className="p-2 text-xs">{fmtPhoneBR(r.telefone) || "—"}</td>
+                          <td className="p-2 text-xs">{r.indicador_nome || "—"}</td>
+                          <td className="p-2">
+                            {r.status === "cumpriu" ? (
+                              <Badge className="gap-1 bg-emerald-600 text-[10px] hover:bg-emerald-600"><CheckCircle2 className="h-3 w-3" /> Cumpriu</Badge>
+                            ) : r.status === "abriu" ? (
+                              <Badge variant="secondary" className="gap-1 text-[10px]"><Eye className="h-3 w-3" /> Abriu</Badge>
+                            ) : (
+                              <Badge variant="destructive" className="gap-1 text-[10px]"><XCircle className="h-3 w-3" /> Não abriu</Badge>
+                            )}
+                          </td>
+                          <td className="p-2">
+                            {(r.links_clicados || []).length === 0 ? (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {(r.links_clicados || []).map((l, i) => (
+                                  <Badge key={`${l}-${i}`} variant="outline" className="text-[10px]">{l}</Badge>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-2 text-xs text-muted-foreground">
+                            {fmtDate(r.concluido_em || r.primeiro_acesso_em)}
+                          </td>
+                          <td className="p-2">
+                            <div className="flex justify-end gap-1">
+                              {r.origem === "eleicao" && (
+                                <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs"
+                                  onClick={() => setHistoricoPessoa({ id: r.pessoa_id, nome: r.nome })}>
+                                  <History className="h-3.5 w-3.5" /> Histórico
+                                </Button>
+                              )}
+                              {r.status !== "cumpriu" && (
+                                <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={() => cobrar(r)}>
+                                  <MessageCircle className="h-3.5 w-3.5" /> Cobrar
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <MissionPessoaHistorico
         clientId={clientId}
