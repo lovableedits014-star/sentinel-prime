@@ -476,8 +476,33 @@ export default function Telemarketing() {
       return;
     }
     if (!current) return;
+    if (ligacaoStatus === "atendeu") {
+      if (!votaCandidato) {
+        toast.error("Informe o voto para deputado estadual");
+        return;
+      }
+      if (votaCandidato === "nao" && !candidatoAlt.trim()) {
+        toast.error("Informe em quem a pessoa vota para deputado estadual");
+        return;
+      }
+      if (perguntarDemaisCargos) {
+        if (!candFederal.trim() && !federalNQ) {
+          toast.error('Informe o deputado federal ou marque "não quis responder"');
+          return;
+        }
+        if (!candSenador.trim() && !senadorNQ) {
+          toast.error('Informe o senador ou marque "não quis responder"');
+          return;
+        }
+        if (!candGovernador.trim() && !governadorNQ) {
+          toast.error('Informe o governador ou marque "não quis responder"');
+          return;
+        }
+      }
+    }
 
     setSaving(true);
+    const atendeu = ligacaoStatus === "atendeu";
     const proximaTs = proximaTentativa ? new Date(proximaTentativa).toISOString() : null;
     const { data: rpcResult, error } = await supabase.rpc("tele_registrar_ligacao" as any, {
       _client_id: clientId!,
@@ -488,10 +513,16 @@ export default function Telemarketing() {
       _ligacao_status: ligacaoStatus,
       _cidade: cidade.trim() || "",
       _bairro: bairro.trim() || "",
-      _vota_candidato: ligacaoStatus === "atendeu" ? (votaCandidato || null) : null,
-      _candidato_alternativo: ligacaoStatus === "atendeu" ? (candidatoAlt.trim() || null) : null,
+      _vota_candidato: atendeu ? (votaCandidato || null) : null,
+      _candidato_alternativo: atendeu ? (candidatoAlt.trim() || null) : null,
       _observacao: observacao.trim() || null,
       _proxima_tentativa_em: proximaTs,
+      _candidato_federal: atendeu && perguntarDemaisCargos ? (candFederal.trim() || null) : null,
+      _federal_status: atendeu && perguntarDemaisCargos && !candFederal.trim() && federalNQ ? "nao_quis_responder" : null,
+      _candidato_senador: atendeu && perguntarDemaisCargos ? (candSenador.trim() || null) : null,
+      _senador_status: atendeu && perguntarDemaisCargos && !candSenador.trim() && senadorNQ ? "nao_quis_responder" : null,
+      _candidato_governador: atendeu && perguntarDemaisCargos ? (candGovernador.trim() || null) : null,
+      _governador_status: atendeu && perguntarDemaisCargos && !candGovernador.trim() && governadorNQ ? "nao_quis_responder" : null,
     });
 
     if (error) {
