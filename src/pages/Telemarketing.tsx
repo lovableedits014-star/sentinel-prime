@@ -731,6 +731,13 @@ export default function Telemarketing() {
             <Clock className="w-3 h-3 mr-1" />
             {totalPendentes} pendentes
           </Badge>
+          {totalRetorno > 0 && (
+            <Badge variant="outline" className="text-xs">
+              <Clock className="w-3 h-3 mr-1" />
+              {totalRetorno} retornos
+            </Badge>
+          )}
+
           <Badge variant="default" className="text-xs">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             {totalLigados} ligados
