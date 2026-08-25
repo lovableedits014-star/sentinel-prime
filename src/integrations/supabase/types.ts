@@ -6224,6 +6224,63 @@ export type Database = {
         }
         Relationships: []
       }
+      mission_checkins: {
+        Row: {
+          clicks: number
+          client_id: string
+          concluido_em: string | null
+          contratado_id: string | null
+          created_at: string
+          distribution_id: string | null
+          funcionario_id: string | null
+          id: string
+          mission_id: string
+          opens: number
+          participant_id: string
+          pessoa_id: string | null
+          primeiro_acesso_em: string
+          primeiro_clique_em: string | null
+          ultimo_acesso_em: string
+          updated_at: string
+        }
+        Insert: {
+          clicks?: number
+          client_id: string
+          concluido_em?: string | null
+          contratado_id?: string | null
+          created_at?: string
+          distribution_id?: string | null
+          funcionario_id?: string | null
+          id?: string
+          mission_id: string
+          opens?: number
+          participant_id: string
+          pessoa_id?: string | null
+          primeiro_acesso_em?: string
+          primeiro_clique_em?: string | null
+          ultimo_acesso_em?: string
+          updated_at?: string
+        }
+        Update: {
+          clicks?: number
+          client_id?: string
+          concluido_em?: string | null
+          contratado_id?: string | null
+          created_at?: string
+          distribution_id?: string | null
+          funcionario_id?: string | null
+          id?: string
+          mission_id?: string
+          opens?: number
+          participant_id?: string
+          pessoa_id?: string | null
+          primeiro_acesso_em?: string
+          primeiro_clique_em?: string | null
+          ultimo_acesso_em?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mission_distributions: {
         Row: {
           client_id: string
@@ -6343,36 +6400,57 @@ export type Database = {
       }
       mission_participants: {
         Row: {
+          cargo_snapshot: string | null
           client_id: string
+          contratado_id: string | null
           created_at: string
+          crm_pessoa_id: string | null
           first_seen_at: string
+          funcionario_id: string | null
           id: string
           last_seen_at: string
+          match_source: string | null
+          matched_at: string | null
           nome: string
           pessoa_id: string | null
           phone_e164: string
+          regiao_snapshot: string | null
           updated_at: string
         }
         Insert: {
+          cargo_snapshot?: string | null
           client_id: string
+          contratado_id?: string | null
           created_at?: string
+          crm_pessoa_id?: string | null
           first_seen_at?: string
+          funcionario_id?: string | null
           id?: string
           last_seen_at?: string
+          match_source?: string | null
+          matched_at?: string | null
           nome: string
           pessoa_id?: string | null
           phone_e164: string
+          regiao_snapshot?: string | null
           updated_at?: string
         }
         Update: {
+          cargo_snapshot?: string | null
           client_id?: string
+          contratado_id?: string | null
           created_at?: string
+          crm_pessoa_id?: string | null
           first_seen_at?: string
+          funcionario_id?: string | null
           id?: string
           last_seen_at?: string
+          match_source?: string | null
+          matched_at?: string | null
           nome?: string
           pessoa_id?: string | null
           phone_e164?: string
+          regiao_snapshot?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -11332,7 +11410,57 @@ export type Database = {
           titulo: string
         }[]
       }
+      mission_checkin_dashboard: {
+        Args: {
+          p_client_id: string
+          p_incluir_funcionarios?: boolean
+          p_incluir_sem_valor?: boolean
+          p_mission_id: string
+          p_regiao?: string
+        }
+        Returns: {
+          cargo: string
+          cidade: string
+          clicks: number
+          concluido_em: string
+          indicador_nome: string
+          is_voluntario: boolean
+          nome: string
+          origem: string
+          pessoa_id: string
+          primeiro_acesso_em: string
+          regiao: string
+          status: string
+          telefone: string
+          tem_contrato: boolean
+        }[]
+      }
+      mission_checkin_pessoa_historico: {
+        Args: { p_client_id: string; p_limit?: number; p_pessoa_id: string }
+        Returns: {
+          concluido_em: string
+          mission_id: string
+          primeiro_acesso_em: string
+          publicado_em: string
+          status: string
+          title: string
+        }[]
+      }
       mission_generate_short_code: { Args: never; Returns: string }
+      mission_link_generate: {
+        Args: {
+          p_group_jid?: string
+          p_group_name?: string
+          p_mission_id: string
+        }
+        Returns: Json
+      }
+      mission_norm_phone: { Args: { p: string }; Returns: string }
+      mission_phone_key: { Args: { p: string }; Returns: string }
+      mission_resolve_identity: {
+        Args: { p_client_id: string; p_phone: string }
+        Returns: Json
+      }
       municipio_ranking: {
         Args: { p_codigo_ibge: number }
         Returns: {
