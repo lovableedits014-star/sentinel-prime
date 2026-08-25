@@ -6412,6 +6412,7 @@ export type Database = {
           ip_hash: string | null
           is_bot: boolean
           mission_id: string | null
+          mission_link_id: string | null
           mission_title_snapshot: string | null
           participant_id: string | null
           user_agent: string | null
@@ -6427,6 +6428,7 @@ export type Database = {
           ip_hash?: string | null
           is_bot?: boolean
           mission_id?: string | null
+          mission_link_id?: string | null
           mission_title_snapshot?: string | null
           participant_id?: string | null
           user_agent?: string | null
@@ -6442,6 +6444,7 @@ export type Database = {
           ip_hash?: string | null
           is_bot?: boolean
           mission_id?: string | null
+          mission_link_id?: string | null
           mission_title_snapshot?: string | null
           participant_id?: string | null
           user_agent?: string | null
@@ -6459,6 +6462,13 @@ export type Database = {
             columns: ["mission_id"]
             isOneToOne: false
             referencedRelation: "portal_missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mission_events_mission_link_id_fkey"
+            columns: ["mission_link_id"]
+            isOneToOne: false
+            referencedRelation: "portal_mission_links"
             referencedColumns: ["id"]
           },
           {
@@ -7373,6 +7383,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      portal_mission_links: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_order: number
+          id: string
+          kind: string
+          label: string
+          mission_id: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          kind?: string
+          label: string
+          mission_id: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          kind?: string
+          label?: string
+          mission_id?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_mission_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_mission_links_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "portal_missions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       portal_missions: {
         Row: {
@@ -12372,6 +12433,7 @@ export type Database = {
         | "click_instagram"
         | "click_avulso"
         | "declared_done"
+        | "click_link"
       nivel_apoio:
         | "desconhecido"
         | "simpatizante"
@@ -12559,6 +12621,7 @@ export const Constants = {
         "click_instagram",
         "click_avulso",
         "declared_done",
+        "click_link",
       ],
       nivel_apoio: [
         "desconhecido",
