@@ -46,8 +46,8 @@ Cada bloco só é considerado resolvido com nome preenchido ou com "Não quis re
 
 ## Detalhes técnicos
 
-- Migração: adicionar `candidato_federal` (texto) e `federal_status` (`informado` | `nao_quis_responder`) nas 5 origens de contato já usadas pelo telemarketing (`telemarketing_contatos_avulsos`, `contratados`, `contratado_indicados`, `eleicao_indicados`, `eleicao_pessoas`) e em `telemarketing_call_log`; ampliar os valores aceitos de `vota_candidato` com `nao_quis_opinar`.
+- Migração: adicionar, nas 5 origens de contato já usadas pelo telemarketing (`telemarketing_contatos_avulsos`, `contratados`, `contratado_indicados`, `eleicao_indicados`, `eleicao_pessoas`) e em `telemarketing_call_log`, os pares `candidato_federal`/`federal_status`, `candidato_senador`/`senador_status` e `candidato_governador`/`governador_status` (status: `informado` | `nao_quis_responder`); ampliar os valores aceitos de `vota_candidato` com `nao_quis_opinar`.
 - `UPDATE` de dados: converter `ligacao_status = 'recusou'` → `'nao_atendeu'` nas mesmas tabelas e no log.
-- `tele_registrar_ligacao`: aceitar/validar os novos parâmetros — rejeita `atendeu` + estadual `nao` sem alternativo (já existe), e rejeita `atendeu` (estadual ≠ `nao_quis_opinar`) sem federal informado nem `nao_quis_responder`; normaliza os nomes.
+- `tele_registrar_ligacao`: novos parâmetros e validação — rejeita `atendeu` + estadual `nao` sem alternativo (já existe) e, quando o estadual ≠ `nao_quis_opinar`, exige para federal, senador e governador nome informado ou `nao_quis_responder`; normaliza os nomes.
 - `tele_list_contatos`, `tele_buscar_contato`, `tele_indicador_report_rows` e as views de relatório: expor os novos campos.
-- Frontend: `src/pages/Telemarketing.tsx` (remoção do botão, fluxo em passos, validações), `TelemarketingResultsPanel.tsx`, `TelemarketingReportsPanel.tsx`, `TelemarketingIndicadorScorecard.tsx`, `DesignarEleicaoPanel.tsx` (remover filtro "Recusou", somar colunas federal/estadual, exports).
+- Frontend: `src/pages/Telemarketing.tsx` (remoção do botão "Recusou", fluxo em passos com os 4 cargos, validações), `TelemarketingResultsPanel.tsx`, `TelemarketingReportsPanel.tsx`, `TelemarketingIndicadorScorecard.tsx`, `DesignarEleicaoPanel.tsx` (remover filtro "Recusou", colunas e agregações por cargo, exports).
