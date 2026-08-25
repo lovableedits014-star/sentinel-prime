@@ -165,6 +165,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
 
       {missionId && (
         <>
+          <MissionLinksEditor clientId={clientId} missionId={missionId} />
           <MissionLinksPanel clientId={clientId} missionId={missionId} missionTitle={mission?.title ?? null} />
           <MissionCheckinDashboard
             clientId={clientId}
