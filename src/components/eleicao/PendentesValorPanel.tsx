@@ -412,8 +412,9 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
           <p className="text-center text-sm text-muted-foreground py-10">Carregando…</p>
         ) : filtered.length === 0 ? (
           <p className="text-center text-sm text-muted-foreground py-10">
-            Nenhum cadastro pendente. 🎉
+            {view === "pendentes" ? "Nenhum cadastro pendente. 🎉" : view === "definidos" ? "Nenhum valor definido ainda." : "Nenhum voluntário marcado."}
           </p>
+
         ) : (
           <div className="divide-y">
             {filtered.map(p => {
