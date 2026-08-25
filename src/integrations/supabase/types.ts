@@ -11757,8 +11757,13 @@ export type Database = {
           campanha_id: string
           campanha_nome: string
           candidato_alternativo: string
+          candidato_federal: string
+          candidato_governador: string
+          candidato_senador: string
           cidade: string
           contratado_id: string
+          federal_status: string
+          governador_status: string
           id: string
           is_lider: boolean
           lider_id: string
@@ -11766,6 +11771,7 @@ export type Database = {
           ligacao_status: string
           nome: string
           operador_nome: string
+          senador_status: string
           tabela: string
           telefone: string
           tipo: string
@@ -11975,8 +11981,13 @@ export type Database = {
           campanha_id: string
           campanha_nome: string
           candidato_alternativo: string
+          candidato_federal: string
+          candidato_governador: string
+          candidato_senador: string
           cidade: string
           contato_id: string
+          federal_status: string
+          governador_status: string
           indicador_id: string
           indicador_nome: string
           indicador_regiao: string
@@ -11984,6 +11995,7 @@ export type Database = {
           nome: string
           operador_nome: string
           proxima_tentativa_em: string
+          senador_status: string
           status_telemarketing: string
           telefone: string
           total_tentativas: number
@@ -12282,6 +12294,20 @@ export type Database = {
       tele_resetar_fila: {
         Args: { _campanha_id: string; _client_id: string }
         Returns: Json
+      }
+      tele_sugestoes_candidatos: {
+        Args: {
+          _cargo: string
+          _client_id: string
+          _limite?: number
+          _nome: string
+          _senha: string
+          _termo?: string
+        }
+        Returns: {
+          candidato: string
+          mencoes: number
+        }[]
       }
       tele_unlock_operador: { Args: { _operador_id: string }; Returns: Json }
       unaccent: { Args: { "": string }; Returns: string }
