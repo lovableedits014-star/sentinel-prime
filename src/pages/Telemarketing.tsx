@@ -417,6 +417,9 @@ export default function Telemarketing() {
       setLigacaoStatus("");
       setVotaCandidato("");
       setCandidatoAlt("");
+      setCandFederal(""); setFederalNQ(false);
+      setCandSenador(""); setSenadorNQ(false);
+      setCandGovernador(""); setGovernadorNQ(false);
       supabase.rpc("tele_claim_contato" as any, {
         _client_id: clientId,
         _nome: operadorNome.trim(),
