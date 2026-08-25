@@ -936,6 +936,17 @@ export default function Eleicao() {
       listaTipada = listaTipada.filter(p => p.tipo === "lider" && !p.parent_id);
     }
 
+    // Filtro de voluntários (relatório separado)
+    const volMode = cfg.voluntarios || "todos";
+    if (volMode === "apenas") {
+      listaTipada = listaTipada.filter(p => !!(p as any).is_voluntario);
+      lista = lista.filter(p => !!(p as any).is_voluntario);
+    } else if (volMode === "excluir") {
+      listaTipada = listaTipada.filter(p => !(p as any).is_voluntario);
+      lista = lista.filter(p => !(p as any).is_voluntario);
+    }
+
+
     if (listaTipada.length === 0) {
       toast.error("Nenhum cadastro para exportar com os filtros escolhidos.");
       return;
