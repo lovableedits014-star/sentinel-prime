@@ -1095,7 +1095,9 @@ export default function Eleicao() {
         sufixo = parc.nome;
       }
     }
+    if (volMode === "apenas") sufixo = [sufixo, "voluntarios"].filter(Boolean).join("-");
     const qtd = rodarExport(listaTipada, lista, dobradinhaLabel, sufixo);
+
     
     // Config para exportação simples
     const exportOpts = {
