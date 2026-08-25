@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { FileText, Printer, Package, Network, List as ListIcon, Handshake } from "lucide-react";
+import { FileText, Printer, Package, Network, List as ListIcon, Handshake, Heart } from "lucide-react";
 
 export type ExportTipo = "coordenador" | "lider" | "cabo";
 export type ExportFormato = "pdf" | "csv" | "print";
