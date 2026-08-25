@@ -14,7 +14,7 @@ export const ACCESS_PROFILES: Record<AccessProfile, { label: string; description
   gestor_social: {
     label: 'Gestor de Redes Sociais',
     description: 'Comentários, Apoiadores e Engajamento',
-    allowedPaths: ['/dashboard', '/comments', '/militancia', '/supporters', '/engagement', '/inteligencia-conteudo'],
+    allowedPaths: ['/dashboard', '/comments', '/militancia', '/supporters', '/engagement', '/missoes-checkin', '/inteligencia-conteudo'],
   },
   gestor_campanha: {
     label: 'Gestor de Campanha',
@@ -36,6 +36,7 @@ export const ALL_APP_TABS: AppTab[] = [
   { section: 'Redes Sociais', label: 'Comentários', path: '/comments' },
   { section: 'Redes Sociais', label: 'Militância Digital', path: '/militancia' },
   { section: 'Redes Sociais', label: 'Engajamento', path: '/engagement' },
+  { section: 'Redes Sociais', label: 'Missões Check-in', path: '/missoes-checkin' },
   { section: 'Redes Sociais', label: 'Inteligência de Conteúdo', path: '/inteligencia-conteudo' },
   // Base Política
   { section: 'Base Política', label: 'Pessoas', path: '/pessoas' },

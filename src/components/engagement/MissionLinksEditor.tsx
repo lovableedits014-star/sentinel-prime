@@ -30,7 +30,7 @@ export default function MissionLinksEditor({
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
 
-  const queryKey = ["mission-links", missionId];
+  const queryKey = ["mission-extra-links", missionId];
 
   const { data: links = [], isLoading } = useQuery<MissionLinkRow[]>({
     queryKey,
