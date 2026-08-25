@@ -18,12 +18,14 @@ import {
   UserCog,
   ClipboardCheck,
   Gauge,
+  Target,
 } from "lucide-react";
 import InfluenciadoresTab from "@/components/engagement/InfluenciadoresTab";
 import PerfisTimeTab from "@/components/engagement/PerfisTimeTab";
 import CobrancaTimeTab from "@/components/engagement/CobrancaTimeTab";
 import MonitoramentoTab from "@/components/engagement/MonitoramentoTab";
 import PublicoMonitoradoTab from "@/components/engagement/PublicoMonitoradoTab";
+import MissionCheckinTab from "@/components/engagement/MissionCheckinTab";
 
 
 
@@ -110,6 +112,10 @@ export default function Engagement() {
             <Users className="h-4 w-4" />
             Público monitorado
           </TabsTrigger>
+          <TabsTrigger value="checkin" className="text-xs sm:text-sm gap-1.5">
+            <Target className="h-4 w-4" />
+            Check-in de missões
+          </TabsTrigger>
           <TabsTrigger value="influenciadores" className="text-xs sm:text-sm gap-1.5">
             <Activity className="h-4 w-4" />
             Influenciadores
@@ -143,6 +149,20 @@ export default function Engagement() {
             </Card>
           )}
         </TabsContent>
+
+        <TabsContent value="checkin">
+          {client?.id ? (
+            <MissionCheckinTab clientId={client.id} />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Nenhum cliente vinculado a este usuário.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+
 
         <TabsContent value="influenciadores">
           {client?.id ? (

@@ -5,9 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import {   ExternalLink, CheckCircle2, Loader2, UserCog } from "lucide-react";
-import { normalizeBRPhone, isValidBRPhone } from "@/lib/phone-utils";
+import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck } from "lucide-react";
+import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
+
+type Participant = {
+  id: string;
+  nome: string;
+  cargo?: string | null;
+  regiao?: string | null;
+  reconhecido?: boolean;
+  obrigado?: boolean;
+  concluido_em?: string | null;
+};
 
 type MissionConfig = {
   mission: {
@@ -24,11 +35,21 @@ type MissionConfig = {
   client_name: string | null;
   distribution_valid: boolean;
   group_name: string | null;
-  participant: { id: string; nome: string } | null;
+  participant: Participant | null;
 };
 
 const TOKEN_KEY_PREFIX = "sm_client_token_";
 const LEGACY_MISSION_TOKEN_PREFIX = "sm_missao_token_";
+
+const CARGO_LABEL: Record<string, string> = {
+  coordenador: "Coordenador",
+  lider: "Líder",
+  cabo: "Cabo",
+  voluntario: "Voluntário",
+  funcionario: "Funcionário",
+  contratado: "Contratado",
+  contato: "Cadastro",
+};
 
 function clientTokenKey(clientId: string) {
   return `${TOKEN_KEY_PREFIX}${clientId}`;
@@ -56,6 +77,7 @@ export default function MissaoPublica() {
   const [identifying, setIdentifying] = useState(false);
   const [declaring, setDeclaring] = useState(false);
   const [declared, setDeclared] = useState(false);
+  const [justRecognized, setJustRecognized] = useState(false);
   const codeInvalid = code === "invalid";
 
   useEffect(() => {
@@ -106,6 +128,7 @@ export default function MissaoPublica() {
           const finalData = (await withTok.json()) as MissionConfig & { client_id?: string };
           if (cancelled) return;
           setConfig(finalData);
+          if (finalData.participant?.concluido_em) setDeclared(true);
           // token não reconhecido pelo servidor → limpa
           if (existing && !finalData.participant && cid) {
             localStorage.removeItem(clientTokenKey(cid));
@@ -152,9 +175,9 @@ export default function MissaoPublica() {
   const handleIdentify = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanNome = nome.trim();
-    const cleanPhone = normalizeBRPhone(phone);
+    const cleanPhone = toWhatsAppBR(phone);
     if (!cleanNome) return toast.error("Informe seu nome");
-    if (!isValidBRPhone(cleanPhone)) return toast.error("Telefone inválido — use DDD + número");
+    if (!cleanPhone) return toast.error("Telefone inválido — use DDD + número");
     setIdentifying(true);
     try {
       const res = await fetch(api("/api/public/missao/identify"), {
@@ -170,7 +193,12 @@ export default function MissaoPublica() {
       if (clientId) localStorage.setItem(clientTokenKey(clientId), data.token);
       setToken(data.token);
       setConfig((prev) => (prev ? { ...prev, participant: data.participant } : prev));
-      toast.success("Prontinho, obrigado por participar!");
+      setJustRecognized(true);
+      toast.success(
+        data.participant?.reconhecido
+          ? `Reconhecemos você, ${String(data.participant.nome).split(" ")[0]}!`
+          : "Prontinho, obrigado por participar!",
+      );
     } catch (err: any) {
       toast.error(err.message || "Erro ao cadastrar");
     } finally {
@@ -193,6 +221,8 @@ export default function MissaoPublica() {
     setConfig((prev) => (prev ? { ...prev, participant: null } : prev));
     setNome("");
     setPhone("");
+    setDeclared(false);
+    setJustRecognized(false);
   };
 
   const handleExternal = async (
@@ -237,10 +267,12 @@ export default function MissaoPublica() {
   }
 
   const m = config.mission;
+  const p = config.participant;
   // Fallback para missões legadas (sem os campos novos preenchidos):
   const linkFb = m.link_facebook || (m.legacy_platform === "facebook" ? m.legacy_post_url : null);
   const linkIg = m.link_instagram || (m.legacy_platform === "instagram" ? m.legacy_post_url : null);
   const linkAv = m.link_avulso || null;
+  const cargoLabel = p?.cargo ? CARGO_LABEL[p.cargo] || p.cargo : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 py-8 px-4">
@@ -259,13 +291,17 @@ export default function MissaoPublica() {
             )}
           </CardHeader>
           <CardContent className="space-y-4">
-            {!config.participant ? (
+            {!p ? (
               <form onSubmit={handleIdentify} className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Antes de continuar, precisamos te conhecer. É rápido.
-                </p>
+                <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground flex gap-2">
+                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Só desta primeira vez: informe seu nome e WhatsApp. Nas próximas missões você entra
+                    direto, sem preencher nada.
+                  </span>
+                </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="nome">Nome</Label>
+                  <Label htmlFor="nome">Nome completo</Label>
                   <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={100} required />
                 </div>
                 <div className="space-y-1.5">
@@ -279,6 +315,13 @@ export default function MissaoPublica() {
                     placeholder="(67) 99123-4567"
                     required
                   />
+                  {phone.trim() !== "" && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {toWhatsAppBR(phone)
+                        ? `Vamos usar ${fmtPhoneBR(toWhatsAppBR(phone))}`
+                        : "Digite DDD + número"}
+                    </p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full" disabled={identifying}>
                   {identifying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -287,14 +330,36 @@ export default function MissaoPublica() {
               </form>
             ) : (
               <>
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <p className="text-sm">
-                    Olá, <strong>{config.participant.nome}</strong>. Sua participação nesta missão será registrada.
-                  </p>
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    {p.reconhecido ? (
+                      <BadgeCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <UserCog className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm">
+                        Olá, <strong>{p.nome}</strong>.
+                      </p>
+                      {p.reconhecido ? (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          {cargoLabel && <Badge variant="secondary" className="text-[10px]">{cargoLabel}</Badge>}
+                          {p.regiao && <Badge variant="outline" className="text-[10px]">{p.regiao}</Badge>}
+                          <span className="text-[11px] text-muted-foreground">
+                            {justRecognized ? "Reconhecemos seu cadastro." : "Cadastro reconhecido."}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Não achamos seu telefone na nossa base, mas sua participação será registrada.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={handleSwitch}
-                    className="mt-2 text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                    className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                   >
                     <UserCog className="w-3 h-3" />
                     Não é você? Trocar participante
@@ -313,7 +378,7 @@ export default function MissaoPublica() {
                       onClick={() => handleExternal(linkFb, "click_facebook")}
                     >
                       <FacebookIcon className="w-4 h-4 text-blue-600" />
-                      Abrir no FacebookIcon
+                      Abrir no Facebook
                       <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
                     </Button>
                   )}
@@ -324,7 +389,7 @@ export default function MissaoPublica() {
                       onClick={() => handleExternal(linkIg, "click_instagram")}
                     >
                       <InstagramIcon className="w-4 h-4 text-pink-500" />
-                      Abrir no InstagramIcon
+                      Abrir no Instagram
                       <ExternalLink className="w-3 h-3 ml-auto opacity-60" />
                     </Button>
                   )}
@@ -353,6 +418,16 @@ export default function MissaoPublica() {
                   )}
                   {declared ? "Missão concluída — obrigado!" : "Já realizei esta missão"}
                 </Button>
+
+                {declared && (
+                  <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs flex gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Sua participação foi registrada no nome de <strong>{p.nome}</strong>. Pode fechar
+                      esta página — na próxima missão você entra direto.
+                    </span>
+                  </div>
+                )}
 
                 <p className="text-[11px] text-muted-foreground text-center">
                   Este é um registro declarado por você. Não verificamos automaticamente curtidas, comentários ou compartilhamentos.
