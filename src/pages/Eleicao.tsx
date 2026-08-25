@@ -1321,7 +1321,24 @@ export default function Eleicao() {
             >
               Todas <span className="opacity-70 ml-1">{search ? matchedIds.size : escopoList.length}</span>
             </button>
+            {(() => {
+              const avulsosCount = pessoas.filter(p => p.escopo === escopo && p.tipo === "lider" && !p.parent_id && (!search || matchedIds.has(p.id))).length;
+              const active = statusFilter === "avulsos";
+              return (
+                <button
+                  onClick={() => { setStatusFilter(active ? "todos" : "avulsos"); setRegiaoFilter("all"); }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors",
+                    active ? "bg-amber-500 text-white border-amber-500" : "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300",
+                    avulsosCount === 0 && !active && "opacity-50"
+                  )}
+                >
+                  ⚡ Avulsos <span className="opacity-70 ml-1">{avulsosCount}</span>
+                </button>
+              );
+            })()}
             {REGIOES.map(r => {
+
               const count = search
                 ? escopoList.filter(p => p.regiao === r.value && matchedIds.has(p.id)).length
                 : escopoList.filter(p => p.regiao === r.value).length;
