@@ -137,7 +137,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         .insert({
           client_id: clientId,
           platform,
-          post_url: extraFb || extraIg,
+          post_url: extraFb || extraIg || extraLinks[0]?.url || null,
           title: autoTitle,
           description: null,
           display_order: 0,
