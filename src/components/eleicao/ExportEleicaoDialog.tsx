@@ -60,7 +60,7 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const [incluirAvulsos, setIncluirAvulsos] = useState(true);
   const [parceiroSel, setParceiroSel] = useState<string>("__all"); // "__all" | "__none" | uuid
   const [porParceiro, setPorParceiro] = useState(false);
-  const [reuniaoFilter, setReuniaoFilter] = useState<"todos" | "reuniao" | "sem_reuniao">("todos");
+  const [voluntarios, setVoluntarios] = useState<"todos" | "apenas" | "excluir">("todos");
 
   const toggleTipo = (t: ExportTipo) => {
     setTipos(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
