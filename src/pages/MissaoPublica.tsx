@@ -17,6 +17,7 @@ type Participant = {
   regiao?: string | null;
   reconhecido?: boolean;
   obrigado?: boolean;
+  telefone_mascarado?: string | null;
   concluido_em?: string | null;
 };
 
