@@ -268,6 +268,38 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
           </div>
         </div>
 
+        <div className="space-y-2 rounded-lg border p-3">
+          <div>
+            <Label className="text-xs font-medium">Links da missão (opcional, quantos quiser)</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Qualquer link externo — site, notícia, YouTube, TikTok, formulário. Dá para criar a missão só com
+              links, sem publicação da Meta.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+            <Input value={extraLabel} onChange={(e) => setExtraLabel(e.target.value)} placeholder="Nome do botão" />
+            <Input value={extraUrl} onChange={(e) => setExtraUrl(e.target.value)} placeholder="https://..." />
+            <Button type="button" variant="outline" className="gap-1.5" onClick={addExtraLink} disabled={!extraUrl.trim()}>
+              <Plus className="h-4 w-4" /> Adicionar link
+            </Button>
+          </div>
+          {extraLinks.length > 0 && (
+            <div className="space-y-1.5">
+              {extraLinks.map((l, i) => (
+                <div key={`${l.url}-${i}`} className="flex items-center gap-2 rounded border px-2 py-1 text-xs">
+                  <Badge variant="secondary" className="text-[10px]">{detectLinkKind(l.url)}</Badge>
+                  <span className="font-medium">{l.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">{l.url}</span>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive"
+                    onClick={() => setExtraLinks((prev) => prev.filter((_, idx) => idx !== i))}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="space-y-1.5">
           <Label className="text-xs">Instruções para a pessoa (opcional)</Label>
           <Textarea
