@@ -11965,6 +11965,10 @@ export type Database = {
         }
         Returns: Json
       }
+      tele_resetar_fila: {
+        Args: { _campanha_id: string; _client_id: string }
+        Returns: Json
+      }
       tele_unlock_operador: { Args: { _operador_id: string }; Returns: Json }
       unaccent: { Args: { "": string }; Returns: string }
       user_allowed_paths: { Args: { _client_id: string }; Returns: string[] }
