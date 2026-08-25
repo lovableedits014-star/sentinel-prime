@@ -79,6 +79,12 @@ export default function Telemarketing() {
   const [ligacaoStatus, setLigacaoStatus] = useState("");
   const [votaCandidato, setVotaCandidato] = useState("");
   const [candidatoAlt, setCandidatoAlt] = useState("");
+  const [candFederal, setCandFederal] = useState("");
+  const [federalNQ, setFederalNQ] = useState(false);
+  const [candSenador, setCandSenador] = useState("");
+  const [senadorNQ, setSenadorNQ] = useState(false);
+  const [candGovernador, setCandGovernador] = useState("");
+  const [governadorNQ, setGovernadorNQ] = useState(false);
   const [cidade, setCidade] = useState("");
   const [bairro, setBairro] = useState("");
   const [observacao, setObservacao] = useState("");
