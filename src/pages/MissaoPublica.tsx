@@ -290,6 +290,7 @@ export default function MissaoPublica() {
   const linkFb = m.link_facebook || (m.legacy_platform === "facebook" ? m.legacy_post_url : null);
   const linkIg = m.link_instagram || (m.legacy_platform === "instagram" ? m.legacy_post_url : null);
   const linkAv = m.link_avulso || null;
+  const extraLinks = config.links || [];
   const cargoLabel = p?.cargo ? CARGO_LABEL[p.cargo] || p.cargo : null;
 
   return (
