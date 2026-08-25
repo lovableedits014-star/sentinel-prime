@@ -1202,7 +1202,18 @@ export default function Telemarketing() {
                 <div className="flex gap-2 pt-2">
                   <Button
                     onClick={handleSave}
-                    disabled={saving || !ligacaoStatus || (ligacaoStatus === "reagendou" && !proximaTentativa) || (ligacaoStatus === "atendeu" && votaCandidato === "nao" && !candidatoAlt.trim())}
+                    disabled={
+                      saving ||
+                      !ligacaoStatus ||
+                      (ligacaoStatus === "reagendou" && !proximaTentativa) ||
+                      (ligacaoStatus === "atendeu" && !votaCandidato) ||
+                      (ligacaoStatus === "atendeu" && votaCandidato === "nao" && !candidatoAlt.trim()) ||
+                      (perguntarDemaisCargos && (
+                        (!candFederal.trim() && !federalNQ) ||
+                        (!candSenador.trim() && !senadorNQ) ||
+                        (!candGovernador.trim() && !governadorNQ)
+                      ))
+                    }
                     className="flex-1"
                   >
                     {saving ? "Salvando..." : "Salvar e Próximo"}
