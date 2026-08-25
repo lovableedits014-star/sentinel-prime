@@ -102,10 +102,14 @@ export default function Engagement() {
         </p>
       </div>
 
-      <Tabs defaultValue="influenciadores" className="space-y-4">
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="influenciadores" className="text-xs sm:text-sm gap-1.5">
+      <Tabs defaultValue="publico" className="space-y-4">
+        <TabsList className="w-full sm:w-auto flex-wrap h-auto">
+          <TabsTrigger value="publico" className="text-xs sm:text-sm gap-1.5">
             <Users className="h-4 w-4" />
+            Público monitorado
+          </TabsTrigger>
+          <TabsTrigger value="influenciadores" className="text-xs sm:text-sm gap-1.5">
+            <Activity className="h-4 w-4" />
             Influenciadores
           </TabsTrigger>
           <TabsTrigger value="time" className="text-xs sm:text-sm gap-1.5">
@@ -118,7 +122,7 @@ export default function Engagement() {
           </TabsTrigger>
           <TabsTrigger value="monitoramento" className="text-xs sm:text-sm gap-1.5">
             <Gauge className="h-4 w-4" />
-            Monitoramento
+            Publicações e ranking
           </TabsTrigger>
           <TabsTrigger value="config" className="text-xs sm:text-sm gap-1.5">
             <Settings className="h-4 w-4" />
@@ -126,6 +130,17 @@ export default function Engagement() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="publico">
+          {client?.id ? (
+            <PublicoMonitoradoTab clientId={client.id} />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                Nenhum cliente vinculado a este usuário.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
         <TabsContent value="influenciadores">
           {client?.id ? (
@@ -139,6 +154,7 @@ export default function Engagement() {
             </Card>
           )}
         </TabsContent>
+
 
         <TabsContent value="time">
           {client?.id ? (
