@@ -385,6 +385,17 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                           <Badge variant="destructive" className="gap-1 text-[10px]"><XCircle className="h-3 w-3" /> Não abriu</Badge>
                         )}
                       </td>
+                      <td className="p-2">
+                        {(r.links_clicados || []).length === 0 ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {(r.links_clicados || []).map((l, i) => (
+                              <Badge key={`${l}-${i}`} variant="outline" className="text-[10px]">{l}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-2 text-xs text-muted-foreground">
                         {fmtDate(r.concluido_em || r.primeiro_acesso_em)}
                       </td>
