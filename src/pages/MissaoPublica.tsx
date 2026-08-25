@@ -267,12 +267,20 @@ export default function MissaoPublica() {
       // silencioso
     }
     if (clientId) localStorage.removeItem(clientTokenKey(clientId));
+    try {
+      if (clickedKey) localStorage.removeItem(clickedKey);
+      if (doneKey) localStorage.removeItem(doneKey);
+    } catch {
+      // ignora
+    }
     setToken("");
     setConfig((prev) => (prev ? { ...prev, participant: null } : prev));
     setNome("");
     setPhone("");
     setDeclared(false);
     setJustRecognized(false);
+    setClickedLinks(new Set());
+    setBackReminder(false);
   };
 
   const handleExternal = async (
@@ -280,6 +288,17 @@ export default function MissaoPublica() {
     type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link",
     linkId?: string,
   ) => {
+    const key = linkId || type;
+    setClickedLinks((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      try {
+        if (clickedKey) localStorage.setItem(clickedKey, JSON.stringify([...next]));
+      } catch {
+        // ignora
+      }
+      return next;
+    });
     await registerEvent(type, linkId);
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -288,9 +307,16 @@ export default function MissaoPublica() {
     setDeclaring(true);
     await registerEvent("declared_done");
     setDeclared(true);
+    setBackReminder(false);
+    try {
+      if (doneKey) localStorage.setItem(doneKey, "1");
+    } catch {
+      // ignora
+    }
     setDeclaring(false);
-    toast.success("Missão marcada como concluída — valeu!");
+    toast.success("Participação confirmada — obrigado!");
   };
+
 
   if (loading) {
     return (
