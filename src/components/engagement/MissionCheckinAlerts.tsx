@@ -250,6 +250,8 @@ export default function MissionCheckinAlerts({
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
+
