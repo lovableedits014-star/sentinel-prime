@@ -286,6 +286,23 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
             </Select>
           </div>
 
+          {/* Voluntários */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+              <Heart className="w-3.5 h-3.5 text-emerald-500" />
+              Voluntários
+            </Label>
+            <Select value={voluntarios} onValueChange={(v: any) => setVoluntarios(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos (remunerados + voluntários)</SelectItem>
+                <SelectItem value="apenas">Apenas voluntários</SelectItem>
+                <SelectItem value="excluir">Apenas remunerados (sem voluntários)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Use "Apenas voluntários" para gerar um relatório separado de gestão dos voluntários.</p>
+          </div>
+
           {/* Coordenador específico */}
           {(incluiLideresOuCabos || modo === "raiz") && coordsOrdenados.length > 0 && (
             <div className="space-y-2">
