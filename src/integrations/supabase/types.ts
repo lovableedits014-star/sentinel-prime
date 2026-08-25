@@ -4208,6 +4208,7 @@ export type Database = {
           origem: string
           ref_id: string
           regiao: string | null
+          supporter_id: string | null
           telefone: string | null
           updated_at: string
         }
@@ -4225,6 +4226,7 @@ export type Database = {
           origem: string
           ref_id: string
           regiao?: string | null
+          supporter_id?: string | null
           telefone?: string | null
           updated_at?: string
         }
@@ -4242,6 +4244,7 @@ export type Database = {
           origem?: string
           ref_id?: string
           regiao?: string | null
+          supporter_id?: string | null
           telefone?: string | null
           updated_at?: string
         }
@@ -4258,6 +4261,13 @@ export type Database = {
             columns: ["grupo_id"]
             isOneToOne: false
             referencedRelation: "engagement_publico_grupos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_publico_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "supporters"
             referencedColumns: ["id"]
           },
         ]
@@ -10768,6 +10778,21 @@ export type Database = {
           telefone: string
         }[]
       }
+      engagement_publico_criar_manual: {
+        Args: {
+          p_cargo?: string
+          p_cidade?: string
+          p_client_id: string
+          p_facebook?: string
+          p_grupo_id?: string
+          p_instagram?: string
+          p_nome: string
+          p_observacao?: string
+          p_regiao?: string
+          p_telefone?: string
+        }
+        Returns: Json
+      }
       engagement_publico_definir: {
         Args: {
           p_client_id: string
@@ -10780,6 +10805,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      engagement_publico_excluir_manual: {
+        Args: { p_client_id: string; p_ref_id: string }
+        Returns: undefined
+      }
       engagement_publico_pendencias: {
         Args: { p_client_id: string; p_grupo_id?: string; p_regra_id?: string }
         Returns: {
@@ -10787,8 +10816,10 @@ export type Database = {
           cidade: string
           facebook_key: string
           instagram_handle: string
+          motivo_bloqueio: string
           nome: string
           origem: string
+          pronta_para_cobranca: boolean
           ref_id: string
           regiao: string
           sem_facebook: boolean
@@ -10797,6 +10828,16 @@ export type Database = {
           sem_telefone: boolean
           telefone: string
           ultimo_comentario: string
+        }[]
+      }
+      engagement_publico_previa: {
+        Args: { p_client_id: string; p_grupo_id?: string; p_regra_id?: string }
+        Returns: {
+          prontas: number
+          sem_dados: number
+          sem_rede: number
+          sem_telefone: number
+          total: number
         }[]
       }
       engagement_publico_set_telefone: {
