@@ -85,6 +85,8 @@ export type Regra = {
   esperado: number;
   prazo_horas: number;
   ativo: boolean;
+  modo_publico: "automatico" | "manual";
+  grupo_id: string | null;
   created_at: string;
 };
 
@@ -184,6 +186,8 @@ export async function salvarRegra(clientId: string, regra: Partial<Regra>): Prom
     esperado: Math.max(1, Number(regra.esperado) || 1),
     prazo_horas: Math.max(1, Number(regra.prazo_horas) || 48),
     ativo: regra.ativo ?? true,
+    modo_publico: regra.modo_publico || "automatico",
+    grupo_id: regra.grupo_id ?? null,
   };
   const { error } = regra.id
     ? await db.from("engagement_regras").update(payload).eq("id", regra.id)
@@ -276,4 +280,149 @@ export async function validarEvidencia(id: string, url: string): Promise<void> {
     .update({ evidencia_url: url, evidencia_validada: true, cumprida_em: new Date().toISOString() })
     .eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+/* ===================== Público monitorado ===================== */
+
+export type PublicoGrupo = {
+  id: string;
+  client_id: string;
+  nome: string;
+  descricao: string | null;
+  created_at: string;
+};
+
+export type CandidatoRow = {
+  origem: string;
+  ref_id: string;
+  nome: string;
+  cargo: string | null;
+  telefone: string | null;
+  regiao: string | null;
+  cidade: string | null;
+  instagram_handle: string | null;
+  facebook_key: string | null;
+  no_publico: boolean;
+  dispensado: boolean;
+};
+
+export type PendenciaRow = {
+  origem: string;
+  ref_id: string;
+  nome: string;
+  cargo: string | null;
+  telefone: string | null;
+  regiao: string | null;
+  cidade: string | null;
+  instagram_handle: string | null;
+  facebook_key: string | null;
+  sem_instagram: boolean;
+  sem_facebook: boolean;
+  sem_telefone: boolean;
+  sem_prova: boolean;
+  ultimo_comentario: string | null;
+};
+
+export async function fetchGrupos(clientId: string): Promise<PublicoGrupo[]> {
+  const { data, error } = await db
+    .from("engagement_publico_grupos")
+    .select("*")
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PublicoGrupo[];
+}
+
+export async function criarGrupo(clientId: string, nome: string, descricao?: string): Promise<PublicoGrupo> {
+  const { data, error } = await db
+    .from("engagement_publico_grupos")
+    .insert({ client_id: clientId, nome: nome.trim(), descricao: descricao || null })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as PublicoGrupo;
+}
+
+export async function excluirGrupo(id: string): Promise<void> {
+  const { error } = await db.from("engagement_publico_grupos").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchCandidatos(
+  clientId: string,
+  grupoId: string | null,
+  busca?: string,
+): Promise<CandidatoRow[]> {
+  return unwrap<CandidatoRow>(
+    await db.rpc("engagement_publico_candidatos", {
+      p_client_id: clientId,
+      p_grupo_id: grupoId,
+      p_busca: busca?.trim() || null,
+      p_limit: 800,
+    }),
+  );
+}
+
+export async function definirPublico(
+  clientId: string,
+  origem: string,
+  refId: string,
+  incluido: boolean,
+  grupoId: string | null,
+  dispensado = false,
+  observacao?: string | null,
+): Promise<void> {
+  const { error } = await db.rpc("engagement_publico_definir", {
+    p_client_id: clientId,
+    p_origem: origem,
+    p_ref_id: refId,
+    p_incluido: incluido,
+    p_grupo_id: grupoId,
+    p_dispensado: dispensado,
+    p_observacao: observacao ?? null,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchPendencias(
+  clientId: string,
+  grupoId: string | null,
+  regraId?: string | null,
+): Promise<PendenciaRow[]> {
+  return unwrap<PendenciaRow>(
+    await db.rpc("engagement_publico_pendencias", {
+      p_client_id: clientId,
+      p_grupo_id: grupoId,
+      p_regra_id: regraId ?? null,
+    }),
+  );
+}
+
+export async function salvarTelefonePessoa(
+  clientId: string,
+  origem: string,
+  refId: string,
+  telefone: string,
+): Promise<void> {
+  const { error } = await db.rpc("engagement_publico_set_telefone", {
+    p_client_id: clientId,
+    p_origem: origem,
+    p_ref_id: refId,
+    p_telefone: telefone,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function contarPublicoDaRegra(clientId: string, regra: Regra): Promise<number> {
+  const rows = unwrap<{ ref_id: string }>(
+    await db.rpc("engagement_publico_alvo", {
+      p_client_id: clientId,
+      p_cargos: regra.cargos ?? [],
+      p_regioes: regra.regioes ?? [],
+      p_cidades: regra.cidades ?? [],
+      p_modo: regra.modo_publico ?? "automatico",
+      p_grupo_id: regra.grupo_id ?? null,
+    }),
+  );
+  return rows.length;
 }

@@ -4193,6 +4193,110 @@ export type Database = {
           },
         ]
       }
+      engagement_publico: {
+        Row: {
+          cargo: string | null
+          cidade: string | null
+          client_id: string
+          created_at: string
+          dispensado: boolean
+          grupo_id: string | null
+          id: string
+          incluido: boolean
+          nome: string
+          observacao: string | null
+          origem: string
+          ref_id: string
+          regiao: string | null
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          cargo?: string | null
+          cidade?: string | null
+          client_id: string
+          created_at?: string
+          dispensado?: boolean
+          grupo_id?: string | null
+          id?: string
+          incluido?: boolean
+          nome: string
+          observacao?: string | null
+          origem: string
+          ref_id: string
+          regiao?: string | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cargo?: string | null
+          cidade?: string | null
+          client_id?: string
+          created_at?: string
+          dispensado?: boolean
+          grupo_id?: string | null
+          id?: string
+          incluido?: boolean
+          nome?: string
+          observacao?: string | null
+          origem?: string
+          ref_id?: string
+          regiao?: string | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_publico_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_publico_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_publico_grupos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_publico_grupos: {
+        Row: {
+          client_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_publico_grupos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engagement_regras: {
         Row: {
           ativo: boolean
@@ -4202,7 +4306,9 @@ export type Database = {
           created_at: string
           descricao: string | null
           esperado: number
+          grupo_id: string | null
           id: string
+          modo_publico: string
           nome: string
           prazo_horas: number
           regioes: string[]
@@ -4217,7 +4323,9 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           esperado?: number
+          grupo_id?: string | null
           id?: string
+          modo_publico?: string
           nome: string
           prazo_horas?: number
           regioes?: string[]
@@ -4232,7 +4340,9 @@ export type Database = {
           created_at?: string
           descricao?: string | null
           esperado?: number
+          grupo_id?: string | null
           id?: string
+          modo_publico?: string
           nome?: string
           prazo_horas?: number
           regioes?: string[]
@@ -4245,6 +4355,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_regras_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_publico_grupos"
             referencedColumns: ["id"]
           },
         ]
@@ -10613,6 +10730,8 @@ export type Database = {
           p_cargos?: string[]
           p_cidades?: string[]
           p_client_id: string
+          p_grupo_id?: string
+          p_modo?: string
           p_regioes?: string[]
         }
         Returns: {
@@ -10627,6 +10746,67 @@ export type Database = {
           regiao: string
           telefone: string
         }[]
+      }
+      engagement_publico_candidatos: {
+        Args: {
+          p_busca?: string
+          p_client_id: string
+          p_grupo_id?: string
+          p_limit?: number
+        }
+        Returns: {
+          cargo: string
+          cidade: string
+          dispensado: boolean
+          facebook_key: string
+          instagram_handle: string
+          no_publico: boolean
+          nome: string
+          origem: string
+          ref_id: string
+          regiao: string
+          telefone: string
+        }[]
+      }
+      engagement_publico_definir: {
+        Args: {
+          p_client_id: string
+          p_dispensado?: boolean
+          p_grupo_id?: string
+          p_incluido: boolean
+          p_observacao?: string
+          p_origem: string
+          p_ref_id: string
+        }
+        Returns: undefined
+      }
+      engagement_publico_pendencias: {
+        Args: { p_client_id: string; p_grupo_id?: string; p_regra_id?: string }
+        Returns: {
+          cargo: string
+          cidade: string
+          facebook_key: string
+          instagram_handle: string
+          nome: string
+          origem: string
+          ref_id: string
+          regiao: string
+          sem_facebook: boolean
+          sem_instagram: boolean
+          sem_prova: boolean
+          sem_telefone: boolean
+          telefone: string
+          ultimo_comentario: string
+        }[]
+      }
+      engagement_publico_set_telefone: {
+        Args: {
+          p_client_id: string
+          p_origem: string
+          p_ref_id: string
+          p_telefone: string
+        }
+        Returns: undefined
       }
       engagement_ranking: {
         Args: { p_client_id: string; p_limit?: number }
