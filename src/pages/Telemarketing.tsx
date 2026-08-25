@@ -79,6 +79,12 @@ export default function Telemarketing() {
   const [ligacaoStatus, setLigacaoStatus] = useState("");
   const [votaCandidato, setVotaCandidato] = useState("");
   const [candidatoAlt, setCandidatoAlt] = useState("");
+  const [candFederal, setCandFederal] = useState("");
+  const [federalNQ, setFederalNQ] = useState(false);
+  const [candSenador, setCandSenador] = useState("");
+  const [senadorNQ, setSenadorNQ] = useState(false);
+  const [candGovernador, setCandGovernador] = useState("");
+  const [governadorNQ, setGovernadorNQ] = useState(false);
   const [cidade, setCidade] = useState("");
   const [bairro, setBairro] = useState("");
   const [observacao, setObservacao] = useState("");
@@ -328,6 +334,9 @@ export default function Telemarketing() {
     setLigacaoStatus("");
     setVotaCandidato("");
     setCandidatoAlt("");
+    setCandFederal(""); setFederalNQ(false);
+    setCandSenador(""); setSenadorNQ(false);
+    setCandGovernador(""); setGovernadorNQ(false);
     setCidade("");
     setBairro("");
     setObservacao("");
@@ -408,6 +417,9 @@ export default function Telemarketing() {
       setLigacaoStatus("");
       setVotaCandidato("");
       setCandidatoAlt("");
+      setCandFederal(""); setFederalNQ(false);
+      setCandSenador(""); setSenadorNQ(false);
+      setCandGovernador(""); setGovernadorNQ(false);
       supabase.rpc("tele_claim_contato" as any, {
         _client_id: clientId,
         _nome: operadorNome.trim(),
@@ -458,14 +470,44 @@ export default function Telemarketing() {
   }, [loggedIn, clientId]);
 
 
+  // "Não quis opinar" no estadual encerra o fluxo: não pergunta os demais cargos.
+  const perguntarDemaisCargos =
+    ligacaoStatus === "atendeu" &&
+    (votaCandidato === "sim" || votaCandidato === "nao" || votaCandidato === "indeciso");
+
   const handleSave = async () => {
     if (!ligacaoStatus) {
       toast.error("Selecione o resultado da ligação");
       return;
     }
     if (!current) return;
+    if (ligacaoStatus === "atendeu") {
+      if (!votaCandidato) {
+        toast.error("Informe o voto para deputado estadual");
+        return;
+      }
+      if (votaCandidato === "nao" && !candidatoAlt.trim()) {
+        toast.error("Informe em quem a pessoa vota para deputado estadual");
+        return;
+      }
+      if (perguntarDemaisCargos) {
+        if (!candFederal.trim() && !federalNQ) {
+          toast.error('Informe o deputado federal ou marque "não quis responder"');
+          return;
+        }
+        if (!candSenador.trim() && !senadorNQ) {
+          toast.error('Informe o senador ou marque "não quis responder"');
+          return;
+        }
+        if (!candGovernador.trim() && !governadorNQ) {
+          toast.error('Informe o governador ou marque "não quis responder"');
+          return;
+        }
+      }
+    }
 
     setSaving(true);
+    const atendeu = ligacaoStatus === "atendeu";
     const proximaTs = proximaTentativa ? new Date(proximaTentativa).toISOString() : null;
     const { data: rpcResult, error } = await supabase.rpc("tele_registrar_ligacao" as any, {
       _client_id: clientId!,
@@ -476,10 +518,16 @@ export default function Telemarketing() {
       _ligacao_status: ligacaoStatus,
       _cidade: cidade.trim() || "",
       _bairro: bairro.trim() || "",
-      _vota_candidato: ligacaoStatus === "atendeu" ? (votaCandidato || null) : null,
-      _candidato_alternativo: ligacaoStatus === "atendeu" ? (candidatoAlt.trim() || null) : null,
+      _vota_candidato: atendeu ? (votaCandidato || null) : null,
+      _candidato_alternativo: atendeu ? (candidatoAlt.trim() || null) : null,
       _observacao: observacao.trim() || null,
       _proxima_tentativa_em: proximaTs,
+      _candidato_federal: atendeu && perguntarDemaisCargos ? (candFederal.trim() || null) : null,
+      _federal_status: atendeu && perguntarDemaisCargos && !candFederal.trim() && federalNQ ? "nao_quis_responder" : null,
+      _candidato_senador: atendeu && perguntarDemaisCargos ? (candSenador.trim() || null) : null,
+      _senador_status: atendeu && perguntarDemaisCargos && !candSenador.trim() && senadorNQ ? "nao_quis_responder" : null,
+      _candidato_governador: atendeu && perguntarDemaisCargos ? (candGovernador.trim() || null) : null,
+      _governador_status: atendeu && perguntarDemaisCargos && !candGovernador.trim() && governadorNQ ? "nao_quis_responder" : null,
     });
 
     if (error) {
@@ -982,7 +1030,7 @@ export default function Telemarketing() {
               <div className="border-t pt-4 space-y-3">
                 <p className="font-medium text-sm">Resultado da ligação</p>
 
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Button
                     variant={ligacaoStatus === "atendeu" ? "default" : "outline"}
                     size="sm"
@@ -1006,15 +1054,6 @@ export default function Telemarketing() {
                     <PhoneOff className="w-3.5 h-3.5 mr-1" />
                     Não atendeu (+6h)
 
-                  </Button>
-                  <Button
-                    variant={ligacaoStatus === "recusou" ? "destructive" : "outline"}
-                    size="sm"
-                    onClick={() => setLigacaoStatus("recusou")}
-                    className="text-xs"
-                  >
-                    <XCircle className="w-3.5 h-3.5 mr-1" />
-                    Recusou
                   </Button>
                   <Button
                     variant={ligacaoStatus === "reagendou" ? "default" : "outline"}
@@ -1065,15 +1104,18 @@ export default function Telemarketing() {
                 {ligacaoStatus === "atendeu" && (
                   <div className="space-y-3 bg-muted/50 p-3 rounded-lg">
                     <div>
-                      <label className="text-xs font-medium mb-1.5 block">Vota no candidato?</label>
+                      <label className="text-xs font-medium mb-1.5 block">
+                        1. Deputado Estadual (nosso candidato) <span className="text-destructive">*</span>
+                      </label>
                       <Select value={votaCandidato} onValueChange={setVotaCandidato}>
                         <SelectTrigger className="h-9 text-sm">
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="sim">✅ Sim, vota</SelectItem>
+                          <SelectItem value="sim">✅ Vota (confirmado)</SelectItem>
                           <SelectItem value="nao">❌ Não vota</SelectItem>
                           <SelectItem value="indeciso">🤔 Indeciso</SelectItem>
+                          <SelectItem value="nao_quis_opinar">🚫 Não quis opinar (encerra)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1081,26 +1123,70 @@ export default function Telemarketing() {
                     {(votaCandidato === "nao" || votaCandidato === "indeciso") && (
                       <div>
                         <label className="text-xs font-medium mb-1.5 block">
-                          Candidato que apoia {votaCandidato === "nao" ? (
+                          Qual estadual vota? {votaCandidato === "nao" ? (
                             <span className="text-destructive">(obrigatório)</span>
                           ) : "(opcional)"}
                         </label>
                         <Input
-                          placeholder="Nome do candidato..."
+                          placeholder="Nome do deputado estadual..."
                           value={candidatoAlt}
                           onChange={(e) => setCandidatoAlt(e.target.value)}
                           className={`h-9 text-sm ${votaCandidato === "nao" && !candidatoAlt.trim() ? "border-destructive" : ""}`}
                         />
                         {votaCandidato === "nao" && !candidatoAlt.trim() && (
                           <p className="text-[11px] text-destructive mt-1">
-                            Informe em quem a pessoa disse que vota para salvar.
+                            Informe o nome. Se a pessoa não quiser dizer, use "Não quis opinar".
                           </p>
                         )}
                       </div>
                     )}
 
+                    {votaCandidato === "nao_quis_opinar" && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Atendimento encerrado: os demais cargos não são perguntados.
+                      </p>
+                    )}
+
+                    {perguntarDemaisCargos && (
+                      <div className="space-y-3 border-t pt-3">
+                        {([
+                          { key: "federal", label: "2. Deputado Federal", value: candFederal, setValue: setCandFederal, nq: federalNQ, setNq: setFederalNQ },
+                          { key: "senador", label: "3. Senador", value: candSenador, setValue: setCandSenador, nq: senadorNQ, setNq: setSenadorNQ },
+                          { key: "governador", label: "4. Governador", value: candGovernador, setValue: setCandGovernador, nq: governadorNQ, setNq: setGovernadorNQ },
+                        ] as const).map((c) => {
+                          const pendente = !c.value.trim() && !c.nq;
+                          return (
+                            <div key={c.key}>
+                              <label className="text-xs font-medium mb-1.5 block">
+                                {c.label} <span className="text-destructive">*</span>
+                              </label>
+                              <Input
+                                placeholder="Nome do candidato..."
+                                value={c.value}
+                                onChange={(e) => { c.setValue(e.target.value); if (e.target.value.trim()) c.setNq(false); }}
+                                disabled={c.nq}
+                                className={`h-9 text-sm ${pendente ? "border-destructive" : ""}`}
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={c.nq ? "secondary" : "ghost"}
+                                className="h-7 text-[11px] mt-1"
+                                onClick={() => { c.setNq(!c.nq); if (!c.nq) c.setValue(""); }}
+                              >
+                                {c.nq ? "✔ Não quis responder" : "Não quis responder"}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        <p className="text-[11px] text-muted-foreground">
+                          Preencha o nome ou marque "Não quis responder" nos três cargos para salvar.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
+
 
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Observação (opcional)</label>
@@ -1116,7 +1202,18 @@ export default function Telemarketing() {
                 <div className="flex gap-2 pt-2">
                   <Button
                     onClick={handleSave}
-                    disabled={saving || !ligacaoStatus || (ligacaoStatus === "reagendou" && !proximaTentativa) || (ligacaoStatus === "atendeu" && votaCandidato === "nao" && !candidatoAlt.trim())}
+                    disabled={
+                      saving ||
+                      !ligacaoStatus ||
+                      (ligacaoStatus === "reagendou" && !proximaTentativa) ||
+                      (ligacaoStatus === "atendeu" && !votaCandidato) ||
+                      (ligacaoStatus === "atendeu" && votaCandidato === "nao" && !candidatoAlt.trim()) ||
+                      (perguntarDemaisCargos && (
+                        (!candFederal.trim() && !federalNQ) ||
+                        (!candSenador.trim() && !senadorNQ) ||
+                        (!candGovernador.trim() && !governadorNQ)
+                      ))
+                    }
                     className="flex-1"
                   >
                     {saving ? "Salvando..." : "Salvar e Próximo"}
