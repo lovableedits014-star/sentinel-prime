@@ -39,6 +39,8 @@ type Row = {
   primeiro_acesso_em: string | null;
   concluido_em: string | null;
   clicks: number;
+  tem_cadastro?: boolean;
+  links_clicados?: string[] | null;
 };
 
 const CARGO_LABEL: Record<string, string> = {
