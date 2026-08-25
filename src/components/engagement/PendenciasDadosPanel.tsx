@@ -194,13 +194,18 @@ export default function PendenciasDadosPanel({ clientId }: { clientId: string })
                       <div className="font-medium text-sm">{r.nome}</div>
                       <div className="text-[11px] text-muted-foreground">
                         {cap(r.cargo)} · {cap(r.regiao || r.cidade) || "sem região"}
-                        {r.sem_prova && (
+                        {r.pronta_para_cobranca ? (
+                          <Badge variant="outline" className="ml-2 bg-emerald-500/15 text-emerald-600 border-emerald-500/30">
+                            pronta p/ cobrança
+                          </Badge>
+                        ) : (
                           <Badge variant="outline" className="ml-2 bg-destructive/15 text-destructive border-destructive/30">
-                            sem comprovação
+                            {r.motivo_bloqueio || "faltam dados"}
                           </Badge>
                         )}
                       </div>
                     </TableCell>
+
                     <TableCell>
                       {r.instagram_handle ? (
                         <span className="text-xs text-emerald-600">@{r.instagram_handle}</span>
