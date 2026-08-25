@@ -244,9 +244,10 @@ export default function MissaoPublica() {
 
   const handleExternal = async (
     url: string,
-    type: "click_facebook" | "click_instagram" | "click_avulso",
+    type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link",
+    linkId?: string,
   ) => {
-    await registerEvent(type);
+    await registerEvent(type, linkId);
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
