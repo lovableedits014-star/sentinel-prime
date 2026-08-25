@@ -754,7 +754,8 @@ export default function Eleicao() {
   const matchesStatus = (p: Pessoa) => {
     if (statusFilter === "sem_valor") return !p.valor_contratacao || p.valor_contratacao === 0;
     if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
-    if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id;
+    if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id && !p.is_voluntario;
+    if (statusFilter === "voluntarios") return !!p.is_voluntario;
     if (statusFilter === "pendente") return p.status_contratacao === "pendente" || !p.status_contratacao;
     if (statusFilter === "em_negociacao") return p.status_contratacao === "em_negociacao";
     if (statusFilter === "confirmado") return p.status_contratacao === "confirmado";
