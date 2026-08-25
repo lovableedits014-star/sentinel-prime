@@ -320,8 +320,19 @@ export type PendenciaRow = {
   sem_facebook: boolean;
   sem_telefone: boolean;
   sem_prova: boolean;
+  pronta_para_cobranca: boolean;
+  motivo_bloqueio: string | null;
   ultimo_comentario: string | null;
 };
+
+export type PreviaPublico = {
+  total: number;
+  prontas: number;
+  sem_rede: number;
+  sem_telefone: number;
+  sem_dados: number;
+};
+
 
 export async function fetchGrupos(clientId: string): Promise<PublicoGrupo[]> {
   const { data, error } = await db
