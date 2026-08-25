@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
 import {
   Loader2, Search, Download, FileText, CheckCircle2, Eye, XCircle, Users,
-  MessageCircle, History, TrendingUp,
+  MessageCircle, History, TrendingUp, ChevronDown,
 } from "lucide-react";
 import { fmtPhoneBR, toWhatsAppBR } from "@/lib/phone-utils";
 import MissionPessoaHistorico from "./MissionPessoaHistorico";
