@@ -106,7 +106,7 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
       }
       return true;
     });
-  }, [rows, somenteFaltantes, cargoFiltro, regiaoFiltro, search]);
+  }, [rows, somenteFaltantes, statusFiltro, obrigacaoFiltro, cadastroFiltro, cargoFiltro, regiaoFiltro, search]);
 
   const kpis = useMemo(() => {
     const total = rows.length;
