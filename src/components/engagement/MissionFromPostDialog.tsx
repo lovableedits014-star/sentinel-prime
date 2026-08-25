@@ -151,6 +151,19 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         .select("id")
         .single();
       if (error) throw error;
+      if (extraLinks.length > 0) {
+        const { error: linkErr } = await (supabase as any).from("portal_mission_links").insert(
+          extraLinks.map((l, i) => ({
+            mission_id: data.id,
+            client_id: clientId,
+            label: l.label,
+            url: l.url,
+            kind: detectLinkKind(l.url),
+            display_order: i,
+          })),
+        );
+        if (linkErr) throw linkErr;
+      }
       qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
       qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
       toast.success("Missão criada com rastreamento — gere o link abaixo e envie no grupo.");
