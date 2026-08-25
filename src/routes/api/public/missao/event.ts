@@ -61,6 +61,7 @@ export const Route = createFileRoute("/api/public/missao/event")({
           const code = String(body.code || "").trim();
           const token = String(body.token || "").trim();
           const type = String(body.type || "").trim();
+          const linkId = String(body.linkId || "").trim();
 
           if (!missionId || !ALLOWED.has(type)) {
             return Response.json({ error: "Dados inválidos" }, { status: 400, headers: corsHeaders });
