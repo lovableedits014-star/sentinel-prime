@@ -255,17 +255,16 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
 
   return (
     <div className="space-y-4">
+      <DesempenhoPublicacoesPanel clientId={clientId} />
+
       <Card>
         <CardHeader className="px-3 sm:px-6">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Gauge className="h-4 w-4 text-primary" /> Monitoramento de contratados
+            <Gauge className="h-4 w-4 text-primary" /> Obrigações e regras (índice detalhado)
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm">
-            Cada publicação monitorada gera uma <strong>obrigação por pessoa</strong> conforme a regra escolhida. O
-            sistema confirma o cumprimento por níveis de evidência: <strong>E1</strong> comentário capturado pela API ou
-            clique no link rastreado, <strong>E2</strong> conclusão declarada no portal, <strong>E3</strong> evidência
-            anexada e validada. O índice (0–100) pesa cumprimento 50%, qualidade 20%, regularidade 15%, pontualidade 10%
-            e tendência 5%.
+            Aqui ficam as regras de cobrança, a configuração de cada publicação monitorada e o índice detalhado
+            (cumprimento 50%, qualidade 20%, regularidade 15%, pontualidade 10% e tendência 5%).
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3 px-3 sm:px-6">
@@ -287,37 +286,14 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <Card><CardContent className="p-4">
-          <p className="text-xs text-muted-foreground">Índice médio</p>
-          <p className="text-2xl font-bold">{overview?.indice_medio ?? 0}</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <p className="text-xs text-muted-foreground">Cumprimento geral</p>
-          <p className="text-2xl font-bold">{overview?.cumprimento_geral ?? 0}%</p>
-          <p className="text-[11px] text-muted-foreground">{overview?.cumpridas ?? 0} de {overview?.obrigacoes ?? 0} obrigações</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <p className="text-xs text-muted-foreground">Publicações monitoradas</p>
-          <p className="text-2xl font-bold">{overview?.publicacoes_monitoradas ?? 0}</p>
-          <p className="text-[11px] text-muted-foreground">{overview?.total_pessoas ?? 0} pessoas cobradas</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <p className="text-xs text-muted-foreground">Em risco</p>
-          <p className="text-2xl font-bold text-destructive">{(overview?.baixo ?? 0) + (overview?.critico ?? 0)}</p>
-          <p className="text-[11px] text-muted-foreground">
-            {overview?.excelente ?? 0} excelentes · {overview?.atencao ?? 0} em atenção
-          </p>
-        </CardContent></Card>
-      </div>
-
       <Tabs defaultValue="ranking" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="ranking" className="gap-1.5 text-xs sm:text-sm"><TrendingUp className="h-4 w-4" /> Ranking</TabsTrigger>
-          <TabsTrigger value="publicacoes" className="gap-1.5 text-xs sm:text-sm"><Megaphone className="h-4 w-4" /> Publicações</TabsTrigger>
+          <TabsTrigger value="ranking" className="gap-1.5 text-xs sm:text-sm"><TrendingUp className="h-4 w-4" /> Índice individual</TabsTrigger>
+          <TabsTrigger value="publicacoes" className="gap-1.5 text-xs sm:text-sm"><Megaphone className="h-4 w-4" /> Obrigações por publicação</TabsTrigger>
           <TabsTrigger value="regras" className="gap-1.5 text-xs sm:text-sm"><Target className="h-4 w-4" /> Regras</TabsTrigger>
           
         </TabsList>
+
 
         <TabsContent value="ranking">
           <Card>
