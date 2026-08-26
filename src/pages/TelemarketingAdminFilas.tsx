@@ -368,6 +368,18 @@ export default function TelemarketingAdminFilas() {
           onChanged={() => load()}
         />
       )}
+
+      {clientId && renameDialog.open && (
+        <RenomearFilaDialog
+          open={renameDialog.open}
+          onOpenChange={(o) => setRenameDialog(s => ({ ...s, open: o }))}
+          clientId={clientId}
+          campanhaId={renameDialog.campanhaId}
+          nomeAtual={renameDialog.nome}
+          descricaoAtual={renameDialog.descricao}
+          onSaved={() => load()}
+        />
+      )}
     </div>
   );
 
