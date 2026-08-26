@@ -25,6 +25,8 @@ type Props = {
   missionId: string;
   missionTitle: string | null;
   missionLink: string | null;
+  audienceId?: string | null;
+  audienceNome?: string | null;
 };
 
 type Row = {
@@ -38,13 +40,31 @@ type Row = {
   is_voluntario: boolean;
   tem_contrato: boolean;
   indicador_nome: string | null;
+  indicador_id?: string | null;
   status: "cumpriu" | "abriu" | "nao_abriu";
   primeiro_acesso_em: string | null;
   concluido_em: string | null;
   clicks: number;
   tem_cadastro?: boolean;
   links_clicados?: string[] | null;
+  missoes_cobradas?: number;
+  missoes_cumpridas?: number;
+  pct_cumprimento?: number;
 };
+
+type NaoObrigadoRow = {
+  participant_id: string;
+  pessoa_id: string | null;
+  nome: string;
+  telefone: string | null;
+  cargo: string | null;
+  regiao: string | null;
+  status: "cumpriu" | "abriu" | "nao_abriu";
+  primeiro_acesso_em: string | null;
+  concluido_em: string | null;
+  clicks: number;
+};
+
 
 const CARGO_LABEL: Record<string, string> = {
   coordenador: "Coordenador",
@@ -58,7 +78,9 @@ const CARGO_LABEL: Record<string, string> = {
 const fmtDate = (s: string | null) =>
   s ? new Date(s).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 
-export default function MissionCheckinDashboard({ clientId, missionId, missionTitle, missionLink }: Props) {
+export default function MissionCheckinDashboard({
+  clientId, missionId, missionTitle, missionLink, audienceId, audienceNome,
+}: Props) {
   const [incluirSemValor, setIncluirSemValor] = useState(false);
   const [incluirFuncionarios, setIncluirFuncionarios] = useState(false);
   const [somenteFaltantes, setSomenteFaltantes] = useState(false);
@@ -67,21 +89,37 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
   const [cadastroFiltro, setCadastroFiltro] = useState<string>("todos");
   const [cargoFiltro, setCargoFiltro] = useState<string>("todos");
   const [regiaoFiltro, setRegiaoFiltro] = useState<string>("todas");
+  const [historicoFiltro, setHistoricoFiltro] = useState<string>("todos");
   const [search, setSearch] = useState("");
   const [historicoPessoa, setHistoricoPessoa] = useState<{ id: string; nome: string } | null>(null);
 
   const { data: rows = [], isLoading } = useQuery<Row[]>({
-    queryKey: ["mission-checkin-dashboard", clientId, missionId, incluirSemValor, incluirFuncionarios],
+    queryKey: ["mission-checkin-dashboard-v2", clientId, missionId, audienceId, incluirSemValor, incluirFuncionarios],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("mission_checkin_dashboard", {
+      const { data, error } = await (supabase as any).rpc("mission_checkin_dashboard_v2", {
         p_client_id: clientId,
         p_mission_id: missionId,
+        p_audience_id: audienceId ?? null,
         p_incluir_sem_valor: incluirSemValor,
         p_incluir_funcionarios: incluirFuncionarios,
-        p_regiao: null,
       });
       if (error) throw error;
       return (data || []) as Row[];
+    },
+    enabled: !!clientId && !!missionId,
+    staleTime: 15_000,
+  });
+
+  const { data: naoObrigados = [], isLoading: loadingNao } = useQuery<NaoObrigadoRow[]>({
+    queryKey: ["mission-checkin-nao-obrigados", clientId, missionId, audienceId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("mission_checkin_nao_obrigados", {
+        p_client_id: clientId,
+        p_mission_id: missionId,
+        p_audience_id: audienceId ?? null,
+      });
+      if (error) throw error;
+      return (data || []) as NaoObrigadoRow[];
     },
     enabled: !!clientId && !!missionId,
     staleTime: 15_000,
@@ -104,13 +142,21 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
       if (cadastroFiltro === "sem" && r.tem_cadastro !== false) return false;
       if (cargoFiltro !== "todos" && (r.cargo || "") !== cargoFiltro) return false;
       if (regiaoFiltro !== "todas" && (r.regiao || "") !== regiaoFiltro) return false;
+      if (historicoFiltro !== "todos") {
+        const pct = r.pct_cumprimento ?? 0;
+        const cobradas = r.missoes_cobradas ?? 0;
+        if (historicoFiltro === "sempre" && !(cobradas > 0 && pct >= 80)) return false;
+        if (historicoFiltro === "nunca" && !(cobradas > 0 && pct === 0)) return false;
+        if (historicoFiltro === "irregular" && !(cobradas > 0 && pct > 0 && pct < 80)) return false;
+      }
       if (q) {
         const hay = `${r.nome} ${r.telefone || ""} ${r.indicador_nome || ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [rows, somenteFaltantes, statusFiltro, obrigacaoFiltro, cadastroFiltro, cargoFiltro, regiaoFiltro, search]);
+  }, [rows, somenteFaltantes, statusFiltro, obrigacaoFiltro, cadastroFiltro, cargoFiltro, regiaoFiltro, historicoFiltro, search]);
+
 
   const kpis = useMemo(() => {
     const total = filtered.length;
@@ -302,9 +348,12 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
               <div>
                 <p className="text-sm font-medium">Quem é obrigado a interagir</p>
                 <p className="text-xs text-muted-foreground">
-                  Por padrão, o público são todos com contrato gerado (valor definido) mais os voluntários.
+                  {audienceId
+                    ? `Lista de obrigados: ${audienceNome || "selecionada"}.`
+                    : "Sem lista escolhida: o público padrão são os contratos vigentes mais os voluntários."}
                 </p>
               </div>
+
               <Badge variant="secondary" className="ml-auto shrink-0">
                 {filtered.length} pessoa{filtered.length !== 1 ? "s" : ""}
               </Badge>
@@ -381,6 +430,16 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                     ))}
                   </SelectContent>
                 </Select>
+                <Select value={historicoFiltro} onValueChange={setHistoricoFiltro}>
+                  <SelectTrigger className="w-full sm:w-52"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Histórico: todos</SelectItem>
+                    <SelectItem value="sempre">Cumpre sempre (80%+)</SelectItem>
+                    <SelectItem value="irregular">Cumpre às vezes</SelectItem>
+                    <SelectItem value="nunca">Nunca cumpre</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Button variant="outline" className="gap-1.5" onClick={exportExcel} disabled={!filtered.length}>
                   <Download className="h-4 w-4" /> Excel
                 </Button>
@@ -408,6 +467,8 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                         <th className="p-2 text-left">Status</th>
                         <th className="p-2 text-left">Links abertos</th>
                         <th className="p-2 text-left">Check-in</th>
+                        <th className="p-2 text-left">Histórico</th>
+
                         <th className="p-2 text-right">Ações</th>
                       </tr>
                     </thead>
@@ -453,6 +514,24 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
                           <td className="p-2 text-xs text-muted-foreground">
                             {fmtDate(r.concluido_em || r.primeiro_acesso_em)}
                           </td>
+                          <td className="p-2 text-xs">
+                            {(r.missoes_cobradas ?? 0) === 0 ? (
+                              <span className="text-muted-foreground">1ª missão</span>
+                            ) : (
+                              <span
+                                className={
+                                  (r.pct_cumprimento ?? 0) >= 80
+                                    ? "text-emerald-600"
+                                    : (r.pct_cumprimento ?? 0) === 0
+                                      ? "text-destructive"
+                                      : "text-amber-600"
+                                }
+                              >
+                                {r.missoes_cumpridas ?? 0}/{r.missoes_cobradas} · {r.pct_cumprimento ?? 0}%
+                              </span>
+                            )}
+                          </td>
+
                           <td className="p-2">
                             <div className="flex justify-end gap-1">
                               {r.origem === "eleicao" && (
@@ -477,7 +556,68 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
             </div>
           </AccordionContent>
         </AccordionItem>
+
+        <AccordionItem value="nao-obrigados" className="mt-3 border rounded-lg bg-card">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline [&>svg]:ml-3">
+            <div className="flex flex-1 items-center text-left">
+              <div>
+                <p className="text-sm font-medium">Participaram mas não são obrigados</p>
+                <p className="text-xs text-muted-foreground">
+                  Quem entrou no link sem estar na lista de obrigados. Não entra no cálculo de adesão.
+                </p>
+              </div>
+              <Badge variant="outline" className="ml-auto shrink-0">
+                {naoObrigados.length} pessoa{naoObrigados.length !== 1 ? "s" : ""}
+              </Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            {loadingNao ? (
+              <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : naoObrigados.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Ninguém de fora da lista participou desta missão.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="p-2 text-left">Pessoa</th>
+                      <th className="p-2 text-left">Cargo</th>
+                      <th className="p-2 text-left">Região</th>
+                      <th className="p-2 text-left">Telefone</th>
+                      <th className="p-2 text-left">Status</th>
+                      <th className="p-2 text-left">Check-in</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {naoObrigados.map((r) => (
+                      <tr key={r.participant_id} className="border-t">
+                        <td className="p-2 font-medium">{r.nome}</td>
+                        <td className="p-2 text-xs">{CARGO_LABEL[r.cargo || ""] || r.cargo || "—"}</td>
+                        <td className="p-2 text-xs">{r.regiao || "—"}</td>
+                        <td className="p-2 text-xs">{fmtPhoneBR(r.telefone) || "—"}</td>
+                        <td className="p-2">
+                          {r.status === "cumpriu" ? (
+                            <Badge className="gap-1 bg-emerald-600 text-[10px] hover:bg-emerald-600"><CheckCircle2 className="h-3 w-3" /> Cumpriu</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="gap-1 text-[10px]"><Eye className="h-3 w-3" /> Abriu</Badge>
+                          )}
+                        </td>
+                        <td className="p-2 text-xs text-muted-foreground">
+                          {fmtDate(r.concluido_em || r.primeiro_acesso_em)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
+
 
       <MissionPessoaHistorico
         clientId={clientId}

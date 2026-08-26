@@ -6296,6 +6296,86 @@ export type Database = {
         }
         Relationships: []
       }
+      mission_audience_members: {
+        Row: {
+          audience_id: string
+          client_id: string
+          created_at: string
+          id: string
+          modo: string
+          motivo: string | null
+          origem: string
+          ref_id: string
+          updated_at: string
+        }
+        Insert: {
+          audience_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          modo?: string
+          motivo?: string | null
+          origem?: string
+          ref_id: string
+          updated_at?: string
+        }
+        Update: {
+          audience_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          modo?: string
+          motivo?: string | null
+          origem?: string
+          ref_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_audience_members_audience_id_fkey"
+            columns: ["audience_id"]
+            isOneToOne: false
+            referencedRelation: "mission_audiences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_audiences: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          id: string
+          is_default: boolean
+          nome: string
+          regra: Json
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          id?: string
+          is_default?: boolean
+          nome: string
+          regra?: Json
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          id?: string
+          is_default?: boolean
+          nome?: string
+          regra?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mission_checkins: {
         Row: {
           clicks: number
@@ -7438,6 +7518,7 @@ export type Database = {
       portal_missions: {
         Row: {
           archived_at: string | null
+          audience_id: string | null
           client_id: string
           created_at: string
           description: string | null
@@ -7462,6 +7543,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          audience_id?: string | null
           client_id: string
           created_at?: string
           description?: string | null
@@ -7486,6 +7568,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          audience_id?: string | null
           client_id?: string
           created_at?: string
           description?: string | null
@@ -7514,6 +7597,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_missions_audience_id_fkey"
+            columns: ["audience_id"]
+            isOneToOne: false
+            referencedRelation: "mission_audiences"
             referencedColumns: ["id"]
           },
           {
@@ -11585,6 +11675,27 @@ export type Database = {
           titulo: string
         }[]
       }
+      mission_audience_preview: {
+        Args: { p_audience_id?: string; p_client_id: string; p_regra: Json }
+        Returns: Json
+      }
+      mission_audience_resolve: {
+        Args: { p_audience_id?: string; p_client_id: string; p_regra: Json }
+        Returns: {
+          cargo: string
+          cidade: string
+          escopo: string
+          indicador_id: string
+          indicador_nome: string
+          is_voluntario: boolean
+          nome: string
+          origem: string
+          pessoa_id: string
+          regiao: string
+          telefone: string
+          tem_contrato: boolean
+        }[]
+      }
       mission_checkin_dashboard: {
         Args: {
           p_client_id: string
@@ -11614,6 +11725,38 @@ export type Database = {
           tem_contrato: boolean
         }[]
       }
+      mission_checkin_dashboard_v2: {
+        Args: {
+          p_audience_id?: string
+          p_client_id: string
+          p_incluir_funcionarios?: boolean
+          p_incluir_sem_valor?: boolean
+          p_mission_id: string
+        }
+        Returns: {
+          cargo: string
+          cidade: string
+          clicks: number
+          concluido_em: string
+          indicador_id: string
+          indicador_nome: string
+          is_voluntario: boolean
+          links_clicados: string[]
+          missoes_cobradas: number
+          missoes_cumpridas: number
+          nome: string
+          origem: string
+          pct_cumprimento: number
+          pessoa_id: string
+          primeiro_acesso_em: string
+          regiao: string
+          status: string
+          telefone: string
+          tem_cadastro: boolean
+          tem_contrato: boolean
+          ultimas_missoes: Json
+        }[]
+      }
       mission_checkin_evolucao: {
         Args: { p_client_id: string; p_limit?: number }
         Returns: {
@@ -11623,6 +11766,25 @@ export type Database = {
           participantes: number
           quando: string
           title: string
+        }[]
+      }
+      mission_checkin_nao_obrigados: {
+        Args: {
+          p_audience_id?: string
+          p_client_id: string
+          p_mission_id: string
+        }
+        Returns: {
+          cargo: string
+          clicks: number
+          concluido_em: string
+          nome: string
+          participant_id: string
+          pessoa_id: string
+          primeiro_acesso_em: string
+          regiao: string
+          status: string
+          telefone: string
         }[]
       }
       mission_checkin_pessoa_historico: {
