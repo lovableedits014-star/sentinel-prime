@@ -341,8 +341,21 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
         .eq("id", campanhaId);
     }
 
+    // Marca os operadores liberados nesta fila
+    if (campanhaId) {
+      const { error: opsErr } = await supabase.rpc("tele_fila_set_operadores" as any, {
+        _client_id: clientId,
+        _campanha_id: campanhaId,
+        _operador_ids: marcados,
+        _modo: modoDesignacao === "dividir" ? "dividida" : "compartilhada",
+        _acao_remocao: "manter",
+        _repassar_para: null,
+      });
+      if (opsErr) toast.error("Fila criada, mas não foi possível salvar os operadores: " + opsErr.message);
+    }
+
     // Se dividir entre N operadores, buscar contatos criados e distribuir
-    if (modoDesignacao === "dividir" && operadoresDividir.size >= 2 && campanhaId) {
+    if (modoDesignacao === "dividir" && marcados.length >= 2 && campanhaId) {
       const { data: lista } = await supabase.rpc("tele_admin_listar_avulsos" as any, {
         _client_id: clientId, _campanha_id: campanhaId,
       });
@@ -352,12 +365,12 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
       if (ids.length) {
         await supabase.rpc("tele_distribute_contatos" as any, {
           _client_id: clientId, _campanha_id: campanhaId,
-          _contato_ids: ids, _operador_ids: Array.from(operadoresDividir),
+          _contato_ids: ids, _operador_ids: marcados,
         });
       }
     }
-    // Se "um" e origem NÃO for CSV, atribuir todos os contatos criados
-    if (modoDesignacao === "um" && operadorUnico && origem !== "csv" && campanhaId) {
+    // Fila de um único operador (não CSV): atribui todos os contatos criados a ele
+    if (opUnicoParaCriar && origem !== "csv" && campanhaId) {
       const { data: lista } = await supabase.rpc("tele_admin_listar_avulsos" as any, {
         _client_id: clientId, _campanha_id: campanhaId,
       });
@@ -367,7 +380,7 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
       if (ids.length) {
         await supabase.rpc("tele_assign_contatos" as any, {
           _client_id: clientId, _campanha_id: campanhaId,
-          _contato_ids: ids, _operador_id: operadorUnico,
+          _contato_ids: ids, _operador_id: opUnicoParaCriar,
         });
       }
     }
