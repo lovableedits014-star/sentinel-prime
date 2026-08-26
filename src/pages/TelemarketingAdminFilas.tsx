@@ -231,6 +231,14 @@ export default function TelemarketingAdminFilas() {
                         {f.descricao && <p className="text-xs text-muted-foreground truncate">{f.descricao}</p>}
                       </div>
                       <div className="flex gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setRenameDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome, descricao: f.descricao })}
+                          title="Renomear fila"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => toggleAtivo(f)} title={f.ativo ? "Pausar" : "Ativar"}>
                           <Power className="w-3.5 h-3.5" />
                         </Button>
