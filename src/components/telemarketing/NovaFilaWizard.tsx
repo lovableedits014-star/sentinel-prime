@@ -660,32 +660,47 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
 
         {step === 5 && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Quem vai ligar para esses contatos?</p>
+            <p className="text-sm text-muted-foreground">Marque quais operadores podem trabalhar esta fila. Quem não estiver marcado não recebe nenhum contato dela.</p>
+
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Operadores desta fila</p>
+                <div className="flex gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setOpsMarcados(new Set(opsAtivos.map(o => o.id)))}>Marcar todos</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setOpsMarcados(new Set())}>Limpar</Button>
+                </div>
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {opsAtivos.map(o => {
+                  const checked = opsMarcados.has(o.id);
+                  return (
+                    <label key={o.id} className={`flex items-center gap-2 border rounded-md px-2 py-1.5 text-sm cursor-pointer ${checked ? "bg-primary/10 border-primary" : "hover:bg-muted/50"}`}>
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          const next = new Set(opsMarcados);
+                          if (v) next.add(o.id); else next.delete(o.id);
+                          setOpsMarcados(next);
+                        }}
+                      />
+                      {o.nome}
+                    </label>
+                  );
+                })}
+                {opsAtivos.length === 0 && <p className="text-xs text-amber-600">Nenhum operador ativo cadastrado.</p>}
+              </div>
+              <p className="text-[11px] text-muted-foreground">{opsMarcados.size} operador(es) marcado(s)</p>
+            </div>
+
+            <p className="text-sm text-muted-foreground">Como distribuir os contatos entre os marcados?</p>
 
             <button
               type="button"
-              onClick={() => setModoDesignacao("pool")}
-              className={`w-full text-left p-3 border rounded-lg ${modoDesignacao === "pool" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
+              onClick={() => setModoDesignacao("compartilhada")}
+              className={`w-full text-left p-3 border rounded-lg ${modoDesignacao === "compartilhada" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
             >
-              <p className="font-medium text-sm">Pool livre <span className="text-xs text-muted-foreground">(recomendado quando todos ligam para todos)</span></p>
-              <p className="text-xs text-muted-foreground">Qualquer operador ativo pode puxar contatos desta fila. O sistema impede que dois operadores peguem o mesmo contato ao mesmo tempo.</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setModoDesignacao("um")}
-              className={`w-full text-left p-3 border rounded-lg ${modoDesignacao === "um" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
-            >
-              <p className="font-medium text-sm">Um operador específico</p>
-              <p className="text-xs text-muted-foreground mb-2">Toda a fila fica com um único operador. Bom para listas pequenas ou VIP.</p>
-              {modoDesignacao === "um" && (
-                <Select value={operadorUnico} onValueChange={setOperadorUnico}>
-                  <SelectTrigger><SelectValue placeholder="Escolher operador…" /></SelectTrigger>
-                  <SelectContent>
-                    {opsAtivos.map(o => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
+              <p className="font-medium text-sm">Fila compartilhada <span className="text-xs text-muted-foreground">(recomendado)</span></p>
+              <p className="text-xs text-muted-foreground">Os operadores marcados puxam contatos do mesmo bolo. O sistema impede que dois peguem o mesmo contato. Se só um estiver marcado, a fila inteira fica com ele.</p>
             </button>
 
             <button
@@ -693,29 +708,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
               onClick={() => setModoDesignacao("dividir")}
               className={`w-full text-left p-3 border rounded-lg ${modoDesignacao === "dividir" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
             >
-              <p className="font-medium text-sm">Dividir igualmente entre operadores</p>
-              <p className="text-xs text-muted-foreground mb-2">Distribuição round-robin: cada operador recebe uma fatia igual e ninguém liga em duplicidade.</p>
-              {modoDesignacao === "dividir" && (
-                <div className="flex flex-wrap gap-2">
-                  {opsAtivos.map(o => {
-                    const checked = operadoresDividir.has(o.id);
-                    return (
-                      <label key={o.id} className={`flex items-center gap-1.5 border rounded-md px-2 py-1 text-xs cursor-pointer ${checked ? "bg-primary/10 border-primary" : ""}`}>
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(v) => {
-                            const next = new Set(operadoresDividir);
-                            if (v) next.add(o.id); else next.delete(o.id);
-                            setOperadoresDividir(next);
-                          }}
-                        />
-                        {o.nome}
-                      </label>
-                    );
-                  })}
-                  {opsAtivos.length === 0 && <p className="text-xs text-amber-600">Nenhum operador ativo cadastrado.</p>}
-                </div>
-              )}
+              <p className="font-medium text-sm">Dividir igualmente entre os marcados</p>
+              <p className="text-xs text-muted-foreground">Distribuição round-robin: cada operador recebe uma fatia fixa (exige 2 ou mais marcados).</p>
             </button>
           </div>
         )}
