@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart3, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
 import { fetchAudiences } from "@/lib/mission-audiences";
 import {
-  fetchEquipeDesempenho, fetchPubKpis, fetchPublicacoesDesempenho,
+  fetchEquipeDesempenho, fetchPubKpis, fetchPublicacoesDesempenho, fetchTeamRoots,
 } from "@/lib/engagement-desempenho";
 import MonitorKpisHeader from "./MonitorKpisHeader";
 import MonitorCharts from "./MonitorCharts";
@@ -20,7 +20,13 @@ import MatrizCumprimentoPanel from "./MatrizCumprimentoPanel";
 export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: string }) {
   const [dias, setDias] = useState(30);
   const [audienceId, setAudienceId] = useState<string>("padrao");
+  const [rootId, setRootId] = useState<string>("todos");
+  const [missionId, setMissionId] = useState<string>("todas");
   const aud = audienceId === "padrao" ? null : audienceId;
+  const filters = {
+    rootId: rootId === "todos" ? null : rootId,
+    missionId: missionId === "todas" ? null : missionId,
+  };
   const periodoLabel = `${dias}d`;
 
   const audiences = useQuery({
@@ -29,21 +35,33 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
     enabled: !!clientId,
   });
 
-  const kpis = useQuery({
-    queryKey: ["eng-pub-kpis", clientId, dias, aud],
-    queryFn: () => fetchPubKpis(clientId, dias, aud),
+  const teamRoots = useQuery({
+    queryKey: ["eng-team-roots", clientId],
+    queryFn: () => fetchTeamRoots(clientId),
     enabled: !!clientId,
   });
 
-  const publicacoes = useQuery({
-    queryKey: ["eng-pub-desempenho", clientId, dias, aud],
+  const missionOptions = useQuery({
+    queryKey: ["eng-pub-mission-options", clientId, dias, aud],
     queryFn: () => fetchPublicacoesDesempenho(clientId, dias, aud),
     enabled: !!clientId,
   });
 
+  const kpis = useQuery({
+    queryKey: ["eng-pub-kpis", clientId, dias, aud, rootId, missionId],
+    queryFn: () => fetchPubKpis(clientId, dias, aud, filters),
+    enabled: !!clientId,
+  });
+
+  const publicacoes = useQuery({
+    queryKey: ["eng-pub-desempenho", clientId, dias, aud, rootId, missionId],
+    queryFn: () => fetchPublicacoesDesempenho(clientId, dias, aud, filters),
+    enabled: !!clientId,
+  });
+
   const equipe = useQuery({
-    queryKey: ["eng-equipe-desempenho", clientId, dias, aud],
-    queryFn: () => fetchEquipeDesempenho(clientId, dias, aud),
+    queryKey: ["eng-equipe-desempenho", clientId, dias, aud, rootId, missionId],
+    queryFn: () => fetchEquipeDesempenho(clientId, dias, aud, filters),
     enabled: !!clientId,
   });
 
@@ -73,7 +91,7 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
         <CardContent className="flex flex-wrap items-end gap-3 px-3 sm:px-6">
           <div className="space-y-1">
             <Label className="text-xs">Período</Label>
-            <Select value={String(dias)} onValueChange={(v) => setDias(Number(v))}>
+            <Select value={String(dias)} onValueChange={(v) => { setDias(Number(v)); setMissionId("todas"); }}>
               <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="7">7 dias</SelectItem>
@@ -85,12 +103,40 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Lista de obrigados</Label>
-            <Select value={audienceId} onValueChange={setAudienceId}>
+            <Select value={audienceId} onValueChange={(v) => { setAudienceId(v); setMissionId("todas"); }}>
               <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="padrao">Padrão (estrutura + contratos)</SelectItem>
                 {(audiences.data ?? []).map((a) => (
                   <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Equipe responsável</Label>
+            <Select value={rootId} onValueChange={setRootId}>
+              <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as equipes</SelectItem>
+                {(teamRoots.data ?? []).map((r) => (
+                  <SelectItem key={r.root_id} value={r.root_id}>
+                    {r.is_avulso ? "Líder avulso" : "Coordenador"} · {r.nome} ({r.pessoas})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Missão</Label>
+            <Select value={missionId} onValueChange={setMissionId}>
+              <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas as missões do período</SelectItem>
+                {(missionOptions.data ?? []).map((m) => (
+                  <SelectItem key={m.mission_id} value={m.mission_id}>
+                    {m.titulo || "Missão sem título"}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
