@@ -1,0 +1,10 @@
+REVOKE ALL ON FUNCTION public.tele_claim_contato(uuid,text,text,text,uuid,integer,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.tele_heartbeat_contato(uuid,text,text,text,uuid,integer,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.tele_release_contato(uuid,text,text,text,uuid,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.tele_proximo_contato(uuid,text,text,uuid,integer,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.tele_diagnostico_fila(uuid,text,text,uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.tele_claim_contato(uuid,text,text,text,uuid,integer,text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tele_heartbeat_contato(uuid,text,text,text,uuid,integer,text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tele_release_contato(uuid,text,text,text,uuid,text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tele_proximo_contato(uuid,text,text,uuid,integer,text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tele_diagnostico_fila(uuid,text,text,uuid) TO anon, authenticated;

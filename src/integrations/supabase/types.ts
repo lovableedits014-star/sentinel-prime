@@ -9186,6 +9186,7 @@ export type Database = {
           expires_at: string
           id: string
           operador_nome: string
+          session_id: string | null
           tabela: string
         }
         Insert: {
@@ -9195,6 +9196,7 @@ export type Database = {
           expires_at: string
           id?: string
           operador_nome: string
+          session_id?: string | null
           tabela: string
         }
         Update: {
@@ -9204,6 +9206,7 @@ export type Database = {
           expires_at?: string
           id?: string
           operador_nome?: string
+          session_id?: string | null
           tabela?: string
         }
         Relationships: []
@@ -12249,6 +12252,15 @@ export type Database = {
         }
         Returns: Json
       }
+      tele_assign_visivel: {
+        Args: {
+          _assigned: string
+          _campanha_id: string
+          _client_id: string
+          _op_id: string
+        }
+        Returns: boolean
+      }
       tele_buscar_contato: {
         Args: {
           _campanha_id?: string
@@ -12296,6 +12308,7 @@ export type Database = {
           _id: string
           _nome: string
           _senha: string
+          _session_id?: string
           _tabela: string
           _ttl_seconds?: number
         }
@@ -12326,6 +12339,15 @@ export type Database = {
       }
       tele_designar_lista_operador: {
         Args: { _client_id: string; _lista_id: string; _operador_id: string }
+        Returns: Json
+      }
+      tele_diagnostico_fila: {
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _nome: string
+          _senha: string
+        }
         Returns: Json
       }
       tele_distribute_contatos: {
@@ -12472,6 +12494,7 @@ export type Database = {
           _id: string
           _nome: string
           _senha: string
+          _session_id?: string
           _tabela: string
           _ttl_seconds?: number
         }
@@ -12678,6 +12701,7 @@ export type Database = {
           _client_id: string
           _nome: string
           _senha: string
+          _session_id?: string
           _ttl_seconds?: number
         }
         Returns: Json
@@ -12756,53 +12780,60 @@ export type Database = {
         }
         Returns: Json
       }
-      tele_registrar_ligacao:
-        | {
-            Args: {
-              _bairro: string
-              _candidato_alternativo?: string
-              _cidade: string
-              _client_id: string
-              _id: string
-              _ligacao_status: string
-              _nome: string
-              _observacao?: string
-              _proxima_tentativa_em?: string
-              _senha: string
-              _tabela: string
-              _vota_candidato?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _bairro: string
-              _candidato_alternativo?: string
-              _candidato_federal?: string
-              _candidato_governador?: string
-              _candidato_senador?: string
-              _cidade: string
-              _client_id: string
-              _federal_status?: string
-              _governador_status?: string
-              _id: string
-              _ligacao_status: string
-              _nome: string
-              _observacao?: string
-              _proxima_tentativa_em?: string
-              _senador_status?: string
-              _senha: string
-              _tabela: string
-              _vota_candidato?: string
-            }
-            Returns: Json
-          }
+      tele_registrar_ligacao: {
+        Args: {
+          _bairro: string
+          _candidato_alternativo?: string
+          _candidato_federal?: string
+          _candidato_governador?: string
+          _candidato_senador?: string
+          _cidade: string
+          _client_id: string
+          _federal_status?: string
+          _governador_status?: string
+          _id: string
+          _ligacao_status: string
+          _nome: string
+          _observacao?: string
+          _proxima_tentativa_em?: string
+          _senador_status?: string
+          _senha: string
+          _tabela: string
+          _vota_candidato?: string
+        }
+        Returns: Json
+      }
+      tele_registrar_ligacao_sessao: {
+        Args: {
+          _bairro: string
+          _candidato_alternativo?: string
+          _candidato_federal?: string
+          _candidato_governador?: string
+          _candidato_senador?: string
+          _cidade: string
+          _client_id: string
+          _federal_status?: string
+          _governador_status?: string
+          _id: string
+          _ligacao_status: string
+          _nome: string
+          _observacao?: string
+          _proxima_tentativa_em?: string
+          _senador_status?: string
+          _senha: string
+          _session_id?: string
+          _tabela: string
+          _vota_candidato?: string
+        }
+        Returns: Json
+      }
       tele_release_contato: {
         Args: {
           _client_id: string
           _id: string
           _nome: string
           _senha: string
+          _session_id?: string
           _tabela: string
         }
         Returns: Json
