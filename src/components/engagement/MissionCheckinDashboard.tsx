@@ -348,9 +348,12 @@ export default function MissionCheckinDashboard({
               <div>
                 <p className="text-sm font-medium">Quem é obrigado a interagir</p>
                 <p className="text-xs text-muted-foreground">
-                  Por padrão, o público são todos com contrato gerado (valor definido) mais os voluntários.
+                  {audienceId
+                    ? `Lista de obrigados: ${audienceNome || "selecionada"}.`
+                    : "Sem lista escolhida: o público padrão são os contratos vigentes mais os voluntários."}
                 </p>
               </div>
+
               <Badge variant="secondary" className="ml-auto shrink-0">
                 {filtered.length} pessoa{filtered.length !== 1 ? "s" : ""}
               </Badge>
