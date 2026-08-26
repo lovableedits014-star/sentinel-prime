@@ -253,9 +253,9 @@ export default function ImportContatosAvulsosDialog({
               <div>
                 <Label className="flex items-center gap-1"><UserPlus className="w-3 h-3" />Designar a operador (opcional)</Label>
                 <Select value={operadorId} onValueChange={setOperadorId}>
-                  <SelectTrigger><SelectValue placeholder="Sem designação (pool livre)" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Livre para os operadores da fila" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>— Pool livre —</SelectItem>
+                    <SelectItem value={NONE}>— Livre para os operadores da fila —</SelectItem>
                     {operadores.filter(o => o.ativo !== false).map(o => (
                       <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>
                     ))}

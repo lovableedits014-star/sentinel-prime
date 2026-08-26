@@ -412,7 +412,7 @@ export default function AdicionarContatosDialog({
             <Select value={designar} onValueChange={setDesignar}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>Pool livre (qualquer operador)</SelectItem>
+                <SelectItem value={ALL}>Livre para os operadores da fila</SelectItem>
                 {opsAtivos.map(o => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
               </SelectContent>
             </Select>

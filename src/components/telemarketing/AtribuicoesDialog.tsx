@@ -151,7 +151,7 @@ export default function AtribuicoesDialog({
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Contatos liberados para o pool");
+    toast.success("Contatos liberados para os operadores da fila");
     onChanged?.();
     load();
   };
@@ -209,7 +209,7 @@ export default function AtribuicoesDialog({
           <DialogDescription>
             Aqui você decide quem liga para quem. Selecione contatos na lista abaixo e escolha uma ação:
             <strong> atribuir</strong> a um operador (só ele verá o contato), <strong> distribuir</strong> igualmente
-            entre vários, <strong> liberar</strong> para o pool livre (qualquer operador da fila pode puxar) ou
+            entre vários, <strong> liberar</strong> para os operadores da fila (qualquer operador marcado pode puxar) ou
             <strong> remover da fila</strong> (o contato continua cadastrado, apenas sai desta fila).
           </DialogDescription>
         </DialogHeader>
@@ -218,7 +218,7 @@ export default function AtribuicoesDialog({
           <Badge variant="outline">{counts.total} total</Badge>
           <Badge variant="secondary">{counts.pend} pendentes</Badge>
           <Badge variant="outline" className="gap-1">
-            {counts.livres} no pool livre <TeleHelp text={TELE_HELP.poolLivre} />
+            {counts.livres} livres para os operadores da fila <TeleHelp text={TELE_HELP.poolLivre} />
           </Badge>
           <Badge variant="default">{counts.atribuidos} atribuídos</Badge>
         </div>
@@ -232,7 +232,7 @@ export default function AtribuicoesDialog({
             <SelectTrigger className="w-[160px] h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="pendentes">Só pendentes</SelectItem>
-              <SelectItem value="livres">Só pool livre</SelectItem>
+              <SelectItem value="livres">Só livres na fila</SelectItem>
               <SelectItem value="atribuidos">Só atribuídos</SelectItem>
               <SelectItem value="todos">Todos</SelectItem>
             </SelectContent>
@@ -241,7 +241,7 @@ export default function AtribuicoesDialog({
             <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Todos operadores</SelectItem>
-              <SelectItem value={NONE}>— Pool livre —</SelectItem>
+              <SelectItem value={NONE}>— Livre na fila —</SelectItem>
               {operadores.map(o => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
             </SelectContent>
           </Select>
