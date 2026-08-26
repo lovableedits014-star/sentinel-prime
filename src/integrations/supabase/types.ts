@@ -12252,6 +12252,15 @@ export type Database = {
         }
         Returns: Json
       }
+      tele_assign_visivel: {
+        Args: {
+          _assigned: string
+          _campanha_id: string
+          _client_id: string
+          _op_id: string
+        }
+        Returns: boolean
+      }
       tele_buscar_contato: {
         Args: {
           _campanha_id?: string
@@ -12293,30 +12302,18 @@ export type Database = {
         Args: { _new_senha: string; _operador_id: string }
         Returns: Json
       }
-      tele_claim_contato:
-        | {
-            Args: {
-              _client_id: string
-              _id: string
-              _nome: string
-              _senha: string
-              _tabela: string
-              _ttl_seconds?: number
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _client_id: string
-              _id: string
-              _nome: string
-              _senha: string
-              _session_id?: string
-              _tabela: string
-              _ttl_seconds?: number
-            }
-            Returns: Json
-          }
+      tele_claim_contato: {
+        Args: {
+          _client_id: string
+          _id: string
+          _nome: string
+          _senha: string
+          _session_id?: string
+          _tabela: string
+          _ttl_seconds?: number
+        }
+        Returns: Json
+      }
       tele_create_fila_wizard: {
         Args: {
           _client_id: string
@@ -12491,30 +12488,18 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      tele_heartbeat_contato:
-        | {
-            Args: {
-              _client_id: string
-              _id: string
-              _nome: string
-              _senha: string
-              _tabela: string
-              _ttl_seconds?: number
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _client_id: string
-              _id: string
-              _nome: string
-              _senha: string
-              _session_id?: string
-              _tabela: string
-              _ttl_seconds?: number
-            }
-            Returns: Json
-          }
+      tele_heartbeat_contato: {
+        Args: {
+          _client_id: string
+          _id: string
+          _nome: string
+          _senha: string
+          _session_id?: string
+          _tabela: string
+          _ttl_seconds?: number
+        }
+        Returns: Json
+      }
       tele_import_contato_avulso_batch: {
         Args: {
           _assigned_operador_id?: string
@@ -12710,28 +12695,17 @@ export type Database = {
         }
         Returns: Json
       }
-      tele_proximo_contato:
-        | {
-            Args: {
-              _campanha_id?: string
-              _client_id: string
-              _nome: string
-              _senha: string
-              _ttl_seconds?: number
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _campanha_id?: string
-              _client_id: string
-              _nome: string
-              _senha: string
-              _session_id?: string
-              _ttl_seconds?: number
-            }
-            Returns: Json
-          }
+      tele_proximo_contato: {
+        Args: {
+          _campanha_id?: string
+          _client_id: string
+          _nome: string
+          _senha: string
+          _session_id?: string
+          _ttl_seconds?: number
+        }
+        Returns: Json
+      }
       tele_ranking_indicadores: {
         Args: {
           _campanha_id?: string
@@ -12806,47 +12780,29 @@ export type Database = {
         }
         Returns: Json
       }
-      tele_registrar_ligacao:
-        | {
-            Args: {
-              _bairro: string
-              _candidato_alternativo?: string
-              _cidade: string
-              _client_id: string
-              _id: string
-              _ligacao_status: string
-              _nome: string
-              _observacao?: string
-              _proxima_tentativa_em?: string
-              _senha: string
-              _tabela: string
-              _vota_candidato?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _bairro: string
-              _candidato_alternativo?: string
-              _candidato_federal?: string
-              _candidato_governador?: string
-              _candidato_senador?: string
-              _cidade: string
-              _client_id: string
-              _federal_status?: string
-              _governador_status?: string
-              _id: string
-              _ligacao_status: string
-              _nome: string
-              _observacao?: string
-              _proxima_tentativa_em?: string
-              _senador_status?: string
-              _senha: string
-              _tabela: string
-              _vota_candidato?: string
-            }
-            Returns: Json
-          }
+      tele_registrar_ligacao: {
+        Args: {
+          _bairro: string
+          _candidato_alternativo?: string
+          _candidato_federal?: string
+          _candidato_governador?: string
+          _candidato_senador?: string
+          _cidade: string
+          _client_id: string
+          _federal_status?: string
+          _governador_status?: string
+          _id: string
+          _ligacao_status: string
+          _nome: string
+          _observacao?: string
+          _proxima_tentativa_em?: string
+          _senador_status?: string
+          _senha: string
+          _tabela: string
+          _vota_candidato?: string
+        }
+        Returns: Json
+      }
       tele_registrar_ligacao_sessao: {
         Args: {
           _bairro: string
@@ -12871,28 +12827,17 @@ export type Database = {
         }
         Returns: Json
       }
-      tele_release_contato:
-        | {
-            Args: {
-              _client_id: string
-              _id: string
-              _nome: string
-              _senha: string
-              _tabela: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _client_id: string
-              _id: string
-              _nome: string
-              _senha: string
-              _session_id?: string
-              _tabela: string
-            }
-            Returns: Json
-          }
+      tele_release_contato: {
+        Args: {
+          _client_id: string
+          _id: string
+          _nome: string
+          _senha: string
+          _session_id?: string
+          _tabela: string
+        }
+        Returns: Json
+      }
       tele_release_contatos: {
         Args: {
           _campanha_id: string
