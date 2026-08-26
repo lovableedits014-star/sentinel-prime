@@ -267,7 +267,7 @@ export default function Telemarketing() {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: selectedCampanhaId,
+      _campanha_id: usedCampanhaId,
       _ttl_seconds: 300,
     });
     const res = pick as { found: boolean; tabela?: string; contato_id?: string; lista_id?: string } | null;
