@@ -224,8 +224,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     }
     if (step === 4) return true;
     if (step === 5) {
-      if (modoDesignacao === "um") return !!operadorUnico;
-      if (modoDesignacao === "dividir") return operadoresDividir.size >= 2;
+      if (opsMarcados.size === 0) return false;
+      if (modoDesignacao === "dividir") return opsMarcados.size >= 2;
       return true;
     }
     return true;
