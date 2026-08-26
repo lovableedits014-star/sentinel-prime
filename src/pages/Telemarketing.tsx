@@ -318,7 +318,14 @@ export default function Telemarketing() {
     ? contatos
     : contatos.filter((c) => c.tipo === filtroTipo);
 
-  const current = filteredContatos[currentIndex] as ContatoTele | undefined;
+  // A fila pode ser atualizada enquanto o operador alterna entre dispositivos.
+  // Nunca deixe um índice antigo esconder os contatos que chegaram da RPC.
+  const safeCurrentIndex = currentIndex >= 0 && currentIndex < filteredContatos.length ? currentIndex : 0;
+  const current = filteredContatos[safeCurrentIndex] as ContatoTele | undefined;
+
+  useEffect(() => {
+    if (currentIndex !== safeCurrentIndex) setCurrentIndex(safeCurrentIndex);
+  }, [currentIndex, safeCurrentIndex]);
 
   const totalPendentes = filteredContatos.filter(
     (i) => !i.ligacao_status || i.ligacao_status === "pendente"
@@ -1228,7 +1235,7 @@ export default function Telemarketing() {
           </Card>
 
           <div className="text-center text-xs text-muted-foreground">
-            Contato {currentIndex + 1} de {filteredContatos.length}
+            Contato {safeCurrentIndex + 1} de {filteredContatos.length}
           </div>
         </>
       ) : (
