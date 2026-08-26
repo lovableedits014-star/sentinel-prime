@@ -179,6 +179,7 @@ export default function FrameEditor({
     try {
       await saveBlob(resultBlob, `foto-campanha-${Date.now()}.jpg`, {
         title: "Foto de campanha",
+        preferDownload: true,
       });
     } catch {
       toast.error("Não foi possível salvar a foto. Abra a página no Safari ou Chrome e tente novamente.");
@@ -265,7 +266,7 @@ export default function FrameEditor({
                   {resultUrl && (
                     <Button variant="default" onClick={handleDownload} disabled={downloading} className="gap-2 bg-primary">
                       {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      Salvar JPG (1080x1080)
+                      Baixar JPG (1080x1080)
                     </Button>
                   )}
                 </div>
