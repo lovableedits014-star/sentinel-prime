@@ -25,6 +25,8 @@ type Props = {
   missionId: string;
   missionTitle: string | null;
   missionLink: string | null;
+  audienceId?: string | null;
+  audienceNome?: string | null;
 };
 
 type Row = {
@@ -38,13 +40,31 @@ type Row = {
   is_voluntario: boolean;
   tem_contrato: boolean;
   indicador_nome: string | null;
+  indicador_id?: string | null;
   status: "cumpriu" | "abriu" | "nao_abriu";
   primeiro_acesso_em: string | null;
   concluido_em: string | null;
   clicks: number;
   tem_cadastro?: boolean;
   links_clicados?: string[] | null;
+  missoes_cobradas?: number;
+  missoes_cumpridas?: number;
+  pct_cumprimento?: number;
 };
+
+type NaoObrigadoRow = {
+  participant_id: string;
+  pessoa_id: string | null;
+  nome: string;
+  telefone: string | null;
+  cargo: string | null;
+  regiao: string | null;
+  status: "cumpriu" | "abriu" | "nao_abriu";
+  primeiro_acesso_em: string | null;
+  concluido_em: string | null;
+  clicks: number;
+};
+
 
 const CARGO_LABEL: Record<string, string> = {
   coordenador: "Coordenador",
