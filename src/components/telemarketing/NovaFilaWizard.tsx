@@ -16,7 +16,7 @@ import IndicadorCombobox from "./IndicadorCombobox";
 import { TELE_HELP } from "./telemarketing-help";
 
 type Origem = "csv" | "estrutura" | "indicados_eleicao" | "contratados" | "indicados_contratados";
-type ModoDesignacao = "pool" | "um" | "dividir";
+type ModoDesignacao = "compartilhada" | "dividir";
 
 interface Props {
   open: boolean;
@@ -83,9 +83,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
 
   // Designação
   const [operadores, setOperadores] = useState<Operador[]>([]);
-  const [modoDesignacao, setModoDesignacao] = useState<ModoDesignacao>("pool");
-  const [operadorUnico, setOperadorUnico] = useState<string>("");
-  const [operadoresDividir, setOperadoresDividir] = useState<Set<string>>(new Set());
+  const [modoDesignacao, setModoDesignacao] = useState<ModoDesignacao>("compartilhada");
+  const [opsMarcados, setOpsMarcados] = useState<Set<string>>(new Set());
   const [nomeLista, setNomeLista] = useState("");
 
 
@@ -101,7 +100,7 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     setCidade(""); setBairro(""); setTipo("__all__"); setIndicadorId("__all__");
     setApenasPendentes(true); setSubstituir(false);
     setIntro(""); setPerguntas(""); setTags("Não mora mais aqui\nNúmero errado\nPediu retorno"); setWhatsappTemplate("");
-    setModoDesignacao("pool"); setOperadorUnico(""); setOperadoresDividir(new Set());
+    setModoDesignacao("compartilhada"); setOpsMarcados(new Set());
     setNomeLista("");
     if (fileRef.current) fileRef.current.value = "";
 
@@ -116,7 +115,12 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
       .select("id, nome, ativo")
       .eq("client_id", clientId)
       .order("nome")
-      .then(({ data }) => setOperadores(((data as any[]) || []).map(o => ({ id: o.id, nome: o.nome, ativo: !!o.ativo }))));
+      .then(({ data }) => {
+        const list = ((data as any[]) || []).map(o => ({ id: o.id, nome: o.nome, ativo: !!o.ativo }));
+        setOperadores(list);
+        // por padrão, todos os operadores ativos vêm marcados
+        setOpsMarcados(new Set(list.filter(o => o.ativo).map(o => o.id)));
+      });
   }, [clientId, open]);
 
   const opsAtivos = useMemo(() => operadores.filter(o => o.ativo), [operadores]);
@@ -220,8 +224,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     }
     if (step === 4) return true;
     if (step === 5) {
-      if (modoDesignacao === "um") return !!operadorUnico;
-      if (modoDesignacao === "dividir") return operadoresDividir.size >= 2;
+      if (opsMarcados.size === 0) return false;
+      if (modoDesignacao === "dividir") return opsMarcados.size >= 2;
       return true;
     }
     return true;
@@ -286,7 +290,9 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
 
     // Se origem é CSV/Excel, criamos a fila SEM contatos (envia [] para o wizard) e depois importamos
     // com dedup pelo tele_import_contato_avulso_batch. Se for outra origem, o wizard já popula.
-    const opUnicoParaCriar = modoDesignacao === "um" ? operadorUnico : null;
+    const marcados = Array.from(opsMarcados);
+    // Fila compartilhada com um único operador marcado = tudo dele
+    const opUnicoParaCriar = modoDesignacao === "compartilhada" && marcados.length === 1 ? marcados[0] : null;
 
     const { data, error } = await supabase.rpc("tele_create_fila_wizard" as any, {
       _client_id: clientId,
@@ -335,8 +341,21 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
         .eq("id", campanhaId);
     }
 
+    // Marca os operadores liberados nesta fila
+    if (campanhaId) {
+      const { error: opsErr } = await supabase.rpc("tele_fila_set_operadores" as any, {
+        _client_id: clientId,
+        _campanha_id: campanhaId,
+        _operador_ids: marcados,
+        _modo: modoDesignacao === "dividir" ? "dividida" : "compartilhada",
+        _acao_remocao: "manter",
+        _repassar_para: null,
+      });
+      if (opsErr) toast.error("Fila criada, mas não foi possível salvar os operadores: " + opsErr.message);
+    }
+
     // Se dividir entre N operadores, buscar contatos criados e distribuir
-    if (modoDesignacao === "dividir" && operadoresDividir.size >= 2 && campanhaId) {
+    if (modoDesignacao === "dividir" && marcados.length >= 2 && campanhaId) {
       const { data: lista } = await supabase.rpc("tele_admin_listar_avulsos" as any, {
         _client_id: clientId, _campanha_id: campanhaId,
       });
@@ -346,12 +365,12 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
       if (ids.length) {
         await supabase.rpc("tele_distribute_contatos" as any, {
           _client_id: clientId, _campanha_id: campanhaId,
-          _contato_ids: ids, _operador_ids: Array.from(operadoresDividir),
+          _contato_ids: ids, _operador_ids: marcados,
         });
       }
     }
-    // Se "um" e origem NÃO for CSV, atribuir todos os contatos criados
-    if (modoDesignacao === "um" && operadorUnico && origem !== "csv" && campanhaId) {
+    // Fila de um único operador (não CSV): atribui todos os contatos criados a ele
+    if (opUnicoParaCriar && origem !== "csv" && campanhaId) {
       const { data: lista } = await supabase.rpc("tele_admin_listar_avulsos" as any, {
         _client_id: clientId, _campanha_id: campanhaId,
       });
@@ -361,7 +380,7 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
       if (ids.length) {
         await supabase.rpc("tele_assign_contatos" as any, {
           _client_id: clientId, _campanha_id: campanhaId,
-          _contato_ids: ids, _operador_id: operadorUnico,
+          _contato_ids: ids, _operador_id: opUnicoParaCriar,
         });
       }
     }
@@ -641,32 +660,47 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
 
         {step === 5 && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Quem vai ligar para esses contatos?</p>
+            <p className="text-sm text-muted-foreground">Marque quais operadores podem trabalhar esta fila. Quem não estiver marcado não recebe nenhum contato dela.</p>
+
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Operadores desta fila</p>
+                <div className="flex gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setOpsMarcados(new Set(opsAtivos.map(o => o.id)))}>Marcar todos</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setOpsMarcados(new Set())}>Limpar</Button>
+                </div>
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {opsAtivos.map(o => {
+                  const checked = opsMarcados.has(o.id);
+                  return (
+                    <label key={o.id} className={`flex items-center gap-2 border rounded-md px-2 py-1.5 text-sm cursor-pointer ${checked ? "bg-primary/10 border-primary" : "hover:bg-muted/50"}`}>
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          const next = new Set(opsMarcados);
+                          if (v) next.add(o.id); else next.delete(o.id);
+                          setOpsMarcados(next);
+                        }}
+                      />
+                      {o.nome}
+                    </label>
+                  );
+                })}
+                {opsAtivos.length === 0 && <p className="text-xs text-amber-600">Nenhum operador ativo cadastrado.</p>}
+              </div>
+              <p className="text-[11px] text-muted-foreground">{opsMarcados.size} operador(es) marcado(s)</p>
+            </div>
+
+            <p className="text-sm text-muted-foreground">Como distribuir os contatos entre os marcados?</p>
 
             <button
               type="button"
-              onClick={() => setModoDesignacao("pool")}
-              className={`w-full text-left p-3 border rounded-lg ${modoDesignacao === "pool" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
+              onClick={() => setModoDesignacao("compartilhada")}
+              className={`w-full text-left p-3 border rounded-lg ${modoDesignacao === "compartilhada" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
             >
-              <p className="font-medium text-sm">Pool livre <span className="text-xs text-muted-foreground">(recomendado quando todos ligam para todos)</span></p>
-              <p className="text-xs text-muted-foreground">Qualquer operador ativo pode puxar contatos desta fila. O sistema impede que dois operadores peguem o mesmo contato ao mesmo tempo.</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setModoDesignacao("um")}
-              className={`w-full text-left p-3 border rounded-lg ${modoDesignacao === "um" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
-            >
-              <p className="font-medium text-sm">Um operador específico</p>
-              <p className="text-xs text-muted-foreground mb-2">Toda a fila fica com um único operador. Bom para listas pequenas ou VIP.</p>
-              {modoDesignacao === "um" && (
-                <Select value={operadorUnico} onValueChange={setOperadorUnico}>
-                  <SelectTrigger><SelectValue placeholder="Escolher operador…" /></SelectTrigger>
-                  <SelectContent>
-                    {opsAtivos.map(o => <SelectItem key={o.id} value={o.id}>{o.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
+              <p className="font-medium text-sm">Fila compartilhada <span className="text-xs text-muted-foreground">(recomendado)</span></p>
+              <p className="text-xs text-muted-foreground">Os operadores marcados puxam contatos do mesmo bolo. O sistema impede que dois peguem o mesmo contato. Se só um estiver marcado, a fila inteira fica com ele.</p>
             </button>
 
             <button
@@ -674,29 +708,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
               onClick={() => setModoDesignacao("dividir")}
               className={`w-full text-left p-3 border rounded-lg ${modoDesignacao === "dividir" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"}`}
             >
-              <p className="font-medium text-sm">Dividir igualmente entre operadores</p>
-              <p className="text-xs text-muted-foreground mb-2">Distribuição round-robin: cada operador recebe uma fatia igual e ninguém liga em duplicidade.</p>
-              {modoDesignacao === "dividir" && (
-                <div className="flex flex-wrap gap-2">
-                  {opsAtivos.map(o => {
-                    const checked = operadoresDividir.has(o.id);
-                    return (
-                      <label key={o.id} className={`flex items-center gap-1.5 border rounded-md px-2 py-1 text-xs cursor-pointer ${checked ? "bg-primary/10 border-primary" : ""}`}>
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(v) => {
-                            const next = new Set(operadoresDividir);
-                            if (v) next.add(o.id); else next.delete(o.id);
-                            setOperadoresDividir(next);
-                          }}
-                        />
-                        {o.nome}
-                      </label>
-                    );
-                  })}
-                  {opsAtivos.length === 0 && <p className="text-xs text-amber-600">Nenhum operador ativo cadastrado.</p>}
-                </div>
-              )}
+              <p className="font-medium text-sm">Dividir igualmente entre os marcados</p>
+              <p className="text-xs text-muted-foreground">Distribuição round-robin: cada operador recebe uma fatia fixa (exige 2 ou mais marcados).</p>
             </button>
           </div>
         )}
@@ -720,9 +733,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Designação</span>
                 <span className="text-right">
-                  {modoDesignacao === "pool" && "Pool livre"}
-                  {modoDesignacao === "um" && `Um operador: ${opsAtivos.find(o => o.id === operadorUnico)?.nome || "—"}`}
-                  {modoDesignacao === "dividir" && `Dividir entre ${operadoresDividir.size} operadores`}
+                  {modoDesignacao === "compartilhada" && `Compartilhada entre ${opsMarcados.size} operador(es)`}
+                  {modoDesignacao === "dividir" && `Dividida entre ${opsMarcados.size} operadores`}
                 </span>
               </div>
             </div>
