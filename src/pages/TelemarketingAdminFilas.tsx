@@ -51,6 +51,7 @@ export default function TelemarketingAdminFilas() {
   const [fonteMap, setFonteMap] = useState<Record<string, { fonte: string | null; filtro: any }>>({});
   const [repopulando, setRepopulando] = useState<string | null>(null);
   const [resetando, setResetando] = useState<string | null>(null);
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; campanhaId: string; nome: string; descricao: string | null }>({ open: false, campanhaId: "", nome: "", descricao: null });
 
   const resetarFila = async (f: FilaResumo) => {
     if (!clientId) return;
