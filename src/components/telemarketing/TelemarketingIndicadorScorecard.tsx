@@ -158,7 +158,7 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
     if (from && (!r.ultima_ligacao_em || r.ultima_ligacao_em.slice(0, 10) < from)) return false;
     if (to && (!r.ultima_ligacao_em || r.ultima_ligacao_em.slice(0, 10) > to)) return false;
     return true;
-  }), [rows, search, indicator, type, campaign, operator, region, city, neighborhood, vote, result, from, to]);
+  }), [rows, campanhaId, search, indicator, type, campaign, operator, region, city, neighborhood, vote, result, from, to]);
 
   const summaries = useMemo(() => summarize(filtered).sort((a, b) => Number(b[sort]) - Number(a[sort]) || a.nome.localeCompare(b.nome)), [filtered, sort]);
   const totals = useMemo(() => summarize(filtered.map((r) => ({ ...r, indicador_id: "total", indicador_nome: "Total" })))[0] || null, [filtered]);
