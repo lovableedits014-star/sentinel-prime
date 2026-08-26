@@ -9211,6 +9211,7 @@ export type Database = {
       telemarketing_call_log: {
         Row: {
           bairro: string | null
+          campanha_id: string | null
           candidato_alternativo: string | null
           candidato_federal: string | null
           candidato_governador: string | null
@@ -9232,6 +9233,7 @@ export type Database = {
         }
         Insert: {
           bairro?: string | null
+          campanha_id?: string | null
           candidato_alternativo?: string | null
           candidato_federal?: string | null
           candidato_governador?: string | null
@@ -9253,6 +9255,7 @@ export type Database = {
         }
         Update: {
           bairro?: string | null
+          campanha_id?: string | null
           candidato_alternativo?: string | null
           candidato_federal?: string | null
           candidato_governador?: string | null
@@ -9272,7 +9275,15 @@ export type Database = {
           tabela?: string
           vota_candidato?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "telemarketing_call_log_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       telemarketing_campanha_operadores: {
         Row: {
@@ -12222,6 +12233,26 @@ export type Database = {
         Returns: Json
       }
       tele_ensure_test_operador: { Args: { _client_id: string }; Returns: Json }
+      tele_fila_compare: {
+        Args: { _client_id: string }
+        Returns: {
+          atendidos: number
+          ativo: boolean
+          campanha_id: string
+          campanha_nome: string
+          criada_em: string
+          indeciso: number
+          invalidos: number
+          nao: number
+          nao_atendeu: number
+          nao_quis_opinar: number
+          pendentes: number
+          sim: number
+          tentativas: number
+          total: number
+          trabalhados: number
+        }[]
+      }
       tele_fila_operadores: {
         Args: { _campanha_id: string; _client_id: string }
         Returns: {
@@ -12231,6 +12262,45 @@ export type Database = {
           nome: string
           operador_id: string
           pendentes: number
+        }[]
+      }
+      tele_fila_renomear: {
+        Args: {
+          _campanha_id: string
+          _client_id: string
+          _descricao?: string
+          _nome: string
+        }
+        Returns: Json
+      }
+      tele_fila_report_rows: {
+        Args: { _campanha_id?: string; _client_id: string }
+        Returns: {
+          bairro: string
+          campanha_id: string
+          campanha_nome: string
+          candidato_alternativo: string
+          candidato_federal: string
+          candidato_governador: string
+          candidato_senador: string
+          cidade: string
+          contato_id: string
+          federal_status: string
+          governador_status: string
+          indicador_id: string
+          indicador_nome: string
+          ligacao_em: string
+          ligacao_status: string
+          nome: string
+          operador_nome: string
+          origem: string
+          proxima_tentativa_em: string
+          senador_status: string
+          status_telemarketing: string
+          tabela: string
+          telefone: string
+          total_tentativas: number
+          vota_candidato: string
         }[]
       }
       tele_fila_set_operadores: {
@@ -12264,6 +12334,7 @@ export type Database = {
         Args: { _client_id: string; _contato_id: string; _tabela: string }
         Returns: {
           bairro: string | null
+          campanha_id: string | null
           candidato_alternativo: string | null
           candidato_federal: string | null
           candidato_governador: string | null
