@@ -290,7 +290,9 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
 
     // Se origem é CSV/Excel, criamos a fila SEM contatos (envia [] para o wizard) e depois importamos
     // com dedup pelo tele_import_contato_avulso_batch. Se for outra origem, o wizard já popula.
-    const opUnicoParaCriar = modoDesignacao === "um" ? operadorUnico : null;
+    const marcados = Array.from(opsMarcados);
+    // Fila compartilhada com um único operador marcado = tudo dele
+    const opUnicoParaCriar = modoDesignacao === "compartilhada" && marcados.length === 1 ? marcados[0] : null;
 
     const { data, error } = await supabase.rpc("tele_create_fila_wizard" as any, {
       _client_id: clientId,
