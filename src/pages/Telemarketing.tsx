@@ -534,12 +534,43 @@ export default function Telemarketing() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "telemarketing_call_assignments", filter: `client_id=eq.${clientId}` },
-        () => { void reloadContatos(current ? { id: current.id, tabela: current.tabela } : undefined); },
+        () => { void reloadContatos(); },
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedIn, clientId]);
+  }, [loggedIn, clientId, selectedCampanhaId]);
+
+  // Celulares frequentemente suspendem a aba e perdem eventos de rede/realtime.
+  // Ao voltar para a tela ou recuperar a conexão, sincroniza sem apagar a lista atual.
+  useEffect(() => {
+    if (!loggedIn) return;
+    const refreshWhenActive = () => {
+      if (document.visibilityState === "visible") void reloadContatos();
+    };
+    window.addEventListener("online", refreshWhenActive);
+    document.addEventListener("visibilitychange", refreshWhenActive);
+    return () => {
+      window.removeEventListener("online", refreshWhenActive);
+      document.removeEventListener("visibilitychange", refreshWhenActive);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, selectedCampanhaId]);
+
+  const forceAppUpdate = async () => {
+    try {
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+      if (typeof caches !== "undefined") {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+    } finally {
+      window.location.reload();
+    }
+  };
 
 
   // "Não quis opinar" no estadual encerra o fluxo: não pergunta os demais cargos.
@@ -738,6 +769,12 @@ export default function Telemarketing() {
               <LogIn className="w-4 h-4 mr-2" />
               {loading ? "Validando..." : "Entrar"}
             </Button>
+            <div className="flex items-center justify-between pt-2 text-[10px] text-muted-foreground">
+              <span>Versão {TELE_APP_VERSION}</span>
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={forceAppUpdate}>
+                <RefreshCw className="mr-1 h-3 w-3" /> Atualizar sistema
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -849,6 +886,15 @@ export default function Telemarketing() {
           </Badge>
         </div>
       </div>
+
+      {filaError && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          <span className="flex items-center gap-2"><WifiOff className="h-4 w-4 shrink-0" />{filaError}</span>
+          <Button variant="outline" size="sm" onClick={() => void reloadContatos()} disabled={refreshing}>
+            <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Tentar novamente
+          </Button>
+        </div>
+      )}
 
       {/* Busca de contato (retorno de ligação) */}
       <Card>
@@ -1292,11 +1338,31 @@ export default function Telemarketing() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Phone className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">Nenhum contato disponível</p>
-            <p className="text-xs mt-1">Não há contatos cadastrados para este filtro</p>
+            <p className="font-medium">
+              {diagnostico?.filas_autorizadas === 0
+                ? "Você ainda não está marcado em uma fila"
+                : diagnostico && diagnostico.aguardando_retorno > 0 && diagnostico.disponiveis === 0
+                  ? "Contatos aguardando horário de retorno"
+                  : "Nenhum contato disponível agora"}
+            </p>
+            <p className="text-xs mt-1">
+              {diagnostico?.filas_autorizadas === 0
+                ? "Peça ao administrador para liberar uma fila para seu operador."
+                : diagnostico && diagnostico.aguardando_retorno > 0
+                  ? `${diagnostico.aguardando_retorno} contato(s) voltarão à fila no horário agendado.`
+                  : "A fila pode estar concluída ou os contatos podem estar em atendimento."}
+            </p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => void reloadContatos()} disabled={refreshing}>
+              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Atualizar fila
+            </Button>
           </CardContent>
         </Card>
       )}
+      <div className="flex items-center justify-center gap-2 pb-3 text-[10px] text-muted-foreground">
+        <span>Versão {TELE_APP_VERSION}</span>
+        <span>·</span>
+        <button type="button" className="underline underline-offset-2" onClick={forceAppUpdate}>Atualizar sistema neste aparelho</button>
+      </div>
     </div>
   );
 }
