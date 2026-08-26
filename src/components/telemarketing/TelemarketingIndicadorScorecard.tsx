@@ -98,7 +98,7 @@ function summarize(rows: ReportRow[]): Summary[] {
   });
 }
 
-export default function TelemarketingIndicadorScorecard({ clientId }: { clientId: string }) {
+export default function TelemarketingIndicadorScorecard({ clientId, campanhaId = null }: { clientId: string; campanhaId?: string | null }) {
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Summary | null>(null);
@@ -142,6 +142,7 @@ export default function TelemarketingIndicadorScorecard({ clientId }: { clientId
   }), [rows]);
 
   const filtered = useMemo(() => rows.filter((r) => {
+    if (campanhaId && r.campanha_id !== campanhaId) return false;
     const query = search.trim().toLocaleLowerCase("pt-BR");
     if (query && !`${r.indicador_nome} ${r.nome} ${r.telefone}`.toLocaleLowerCase("pt-BR").includes(query)) return false;
     if (indicator !== ALL && r.indicador_id !== indicator) return false;
@@ -157,7 +158,7 @@ export default function TelemarketingIndicadorScorecard({ clientId }: { clientId
     if (from && (!r.ultima_ligacao_em || r.ultima_ligacao_em.slice(0, 10) < from)) return false;
     if (to && (!r.ultima_ligacao_em || r.ultima_ligacao_em.slice(0, 10) > to)) return false;
     return true;
-  }), [rows, search, indicator, type, campaign, operator, region, city, neighborhood, vote, result, from, to]);
+  }), [rows, campanhaId, search, indicator, type, campaign, operator, region, city, neighborhood, vote, result, from, to]);
 
   const summaries = useMemo(() => summarize(filtered).sort((a, b) => Number(b[sort]) - Number(a[sort]) || a.nome.localeCompare(b.nome)), [filtered, sort]);
   const totals = useMemo(() => summarize(filtered.map((r) => ({ ...r, indicador_id: "total", indicador_nome: "Total" })))[0] || null, [filtered]);

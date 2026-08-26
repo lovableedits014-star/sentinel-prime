@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw, RefreshCcw } from "lucide-react";
+import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw, RefreshCcw, Pencil } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
 import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
 import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
 import AdicionarContatosDialog from "@/components/telemarketing/AdicionarContatosDialog";
+import RenomearFilaDialog from "@/components/telemarketing/RenomearFilaDialog";
 import TeleHelp from "@/components/telemarketing/TeleHelp";
 import { TELE_HELP } from "@/components/telemarketing/telemarketing-help";
 
@@ -51,6 +52,7 @@ export default function TelemarketingAdminFilas() {
   const [fonteMap, setFonteMap] = useState<Record<string, { fonte: string | null; filtro: any }>>({});
   const [repopulando, setRepopulando] = useState<string | null>(null);
   const [resetando, setResetando] = useState<string | null>(null);
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; campanhaId: string; nome: string; descricao: string | null }>({ open: false, campanhaId: "", nome: "", descricao: null });
 
   const resetarFila = async (f: FilaResumo) => {
     if (!clientId) return;
@@ -231,6 +233,14 @@ export default function TelemarketingAdminFilas() {
                         {f.descricao && <p className="text-xs text-muted-foreground truncate">{f.descricao}</p>}
                       </div>
                       <div className="flex gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setRenameDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome, descricao: f.descricao })}
+                          title="Renomear fila"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => toggleAtivo(f)} title={f.ativo ? "Pausar" : "Ativar"}>
                           <Power className="w-3.5 h-3.5" />
                         </Button>
@@ -357,6 +367,18 @@ export default function TelemarketingAdminFilas() {
           filtroAnterior={fonteMap[addDialog.campanhaId]?.filtro}
           operadores={operadores}
           onChanged={() => load()}
+        />
+      )}
+
+      {clientId && renameDialog.open && (
+        <RenomearFilaDialog
+          open={renameDialog.open}
+          onOpenChange={(o) => setRenameDialog(s => ({ ...s, open: o }))}
+          clientId={clientId}
+          campanhaId={renameDialog.campanhaId}
+          nomeAtual={renameDialog.nome}
+          descricaoAtual={renameDialog.descricao}
+          onSaved={() => load()}
         />
       )}
     </div>
