@@ -430,6 +430,16 @@ export default function MissionCheckinDashboard({
                     ))}
                   </SelectContent>
                 </Select>
+                <Select value={historicoFiltro} onValueChange={setHistoricoFiltro}>
+                  <SelectTrigger className="w-full sm:w-52"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Histórico: todos</SelectItem>
+                    <SelectItem value="sempre">Cumpre sempre (80%+)</SelectItem>
+                    <SelectItem value="irregular">Cumpre às vezes</SelectItem>
+                    <SelectItem value="nunca">Nunca cumpre</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 <Button variant="outline" className="gap-1.5" onClick={exportExcel} disabled={!filtered.length}>
                   <Download className="h-4 w-4" /> Excel
                 </Button>
