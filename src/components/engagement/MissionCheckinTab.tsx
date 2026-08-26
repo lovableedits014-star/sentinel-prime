@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, Filter, Link2, Loader2, Target, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
+import { BarChart3, Filter, Link2, ListChecks, Loader2, Target, ExternalLink } from "lucide-react";
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { resolvePublicBaseUrl } from "@/lib/public-base-url";
+import { fetchAudiences, setMissionAudience, type MissionAudience } from "@/lib/mission-audiences";
 import MissionLinksPanel from "./MissionLinksPanel";
 import MissionLinksEditor from "./MissionLinksEditor";
 import MissionCheckinDashboard from "./MissionCheckinDashboard";
 import MissionFromPostDialog from "./MissionFromPostDialog";
+import MissionAudiencesTab from "./MissionAudiencesTab";
 
 type Mission = {
   id: string;
@@ -22,7 +26,9 @@ type Mission = {
   link_facebook: string | null;
   link_instagram: string | null;
   instructions: string | null;
+  audience_id?: string | null;
 };
+
 
 export default function MissionCheckinTab({ clientId }: { clientId: string }) {
   const [missionId, setMissionId] = useState<string>("");
