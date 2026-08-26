@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { ImageIcon, Camera, Download, Loader2, Upload, Sparkles } from "lucide-react";
+import { ImageIcon, Camera, CheckCircle2, Download, Loader2, Upload, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_COMPOSITION, FrameComposition, preloadComposition, renderComposition } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,6 +55,7 @@ export default function FrameEditor({
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const photoImgRef = useRef<HTMLImageElement | null>(null);
@@ -126,6 +127,7 @@ export default function FrameEditor({
         setOffset({ x: 0, y: 0 });
         setResultUrl(null);
         setResultBlob(null);
+        setDownloaded(false);
         redraw();
       };
       img.src = url;
@@ -157,6 +159,7 @@ export default function FrameEditor({
       return;
     }
     setGenerating(true);
+    setDownloaded(false);
     redraw();
     requestAnimationFrame(() => {
       canvasRef.current?.toBlob((blob) => {
@@ -174,12 +177,16 @@ export default function FrameEditor({
   };
 
   const handleDownload = async () => {
-    if (!resultBlob || downloading) return;
+    if (!resultBlob || downloading || downloaded) return;
     setDownloading(true);
     try {
       await saveBlob(resultBlob, `foto-campanha-${Date.now()}.jpg`, {
         title: "Foto de campanha",
         preferDownload: true,
+      });
+      setDownloaded(true);
+      toast.success("Foto baixada! Procure na Galeria ou na pasta Downloads.", {
+        duration: 6000,
       });
     } catch {
       toast.error("Não foi possível salvar a foto. Abra a página no Safari ou Chrome e tente novamente.");
@@ -264,10 +271,28 @@ export default function FrameEditor({
                     Gerar imagem final
                   </Button>
                   {resultUrl && (
-                    <Button variant="default" onClick={handleDownload} disabled={downloading} className="gap-2 bg-primary">
-                      {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                      Baixar JPG (1080x1080)
-                    </Button>
+                    <>
+                      <Button
+                        variant="default"
+                        onClick={handleDownload}
+                        disabled={downloading || downloaded}
+                        className="gap-2 bg-primary"
+                      >
+                        {downloading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : downloaded ? (
+                          <CheckCircle2 className="w-4 h-4" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        {downloaded ? "Foto baixada com sucesso" : "Baixar JPG (1080x1080)"}
+                      </Button>
+                      {downloaded && (
+                        <p className="text-xs text-center text-emerald-600 font-medium">
+                          Confira a Galeria ou a pasta Downloads do celular.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
