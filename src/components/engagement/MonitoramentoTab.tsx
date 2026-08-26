@@ -27,6 +27,8 @@ import {
   type AdesaoRow, type HistoricoRow, type MissaoMonitorada, type MonitorOverview,
   type RankingRow, type Regra,
 } from "@/lib/engagement-monitor";
+import DesempenhoPublicacoesPanel from "./desempenho/DesempenhoPublicacoesPanel";
+
 
 
 const CARGOS = ["coordenador", "lider", "cabo", "contratado", "funcionario", "portal", "apoiador"];
