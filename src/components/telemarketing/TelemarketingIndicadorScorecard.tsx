@@ -142,6 +142,7 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
   }), [rows]);
 
   const filtered = useMemo(() => rows.filter((r) => {
+    if (campanhaId && r.campanha_id !== campanhaId) return false;
     const query = search.trim().toLocaleLowerCase("pt-BR");
     if (query && !`${r.indicador_nome} ${r.nome} ${r.telefone}`.toLocaleLowerCase("pt-BR").includes(query)) return false;
     if (indicator !== ALL && r.indicador_id !== indicator) return false;
