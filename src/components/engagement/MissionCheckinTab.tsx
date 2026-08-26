@@ -266,6 +266,3 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
     </Tabs>
   );
 }
-
-  );
-}
