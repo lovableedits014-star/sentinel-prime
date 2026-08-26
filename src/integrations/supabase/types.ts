@@ -11058,6 +11058,31 @@ export type Database = {
         }
         Returns: Json
       }
+      engagement_equipe_desempenho: {
+        Args: { p_audience_id?: string; p_client_id: string; p_dias?: number }
+        Returns: {
+          abriu_sem_confirmar: number
+          cargo: string
+          cidade: string
+          cumpridas: number
+          detalhe: Json
+          faixa: string
+          faltas: number
+          is_voluntario: boolean
+          nome: string
+          origem: string
+          pct: number
+          pct_anterior: number
+          pessoa_id: string
+          prova_principal: string
+          publicacoes: number
+          regiao: string
+          telefone: string
+          tem_contrato: boolean
+          ultima_atividade: string
+          variacao: number
+        }[]
+      }
       engagement_gerar_obrigacoes: {
         Args: { p_client_id: string; p_mission_id: string; p_regra_id?: string }
         Returns: number
@@ -11129,6 +11154,86 @@ export type Database = {
           supporter_id: string
           telefone: string
           tipo_pessoa: string
+        }[]
+      }
+      engagement_pub_facts: {
+        Args: {
+          p_audience_id?: string
+          p_client_id: string
+          p_dias?: number
+          p_offset_dias?: number
+        }
+        Returns: {
+          cargo: string
+          cidade: string
+          cumprido_em: string
+          is_voluntario: boolean
+          mission_id: string
+          nome: string
+          origem: string
+          pessoa_id: string
+          plataforma: string
+          primeiro_acesso_em: string
+          prova: string
+          publicado_em: string
+          regiao: string
+          status: string
+          telefone: string
+          tem_contrato: boolean
+          titulo: string
+        }[]
+      }
+      engagement_pub_kpis: {
+        Args: { p_audience_id?: string; p_client_id: string; p_dias?: number }
+        Returns: {
+          abriu_sem_confirmar: number
+          adesao: number
+          adesao_ant: number
+          cumprimentos: number
+          cumprimentos_ant: number
+          e1: number
+          e2: number
+          e3: number
+          nunca_engajaram: number
+          obrigados: number
+          pares: number
+          publicacoes: number
+          publicacoes_ant: number
+        }[]
+      }
+      engagement_publicacao_faltantes: {
+        Args: {
+          p_audience_id?: string
+          p_client_id: string
+          p_dias?: number
+          p_mission_id: string
+        }
+        Returns: {
+          cargo: string
+          cidade: string
+          nome: string
+          origem: string
+          pessoa_id: string
+          regiao: string
+          status: string
+          telefone: string
+        }[]
+      }
+      engagement_publicacoes_desempenho: {
+        Args: { p_audience_id?: string; p_client_id: string; p_dias?: number }
+        Returns: {
+          abriu_sem_confirmar: number
+          adesao: number
+          cumpriram: number
+          e1: number
+          e2: number
+          e3: number
+          faltaram: number
+          mission_id: string
+          obrigados: number
+          plataforma: string
+          publicado_em: string
+          titulo: string
         }[]
       }
       engagement_publico_alvo: {
