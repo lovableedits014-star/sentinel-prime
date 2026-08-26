@@ -9274,6 +9274,51 @@ export type Database = {
         }
         Relationships: []
       }
+      telemarketing_campanha_operadores: {
+        Row: {
+          ativo: boolean
+          campanha_id: string
+          client_id: string
+          created_at: string
+          id: string
+          operador_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          campanha_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          operador_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          campanha_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          operador_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemarketing_campanha_operadores_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemarketing_campanha_operadores_operador_id_fkey"
+            columns: ["operador_id"]
+            isOneToOne: false
+            referencedRelation: "telemarketing_operadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telemarketing_campanhas: {
         Row: {
           ativo: boolean
@@ -9282,6 +9327,7 @@ export type Database = {
           descricao: string | null
           filtros: Json
           id: string
+          modo_designacao: string
           nome: string
           script_intro: string | null
           script_perguntas: Json
@@ -9296,6 +9342,7 @@ export type Database = {
           descricao?: string | null
           filtros?: Json
           id?: string
+          modo_designacao?: string
           nome: string
           script_intro?: string | null
           script_perguntas?: Json
@@ -9310,6 +9357,7 @@ export type Database = {
           descricao?: string | null
           filtros?: Json
           id?: string
+          modo_designacao?: string
           nome?: string
           script_intro?: string | null
           script_perguntas?: Json
@@ -12174,6 +12222,28 @@ export type Database = {
         Returns: Json
       }
       tele_ensure_test_operador: { Args: { _client_id: string }; Returns: Json }
+      tele_fila_operadores: {
+        Args: { _campanha_id: string; _client_id: string }
+        Returns: {
+          ativo: boolean
+          ligados: number
+          marcado: boolean
+          nome: string
+          operador_id: string
+          pendentes: number
+        }[]
+      }
+      tele_fila_set_operadores: {
+        Args: {
+          _acao_remocao?: string
+          _campanha_id: string
+          _client_id: string
+          _modo?: string
+          _operador_ids: string[]
+          _repassar_para?: string
+        }
+        Returns: Json
+      }
       tele_fila_summary: {
         Args: { _client_id: string }
         Returns: {
@@ -12183,7 +12253,9 @@ export type Database = {
           created_at: string
           descricao: string
           ligados: number
+          modo_designacao: string
           nome: string
+          operadores_marcados: number
           pendentes: number
           total: number
         }[]
