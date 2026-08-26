@@ -168,17 +168,36 @@ export default function Telemarketing() {
 
     // Fetch contacts via secure RPC (operator-authenticated). When opened from
     // the admin "Filas" page, ?campanha=ID restricts the list to that fila.
-    const { data: rpcRows, error: rpcErr } = await supabase.rpc("tele_list_contatos" as any, {
+    let usedCampanhaId = selectedCampanhaId;
+    let { data: rpcRows, error: rpcErr } = await supabase.rpc("tele_list_contatos" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: selectedCampanhaId,
+      _campanha_id: usedCampanhaId,
     });
     if (rpcErr) {
       toast.error("Erro ao carregar contatos: " + rpcErr.message);
       setLoading(false);
       return;
     }
+    // Link salvo/compartilhado pode apontar para uma fila em que este operador
+    // não está marcado. Nesse caso, refaz a busca em todas as filas dele.
+    if (usedCampanhaId && (!rpcRows || (rpcRows as any[]).length === 0)) {
+      const retry = await supabase.rpc("tele_list_contatos" as any, {
+        _client_id: clientId!,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _campanha_id: null,
+      });
+      if (!retry.error && ((retry.data as any[]) || []).length > 0) {
+        rpcRows = retry.data as any;
+        usedCampanhaId = null;
+        setSelectedCampanhaId(null);
+        setCampanhaNome(null);
+        toast.info("Esta fila não está liberada para você. Carregamos as suas filas.");
+      }
+    }
+
     const allContatos: ContatoTele[] = ((rpcRows as any[]) || []).map((r) => ({
       id: r.id,
       nome: r.nome,
@@ -208,6 +227,16 @@ export default function Telemarketing() {
 
     setContatos(lista);
 
+    if (lista.length === 0) {
+      toast.info(
+        allContatos.length > 0
+          ? "Sua fila está sem contatos disponíveis agora (todos já foram trabalhados ou estão aguardando retorno)."
+          : "Nenhum contato liberado para você. Peça ao administrador para marcar você nos operadores da fila.",
+        { duration: 8000 },
+      );
+    }
+
+
     // Load campaign scripts (best-effort)
     const { data: scriptRows } = await supabase.rpc("tele_list_campanhas_scripts" as any, {
       _client_id: clientId!,
@@ -228,7 +257,7 @@ export default function Telemarketing() {
     // Se o operador tem múltiplas campanhas atribuídas e nenhuma foi passada por URL,
     // abre a tela de escolha em vez de já saltar para um contato.
     const campanhasComContato = new Set(lista.map(c => c.campanha_id).filter(Boolean));
-    if (!campanhaIdParam && campanhasComContato.size > 1) {
+    if (!usedCampanhaId && campanhasComContato.size > 1) {
       setPickingCampanha(true);
       return;
     }
@@ -238,7 +267,7 @@ export default function Telemarketing() {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
-      _campanha_id: selectedCampanhaId,
+      _campanha_id: usedCampanhaId,
       _ttl_seconds: 300,
     });
     const res = pick as { found: boolean; tabela?: string; contato_id?: string; lista_id?: string } | null;
