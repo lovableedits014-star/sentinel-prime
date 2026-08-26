@@ -1,12 +1,9 @@
 // Service Worker para Push Notifications do Portal do Apoiador
-// v6 - limpa caches antigos e RECARREGA as abas controladas no activate
-// para que celulares com versão antiga já recebam o conteúdo novo
-// sem precisar fechar a aba.
-const SW_VERSION = "v6";
+// v7 - atualizações aguardam confirmação do usuário e nunca recarregam
+// automaticamente uma ligação que esteja em andamento.
+const SW_VERSION = "v7";
 
-self.addEventListener("install", (event) => {
-  self.skipWaiting();
-});
+self.addEventListener("install", () => {});
 
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
@@ -23,18 +20,6 @@ self.addEventListener("activate", (event) => {
       } catch {}
       try {
         await self.clients.claim();
-      } catch {}
-      try {
-        const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-        await Promise.allSettled(
-          wins.map((c) => {
-            try {
-              return c.navigate(c.url);
-            } catch {
-              return Promise.resolve();
-            }
-          }),
-        );
       } catch {}
     })(),
   );

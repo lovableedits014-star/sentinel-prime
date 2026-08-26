@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock, Search } from "lucide-react";
+import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock, Search, RefreshCw, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
@@ -44,6 +44,33 @@ interface CampanhaScript {
   whatsapp_template?: string | null;
 }
 
+interface FilaDiagnostico {
+  filas_autorizadas: number;
+  fila_solicitada_valida: boolean;
+  disponiveis: number;
+  aguardando_retorno: number;
+  reservados_ativos: number;
+}
+
+const TELE_APP_VERSION = "2026.08.26.1";
+
+const mapContato = (r: any): ContatoTele => ({
+  id: r.id, nome: r.nome, telefone: r.telefone,
+  cidade: r.cidade, bairro: r.bairro,
+  ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
+  candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
+  ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
+  tabela: r.tabela as ContatoTele["tabela"],
+  proxima_tentativa_em: r.proxima_tentativa_em ?? null,
+  tentativas_count: r.tentativas_count ?? 0,
+  observacao_tele: r.observacao_tele ?? null,
+  locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
+  campanha_id: r.campanha_id ?? null,
+  indicador_nome: r.indicador_nome ?? null,
+  indicador_tipo: r.indicador_tipo ?? null,
+  lista_id: r.lista_id ?? null,
+});
+
 // Um contato continua na fila do operador quando:
 // - nunca foi trabalhado (sem status ou "pendente"); ou
 // - foi marcado como "não atendeu"/"reagendou" e a hora do retorno já chegou.
@@ -72,8 +99,22 @@ export default function Telemarketing() {
   const [campanhaNome, setCampanhaNome] = useState<string | null>(null);
   const [selectedCampanhaId, setSelectedCampanhaId] = useState<string | null>(campanhaIdParam);
   const [pickingCampanha, setPickingCampanha] = useState(false);
+  const [filaError, setFilaError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [diagnostico, setDiagnostico] = useState<FilaDiagnostico | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura">("todos");
   const autoLoginAttempted = useRef(false);
+  const sessionIdRef = useRef("");
+
+  if (!sessionIdRef.current && typeof window !== "undefined") {
+    const storageKey = "sentinelle.telemarketing.session";
+    const stored = window.sessionStorage.getItem(storageKey);
+    const generated = typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    sessionIdRef.current = stored || generated;
+    if (!stored) window.sessionStorage.setItem(storageKey, generated);
+  }
 
   // Form state
   const [ligacaoStatus, setLigacaoStatus] = useState("");
@@ -140,6 +181,7 @@ export default function Telemarketing() {
       return;
     }
     setLoading(true);
+    setFilaError(null);
 
     // Validate operator credentials via SECURITY DEFINER function (senha não trafega na tabela)
     const { data: opRows, error: opErr } = await supabase.rpc("verify_telemarketing_operador" as any, {
@@ -181,51 +223,42 @@ export default function Telemarketing() {
       return;
     }
     // Link salvo/compartilhado pode apontar para uma fila em que este operador
-    // não está marcado. Nesse caso, refaz a busca em todas as filas dele.
+    // não está marcado. Só faz fallback quando o diagnóstico confirma isso;
+    // uma fila válida e temporariamente vazia deve continuar selecionada.
     if (usedCampanhaId && (!rpcRows || (rpcRows as any[]).length === 0)) {
-      const retry = await supabase.rpc("tele_list_contatos" as any, {
-        _client_id: clientId!,
-        _nome: operadorNome.trim(),
-        _senha: operadorSenha.trim(),
-        _campanha_id: null,
+      const diag = await supabase.rpc("tele_diagnostico_fila" as any, {
+        _client_id: clientId!, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: usedCampanhaId,
       });
-      if (!retry.error && ((retry.data as any[]) || []).length > 0) {
-        rpcRows = retry.data as any;
-        usedCampanhaId = null;
-        setSelectedCampanhaId(null);
-        setCampanhaNome(null);
-        toast.info("Esta fila não está liberada para você. Carregamos as suas filas.");
+      const detail = diag.data as FilaDiagnostico | null;
+      if (detail && !detail.fila_solicitada_valida) {
+        const retry = await supabase.rpc("tele_list_contatos" as any, {
+          _client_id: clientId!,
+          _nome: operadorNome.trim(),
+          _senha: operadorSenha.trim(),
+          _campanha_id: null,
+        });
+        if (!retry.error) {
+          rpcRows = retry.data as any;
+          usedCampanhaId = null;
+          setSelectedCampanhaId(null);
+          setCampanhaNome(null);
+          window.history.replaceState({}, "", window.location.pathname);
+          toast.info("Esta fila não está liberada para você. Carregamos as suas filas.");
+        }
       }
     }
 
-    const allContatos: ContatoTele[] = ((rpcRows as any[]) || []).map((r) => ({
-      id: r.id,
-      nome: r.nome,
-      telefone: r.telefone,
-      cidade: r.cidade,
-      bairro: r.bairro,
-      ligacao_status: r.ligacao_status,
-      vota_candidato: r.vota_candidato,
-      candidato_alternativo: r.candidato_alternativo,
-      operador_nome: r.operador_nome,
-      ligacao_em: r.ligacao_em,
-      tipo: r.tipo as ContatoTele["tipo"],
-      tabela: r.tabela as ContatoTele["tabela"],
-      proxima_tentativa_em: r.proxima_tentativa_em ?? null,
-      tentativas_count: r.tentativas_count ?? 0,
-      observacao_tele: r.observacao_tele ?? null,
-      locked_by: r.locked_by ?? null,
-      locked_until: r.locked_until ?? null,
-      campanha_id: r.campanha_id ?? null,
-      indicador_nome: r.indicador_nome ?? null,
-      indicador_tipo: r.indicador_tipo ?? null,
-      lista_id: r.lista_id ?? null,
-    }));
+    const allContatos: ContatoTele[] = ((rpcRows as any[]) || []).map(mapContato);
 
     // Filter out contacts that have already been called — they must NOT return to the funnel
     const lista = allContatos.filter(isNaFila);
 
     setContatos(lista);
+
+    const { data: diagData } = await supabase.rpc("tele_diagnostico_fila" as any, {
+      _client_id: clientId!, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: usedCampanhaId,
+    });
+    setDiagnostico((diagData as FilaDiagnostico | null) ?? null);
 
     if (lista.length === 0) {
       toast.info(
@@ -269,6 +302,7 @@ export default function Telemarketing() {
       _senha: operadorSenha.trim(),
       _campanha_id: usedCampanhaId,
       _ttl_seconds: 300,
+      _session_id: sessionIdRef.current,
     });
     const res = pick as { found: boolean; tabela?: string; contato_id?: string; lista_id?: string } | null;
     
@@ -302,6 +336,7 @@ export default function Telemarketing() {
       _senha: operadorSenha.trim(),
       _campanha_id: campanhaId,
       _ttl_seconds: 300,
+      _session_id: sessionIdRef.current,
     });
     const res = data as { found: boolean; tabela?: string; contato_id?: string } | null;
     if (res?.found) {
@@ -315,31 +350,46 @@ export default function Telemarketing() {
 
   const reloadContatosWithCampanha = async (campanhaId: string | null) => {
     if (!clientId) return;
-    const { data: rpcRows } = await supabase.rpc("tele_list_contatos" as any, {
+    setRefreshing(true);
+    setFilaError(null);
+    let resolvedCampanhaId = campanhaId;
+    let { data: rpcRows, error } = await supabase.rpc("tele_list_contatos" as any, {
       _client_id: clientId,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
       _campanha_id: campanhaId,
     });
-    const lista: ContatoTele[] = ((rpcRows as any[]) || [])
-      .map((r) => ({
-        id: r.id, nome: r.nome, telefone: r.telefone,
-        cidade: r.cidade, bairro: r.bairro,
-        ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
-        candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
-        ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
-        tabela: r.tabela as ContatoTele["tabela"],
-        proxima_tentativa_em: r.proxima_tentativa_em ?? null,
-        tentativas_count: r.tentativas_count ?? 0,
-        observacao_tele: r.observacao_tele ?? null,
-        locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
-        campanha_id: r.campanha_id ?? null,
-        indicador_nome: r.indicador_nome ?? null,
-        indicador_tipo: r.indicador_tipo ?? null,
-        lista_id: r.lista_id ?? null,
-      }))
-      .filter(isNaFila);
+    if (!error && campanhaId && ((rpcRows as any[]) || []).length === 0) {
+      const diag = await supabase.rpc("tele_diagnostico_fila" as any, {
+        _client_id: clientId, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: campanhaId,
+      });
+      const detail = diag.data as FilaDiagnostico | null;
+      if (detail && !detail.fila_solicitada_valida) {
+        const fallback = await supabase.rpc("tele_list_contatos" as any, {
+          _client_id: clientId, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: null,
+        });
+        if (!fallback.error) {
+          rpcRows = fallback.data;
+          error = null;
+          resolvedCampanhaId = null;
+          setSelectedCampanhaId(null);
+          setCampanhaNome(null);
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      }
+    }
+    if (error) {
+      setFilaError("Não foi possível atualizar a fila. Seus contatos anteriores foram mantidos.");
+      setRefreshing(false);
+      return;
+    }
+    const lista: ContatoTele[] = ((rpcRows as any[]) || []).map(mapContato).filter(isNaFila);
     setContatos(lista);
+    const { data: diagData } = await supabase.rpc("tele_diagnostico_fila" as any, {
+      _client_id: clientId, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: resolvedCampanhaId,
+    });
+    setDiagnostico((diagData as FilaDiagnostico | null) ?? null);
+    setRefreshing(false);
   };
 
 
@@ -382,35 +432,26 @@ export default function Telemarketing() {
   // Recarrega a lista (mantendo o contato atual se ainda existir)
   const reloadContatos = async (preserveId?: { id: string; tabela: string }) => {
     if (!clientId || !operadorNome.trim() || !operadorSenha.trim()) return [] as ContatoTele[];
-    const { data: rpcRows } = await supabase.rpc("tele_list_contatos" as any, {
+    setRefreshing(true);
+    const { data: rpcRows, error } = await supabase.rpc("tele_list_contatos" as any, {
       _client_id: clientId,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
       _campanha_id: selectedCampanhaId,
     });
-    const lista: ContatoTele[] = ((rpcRows as any[]) || [])
-      .map((r) => ({
-        id: r.id, nome: r.nome, telefone: r.telefone,
-        cidade: r.cidade, bairro: r.bairro,
-        ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
-        candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
-        ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
-        tabela: r.tabela as ContatoTele["tabela"],
-        proxima_tentativa_em: r.proxima_tentativa_em ?? null,
-        tentativas_count: r.tentativas_count ?? 0,
-        observacao_tele: r.observacao_tele ?? null,
-        locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
-        campanha_id: r.campanha_id ?? null,
-        indicador_nome: r.indicador_nome ?? null,
-        indicador_tipo: r.indicador_tipo ?? null,
-        lista_id: r.lista_id ?? null,
-      }))
-      .filter(isNaFila);
+    if (error) {
+      setFilaError("A conexão oscilou. A lista anterior foi mantida; tente novamente.");
+      setRefreshing(false);
+      return contatos;
+    }
+    const lista: ContatoTele[] = ((rpcRows as any[]) || []).map(mapContato).filter(isNaFila);
+    setFilaError(null);
     setContatos(lista);
     if (preserveId) {
       const idx = lista.findIndex(c => c.id === preserveId.id && c.tabela === preserveId.tabela);
       if (idx >= 0) setCurrentIndex(idx);
     }
+    setRefreshing(false);
     return lista;
   };
 
@@ -424,6 +465,7 @@ export default function Telemarketing() {
       _senha: operadorSenha.trim(),
       _campanha_id: selectedCampanhaId,
       _ttl_seconds: 300,
+      _session_id: sessionIdRef.current,
     });
     if (error) { toast.error("Erro: " + error.message); return; }
     const res = data as { found: boolean; tabela?: string; contato_id?: string } | null;
@@ -463,9 +505,13 @@ export default function Telemarketing() {
         _tabela: current.tabela,
         _id: current.id,
         _ttl_seconds: 300,
+        _session_id: sessionIdRef.current,
       }).then(({ data }: any) => {
-        if (data && data.claimed === false && data.operador_nome && data.operador_nome !== operadorNome.trim()) {
-          toast.warning(`Este contato está em atendimento por ${data.operador_nome}. Pulando…`);
+        if (data?.claimed === false) {
+          const sameOperator = data.operador_nome?.trim().toLocaleLowerCase("pt-BR") === operadorNome.trim().toLocaleLowerCase("pt-BR");
+          toast.warning(sameOperator
+            ? "Este contato está aberto em outro aparelho. Buscando o próximo…"
+            : `Este contato está em atendimento por ${data.operador_nome}. Buscando o próximo…`);
           void jumpToProximoDisponivel();
         }
       });
@@ -484,6 +530,7 @@ export default function Telemarketing() {
         _tabela: current.tabela,
         _id: current.id,
         _ttl_seconds: 300,
+        _session_id: sessionIdRef.current,
       });
     }, 60_000);
     return () => clearInterval(iv);
@@ -498,12 +545,43 @@ export default function Telemarketing() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "telemarketing_call_assignments", filter: `client_id=eq.${clientId}` },
-        () => { void reloadContatos(current ? { id: current.id, tabela: current.tabela } : undefined); },
+        () => { void reloadContatos(); },
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedIn, clientId]);
+  }, [loggedIn, clientId, selectedCampanhaId]);
+
+  // Celulares frequentemente suspendem a aba e perdem eventos de rede/realtime.
+  // Ao voltar para a tela ou recuperar a conexão, sincroniza sem apagar a lista atual.
+  useEffect(() => {
+    if (!loggedIn) return;
+    const refreshWhenActive = () => {
+      if (document.visibilityState === "visible") void reloadContatos();
+    };
+    window.addEventListener("online", refreshWhenActive);
+    document.addEventListener("visibilitychange", refreshWhenActive);
+    return () => {
+      window.removeEventListener("online", refreshWhenActive);
+      document.removeEventListener("visibilitychange", refreshWhenActive);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, selectedCampanhaId]);
+
+  const forceAppUpdate = async () => {
+    try {
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+      if (typeof caches !== "undefined") {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+    } finally {
+      window.location.reload();
+    }
+  };
 
 
   // "Não quis opinar" no estadual encerra o fluxo: não pergunta os demais cargos.
@@ -545,7 +623,7 @@ export default function Telemarketing() {
     setSaving(true);
     const atendeu = ligacaoStatus === "atendeu";
     const proximaTs = proximaTentativa ? new Date(proximaTentativa).toISOString() : null;
-    const { data: rpcResult, error } = await supabase.rpc("tele_registrar_ligacao" as any, {
+    const { data: rpcResult, error } = await supabase.rpc("tele_registrar_ligacao_sessao" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
@@ -564,6 +642,7 @@ export default function Telemarketing() {
       _senador_status: atendeu && perguntarDemaisCargos && !candSenador.trim() && senadorNQ ? "nao_quis_responder" : null,
       _candidato_governador: atendeu && perguntarDemaisCargos ? (candGovernador.trim() || null) : null,
       _governador_status: atendeu && perguntarDemaisCargos && !candGovernador.trim() && governadorNQ ? "nao_quis_responder" : null,
+      _session_id: sessionIdRef.current,
     });
 
     if (error) {
@@ -600,28 +679,12 @@ export default function Telemarketing() {
         _senha: operadorSenha.trim(),
         _tabela: current.tabela,
         _id: current.id,
+        _session_id: sessionIdRef.current,
       });
     }
     resetForm();
     await jumpToProximoDisponivel();
   };
-
-  const mapRow = (r: any): ContatoTele => ({
-    id: r.id, nome: r.nome, telefone: r.telefone,
-    cidade: r.cidade, bairro: r.bairro,
-    ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
-    candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
-    ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
-    tabela: r.tabela as ContatoTele["tabela"],
-    proxima_tentativa_em: r.proxima_tentativa_em ?? null,
-    tentativas_count: r.tentativas_count ?? 0,
-    observacao_tele: r.observacao_tele ?? null,
-    locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
-    campanha_id: r.campanha_id ?? null,
-    indicador_nome: r.indicador_nome ?? null,
-    indicador_tipo: r.indicador_tipo ?? null,
-    lista_id: r.lista_id ?? null,
-  });
 
   const handleBuscar = async () => {
     const termo = buscaTermo.trim();
@@ -645,7 +708,7 @@ export default function Telemarketing() {
       toast.error("Erro na busca: " + error.message);
       return;
     }
-    const rows = ((data as any[]) || []).map(mapRow);
+    const rows = ((data as any[]) || []).map(mapContato);
     setBuscaResultados(rows);
     setBuscouVazio(rows.length === 0);
   };
@@ -717,6 +780,12 @@ export default function Telemarketing() {
               <LogIn className="w-4 h-4 mr-2" />
               {loading ? "Validando..." : "Entrar"}
             </Button>
+            <div className="flex items-center justify-between pt-2 text-[10px] text-muted-foreground">
+              <span>Versão {TELE_APP_VERSION}</span>
+              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={forceAppUpdate}>
+                <RefreshCw className="mr-1 h-3 w-3" /> Atualizar sistema
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -828,6 +897,15 @@ export default function Telemarketing() {
           </Badge>
         </div>
       </div>
+
+      {filaError && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          <span className="flex items-center gap-2"><WifiOff className="h-4 w-4 shrink-0" />{filaError}</span>
+          <Button variant="outline" size="sm" onClick={() => void reloadContatos()} disabled={refreshing}>
+            <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Tentar novamente
+          </Button>
+        </div>
+      )}
 
       {/* Busca de contato (retorno de ligação) */}
       <Card>
@@ -1271,11 +1349,31 @@ export default function Telemarketing() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Phone className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">Nenhum contato disponível</p>
-            <p className="text-xs mt-1">Não há contatos cadastrados para este filtro</p>
+            <p className="font-medium">
+              {diagnostico?.filas_autorizadas === 0
+                ? "Você ainda não está marcado em uma fila"
+                : diagnostico && diagnostico.aguardando_retorno > 0 && diagnostico.disponiveis === 0
+                  ? "Contatos aguardando horário de retorno"
+                  : "Nenhum contato disponível agora"}
+            </p>
+            <p className="text-xs mt-1">
+              {diagnostico?.filas_autorizadas === 0
+                ? "Peça ao administrador para liberar uma fila para seu operador."
+                : diagnostico && diagnostico.aguardando_retorno > 0
+                  ? `${diagnostico.aguardando_retorno} contato(s) voltarão à fila no horário agendado.`
+                  : "A fila pode estar concluída ou os contatos podem estar em atendimento."}
+            </p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => void reloadContatos()} disabled={refreshing}>
+              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Atualizar fila
+            </Button>
           </CardContent>
         </Card>
       )}
+      <div className="flex items-center justify-center gap-2 pb-3 text-[10px] text-muted-foreground">
+        <span>Versão {TELE_APP_VERSION}</span>
+        <span>·</span>
+        <Button type="button" variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={forceAppUpdate}>Atualizar sistema neste aparelho</Button>
+      </div>
     </div>
   );
 }
