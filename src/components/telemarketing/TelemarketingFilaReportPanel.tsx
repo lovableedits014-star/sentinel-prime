@@ -46,6 +46,7 @@ export interface FilaReportRow {
 }
 
 const ALL = "__all__";
+const REPORT_PAGE_SIZE = 1000;
 const clean = (v: string | null | undefined) => v?.trim() || "—";
 const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 1000) / 10 : 0);
 const slug = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
@@ -91,13 +92,34 @@ export default function TelemarketingFilaReportPanel({ clientId, campanhaId, cam
 
   const load = useCallback(async (notify = false) => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("tele_fila_report_rows" as any, {
-      _client_id: clientId,
-      _campanha_id: campanhaId,
-    });
+    const allRows: FilaReportRow[] = [];
+    let page = 0;
+    let error: { message: string } | null = null;
+
+    // O servidor limita cada resposta a 1.000 registros. Percorre todas as
+    // paginas para que os indicadores, graficos e exportacoes usem a fila completa.
+    while (true) {
+      const fromRow = page * REPORT_PAGE_SIZE;
+      const response = await supabase
+        .rpc("tele_fila_report_rows" as any, {
+          _client_id: clientId,
+          _campanha_id: campanhaId,
+        })
+        .range(fromRow, fromRow + REPORT_PAGE_SIZE - 1);
+
+      if (response.error) {
+        error = response.error;
+        break;
+      }
+
+      const pageRows = ((response.data as any[]) || []) as FilaReportRow[];
+      allRows.push(...pageRows);
+      if (pageRows.length < REPORT_PAGE_SIZE) break;
+      page += 1;
+    }
     setLoading(false);
     if (error) { toast.error(`Erro ao carregar relatório: ${error.message}`); return; }
-    setRows(((data as any[]) || []) as FilaReportRow[]);
+    setRows(allRows);
     if (notify) toast.success("Relatório atualizado");
   }, [clientId, campanhaId]);
 

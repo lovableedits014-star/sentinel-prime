@@ -10,9 +10,9 @@ import { toast } from "sonner";
 
 interface CompareRow {
   campanha_id: string;
-  nome: string;
+  campanha_nome: string;
   total: number;
-  ligados: number;
+  trabalhados: number;
   pendentes: number;
   sim: number;
   nao: number;
@@ -33,8 +33,8 @@ export default function TelemarketingFilaCompareCard({ clientId }: { clientId: s
     if (error) { toast.error(`Erro ao comparar filas: ${error.message}`); return; }
     setRows(((data as any[]) || []).map((r) => ({
       campanha_id: r.campanha_id,
-      nome: r.nome || "Sem fila",
-      total: num(r.total), ligados: num(r.ligados), pendentes: num(r.pendentes),
+      campanha_nome: r.campanha_nome || "Fila sem nome",
+      total: num(r.total), trabalhados: num(r.trabalhados), pendentes: num(r.pendentes),
       sim: num(r.sim), nao: num(r.nao), indeciso: num(r.indeciso), nao_atendeu: num(r.nao_atendeu),
     })));
   }, [clientId]);
@@ -71,12 +71,12 @@ export default function TelemarketingFilaCompareCard({ clientId }: { clientId: s
               </TableHeader>
               <TableBody>
                 {rows.map((r) => {
-                  const cobertura = r.total > 0 ? Math.round((r.ligados / r.total) * 100) : 0;
+                  const cobertura = r.total > 0 ? Math.round((r.trabalhados / r.total) * 100) : 0;
                   return (
-                    <TableRow key={r.campanha_id || r.nome}>
-                      <TableCell className="font-medium">{r.nome}</TableCell>
+                    <TableRow key={r.campanha_id || r.campanha_nome}>
+                      <TableCell className="font-medium">{r.campanha_nome}</TableCell>
                       <TableCell className="text-right">{r.total}</TableCell>
-                      <TableCell className="text-right">{r.ligados}</TableCell>
+                      <TableCell className="text-right">{r.trabalhados}</TableCell>
                       <TableCell className="text-right">{r.pendentes}</TableCell>
                       <TableCell className="text-right font-semibold text-emerald-600">{r.sim}</TableCell>
                       <TableCell className="text-right">{r.nao}</TableCell>
