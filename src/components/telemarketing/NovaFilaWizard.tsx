@@ -733,9 +733,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Designação</span>
                 <span className="text-right">
-                  {modoDesignacao === "pool" && "Pool livre"}
-                  {modoDesignacao === "um" && `Um operador: ${opsAtivos.find(o => o.id === operadorUnico)?.nome || "—"}`}
-                  {modoDesignacao === "dividir" && `Dividir entre ${operadoresDividir.size} operadores`}
+                  {modoDesignacao === "compartilhada" && `Compartilhada entre ${opsMarcados.size} operador(es)`}
+                  {modoDesignacao === "dividir" && `Dividida entre ${opsMarcados.size} operadores`}
                 </span>
               </div>
             </div>
