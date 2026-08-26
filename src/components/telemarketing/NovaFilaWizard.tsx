@@ -83,9 +83,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
 
   // Designação
   const [operadores, setOperadores] = useState<Operador[]>([]);
-  const [modoDesignacao, setModoDesignacao] = useState<ModoDesignacao>("pool");
-  const [operadorUnico, setOperadorUnico] = useState<string>("");
-  const [operadoresDividir, setOperadoresDividir] = useState<Set<string>>(new Set());
+  const [modoDesignacao, setModoDesignacao] = useState<ModoDesignacao>("compartilhada");
+  const [opsMarcados, setOpsMarcados] = useState<Set<string>>(new Set());
   const [nomeLista, setNomeLista] = useState("");
 
 
