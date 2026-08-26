@@ -12847,6 +12847,30 @@ export type Database = {
             }
             Returns: Json
           }
+      tele_registrar_ligacao_sessao: {
+        Args: {
+          _bairro: string
+          _candidato_alternativo?: string
+          _candidato_federal?: string
+          _candidato_governador?: string
+          _candidato_senador?: string
+          _cidade: string
+          _client_id: string
+          _federal_status?: string
+          _governador_status?: string
+          _id: string
+          _ligacao_status: string
+          _nome: string
+          _observacao?: string
+          _proxima_tentativa_em?: string
+          _senador_status?: string
+          _senha: string
+          _session_id?: string
+          _tabela: string
+          _vota_candidato?: string
+        }
+        Returns: Json
+      }
       tele_release_contato:
         | {
             Args: {
