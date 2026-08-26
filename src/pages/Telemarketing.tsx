@@ -227,6 +227,16 @@ export default function Telemarketing() {
 
     setContatos(lista);
 
+    if (lista.length === 0) {
+      toast.info(
+        allContatos.length > 0
+          ? "Sua fila está sem contatos disponíveis agora (todos já foram trabalhados ou estão aguardando retorno)."
+          : "Nenhum contato liberado para você. Peça ao administrador para marcar você nos operadores da fila.",
+        { duration: 8000 },
+      );
+    }
+
+
     // Load campaign scripts (best-effort)
     const { data: scriptRows } = await supabase.rpc("tele_list_campanhas_scripts" as any, {
       _client_id: clientId!,
