@@ -32,6 +32,7 @@ type Mission = {
 
 export default function MissionCheckinTab({ clientId }: { clientId: string }) {
   const [missionId, setMissionId] = useState<string>("");
+  const qc = useQueryClient();
 
   const { data: client } = useQuery({
     queryKey: ["client-public-base", clientId],
@@ -51,7 +52,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("portal_missions")
-        .select("id, title, created_at, publicado_em, post_url, link_facebook, link_instagram, instructions")
+        .select("id, title, created_at, publicado_em, post_url, link_facebook, link_instagram, instructions, audience_id")
         .eq("client_id", clientId)
         .is("archived_at", null)
         .order("created_at", { ascending: false })
@@ -62,6 +63,12 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
+  const { data: audiences = [] } = useQuery<MissionAudience[]>({
+    queryKey: ["mission-audiences", clientId],
+    queryFn: () => fetchAudiences(clientId),
+    enabled: !!clientId,
+  });
+
   useEffect(() => {
     if (!missionId && missions.length > 0) setMissionId(missions[0].id);
   }, [missions, missionId]);
@@ -69,6 +76,24 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
   const mission = useMemo(() => missions.find((m) => m.id === missionId) || null, [missions, missionId]);
   const base = useMemo(() => resolvePublicBaseUrl(client), [client]);
   const missionLink = mission ? `${base.url}/missao/${mission.id}` : null;
+  const audienceId = mission?.audience_id ?? null;
+  const audienceNome = useMemo(
+    () => audiences.find((a) => a.id === audienceId)?.nome ?? null,
+    [audiences, audienceId],
+  );
+
+  const escolherLista = async (value: string) => {
+    if (!missionId) return;
+    const next = value === "__none" ? null : value;
+    try {
+      await setMissionAudience(missionId, next);
+      await qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
+      toast.success(next ? "Lista de obrigados aplicada à missão" : "Missão volta ao público padrão");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao aplicar a lista");
+    }
+  };
+
 
 
   if (isLoading) {
