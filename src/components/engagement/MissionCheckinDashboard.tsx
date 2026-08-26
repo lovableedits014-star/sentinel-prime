@@ -514,6 +514,24 @@ export default function MissionCheckinDashboard({
                           <td className="p-2 text-xs text-muted-foreground">
                             {fmtDate(r.concluido_em || r.primeiro_acesso_em)}
                           </td>
+                          <td className="p-2 text-xs">
+                            {(r.missoes_cobradas ?? 0) === 0 ? (
+                              <span className="text-muted-foreground">1ª missão</span>
+                            ) : (
+                              <span
+                                className={
+                                  (r.pct_cumprimento ?? 0) >= 80
+                                    ? "text-emerald-600"
+                                    : (r.pct_cumprimento ?? 0) === 0
+                                      ? "text-destructive"
+                                      : "text-amber-600"
+                                }
+                              >
+                                {r.missoes_cumpridas ?? 0}/{r.missoes_cobradas} · {r.pct_cumprimento ?? 0}%
+                              </span>
+                            )}
+                          </td>
+
                           <td className="p-2">
                             <div className="flex justify-end gap-1">
                               {r.origem === "eleicao" && (
