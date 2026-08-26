@@ -16,7 +16,7 @@ import IndicadorCombobox from "./IndicadorCombobox";
 import { TELE_HELP } from "./telemarketing-help";
 
 type Origem = "csv" | "estrutura" | "indicados_eleicao" | "contratados" | "indicados_contratados";
-type ModoDesignacao = "pool" | "um" | "dividir";
+type ModoDesignacao = "compartilhada" | "dividir";
 
 interface Props {
   open: boolean;
