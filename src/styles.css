@@ -143,3 +143,26 @@
   0% { left: -35%; }
   100% { left: 100%; }
 }
+
+@keyframes hero-title-sparkle {
+  0%, 68%, 100% {
+    text-shadow: 0 0 0.3em rgb(255 255 255 / 0.25);
+  }
+  76% {
+    text-shadow: 0 0 0.35em rgb(255 255 255 / 0.8), 0 0 0.9em rgb(96 165 250 / 0.7), 0 0 1.5em rgb(59 130 246 / 0.45);
+  }
+  82% {
+    text-shadow: 0 0 0.22em rgb(255 255 255 / 0.45), 0 0 0.6em rgb(96 165 250 / 0.35);
+  }
+}
+
+.hero-title-sparkle {
+  animation: hero-title-sparkle 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-title-sparkle {
+    animation: none;
+    text-shadow: 0 0 0.3em rgb(255 255 255 / 0.3);
+  }
+}

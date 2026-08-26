@@ -278,7 +278,7 @@ const Index = () => {
           </div>
 
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-none mb-6 tracking-tight">
-            <span className="block text-white">Comando digital</span>
+            <span className="hero-title-sparkle block text-white">Comando digital</span>
             <span className="block bg-gradient-to-r from-blue-400 via-blue-300 to-cyan-400 bg-clip-text text-transparent">
               completo para políticos.
             </span>
