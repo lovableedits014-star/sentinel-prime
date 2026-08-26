@@ -467,6 +467,8 @@ export default function MissionCheckinDashboard({
                         <th className="p-2 text-left">Status</th>
                         <th className="p-2 text-left">Links abertos</th>
                         <th className="p-2 text-left">Check-in</th>
+                        <th className="p-2 text-left">Histórico</th>
+
                         <th className="p-2 text-right">Ações</th>
                       </tr>
                     </thead>
