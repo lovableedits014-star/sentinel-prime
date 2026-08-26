@@ -100,7 +100,7 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     setCidade(""); setBairro(""); setTipo("__all__"); setIndicadorId("__all__");
     setApenasPendentes(true); setSubstituir(false);
     setIntro(""); setPerguntas(""); setTags("Não mora mais aqui\nNúmero errado\nPediu retorno"); setWhatsappTemplate("");
-    setModoDesignacao("pool"); setOperadorUnico(""); setOperadoresDividir(new Set());
+    setModoDesignacao("compartilhada"); setOpsMarcados(new Set());
     setNomeLista("");
     if (fileRef.current) fileRef.current.value = "";
 
@@ -115,7 +115,12 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
       .select("id, nome, ativo")
       .eq("client_id", clientId)
       .order("nome")
-      .then(({ data }) => setOperadores(((data as any[]) || []).map(o => ({ id: o.id, nome: o.nome, ativo: !!o.ativo }))));
+      .then(({ data }) => {
+        const list = ((data as any[]) || []).map(o => ({ id: o.id, nome: o.nome, ativo: !!o.ativo }));
+        setOperadores(list);
+        // por padrão, todos os operadores ativos vêm marcados
+        setOpsMarcados(new Set(list.filter(o => o.ativo).map(o => o.id)));
+      });
   }, [clientId, open]);
 
   const opsAtivos = useMemo(() => operadores.filter(o => o.ativo), [operadores]);
