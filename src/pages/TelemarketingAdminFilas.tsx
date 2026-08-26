@@ -12,6 +12,7 @@ import NovaFilaWizard from "@/components/telemarketing/NovaFilaWizard";
 import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCard";
 import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
 import AdicionarContatosDialog from "@/components/telemarketing/AdicionarContatosDialog";
+import RenomearFilaDialog from "@/components/telemarketing/RenomearFilaDialog";
 import TeleHelp from "@/components/telemarketing/TeleHelp";
 import { TELE_HELP } from "@/components/telemarketing/telemarketing-help";
 
