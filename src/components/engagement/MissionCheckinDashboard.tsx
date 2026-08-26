@@ -556,7 +556,68 @@ export default function MissionCheckinDashboard({
             </div>
           </AccordionContent>
         </AccordionItem>
+
+        <AccordionItem value="nao-obrigados" className="mt-3 border rounded-lg bg-card">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline [&>svg]:ml-3">
+            <div className="flex flex-1 items-center text-left">
+              <div>
+                <p className="text-sm font-medium">Participaram mas não são obrigados</p>
+                <p className="text-xs text-muted-foreground">
+                  Quem entrou no link sem estar na lista de obrigados. Não entra no cálculo de adesão.
+                </p>
+              </div>
+              <Badge variant="outline" className="ml-auto shrink-0">
+                {naoObrigados.length} pessoa{naoObrigados.length !== 1 ? "s" : ""}
+              </Badge>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            {loadingNao ? (
+              <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : naoObrigados.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Ninguém de fora da lista participou desta missão.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="p-2 text-left">Pessoa</th>
+                      <th className="p-2 text-left">Cargo</th>
+                      <th className="p-2 text-left">Região</th>
+                      <th className="p-2 text-left">Telefone</th>
+                      <th className="p-2 text-left">Status</th>
+                      <th className="p-2 text-left">Check-in</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {naoObrigados.map((r) => (
+                      <tr key={r.participant_id} className="border-t">
+                        <td className="p-2 font-medium">{r.nome}</td>
+                        <td className="p-2 text-xs">{CARGO_LABEL[r.cargo || ""] || r.cargo || "—"}</td>
+                        <td className="p-2 text-xs">{r.regiao || "—"}</td>
+                        <td className="p-2 text-xs">{fmtPhoneBR(r.telefone) || "—"}</td>
+                        <td className="p-2">
+                          {r.status === "cumpriu" ? (
+                            <Badge className="gap-1 bg-emerald-600 text-[10px] hover:bg-emerald-600"><CheckCircle2 className="h-3 w-3" /> Cumpriu</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="gap-1 text-[10px]"><Eye className="h-3 w-3" /> Abriu</Badge>
+                          )}
+                        </td>
+                        <td className="p-2 text-xs text-muted-foreground">
+                          {fmtDate(r.concluido_em || r.primeiro_acesso_em)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
+
 
       <MissionPessoaHistorico
         clientId={clientId}
