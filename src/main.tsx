@@ -63,10 +63,12 @@ createRoot(document.getElementById("root")!).render(<App />);
     return;
   }
 
-  // Recarrega quando o SW novo assumir o controle (uma única vez)
+  // Só recarrega quando o próprio usuário aceitou a atualização. Assim um
+  // deploy nunca apaga uma ligação ou observação ainda não salva.
   let reloading = false;
+  let updateAccepted = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (reloading) return;
+    if (reloading || !updateAccepted) return;
     reloading = true;
     window.location.reload();
   });
@@ -97,6 +99,7 @@ createRoot(document.getElementById("root")!).render(<App />);
       '<button id="__sw_update_btn" style="background:#22c55e;color:#fff;border:0;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer">Atualizar</button>';
     document.body.appendChild(box);
     document.getElementById("__sw_update_btn")?.addEventListener("click", () => {
+      updateAccepted = true;
       try { waiting.postMessage({ type: "SKIP_WAITING" }); } catch {}
       // Fallback: força reload caso o SW não dispare controllerchange
       setTimeout(() => window.location.reload(), 400);
