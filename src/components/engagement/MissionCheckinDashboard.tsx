@@ -78,7 +78,9 @@ const CARGO_LABEL: Record<string, string> = {
 const fmtDate = (s: string | null) =>
   s ? new Date(s).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 
-export default function MissionCheckinDashboard({ clientId, missionId, missionTitle, missionLink }: Props) {
+export default function MissionCheckinDashboard({
+  clientId, missionId, missionTitle, missionLink, audienceId, audienceNome,
+}: Props) {
   const [incluirSemValor, setIncluirSemValor] = useState(false);
   const [incluirFuncionarios, setIncluirFuncionarios] = useState(false);
   const [somenteFaltantes, setSomenteFaltantes] = useState(false);
@@ -87,21 +89,37 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
   const [cadastroFiltro, setCadastroFiltro] = useState<string>("todos");
   const [cargoFiltro, setCargoFiltro] = useState<string>("todos");
   const [regiaoFiltro, setRegiaoFiltro] = useState<string>("todas");
+  const [historicoFiltro, setHistoricoFiltro] = useState<string>("todos");
   const [search, setSearch] = useState("");
   const [historicoPessoa, setHistoricoPessoa] = useState<{ id: string; nome: string } | null>(null);
 
   const { data: rows = [], isLoading } = useQuery<Row[]>({
-    queryKey: ["mission-checkin-dashboard", clientId, missionId, incluirSemValor, incluirFuncionarios],
+    queryKey: ["mission-checkin-dashboard-v2", clientId, missionId, audienceId, incluirSemValor, incluirFuncionarios],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("mission_checkin_dashboard", {
+      const { data, error } = await (supabase as any).rpc("mission_checkin_dashboard_v2", {
         p_client_id: clientId,
         p_mission_id: missionId,
+        p_audience_id: audienceId ?? null,
         p_incluir_sem_valor: incluirSemValor,
         p_incluir_funcionarios: incluirFuncionarios,
-        p_regiao: null,
       });
       if (error) throw error;
       return (data || []) as Row[];
+    },
+    enabled: !!clientId && !!missionId,
+    staleTime: 15_000,
+  });
+
+  const { data: naoObrigados = [], isLoading: loadingNao } = useQuery<NaoObrigadoRow[]>({
+    queryKey: ["mission-checkin-nao-obrigados", clientId, missionId, audienceId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("mission_checkin_nao_obrigados", {
+        p_client_id: clientId,
+        p_mission_id: missionId,
+        p_audience_id: audienceId ?? null,
+      });
+      if (error) throw error;
+      return (data || []) as NaoObrigadoRow[];
     },
     enabled: !!clientId && !!missionId,
     staleTime: 15_000,
@@ -124,13 +142,21 @@ export default function MissionCheckinDashboard({ clientId, missionId, missionTi
       if (cadastroFiltro === "sem" && r.tem_cadastro !== false) return false;
       if (cargoFiltro !== "todos" && (r.cargo || "") !== cargoFiltro) return false;
       if (regiaoFiltro !== "todas" && (r.regiao || "") !== regiaoFiltro) return false;
+      if (historicoFiltro !== "todos") {
+        const pct = r.pct_cumprimento ?? 0;
+        const cobradas = r.missoes_cobradas ?? 0;
+        if (historicoFiltro === "sempre" && !(cobradas > 0 && pct >= 80)) return false;
+        if (historicoFiltro === "nunca" && !(cobradas > 0 && pct === 0)) return false;
+        if (historicoFiltro === "irregular" && !(cobradas > 0 && pct > 0 && pct < 80)) return false;
+      }
       if (q) {
         const hay = `${r.nome} ${r.telefone || ""} ${r.indicador_nome || ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [rows, somenteFaltantes, statusFiltro, obrigacaoFiltro, cadastroFiltro, cargoFiltro, regiaoFiltro, search]);
+  }, [rows, somenteFaltantes, statusFiltro, obrigacaoFiltro, cadastroFiltro, cargoFiltro, regiaoFiltro, historicoFiltro, search]);
+
 
   const kpis = useMemo(() => {
     const total = filtered.length;
