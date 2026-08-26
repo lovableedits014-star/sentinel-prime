@@ -223,20 +223,28 @@ export default function Telemarketing() {
       return;
     }
     // Link salvo/compartilhado pode apontar para uma fila em que este operador
-    // não está marcado. Nesse caso, refaz a busca em todas as filas dele.
+    // não está marcado. Só faz fallback quando o diagnóstico confirma isso;
+    // uma fila válida e temporariamente vazia deve continuar selecionada.
     if (usedCampanhaId && (!rpcRows || (rpcRows as any[]).length === 0)) {
-      const retry = await supabase.rpc("tele_list_contatos" as any, {
-        _client_id: clientId!,
-        _nome: operadorNome.trim(),
-        _senha: operadorSenha.trim(),
-        _campanha_id: null,
+      const diag = await supabase.rpc("tele_diagnostico_fila" as any, {
+        _client_id: clientId!, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: usedCampanhaId,
       });
-      if (!retry.error && ((retry.data as any[]) || []).length > 0) {
-        rpcRows = retry.data as any;
-        usedCampanhaId = null;
-        setSelectedCampanhaId(null);
-        setCampanhaNome(null);
-        toast.info("Esta fila não está liberada para você. Carregamos as suas filas.");
+      const detail = diag.data as FilaDiagnostico | null;
+      if (detail && !detail.fila_solicitada_valida) {
+        const retry = await supabase.rpc("tele_list_contatos" as any, {
+          _client_id: clientId!,
+          _nome: operadorNome.trim(),
+          _senha: operadorSenha.trim(),
+          _campanha_id: null,
+        });
+        if (!retry.error) {
+          rpcRows = retry.data as any;
+          usedCampanhaId = null;
+          setSelectedCampanhaId(null);
+          setCampanhaNome(null);
+          window.history.replaceState({}, "", window.location.pathname);
+          toast.info("Esta fila não está liberada para você. Carregamos as suas filas.");
+        }
       }
     }
 
@@ -499,8 +507,11 @@ export default function Telemarketing() {
         _ttl_seconds: 300,
         _session_id: sessionIdRef.current,
       }).then(({ data }: any) => {
-        if (data && data.claimed === false && data.operador_nome && data.operador_nome !== operadorNome.trim()) {
-          toast.warning(`Este contato está em atendimento por ${data.operador_nome}. Pulando…`);
+        if (data?.claimed === false) {
+          const sameOperator = data.operador_nome?.trim().toLocaleLowerCase("pt-BR") === operadorNome.trim().toLocaleLowerCase("pt-BR");
+          toast.warning(sameOperator
+            ? "Este contato está aberto em outro aparelho. Buscando o próximo…"
+            : `Este contato está em atendimento por ${data.operador_nome}. Buscando o próximo…`);
           void jumpToProximoDisponivel();
         }
       });
@@ -1361,7 +1372,7 @@ export default function Telemarketing() {
       <div className="flex items-center justify-center gap-2 pb-3 text-[10px] text-muted-foreground">
         <span>Versão {TELE_APP_VERSION}</span>
         <span>·</span>
-        <button type="button" className="underline underline-offset-2" onClick={forceAppUpdate}>Atualizar sistema neste aparelho</button>
+        <Button type="button" variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={forceAppUpdate}>Atualizar sistema neste aparelho</Button>
       </div>
     </div>
   );
