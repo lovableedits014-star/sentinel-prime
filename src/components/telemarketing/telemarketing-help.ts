@@ -60,7 +60,7 @@ export const TELE_HELP = {
   adicionarContatos:
     "Acrescenta novos contatos a uma fila que já existe, sem criar outra. Você escolhe a origem (planilha, estrutura, indicados) e vê uma prévia de quantos entrarão. Quem já está na fila não é duplicado.",
   gerenciarDesignacoes:
-    "Aqui você decide quem liga para quem: selecione contatos e atribua a um operador, distribua igualmente entre vários ou devolva ao pool livre.",
+    "Aqui você decide quem liga para quem: selecione contatos e atribua a um operador, distribua igualmente entre vários ou deixe livre para os operadores marcados nesta fila.",
   buscarNovos:
     "Repete o mesmo filtro usado quando a fila foi criada e traz apenas as pessoas cadastradas depois disso. Útil quando a lista de um indicador cresce ao longo dos dias.",
   redistribuirFila:
@@ -68,9 +68,9 @@ export const TELE_HELP = {
   removerDaFila:
     "Tira os contatos selecionados desta fila. Eles continuam cadastrados no sistema, apenas deixam de aparecer para os operadores.",
   liberar:
-    "Remove a designação do operador e devolve o contato ao pool livre, onde qualquer operador da fila pode puxá-lo.",
+    "Remove a designação fixa e deixa o contato livre para qualquer operador marcado nesta fila puxá-lo.",
   poolLivre:
-    "Contato sem operador fixo: o próximo operador que pedir um contato pode recebê-lo. Contatos atribuídos aparecem só para o operador escolhido.",
+    "Contato sem operador fixo: o próximo operador marcado nesta fila que pedir um contato pode recebê-lo. Contatos atribuídos aparecem só para o operador escolhido.",
   origemFila:
     "De onde vieram os contatos desta fila e qual filtro foi usado (por exemplo: indicados de um coordenador específico, só de uma cidade).",
   statusLigacao:

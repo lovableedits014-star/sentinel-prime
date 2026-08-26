@@ -13,6 +13,7 @@ import OperadoresAoVivoCard from "@/components/telemarketing/OperadoresAoVivoCar
 import AtribuicoesDialog from "@/components/telemarketing/AtribuicoesDialog";
 import AdicionarContatosDialog from "@/components/telemarketing/AdicionarContatosDialog";
 import RenomearFilaDialog from "@/components/telemarketing/RenomearFilaDialog";
+import FilaOperadoresDialog from "@/components/telemarketing/FilaOperadoresDialog";
 import TeleHelp from "@/components/telemarketing/TeleHelp";
 import { TELE_HELP } from "@/components/telemarketing/telemarketing-help";
 
@@ -26,6 +27,7 @@ const ORIGEM_LABEL: Record<string, string> = {
 
 
 interface OpCount { operador_id: string | null; operador_nome: string; pendentes: number; ligados: number }
+interface FilaOperadorResumo { operador_id: string; nome: string; marcado: boolean }
 
 
 interface FilaResumo {
@@ -53,6 +55,8 @@ export default function TelemarketingAdminFilas() {
   const [repopulando, setRepopulando] = useState<string | null>(null);
   const [resetando, setResetando] = useState<string | null>(null);
   const [renameDialog, setRenameDialog] = useState<{ open: boolean; campanhaId: string; nome: string; descricao: string | null }>({ open: false, campanhaId: "", nome: "", descricao: null });
+  const [opsDialog, setOpsDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
+  const [filaOpsMap, setFilaOpsMap] = useState<Record<string, FilaOperadorResumo[]>>({});
 
   const resetarFila = async (f: FilaResumo) => {
     if (!clientId) return;
@@ -94,16 +98,22 @@ export default function TelemarketingAdminFilas() {
     setFonteMap(fmap);
     // Carrega contagem por operador em cada fila
     const map: Record<string, OpCount[]> = {};
+    const opsMap: Record<string, FilaOperadorResumo[]> = {};
     await Promise.all(list.map(async (f) => {
-      const { data: rows } = await supabase.rpc("tele_operador_counts_por_campanha" as any, {
-        _client_id: clientId, _campanha_id: f.campanha_id,
-      });
+      const [{ data: rows }, { data: filaOps }] = await Promise.all([
+        supabase.rpc("tele_operador_counts_por_campanha" as any, { _client_id: clientId, _campanha_id: f.campanha_id }),
+        supabase.rpc("tele_fila_operadores" as any, { _client_id: clientId, _campanha_id: f.campanha_id }),
+      ]);
       map[f.campanha_id] = ((rows as any[]) || []).map(x => ({
         operador_id: x.operador_id, operador_nome: x.operador_nome,
         pendentes: Number(x.pendentes || 0), ligados: Number(x.ligados || 0),
       }));
+      opsMap[f.campanha_id] = ((filaOps as any[]) || []).map(x => ({
+        operador_id: x.operador_id, nome: x.nome, marcado: Boolean(x.marcado),
+      }));
     }));
     setCountsMap(map);
+    setFilaOpsMap(opsMap);
     setLoading(false);
   };
 
@@ -212,6 +222,8 @@ export default function TelemarketingAdminFilas() {
           <div className="grid md:grid-cols-2 gap-3">
             {filas.map(f => {
               const pct = f.total > 0 ? Math.round((f.ligados / f.total) * 100) : 0;
+              const opsMarcados = (filaOpsMap[f.campanha_id] || []).filter((op) => op.marcado);
+              const nomesOps = opsMarcados.slice(0, 2).map((op) => op.nome).join(", ");
               return (
                 <Card key={f.campanha_id} className={f.ativo ? "" : "opacity-60"}>
                   <CardContent className="p-4 space-y-3">
@@ -231,6 +243,11 @@ export default function TelemarketingAdminFilas() {
                         </div>
 
                         {f.descricao && <p className="text-xs text-muted-foreground truncate">{f.descricao}</p>}
+                        <Badge variant={opsMarcados.length ? "outline" : "destructive"} className="mt-1 text-[10px]">
+                          {opsMarcados.length
+                            ? `${nomesOps}${opsMarcados.length > 2 ? ` +${opsMarcados.length - 2}` : ""}`
+                            : "Sem operador — ninguém liga"}
+                        </Badge>
                       </div>
                       <div className="flex gap-1 shrink-0">
                         <Button
@@ -298,6 +315,9 @@ export default function TelemarketingAdminFilas() {
                         <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
                       <TeleHelp text={TELE_HELP.gerenciarDesignacoes} className="self-center" />
+                      <Button size="sm" variant="outline" onClick={() => setOpsDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
+                        <Users className="w-3.5 h-3.5 mr-1" /> Operadores da fila
+                      </Button>
 
                       <Button
                         size="sm"
@@ -379,6 +399,16 @@ export default function TelemarketingAdminFilas() {
           nomeAtual={renameDialog.nome}
           descricaoAtual={renameDialog.descricao}
           onSaved={() => load()}
+        />
+      )}
+      {clientId && opsDialog.open && (
+        <FilaOperadoresDialog
+          open={opsDialog.open}
+          onOpenChange={(open) => setOpsDialog((current) => ({ ...current, open }))}
+          clientId={clientId}
+          campanhaId={opsDialog.campanhaId}
+          campanhaNome={opsDialog.nome}
+          onChanged={() => load()}
         />
       )}
     </div>
