@@ -98,7 +98,7 @@ function summarize(rows: ReportRow[]): Summary[] {
   });
 }
 
-export default function TelemarketingIndicadorScorecard({ clientId }: { clientId: string }) {
+export default function TelemarketingIndicadorScorecard({ clientId, campanhaId = null }: { clientId: string; campanhaId?: string | null }) {
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Summary | null>(null);
