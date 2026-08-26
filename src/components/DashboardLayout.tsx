@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, MessageSquare, Settings, LogOut, Shield,
-  Users, TrendingUp, Crown, Menu, X, MapPin, BookUser, UserPlus, Kanban, Sparkles, Trophy, Target, Briefcase, Send, CalendarCheck, Vote, CalendarDays, Newspaper, Activity, Megaphone, Brain, Headphones, Camera,
+  Users, TrendingUp, Crown, Menu, X, MapPin, BookUser, UserPlus, Kanban, Sparkles, Trophy, Briefcase, Send, CalendarCheck, Vote, CalendarDays, Newspaper, Activity, Megaphone, Brain, Headphones, Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -68,7 +68,6 @@ const MENU_SECTIONS: MenuSection[] = [
       { icon: MessageSquare, label: "Comentários", path: "/comments" },
       { icon: Megaphone, label: "Militância Digital", path: "/militancia" },
       { icon: TrendingUp, label: "Engajamento", path: "/engagement" },
-      { icon: Target, label: "Missões Check-in", path: "/missoes-checkin" },
       { icon: Brain, label: "Inteligência de Conteúdo", path: "/inteligencia-conteudo" },
       { icon: Camera, label: "Fotos de Campanha", path: "/fotos-campanha" },
     ],
@@ -274,7 +273,12 @@ const DashboardLayout = () => {
   // Helper: pode acessar um path?
   const canAccess = useCallback((path: string) => {
     if (isClientOwner) return true;
-    if (platformPaths) return platformPaths.includes(path);
+    if (platformPaths) {
+      if (path === "/engagement" || path === "/missoes-checkin") {
+        return platformPaths.includes("/engagement") || platformPaths.includes("/missoes-checkin");
+      }
+      return platformPaths.includes(path);
+    }
     if (accessProfile) return isPathAllowed(accessProfile, path);
     return true;
   }, [isClientOwner, platformPaths, accessProfile]);

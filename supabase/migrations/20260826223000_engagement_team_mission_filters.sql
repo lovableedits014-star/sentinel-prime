@@ -97,7 +97,7 @@ BEGIN
            coalesce(o.cumprida,false) ob_cumprida,coalesce(o.e1,false) ob_e1,
            coalesce(o.e3,false) ob_e3,o.cumprida_em ob_em,
            EXISTS(SELECT 1 FROM mission_events e WHERE e.mission_id=b.id AND e.participant_id=c.participant_id
-             AND coalesce(e.is_bot,false)=false AND e.event_type LIKE 'click_%') clicou
+             AND coalesce(e.is_bot,false)=false AND e.event_type::text LIKE 'click_%') clicou
     FROM base b LEFT JOIN ck c ON c.mission_id=b.id AND
       ((b.origem='eleicao' AND c.pessoa_id=b.pessoa_id) OR (b.origem='funcionario' AND c.funcionario_id=b.pessoa_id))
     LEFT JOIN ob o ON o.mission_id=b.id AND o.origem=b.origem AND o.ref_id=b.pessoa_id

@@ -61,15 +61,15 @@ export default function EquipeRankingPanel({
       Cargo: r.cargo || "—",
       Região: r.regiao || r.cidade || "—",
       Telefone: fmtTelefone(r.telefone),
-      Publicações: r.publicacoes,
-      Cumpridas: r.cumpridas,
+      "Missões recebidas": r.publicacoes,
+      Confirmadas: r.cumpridas,
       "Abriu sem confirmar": r.abriu_sem_confirmar,
-      Faltas: r.faltas,
-      "Cumprimento %": Number(r.pct),
+      "Não abriu": r.faltas,
+      "Taxa de cumprimento %": Number(r.pct),
       "Período anterior %": r.pct_anterior == null ? "" : Number(r.pct_anterior),
       Variação: r.variacao == null ? "" : Number(r.variacao),
-      Prova: r.prova_principal || "—",
-      Faixa: FAIXA_DESEMPENHO[r.faixa].label,
+      "Como confirmou": r.prova_principal ? PROVA_LABEL[r.prova_principal] : "Nenhuma confirmação",
+      Situação: FAIXA_DESEMPENHO[r.faixa].label,
       Contrato: r.tem_contrato ? "Sim" : "Não",
       Voluntário: r.is_voluntario ? "Sim" : "Não",
       "Última atividade": fmtDataHora(r.ultima_atividade),
@@ -88,17 +88,17 @@ export default function EquipeRankingPanel({
     autoTable(doc, {
       startY: 26,
       styles: { fontSize: 8 },
-      head: [["Nome", "Cargo", "Região", "Public.", "Cumpr.", "Faltas", "%", "Faixa", "Última atividade"]],
+      head: [["Nome", "Cargo", "Região", "Recebidas", "Confirmadas", "Abriu s/ confirmar", "Não abriu", "%", "Situação"]],
       body: filtradas.map((r) => [
         r.nome.slice(0, 40),
         r.cargo || "—",
         (r.regiao || r.cidade || "—").slice(0, 20),
         r.publicacoes,
         r.cumpridas,
+        r.abriu_sem_confirmar,
         r.faltas,
         fmtPct(r.pct),
         FAIXA_DESEMPENHO[r.faixa].label,
-        fmtDataHora(r.ultima_atividade),
       ]),
     });
     doc.save(`ranking-equipe-${periodoLabel}.pdf`);
@@ -113,7 +113,7 @@ export default function EquipeRankingPanel({
               <TrendingUp className="h-4 w-4 text-primary" /> Ranking da equipe
             </CardTitle>
             <CardDescription className="text-xs">
-              Clique em uma pessoa para ver publicação por publicação e cobrar pelo WhatsApp.
+              Recebidas = confirmadas + abriu sem confirmar + não abriu. Clique em uma pessoa para ver missão por missão.
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -171,7 +171,9 @@ export default function EquipeRankingPanel({
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">{filtradas.length} pessoas no filtro atual.</p>
+        <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+          <strong>{filtradas.length} pessoas</strong> no filtro · Missões recebidas = confirmadas + abriu sem confirmar + não abriu.
+        </div>
 
         <div className="overflow-x-auto">
           <Table>
@@ -179,14 +181,14 @@ export default function EquipeRankingPanel({
               <TableRow>
                 <TableHead>#</TableHead>
                 <TableHead>Pessoa</TableHead>
-                <TableHead className="text-right">Public.</TableHead>
-                <TableHead className="text-right">Cumpridas</TableHead>
-                <TableHead className="text-right">Faltas</TableHead>
-                <TableHead className="text-right">%</TableHead>
+                <TableHead className="text-right">Recebidas</TableHead>
+                <TableHead className="text-right">Confirmadas</TableHead>
+                <TableHead className="text-right">Abriu, não confirmou</TableHead>
+                <TableHead className="text-right">Não abriu</TableHead>
+                <TableHead className="text-right">Taxa</TableHead>
                 <TableHead>Variação</TableHead>
-                <TableHead>Prova</TableHead>
-                <TableHead>Faixa</TableHead>
-                <TableHead>Última atividade</TableHead>
+                <TableHead>Como confirmou</TableHead>
+                <TableHead>Situação</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -211,7 +213,8 @@ export default function EquipeRankingPanel({
                       </p>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{r.publicacoes}</TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums text-emerald-600">{r.cumpridas}</TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums text-emerald-600">{r.cumpridas} de {r.publicacoes}</TableCell>
+                    <TableCell className="text-right tabular-nums text-amber-600">{r.abriu_sem_confirmar}</TableCell>
                     <TableCell className="text-right tabular-nums text-destructive">{r.faltas}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{fmtPct(r.pct)}</TableCell>
                     <TableCell>
@@ -227,13 +230,12 @@ export default function EquipeRankingPanel({
                         {r.variacao == null ? "—" : `${r.variacao > 0 ? "+" : ""}${r.variacao}`}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs">{r.prova_principal || "—"}</TableCell>
+                    <TableCell className="text-xs">{r.prova_principal ? PROVA_LABEL[r.prova_principal] : "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={cn("text-[10px]", FAIXA_DESEMPENHO[r.faixa].className)}>
                         {FAIXA_DESEMPENHO[r.faixa].label}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-[11px] text-muted-foreground">{fmtDataHora(r.ultima_atividade)}</TableCell>
                   </TableRow>
                 );
               })}
@@ -261,6 +263,14 @@ export default function EquipeRankingPanel({
                     {fmtData(d.publicado_em)}
                     {d.prova ? ` · ${PROVA_LABEL[d.prova]}` : ""}
                   </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <Badge variant="outline" className={cn("text-[9px]", d.facebook_abriu && "border-blue-500/40 bg-blue-500/10 text-blue-700")}>
+                      Facebook: {d.facebook_abriu ? "abriu" : "não abriu"}
+                    </Badge>
+                    <Badge variant="outline" className={cn("text-[9px]", d.instagram_abriu && "border-pink-500/40 bg-pink-500/10 text-pink-700")}>
+                      Instagram: {d.instagram_abriu ? "abriu" : "não abriu"}
+                    </Badge>
+                  </div>
                 </div>
                 <Badge
                   variant="outline"

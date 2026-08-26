@@ -36,7 +36,6 @@ export const ALL_APP_TABS: AppTab[] = [
   { section: 'Redes Sociais', label: 'Comentários', path: '/comments' },
   { section: 'Redes Sociais', label: 'Militância Digital', path: '/militancia' },
   { section: 'Redes Sociais', label: 'Engajamento', path: '/engagement' },
-  { section: 'Redes Sociais', label: 'Missões Check-in', path: '/missoes-checkin' },
   { section: 'Redes Sociais', label: 'Inteligência de Conteúdo', path: '/inteligencia-conteudo' },
   // Base Política
   { section: 'Base Política', label: 'Pessoas', path: '/pessoas' },

@@ -69,6 +69,20 @@ export const Route = createFileRoute("/api/public/missao/event")({
 
           const ua = request.headers.get("user-agent");
           const sb = makeClient();
+          if (type === "declared_done") {
+            const { data: gate, error: gateError } = await sb.rpc("public_mission_can_confirm" as any, {
+              p_mission_id: missionId,
+              p_token: token || null,
+            } as any);
+            if (gateError) return Response.json({ error: gateError.message }, { status: 500, headers: corsHeaders });
+            const check = (gate || {}) as any;
+            if (!check.ok) {
+              return Response.json(
+                { error: check.error || "Acesse todos os links antes de confirmar", remaining: check.remaining ?? 0 },
+                { status: 409, headers: corsHeaders },
+              );
+            }
+          }
           const { data, error } = await sb.rpc("public_mission_event", {
             p_mission_id: missionId,
             p_code: code || null,

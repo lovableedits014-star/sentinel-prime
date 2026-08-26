@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle } from "lucide-react";
+import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 
@@ -204,13 +204,15 @@ export default function MissaoPublica() {
     ) => {
       if (!missionId) return;
       try {
-        await fetch(api("/api/public/missao/event"), {
+        const response = await fetch(api("/api/public/missao/event"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ missionId, code, token, type, linkId: linkId || null }),
         });
+        return response.ok;
       } catch {
         // silencioso — não bloqueia o clique
+        return false;
       }
     },
     [missionId, code, token],
@@ -305,8 +307,27 @@ export default function MissaoPublica() {
   };
 
   const handleDeclare = async () => {
+    if (config) {
+      const mission = config.mission;
+      const required = [
+        ...(mission.link_facebook || (mission.legacy_platform === "facebook" && mission.legacy_post_url) ? ["click_facebook"] : []),
+        ...(mission.link_instagram || (mission.legacy_platform === "instagram" && mission.legacy_post_url) ? ["click_instagram"] : []),
+        ...(mission.link_avulso ? ["click_avulso"] : []),
+        ...(config.links || []).map((link) => link.id),
+      ];
+      const pending = required.filter((key) => !clickedLinks.has(key)).length;
+      if (pending > 0) {
+        toast.error(`Abra ${pending === 1 ? "o link pendente" : `os ${pending} links pendentes`} antes de confirmar.`);
+        return;
+      }
+    }
     setDeclaring(true);
-    await registerEvent("declared_done");
+    const registered = await registerEvent("declared_done");
+    if (!registered) {
+      setDeclaring(false);
+      toast.error("Não foi possível confirmar. Verifique se todos os links foram acessados e tente novamente.");
+      return;
+    }
     setDeclared(true);
     setBackReminder(false);
     try {
@@ -353,12 +374,24 @@ export default function MissaoPublica() {
   const linkAv = m.link_avulso || null;
   const extraLinks = config.links || [];
   const cargoLabel = p?.cargo ? CARGO_LABEL[p.cargo] || p.cargo : null;
-  const anyClicked = clickedLinks.size > 0;
-  const showStickyBar = !!p && !declared && anyClicked;
+  const requiredLinkKeys = [
+    ...(linkFb ? ["click_facebook"] : []),
+    ...(linkIg ? ["click_instagram"] : []),
+    ...(linkAv ? ["click_avulso"] : []),
+    ...extraLinks.map((l) => l.id),
+  ];
+  const clickedRequiredCount = requiredLinkKeys.filter((key) => clickedLinks.has(key)).length;
+  const remainingLinks = requiredLinkKeys.length - clickedRequiredCount;
+  const allLinksClicked = remainingLinks === 0;
+  const showStickyBar = !!p && !declared && allLinksClicked && requiredLinkKeys.length > 0;
   const isClicked = (key: string) => clickedLinks.has(key);
 
   const linkBtnClass = (key: string) =>
-    `w-full justify-start gap-2 ${isClicked(key) ? "border-emerald-500/60 bg-emerald-500/5" : ""}`;
+    `w-full min-h-16 h-auto justify-start gap-3 border-2 px-4 py-3 text-left shadow-sm transition-all ${
+      isClicked(key)
+        ? "border-emerald-500 bg-emerald-500/10"
+        : "border-primary/50 bg-primary/5 hover:border-primary hover:bg-primary/10"
+    }`;
 
   const ClickedMark = ({ k }: { k: string }) =>
     isClicked(k) ? (
@@ -489,16 +522,38 @@ export default function MissaoPublica() {
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
                       1
                     </span>
-                    <p className="text-sm font-medium">Abra a publicação e interaja</p>
+                    <p className="text-sm font-medium">Abra todos os links e realize as ações</p>
                   </div>
+                  {requiredLinkKeys.length > 0 && (
+                    <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-3">
+                      <div className="flex items-center justify-between gap-2 text-sm font-semibold">
+                        <span>Progresso da missão</span>
+                        <span>{clickedRequiredCount} de {requiredLinkKeys.length} links</span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-emerald-500 transition-all"
+                          style={{ width: `${(clickedRequiredCount / requiredLinkKeys.length) * 100}%` }}
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {allLinksClicked
+                          ? "Todos os links foram acessados. Agora confirme a missão."
+                          : `Acesse ${remainingLinks === 1 ? "o link restante" : `os ${remainingLinks} links restantes`} para liberar a confirmação.`}
+                      </p>
+                    </div>
+                  )}
                   {linkFb && (
                     <Button
                       variant="outline"
                       className={linkBtnClass("click_facebook")}
                       onClick={() => handleExternal(linkFb, "click_facebook")}
                     >
-                      <FacebookIcon className="w-4 h-4 text-blue-600" />
-                      Abrir no Facebook
+                      <FacebookIcon className="w-7 h-7 shrink-0 text-blue-600" />
+                      <span className="flex-1">
+                        <span className="block font-bold">FACEBOOK</span>
+                        <span className="block text-xs font-normal text-muted-foreground">Abrir publicação e interagir</span>
+                      </span>
                       <ClickedMark k="click_facebook" />
                     </Button>
                   )}
@@ -508,8 +563,11 @@ export default function MissaoPublica() {
                       className={linkBtnClass("click_instagram")}
                       onClick={() => handleExternal(linkIg, "click_instagram")}
                     >
-                      <InstagramIcon className="w-4 h-4 text-pink-500" />
-                      Abrir no Instagram
+                      <InstagramIcon className="w-7 h-7 shrink-0 text-pink-500" />
+                      <span className="flex-1">
+                        <span className="block font-bold">INSTAGRAM</span>
+                        <span className="block text-xs font-normal text-muted-foreground">Abrir publicação e interagir</span>
+                      </span>
                       <ClickedMark k="click_instagram" />
                     </Button>
                   )}
@@ -519,8 +577,11 @@ export default function MissaoPublica() {
                       className={linkBtnClass("click_avulso")}
                       onClick={() => handleExternal(linkAv, "click_avulso")}
                     >
-                      <ExternalLink className="w-4 h-4" />
-                      Abrir link
+                      <ExternalLink className="w-6 h-6 shrink-0 text-primary" />
+                      <span className="flex-1">
+                        <span className="block font-bold">ABRIR LINK</span>
+                        <span className="block text-xs font-normal text-muted-foreground">Acessar esta etapa da missão</span>
+                      </span>
                       <ClickedMark k="click_avulso" />
                     </Button>
                   )}
@@ -532,13 +593,16 @@ export default function MissaoPublica() {
                       onClick={() => handleExternal(l.url, "click_link", l.id)}
                     >
                       {l.kind === "facebook" ? (
-                        <FacebookIcon className="w-4 h-4 text-blue-600" />
+                        <FacebookIcon className="w-7 h-7 shrink-0 text-blue-600" />
                       ) : l.kind === "instagram" ? (
-                        <InstagramIcon className="w-4 h-4 text-pink-500" />
+                        <InstagramIcon className="w-7 h-7 shrink-0 text-pink-500" />
                       ) : (
-                        <ExternalLink className="w-4 h-4" />
+                        <ExternalLink className="w-6 h-6 shrink-0 text-primary" />
                       )}
-                      <span className="truncate">{l.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-bold">{l.label}</span>
+                        <span className="block text-xs font-normal text-muted-foreground">Acessar esta etapa da missão</span>
+                      </span>
                       <ClickedMark k={l.id} />
                     </Button>
                   ))}
@@ -553,12 +617,20 @@ export default function MissaoPublica() {
                       <p className="text-sm font-medium">Confirme que você cumpriu</p>
                     </div>
 
-                    {backReminder && (
+                    {backReminder && allLinksClicked && (
                       <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-xs flex gap-2 animate-pulse">
                         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                         <span>
                           <strong>Falta só confirmar!</strong> Toque no botão verde abaixo para sua
                           participação ser registrada.
+                        </span>
+                      </div>
+                    )}
+                    {backReminder && !allLinksClicked && (
+                      <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-xs flex gap-2">
+                        <AlertTriangle className="w-4 h-4 text-primary shrink-0" />
+                        <span>
+                          Link registrado! Agora acesse {remainingLinks === 1 ? "o último link" : `os ${remainingLinks} links restantes`}.
                         </span>
                       </div>
                     )}
@@ -569,16 +641,18 @@ export default function MissaoPublica() {
                     </div>
 
                     <Button
-                      className={`w-full gap-2 h-14 text-base bg-emerald-600 hover:bg-emerald-700 text-white ${anyClicked ? "animate-pulse" : ""}`}
+                      className={`w-full gap-2 h-14 text-base ${allLinksClicked ? "bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse" : ""}`}
                       onClick={handleDeclare}
-                      disabled={declaring}
+                      disabled={declaring || !allLinksClicked}
                     >
                       {declaring ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
                       ) : (
-                        <CheckCircle2 className="w-5 h-5" />
+                        allLinksClicked ? <CheckCircle2 className="w-5 h-5" /> : <Lock className="w-5 h-5" />
                       )}
-                      Confirmar que cumpri
+                      {allLinksClicked
+                        ? "Confirmar que cumpri"
+                        : `Acesse ${remainingLinks} ${remainingLinks === 1 ? "link" : "links"} para liberar`}
                     </Button>
                   </div>
                 )}

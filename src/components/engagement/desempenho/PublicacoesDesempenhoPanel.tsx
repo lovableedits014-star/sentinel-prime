@@ -47,14 +47,14 @@ export default function PublicacoesDesempenhoPanel({
       Publicação: p.titulo || "—",
       Plataforma: p.plataforma || "—",
       Data: fmtData(p.publicado_em),
-      Obrigados: p.obrigados,
-      Cumpriram: p.cumpriram,
+      "Pessoas obrigadas": p.obrigados,
+      Confirmaram: p.cumpriram,
       "Abriu sem confirmar": p.abriu_sem_confirmar,
-      Faltaram: p.faltaram,
-      "E1 comprovado": p.e1,
-      "E2 declarado": p.e2,
-      "E3 evidência": p.e3,
-      "Adesão %": Number(p.adesao),
+      "Não abriu": p.faltaram,
+      "Comprovação validada": p.e1,
+      "Confirmou no portal": p.e2,
+      "Evidência aprovada": p.e3,
+      "Taxa de cumprimento %": Number(p.adesao),
     }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Publicações");
@@ -70,7 +70,7 @@ export default function PublicacoesDesempenhoPanel({
     autoTable(doc, {
       startY: 26,
       styles: { fontSize: 8 },
-      head: [["Publicação", "Plataforma", "Data", "Obrigados", "Cumpriram", "Abriu", "Faltaram", "Adesão"]],
+      head: [["Missão", "Rede", "Data", "Obrigados", "Confirmaram", "Abriu s/ confirmar", "Não abriu", "Taxa"]],
       body: rows.map((p) => [
         (p.titulo || "—").slice(0, 60),
         p.plataforma || "—",
@@ -94,7 +94,7 @@ export default function PublicacoesDesempenhoPanel({
               <Megaphone className="h-4 w-4 text-primary" /> Desempenho por publicação
             </CardTitle>
             <CardDescription className="text-xs">
-              Cada linha é uma publicação enviada para o time. Clique em "Cobrar" para ver quem não cumpriu.
+              Cada linha é uma missão. Obrigados = confirmaram + abriram sem confirmar + não abriram.
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -115,10 +115,10 @@ export default function PublicacoesDesempenhoPanel({
                 <TableHead>Publicação</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead className="text-right">Obrigados</TableHead>
-                <TableHead className="text-right">Cumpriram</TableHead>
+                <TableHead className="text-right">Confirmaram</TableHead>
                 <TableHead className="text-right">Abriu s/ confirmar</TableHead>
-                <TableHead className="text-right">Faltaram</TableHead>
-                <TableHead className="text-right">Adesão</TableHead>
+                <TableHead className="text-right">Não abriram</TableHead>
+                <TableHead className="text-right">Taxa</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -135,7 +135,7 @@ export default function PublicacoesDesempenhoPanel({
                   <TableCell className="max-w-[280px]">
                     <p className="truncate font-medium">{p.titulo || "Publicação sem título"}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {p.plataforma || "—"} · E1 {p.e1} · E2 {p.e2} · E3 {p.e3}
+                      {p.plataforma || "—"} · Portal {p.e2} · Comprovadas {p.e1 + p.e3}
                     </p>
                   </TableCell>
                   <TableCell className="text-xs">{fmtData(p.publicado_em)}</TableCell>

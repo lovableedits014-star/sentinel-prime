@@ -83,7 +83,7 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm">
             Conta <strong>todas</strong> as publicações do período e reúne as provas de cumprimento em um só lugar:
-            <strong> E1</strong> comprovado pela API ou clique na rede, <strong>E2</strong> confirmado no portal ou
+            <strong> E1</strong> comprovado e validado, <strong>E2</strong> confirmado no portal ou
             check-in, <strong>E3</strong> evidência anexada. Quem abriu o link e não confirmou aparece separado de quem
             nunca abriu.
           </CardDescription>

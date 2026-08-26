@@ -39,6 +39,8 @@ export type DetalheItem = {
   publicado_em: string | null;
   status: "cumpriu" | "abriu" | "nao_abriu";
   prova: "E1" | "E2" | "E3" | null;
+  facebook_abriu?: boolean;
+  instagram_abriu?: boolean;
 };
 
 export type PessoaDesempenho = {
@@ -155,19 +157,19 @@ export async function fetchFaltantes(
 }
 
 export const PROVA_LABEL: Record<string, string> = {
-  E1: "E1 · Comprovado (API/clique)",
-  E2: "E2 · Declarado no portal",
-  E3: "E3 · Evidência anexada",
+  E1: "Comprovação validada",
+  E2: "Confirmou no portal",
+  E3: "Evidência aprovada",
 };
 
 export const FAIXA_DESEMPENHO: Record<
   PessoaDesempenho["faixa"],
   { label: string; className: string }
 > = {
-  excelente: { label: "Excelente", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
-  atencao: { label: "Atenção", className: "bg-sky-500/15 text-sky-600 border-sky-500/30" },
-  baixo: { label: "Baixo", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-  critico: { label: "Crítico", className: "bg-destructive/15 text-destructive border-destructive/30" },
+  excelente: { label: "Cumprindo bem", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
+  atencao: { label: "Precisa melhorar", className: "bg-sky-500/15 text-sky-600 border-sky-500/30" },
+  baixo: { label: "Poucas confirmações", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+  critico: { label: "Nenhuma confirmação", className: "bg-destructive/15 text-destructive border-destructive/30" },
 };
 
 export const STATUS_PUB_LABEL: Record<string, string> = {
