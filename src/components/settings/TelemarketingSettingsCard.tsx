@@ -37,7 +37,9 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
     setLoading(false);
   };
 
-  useEffect(() => { fetchOps(); }, [clientId]);
+  useEffect(() => {
+    fetchOps();
+  }, [clientId]);
 
   const handleAdd = async () => {
     if (!nome.trim() || !senha.trim()) {
@@ -67,39 +69,86 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
     fetchOps();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Remover este operador? Se ele tiver contatos designados, você poderá reatribuí-los na próxima etapa.")) return;
+  const handleDelete = async (op: Operador) => {
+    const isTestOperator = ["operador1", "teste admin"].includes(
+      op.nome.trim().toLocaleLowerCase("pt-BR"),
+    );
+    if (isTestOperator) {
+      if (
+        !confirm(
+          `Excluir ${op.nome} por completo? Isso apagará também as ligações e confirmações de voto de teste feitas por este operador. Os contatos voltarão para a fila como pendentes.`,
+        )
+      )
+        return;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        toast.error("Sessão expirada. Entre novamente.");
+        return;
+      }
+      const response = await fetch("/api/telemarketing/purge-test-operator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ clientId, operatorId: op.id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error("Erro ao remover: " + (result.error || response.statusText));
+        return;
+      }
+      toast.success(`${op.nome} e seus registros de teste foram removidos`);
+      fetchOps();
+      return;
+    }
+
+    const id = op.id;
+    if (
+      !confirm(
+        "Remover este operador? Se ele tiver contatos designados, você poderá reatribuí-los na próxima etapa.",
+      )
+    )
+      return;
     // Verifica se há contatos designados
     const { count } = await supabase
       .from("telemarketing_contatos_avulsos")
       .select("id", { count: "exact", head: true })
       .eq("assigned_operador_id", id);
     if ((count || 0) > 0) {
-      const reassign = confirm(`Este operador tem ${count} contato(s) designado(s). Clique em OK para redistribuir automaticamente entre os operadores ativos restantes, ou Cancelar para liberar (deixar sem operador designado).`);
+      const reassign = confirm(
+        `Este operador tem ${count} contato(s) designado(s). Clique em OK para redistribuir automaticamente entre os operadores ativos restantes, ou Cancelar para liberar (deixar sem operador designado).`,
+      );
       if (reassign) {
-        const ativos = operadores.filter(o => o.ativo && o.id !== id).map(o => o.id);
+        const ativos = operadores.filter((o) => o.ativo && o.id !== id).map((o) => o.id);
         if (ativos.length === 0) {
           toast.error("Nenhum outro operador ativo. Ative um operador antes de remover este.");
           return;
         }
         const { error: rerr } = await supabase.rpc("tele_reassign_from_operador" as any, {
-          _client_id: clientId, _from_operador_id: id, _to_operador_ids: ativos,
+          _client_id: clientId,
+          _from_operador_id: id,
+          _to_operador_ids: ativos,
         });
-        if (rerr) { toast.error("Erro ao redistribuir: " + rerr.message); return; }
+        if (rerr) {
+          toast.error("Erro ao redistribuir: " + rerr.message);
+          return;
+        }
         toast.success("Contatos redistribuídos");
       } else {
         // Libera (assigned_operador_id = null)
-        await supabase.from("telemarketing_contatos_avulsos")
+        await supabase
+          .from("telemarketing_contatos_avulsos")
           .update({ assigned_operador_id: null } as any)
           .eq("assigned_operador_id", id);
       }
     }
     const { error } = await supabase.from("telemarketing_operadores").delete().eq("id", id);
-    if (error) { toast.error("Erro ao remover: " + error.message); return; }
+    if (error) {
+      toast.error("Erro ao remover: " + error.message);
+      return;
+    }
     toast.success("Operador removido");
     fetchOps();
   };
-
 
   const copyLink = () => {
     navigator.clipboard.writeText(teleUrl);
@@ -117,27 +166,41 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
           </div>
           <div>
             <CardTitle>Central de Telemarketing</CardTitle>
-            <CardDescription>Link de acesso, operadores cadastrados e controle de ligações</CardDescription>
+            <CardDescription>
+              Link de acesso, operadores cadastrados e controle de ligações
+            </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Link de acesso */}
         <div className="border rounded-lg p-4 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Link de acesso dos operadores</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Link de acesso dos operadores
+          </p>
           <div className="bg-muted rounded-md px-3 py-2 flex items-center justify-between gap-2">
             <code className="text-xs text-muted-foreground truncate flex-1">{teleUrl}</code>
             <div className="flex gap-1 shrink-0">
               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={copyLink}>
-                {copiedLink ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedLink ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
               </Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open(teleUrl, "_blank")}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => window.open(teleUrl, "_blank")}
+              >
                 <ExternalLink className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Compartilhe este link com os operadores. Eles precisarão do nome e senha cadastrados abaixo para acessar.
+            Compartilhe este link com os operadores. Eles precisarão do nome e senha cadastrados
+            abaixo para acessar.
           </p>
         </div>
 
@@ -147,11 +210,21 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <label className="text-xs font-medium mb-1 block">Nome</label>
-              <Input placeholder="Nome do operador" value={nome} onChange={(e) => setNome(e.target.value)} className="h-9 text-sm" />
+              <Input
+                placeholder="Nome do operador"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="h-9 text-sm"
+              />
             </div>
             <div className="flex-1">
               <label className="text-xs font-medium mb-1 block">Senha</label>
-              <Input placeholder="Senha de acesso" value={senha} onChange={(e) => setSenha(e.target.value)} className="h-9 text-sm" />
+              <Input
+                placeholder="Senha de acesso"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                className="h-9 text-sm"
+              />
             </div>
             <Button size="sm" onClick={handleAdd} disabled={adding} className="h-9">
               <Plus className="w-4 h-4 mr-1" />
@@ -162,11 +235,16 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
           {loading ? (
             <div className="h-20 bg-muted animate-pulse rounded-lg" />
           ) : operadores.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Nenhum operador cadastrado</p>
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhum operador cadastrado
+            </p>
           ) : (
             <div className="space-y-2">
               {operadores.map((op) => (
-                <div key={op.id} className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2">
+                <div
+                  key={op.id}
+                  className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2"
+                >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div>
                       <p className="text-sm font-medium">{op.nome}</p>
@@ -183,11 +261,19 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
                       variant="ghost"
                       className="h-7 w-7"
                       title="Redefinir senha"
-                      onClick={() => { setResetTarget(op); setResetSenha(""); }}
+                      onClick={() => {
+                        setResetTarget(op);
+                        setResetSenha("");
+                      }}
                     >
                       <KeyRound className="w-3.5 h-3.5" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDelete(op.id)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive"
+                      onClick={() => handleDelete(op)}
+                    >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -210,12 +296,18 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
               <Button
                 size="sm"
                 onClick={async () => {
-                  if (!resetSenha.trim()) { toast.error("Informe a nova senha"); return; }
+                  if (!resetSenha.trim()) {
+                    toast.error("Informe a nova senha");
+                    return;
+                  }
                   const { error } = await supabase
                     .from("telemarketing_operadores")
                     .update({ senha: resetSenha.trim() } as any)
                     .eq("id", resetTarget.id);
-                  if (error) { toast.error("Erro: " + error.message); return; }
+                  if (error) {
+                    toast.error("Erro: " + error.message);
+                    return;
+                  }
                   toast.success("Senha atualizada");
                   setResetTarget(null);
                   setResetSenha("");
@@ -223,7 +315,9 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
               >
                 Salvar
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setResetTarget(null)}>Cancelar</Button>
+              <Button size="sm" variant="ghost" onClick={() => setResetTarget(null)}>
+                Cancelar
+              </Button>
             </div>
           </div>
         )}

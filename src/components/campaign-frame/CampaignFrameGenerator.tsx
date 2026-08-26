@@ -19,6 +19,8 @@ interface Props {
   clientId: string;
   triggerLabel?: string;
   variant?: "card" | "button" | "showcase";
+  individualOnly?: boolean;
+  hideWithoutActiveFrame?: boolean;
 }
 
 const CANVAS_SIZE = 1080;
@@ -35,9 +37,16 @@ const DEFAULT_FRAME: Frame = {
   },
 };
 
-export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar minha foto", variant = "card" }: Props) {
+export default function CampaignFrameGenerator({
+  clientId,
+  triggerLabel = "Gerar minha foto",
+  variant = "card",
+  individualOnly = false,
+  hideWithoutActiveFrame = false,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [showcaseFrame, setShowcaseFrame] = useState<Frame | null>(null);
+  const [showcaseLoaded, setShowcaseLoaded] = useState(false);
   const showcaseCanvasRef = useRef<HTMLCanvasElement>(null);
   const showcaseCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
@@ -47,10 +56,11 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
     (async () => {
       const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
       const list = ((data ?? []) as any as Frame[]);
-      const first = list[0] ?? DEFAULT_FRAME;
+      const first = list[0] ?? (hideWithoutActiveFrame ? null : DEFAULT_FRAME);
       setShowcaseFrame(first);
+      setShowcaseLoaded(true);
     })();
-  }, [variant, clientId]);
+  }, [variant, clientId, hideWithoutActiveFrame]);
 
   // Render empty showcase preview (no user photo)
   useEffect(() => {
@@ -139,6 +149,10 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
     );
   }
 
+  if (variant === "showcase" && hideWithoutActiveFrame && showcaseLoaded && !showcaseFrame) {
+    return null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); }}>
       <DialogTrigger asChild>{Trigger}</DialogTrigger>
@@ -147,7 +161,11 @@ export default function CampaignFrameGenerator({ clientId, triggerLabel = "Gerar
           <DialogTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Gerar foto de campanha</DialogTitle>
           <DialogDescription>Suba sua foto, ajuste o enquadramento e baixe pronta para usar no WhatsApp e redes sociais.</DialogDescription>
         </DialogHeader>
-        <FrameEditor clientId={clientId} />
+        <FrameEditor
+          clientId={clientId}
+          individualOnly={individualOnly}
+          requireActiveFrame={hideWithoutActiveFrame}
+        />
       </DialogContent>
     </Dialog>
   );

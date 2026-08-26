@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiTelemarketingPurgeTestOperatorRouteImport } from './routes/api/telemarketing/purge-test-operator'
 import { Route as ApiPublicMissaoSwitchRouteImport } from './routes/api/public/missao/switch'
 import { Route as ApiPublicMissaoIdentifyRouteImport } from './routes/api/public/missao/identify'
 import { Route as ApiPublicMissaoEventRouteImport } from './routes/api/public/missao/event'
@@ -28,6 +29,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTelemarketingPurgeTestOperatorRoute =
+  ApiTelemarketingPurgeTestOperatorRouteImport.update({
+    id: '/api/telemarketing/purge-test-operator',
+    path: '/api/telemarketing/purge-test-operator',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicMissaoSwitchRoute = ApiPublicMissaoSwitchRouteImport.update({
   id: '/api/public/missao/switch',
   path: '/api/public/missao/switch',
@@ -65,6 +72,7 @@ const ApiPublicMMissionIdDCodeRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/api/telemarketing/purge-test-operator': typeof ApiTelemarketingPurgeTestOperatorRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
   '/api/public/missao/event': typeof ApiPublicMissaoEventRoute
   '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
@@ -75,6 +83,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/api/telemarketing/purge-test-operator': typeof ApiTelemarketingPurgeTestOperatorRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
   '/api/public/missao/event': typeof ApiPublicMissaoEventRoute
   '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
@@ -86,6 +95,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/api/telemarketing/purge-test-operator': typeof ApiTelemarketingPurgeTestOperatorRoute
   '/api/public/hooks/eleicao-cobranca-auto': typeof ApiPublicHooksEleicaoCobrancaAutoRoute
   '/api/public/missao/event': typeof ApiPublicMissaoEventRoute
   '/api/public/missao/identify': typeof ApiPublicMissaoIdentifyRoute
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
+    | '/api/telemarketing/purge-test-operator'
     | '/api/public/hooks/eleicao-cobranca-auto'
     | '/api/public/missao/event'
     | '/api/public/missao/identify'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
+    | '/api/telemarketing/purge-test-operator'
     | '/api/public/hooks/eleicao-cobranca-auto'
     | '/api/public/missao/event'
     | '/api/public/missao/identify'
@@ -118,6 +130,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$'
+    | '/api/telemarketing/purge-test-operator'
     | '/api/public/hooks/eleicao-cobranca-auto'
     | '/api/public/missao/event'
     | '/api/public/missao/identify'
@@ -129,6 +142,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
+  ApiTelemarketingPurgeTestOperatorRoute: typeof ApiTelemarketingPurgeTestOperatorRoute
   ApiPublicHooksEleicaoCobrancaAutoRoute: typeof ApiPublicHooksEleicaoCobrancaAutoRoute
   ApiPublicMissaoEventRoute: typeof ApiPublicMissaoEventRoute
   ApiPublicMissaoIdentifyRoute: typeof ApiPublicMissaoIdentifyRoute
@@ -151,6 +165,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telemarketing/purge-test-operator': {
+      id: '/api/telemarketing/purge-test-operator'
+      path: '/api/telemarketing/purge-test-operator'
+      fullPath: '/api/telemarketing/purge-test-operator'
+      preLoaderRoute: typeof ApiTelemarketingPurgeTestOperatorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/missao/switch': {
@@ -201,6 +222,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
+  ApiTelemarketingPurgeTestOperatorRoute:
+    ApiTelemarketingPurgeTestOperatorRoute,
   ApiPublicHooksEleicaoCobrancaAutoRoute:
     ApiPublicHooksEleicaoCobrancaAutoRoute,
   ApiPublicMissaoEventRoute: ApiPublicMissaoEventRoute,

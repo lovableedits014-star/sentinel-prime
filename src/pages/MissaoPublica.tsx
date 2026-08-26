@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
+import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 
 type Participant = {
   id: string;
@@ -339,6 +340,7 @@ export default function MissaoPublica() {
             </CardDescription>
           </CardHeader>
         </Card>
+
       </div>
     );
   }
@@ -601,6 +603,23 @@ export default function MissaoPublica() {
             )}
           </CardContent>
         </Card>
+
+        {p && clientId && (
+          <section aria-label="Criador de foto de perfil" className="space-y-2">
+            <div className="px-1 text-center">
+              <h2 className="text-lg font-semibold">Crie sua foto de perfil da campanha</h2>
+              <p className="text-xs text-muted-foreground">
+                Use o template oficial e deixe sua foto pronta para o WhatsApp e as redes sociais.
+              </p>
+            </div>
+            <CampaignFrameGenerator
+              clientId={clientId}
+              variant="showcase"
+              individualOnly
+              hideWithoutActiveFrame
+            />
+          </section>
+        )}
       </div>
 
       {showStickyBar && (

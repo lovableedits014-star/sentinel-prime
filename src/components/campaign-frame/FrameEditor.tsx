@@ -19,6 +19,8 @@ interface Frame {
 export interface FrameEditorProps {
   clientId: string;
   defaultTab?: "individual" | "lote";
+  individualOnly?: boolean;
+  requireActiveFrame?: boolean;
 }
 
 const CANVAS_SIZE = 1080;
@@ -35,7 +37,12 @@ const DEFAULT_FRAME: Frame = {
   },
 };
 
-export default function FrameEditor({ clientId, defaultTab = "individual" }: FrameEditorProps) {
+export default function FrameEditor({
+  clientId,
+  defaultTab = "individual",
+  individualOnly = false,
+  requireActiveFrame = false,
+}: FrameEditorProps) {
   const [frames, setFrames] = useState<Frame[]>([]);
   const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
   const [photoFile, setPhotoFile] = useState<string | null>(null);
@@ -57,12 +64,12 @@ export default function FrameEditor({ clientId, defaultTab = "individual" }: Fra
     (async () => {
       const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
       const list = ((data ?? []) as any as Frame[]);
-      const effective = list.length > 0 ? list : [DEFAULT_FRAME];
+      const effective = list.length > 0 ? list : (requireActiveFrame ? [] : [DEFAULT_FRAME]);
       setFrames(effective);
       if (!selectedFrame) setSelectedFrame(effective[0]);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId]);
+  }, [clientId, requireActiveFrame]);
 
   const getComposition = (f: Frame | null): FrameComposition => {
     if (!f) return DEFAULT_COMPOSITION;
@@ -171,10 +178,12 @@ export default function FrameEditor({ clientId, defaultTab = "individual" }: Fra
         </div>
       ) : (
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="grid grid-cols-2 w-full max-w-sm">
-            <TabsTrigger value="individual">Individual</TabsTrigger>
-            <TabsTrigger value="lote">Lote (várias fotos)</TabsTrigger>
-          </TabsList>
+          {!individualOnly && (
+            <TabsList className="grid grid-cols-2 w-full max-w-sm">
+              <TabsTrigger value="individual">Individual</TabsTrigger>
+              <TabsTrigger value="lote">Lote (várias fotos)</TabsTrigger>
+            </TabsList>
+          )}
 
           {frames.length > 1 && (
             <div className="mt-4">
@@ -236,7 +245,7 @@ export default function FrameEditor({ clientId, defaultTab = "individual" }: Fra
                   </Button>
                   {resultUrl && (
                     <Button variant="default" onClick={handleDownload} className="gap-2 bg-primary">
-                      <Download className="w-4 h-4" /> Baixar PNG (1080x1080)
+                      <Download className="w-4 h-4" /> Baixar JPG (1080x1080)
                     </Button>
                   )}
                 </div>
@@ -244,12 +253,14 @@ export default function FrameEditor({ clientId, defaultTab = "individual" }: Fra
             </div>
           </TabsContent>
 
-          <TabsContent value="lote" className="mt-4">
-            <BatchFrameGenerator
-              composition={selectedFrame ? getComposition(selectedFrame) : null}
-              frameName={selectedFrame?.nome}
-            />
-          </TabsContent>
+          {!individualOnly && (
+            <TabsContent value="lote" className="mt-4">
+              <BatchFrameGenerator
+                composition={selectedFrame ? getComposition(selectedFrame) : null}
+                frameName={selectedFrame?.nome}
+              />
+            </TabsContent>
+          )}
         </Tabs>
       )}
     </div>
