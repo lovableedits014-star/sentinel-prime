@@ -36,101 +36,33 @@ function parsePlatformFromUrl(url: string): "facebook" | "instagram" | null {
   return null;
 }
 
-function getProjectRef(baseUrl: string): string | null {
-  try {
-    const hostname = new URL(baseUrl).hostname;
-    return hostname.endsWith(".supabase.co") ? hostname.split(".")[0] || null : null;
-  } catch {
-    return null;
-  }
-}
-
-function getStoredAccessToken(baseUrl: string): string | null {
-  try {
-    const projectRef = getProjectRef(baseUrl);
-    if (!projectRef) return null;
-    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as {
-      access_token?: string;
-      currentSession?: { access_token?: string };
-    };
-    return parsed.currentSession?.access_token || parsed.access_token || null;
-  } catch {
-    // O chamador exibe uma mensagem de sessão expirada.
-  }
-  return null;
-}
-
 async function restWrite(
   table: "portal_missions" | "portal_mission_links",
   rows: Record<string, unknown> | Record<string, unknown>[],
-  diagnosticId: string,
+  _diagnosticId: string,
 ) {
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-  const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!baseUrl || !apiKey) throw new Error("Configuração do banco indisponível");
-  const accessToken = getStoredAccessToken(baseUrl);
-  if (!accessToken) throw new Error("Sessão não encontrada. Saia, entre novamente e repita a operação.");
-
-  const response = await fetch(`${baseUrl}/rest/v1/${table}`, {
-    method: "POST",
-    headers: {
-      apikey: apiKey,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Prefer: "return=minimal",
-      "X-Client-Info": `sentinel-prime-mission/${diagnosticId}`,
-    },
-    body: JSON.stringify(rows),
-  });
-  const responseText = await response.text();
-  const requestId =
-    response.headers.get("sb-request-id") || response.headers.get("x-request-id") || response.headers.get("cf-ray") || "sem-request-id";
-
-  if (!response.ok) {
-    let serverMessage = responseText.trim() || `HTTP ${response.status}`;
-    try {
-      const parsed = JSON.parse(responseText) as { message?: string; details?: string; hint?: string };
-      serverMessage = parsed.message || parsed.details || parsed.hint || serverMessage;
-    } catch {
-      // Preserva a resposta original quando o gateway não devolve JSON.
-    }
-    throw new Error(`${table}: ${serverMessage} (HTTP ${response.status}; req ${requestId})`);
+  const payload = Array.isArray(rows) ? rows : [rows];
+  const { error } = await supabase.from(table).insert(payload as never);
+  if (error) {
+    throw new Error(`${table}: ${error.message}${error.hint ? ` — ${error.hint}` : ""}`);
   }
 }
 
 async function rollbackMission(missionId: string) {
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-  const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!baseUrl || !apiKey) return;
-  const accessToken = getStoredAccessToken(baseUrl);
-  if (!accessToken) return;
-  await fetch(`${baseUrl}/rest/v1/portal_missions?id=eq.${encodeURIComponent(missionId)}`, {
-    method: "DELETE",
-    headers: { apikey: apiKey, Authorization: `Bearer ${accessToken}`, Prefer: "return=minimal" },
-  }).catch(() => undefined);
+  await supabase.from("portal_missions").delete().eq("id", missionId);
 }
 
 async function confirmMissionExists(missionId: string, clientId: string) {
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
-  const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!baseUrl || !apiKey) return false;
-  const accessToken = getStoredAccessToken(baseUrl);
-  if (!accessToken) return false;
-  const query = new URLSearchParams({ select: "id", id: `eq.${missionId}`, client_id: `eq.${clientId}`, limit: "1" });
-  const response = await fetch(`${baseUrl}/rest/v1/portal_missions?${query}`, {
-    headers: { apikey: apiKey, Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-  });
-  if (!response.ok) return false;
-  try {
-    const rows = JSON.parse(await response.text()) as Array<{ id?: string }>;
-    return rows.some((row) => row.id === missionId);
-  } catch {
-    return false;
-  }
+  const { data, error } = await supabase
+    .from("portal_missions")
+    .select("id")
+    .eq("id", missionId)
+    .eq("client_id", clientId)
+    .limit(1);
+  if (error) return false;
+  return (data || []).some((row) => row.id === missionId);
 }
+
 
 export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
   const qc = useQueryClient();
