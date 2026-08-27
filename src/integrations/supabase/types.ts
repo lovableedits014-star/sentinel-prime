@@ -10811,19 +10811,6 @@ export type Database = {
         Returns: Json
       }
       consume_lider_invite_token: { Args: { _token: string }; Returns: boolean }
-      create_tracked_mission: {
-        Args: {
-          p_client_id: string
-          p_instructions?: string | null
-          p_link_facebook?: string | null
-          p_link_instagram?: string | null
-          p_links?: Json
-          p_platform: string
-          p_post_url: string
-          p_title?: string | null
-        }
-        Returns: Json
-      }
       coordenador_pode_cadastrar: {
         Args: { _client_id: string; _coord_id: string; _tipo: string }
         Returns: boolean
@@ -11099,6 +11086,37 @@ export type Database = {
           variacao: number
         }[]
       }
+      engagement_equipe_desempenho_v2: {
+        Args: {
+          p_audience_id?: string
+          p_client_id: string
+          p_dias?: number
+          p_mission_id?: string
+          p_root_id?: string
+        }
+        Returns: {
+          abriu_sem_confirmar: number
+          cargo: string
+          cidade: string
+          cumpridas: number
+          detalhe: Json
+          faixa: string
+          faltas: number
+          is_voluntario: boolean
+          nome: string
+          origem: string
+          pct: number
+          pct_anterior: number
+          pessoa_id: string
+          prova_principal: string
+          publicacoes: number
+          regiao: string
+          telefone: string
+          tem_contrato: boolean
+          ultima_atividade: string
+          variacao: number
+        }[]
+      }
       engagement_gerar_obrigacoes: {
         Args: { p_client_id: string; p_mission_id: string; p_regra_id?: string }
         Returns: number
@@ -11199,8 +11217,61 @@ export type Database = {
           titulo: string
         }[]
       }
+      engagement_pub_facts_v2: {
+        Args: {
+          p_audience_id?: string
+          p_client_id: string
+          p_dias?: number
+          p_mission_id?: string
+          p_offset_dias?: number
+          p_root_id?: string
+        }
+        Returns: {
+          cargo: string
+          cidade: string
+          cumprido_em: string
+          is_voluntario: boolean
+          mission_id: string
+          nome: string
+          origem: string
+          pessoa_id: string
+          plataforma: string
+          primeiro_acesso_em: string
+          prova: string
+          publicado_em: string
+          regiao: string
+          status: string
+          telefone: string
+          tem_contrato: boolean
+          titulo: string
+        }[]
+      }
       engagement_pub_kpis: {
         Args: { p_audience_id?: string; p_client_id: string; p_dias?: number }
+        Returns: {
+          abriu_sem_confirmar: number
+          adesao: number
+          adesao_ant: number
+          cumprimentos: number
+          cumprimentos_ant: number
+          e1: number
+          e2: number
+          e3: number
+          nunca_engajaram: number
+          obrigados: number
+          pares: number
+          publicacoes: number
+          publicacoes_ant: number
+        }[]
+      }
+      engagement_pub_kpis_v2: {
+        Args: {
+          p_audience_id?: string
+          p_client_id: string
+          p_dias?: number
+          p_mission_id?: string
+          p_root_id?: string
+        }
         Returns: {
           abriu_sem_confirmar: number
           adesao: number
@@ -11237,6 +11308,29 @@ export type Database = {
       }
       engagement_publicacoes_desempenho: {
         Args: { p_audience_id?: string; p_client_id: string; p_dias?: number }
+        Returns: {
+          abriu_sem_confirmar: number
+          adesao: number
+          cumpriram: number
+          e1: number
+          e2: number
+          e3: number
+          faltaram: number
+          mission_id: string
+          obrigados: number
+          plataforma: string
+          publicado_em: string
+          titulo: string
+        }[]
+      }
+      engagement_publicacoes_desempenho_v2: {
+        Args: {
+          p_audience_id?: string
+          p_client_id: string
+          p_dias?: number
+          p_mission_id?: string
+          p_root_id?: string
+        }
         Returns: {
           abriu_sem_confirmar: number
           adesao: number
@@ -11409,6 +11503,16 @@ export type Database = {
       engagement_remove_social: {
         Args: { p_pessoa_id: string; p_plataforma: string }
         Returns: boolean
+      }
+      engagement_team_roots: {
+        Args: { p_client_id: string }
+        Returns: {
+          is_avulso: boolean
+          nome: string
+          pessoas: number
+          root_id: string
+          tipo: string
+        }[]
       }
       engagement_time_overview: {
         Args: { p_client_id: string; p_days?: number }
@@ -12093,6 +12197,10 @@ export type Database = {
         Returns: string
       }
       promote_whatsapp_ramp_stages: { Args: never; Returns: number }
+      public_mission_can_confirm: {
+        Args: { p_mission_id: string; p_token: string }
+        Returns: Json
+      }
       public_mission_config: {
         Args: { p_code: string; p_mission_id: string; p_token: string }
         Returns: Json
