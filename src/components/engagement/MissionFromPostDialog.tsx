@@ -62,28 +62,32 @@ function getStoredAccessToken(baseUrl: string): string | null {
   return null;
 }
 
-type MissionRpcResult = { ok?: boolean; mission_id?: string; links_created?: number };
-
-async function createTrackedMissionRaw(payload: Record<string, unknown>, diagnosticId: string) {
+async function restWrite(
+  table: "portal_missions" | "portal_mission_links",
+  rows: Record<string, unknown> | Record<string, unknown>[],
+  diagnosticId: string,
+) {
   const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
   const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!baseUrl || !apiKey) throw new Error("Configuração do banco indisponível");
   const accessToken = getStoredAccessToken(baseUrl);
   if (!accessToken) throw new Error("Sessão não encontrada. Saia, entre novamente e repita a operação.");
 
-  const response = await fetch(`${baseUrl}/rest/v1/rpc/create_tracked_mission`, {
+  const response = await fetch(`${baseUrl}/rest/v1/${table}`, {
     method: "POST",
     headers: {
       apikey: apiKey,
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
       Accept: "application/json",
+      Prefer: "return=minimal",
       "X-Client-Info": `sentinel-prime-mission/${diagnosticId}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(rows),
   });
   const responseText = await response.text();
-  const requestId = response.headers.get("x-request-id") || response.headers.get("cf-ray") || "sem-request-id";
+  const requestId =
+    response.headers.get("sb-request-id") || response.headers.get("x-request-id") || response.headers.get("cf-ray") || "sem-request-id";
 
   if (!response.ok) {
     let serverMessage = responseText.trim() || `HTTP ${response.status}`;
@@ -93,19 +97,20 @@ async function createTrackedMissionRaw(payload: Record<string, unknown>, diagnos
     } catch {
       // Preserva a resposta original quando o gateway não devolve JSON.
     }
-    throw new Error(`${serverMessage} (HTTP ${response.status}; req ${requestId})`);
+    throw new Error(`${table}: ${serverMessage} (HTTP ${response.status}; req ${requestId})`);
   }
+}
 
-  if (!responseText.trim()) {
-    throw new Error(`O banco respondeu sucesso sem conteúdo (HTTP ${response.status}; req ${requestId})`);
-  }
-  try {
-    return JSON.parse(responseText) as MissionRpcResult;
-  } catch {
-    throw new Error(
-      `Resposta inválida do banco (HTTP ${response.status}; ${response.headers.get("content-type") || "sem content-type"}; req ${requestId})`,
-    );
-  }
+async function rollbackMission(missionId: string) {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!baseUrl || !apiKey) return;
+  const accessToken = getStoredAccessToken(baseUrl);
+  if (!accessToken) return;
+  await fetch(`${baseUrl}/rest/v1/portal_missions?id=eq.${encodeURIComponent(missionId)}`, {
+    method: "DELETE",
+    headers: { apikey: apiKey, Authorization: `Bearer ${accessToken}`, Prefer: "return=minimal" },
+  }).catch(() => undefined);
 }
 
 async function confirmMissionExists(missionId: string, clientId: string) {
@@ -226,24 +231,37 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
 
     setSaving(true);
     const diagnosticId = crypto.randomUUID().slice(0, 8);
+    const missionId = crypto.randomUUID();
+    let missionInserted = false;
     try {
-      const payload = {
-        p_client_id: clientId,
-        p_platform: platform,
-        p_post_url: postUrl,
-        p_title: autoTitle,
-        p_instructions: instrucoes.trim() || null,
-        p_link_facebook: extraFb,
-        p_link_instagram: extraIg,
-        p_links: linksToCreate.map((link) => ({
+      await restWrite("portal_missions", {
+        id: missionId,
+        client_id: clientId,
+        platform,
+        post_url: postUrl,
+        title: autoTitle,
+        description: null,
+        display_order: 0,
+        is_active: true,
+        tracking_enabled: true,
+        link_facebook: extraFb,
+        link_instagram: extraIg,
+        link_avulso: null,
+        instructions: instrucoes.trim() || null,
+      }, diagnosticId);
+      missionInserted = true;
+
+      if (linksToCreate.length > 0) {
+        await restWrite("portal_mission_links", linksToCreate.map((link, index) => ({
+          mission_id: missionId,
+          client_id: clientId,
           label: link.label,
           url: link.url,
           kind: detectLinkKind(link.url),
-        })),
-      };
-      const result = await createTrackedMissionRaw(payload, diagnosticId);
-      if (!result?.ok || !result.mission_id) throw new Error("O banco não retornou o ID da missão criada");
-      const missionId = result.mission_id;
+          display_order: index,
+        })), diagnosticId);
+      }
+
       if (!(await confirmMissionExists(missionId, clientId))) {
         throw new Error("A operação respondeu sucesso, mas a missão não foi encontrada na conferência final");
       }
@@ -254,8 +272,9 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       reset();
       onCreated(missionId);
     } catch (e: unknown) {
+      if (missionInserted) await rollbackMission(missionId);
       const error = e as { code?: string; message?: string; details?: string; hint?: string };
-      console.error("[create_tracked_mission]", {
+      console.error("[create-tracked-mission]", {
         diagnosticId,
         code: error.code,
         message: error.message,
