@@ -36,38 +36,6 @@ function parsePlatformFromUrl(url: string): "facebook" | "instagram" | null {
   return null;
 }
 
-async function insertRowsWithoutResponse(table: string, rows: Record<string, unknown> | Record<string, unknown>[]) {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl || !publishableKey) throw new Error("Configuração do banco indisponível");
-
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
-  if (!accessToken) throw new Error("Sua sessão expirou. Entre novamente e tente criar a missão.");
-
-  const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/${table}`, {
-    method: "POST",
-    headers: {
-      apikey: publishableKey,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify(rows),
-  });
-
-  if (response.ok) return;
-  const raw = await response.text();
-  let message = raw || `Erro HTTP ${response.status}`;
-  try {
-    const payload = JSON.parse(raw);
-    message = payload.message || payload.error_description || payload.error || message;
-  } catch {
-    // O servidor pode responder texto simples em erros de proxy.
-  }
-  throw new Error(message);
-}
-
 export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -96,7 +64,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       ]);
       const seen = new Set<string>();
       const unique: PostOption[] = [];
-      for (const row of [...(stubs || []), ...(rows || [])] as any[]) {
+      for (const row of [...(stubs || []), ...(rows || [])] as PostOption[]) {
         if (!row.post_id || seen.has(row.post_id)) continue;
         seen.add(row.post_id);
         unique.push(row as PostOption);
@@ -154,7 +122,8 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       if (det === "instagram" && !extraIg) extraIg = manual;
       if (!det) linksToCreate = [{ label: titulo.trim() || "Abrir link", url: manual }, ...linksToCreate];
     }
-    if (!extraFb && !extraIg && linksToCreate.length === 0) {
+    const postUrl = extraFb || extraIg || linksToCreate[0]?.url;
+    if (!postUrl) {
       toast.error("Escolha uma publicação, cole o link do post ou adicione ao menos um link externo");
       return;
     }
@@ -165,46 +134,44 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       `Missão ${new Date().toLocaleDateString("pt-BR")}`;
 
     setSaving(true);
+    const diagnosticId = crypto.randomUUID().slice(0, 8);
     try {
-      // Manter o ID no cliente evita depender do corpo JSON devolvido pelo
-      // PostgREST no insert (alguns proxies devolvem 201/204 com corpo vazio).
-      const missionId = crypto.randomUUID();
-      await insertRowsWithoutResponse("portal_missions", {
-        id: missionId,
-        client_id: clientId,
-        platform,
-        post_url: extraFb || extraIg || linksToCreate[0]?.url || null,
-        title: autoTitle,
-        description: null,
-        display_order: 0,
-        is_active: true,
-        tracking_enabled: true,
-        link_facebook: extraFb,
-        link_instagram: extraIg,
-        link_avulso: null,
-        instructions: instrucoes.trim() || null,
-      });
-      if (linksToCreate.length > 0) {
-        await insertRowsWithoutResponse(
-          "portal_mission_links",
-          linksToCreate.map((l, i) => ({
-            mission_id: missionId,
-            client_id: clientId,
-            label: l.label,
-            url: l.url,
-            kind: detectLinkKind(l.url),
-            display_order: i,
-          })),
-        );
-      }
+      const payload = {
+        p_client_id: clientId,
+        p_platform: platform,
+        p_post_url: postUrl,
+        p_title: autoTitle,
+        p_instructions: instrucoes.trim() || null,
+        p_link_facebook: extraFb,
+        p_link_instagram: extraIg,
+        p_links: linksToCreate.map((link) => ({
+          label: link.label,
+          url: link.url,
+          kind: detectLinkKind(link.url),
+        })),
+      };
+      const { data, error } = await supabase.rpc("create_tracked_mission", payload);
+      if (error) throw error;
+      const result = data as { ok?: boolean; mission_id?: string } | null;
+      if (!result?.ok || !result.mission_id) throw new Error("O banco não retornou o ID da missão criada");
+      const missionId = result.mission_id;
       qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
       qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
       toast.success("Missão criada com rastreamento — gere o link abaixo e envie no grupo.");
       setOpen(false);
       reset();
       onCreated(missionId);
-    } catch (e: any) {
-      toast.error("Erro ao criar missão: " + (e?.message || "tente novamente"));
+    } catch (e: unknown) {
+      const error = e as { code?: string; message?: string; details?: string; hint?: string };
+      console.error("[create_tracked_mission]", {
+        diagnosticId,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      const detail = error.message || error.details || "falha desconhecida";
+      toast.error(`Erro ao criar missão [${diagnosticId}]: ${detail}`);
     } finally {
       setSaving(false);
     }

@@ -10811,6 +10811,19 @@ export type Database = {
         Returns: Json
       }
       consume_lider_invite_token: { Args: { _token: string }; Returns: boolean }
+      create_tracked_mission: {
+        Args: {
+          p_client_id: string
+          p_instructions?: string | null
+          p_link_facebook?: string | null
+          p_link_instagram?: string | null
+          p_links?: Json
+          p_platform: string
+          p_post_url: string
+          p_title?: string | null
+        }
+        Returns: Json
+      }
       coordenador_pode_cadastrar: {
         Args: { _client_id: string; _coord_id: string; _tipo: string }
         Returns: boolean
