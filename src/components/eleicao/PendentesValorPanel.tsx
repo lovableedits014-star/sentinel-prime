@@ -129,6 +129,17 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
     return c;
   }, [filtered]);
 
+  // pessoas que casam com a busca mas estão em outra aba (voluntários / com valor)
+  const outraAba = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const inBase = new Set(base.map(r => r.id));
+    return rows.filter(r =>
+      !inBase.has(r.id) &&
+      (r.nome.toLowerCase().includes(q) || (r.telefone || "").includes(search.trim()))
+    );
+  }, [rows, base, search]);
+
   async function marcarVoluntario(ids: string[]) {
     if (ids.length === 0) return;
     setSavingBulk(true);
