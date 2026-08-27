@@ -13,7 +13,7 @@ import {
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { Check, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { detectLinkKind, isValidHttpUrl } from "@/lib/mission-link-kind";
+import { detectLinkKind, isValidHttpUrl, sanitizeText, safeTruncate } from "@/lib/mission-link-kind";
 
 type PostOption = {
   post_id: string;
@@ -157,9 +157,10 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
     }
     const platform: "facebook" | "instagram" = extraIg && !extraFb ? "instagram" : "facebook";
     const autoTitle =
-      titulo.trim() ||
-      (fb?.post_message || ig?.post_message || "").slice(0, 60).trim() ||
+      sanitizeText(titulo) ||
+      safeTruncate(fb?.post_message || ig?.post_message || "", 60) ||
       `Missão ${new Date().toLocaleDateString("pt-BR")}`;
+
 
     setSaving(true);
     const diagnosticId = crypto.randomUUID().slice(0, 8);
@@ -179,7 +180,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         link_facebook: extraFb,
         link_instagram: extraIg,
         link_avulso: null,
-        instructions: instrucoes.trim() || null,
+        instructions: sanitizeText(instrucoes) || null,
       }, diagnosticId);
       missionInserted = true;
 
@@ -187,12 +188,13 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         await restWrite("portal_mission_links", linksToCreate.map((link, index) => ({
           mission_id: missionId,
           client_id: clientId,
-          label: link.label,
-          url: link.url,
+          label: safeTruncate(link.label, 80) || "Abrir link",
+          url: link.url.trim(),
           kind: detectLinkKind(link.url),
           display_order: index,
         })), diagnosticId);
       }
+
 
       if (!(await confirmMissionExists(missionId, clientId))) {
         throw new Error("A operação respondeu sucesso, mas a missão não foi encontrada na conferência final");
