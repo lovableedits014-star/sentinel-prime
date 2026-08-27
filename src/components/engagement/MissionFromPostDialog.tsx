@@ -36,20 +36,26 @@ function parsePlatformFromUrl(url: string): "facebook" | "instagram" | null {
   return null;
 }
 
-function getStoredAccessToken(): string | null {
+function getProjectRef(baseUrl: string): string | null {
   try {
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const storageKey = localStorage.key(index);
-      if (!storageKey?.startsWith("sb-") || !storageKey.endsWith("-auth-token")) continue;
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw) as {
-        access_token?: string;
-        currentSession?: { access_token?: string };
-      };
-      const token = parsed.currentSession?.access_token || parsed.access_token;
-      if (token) return token;
-    }
+    const hostname = new URL(baseUrl).hostname;
+    return hostname.endsWith(".supabase.co") ? hostname.split(".")[0] || null : null;
+  } catch {
+    return null;
+  }
+}
+
+function getStoredAccessToken(baseUrl: string): string | null {
+  try {
+    const projectRef = getProjectRef(baseUrl);
+    if (!projectRef) return null;
+    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      access_token?: string;
+      currentSession?: { access_token?: string };
+    };
+    return parsed.currentSession?.access_token || parsed.access_token || null;
   } catch {
     // O chamador exibe uma mensagem de sessão expirada.
   }
@@ -61,8 +67,8 @@ type MissionRpcResult = { ok?: boolean; mission_id?: string; links_created?: num
 async function createTrackedMissionRaw(payload: Record<string, unknown>, diagnosticId: string) {
   const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
   const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const accessToken = getStoredAccessToken();
   if (!baseUrl || !apiKey) throw new Error("Configuração do banco indisponível");
+  const accessToken = getStoredAccessToken(baseUrl);
   if (!accessToken) throw new Error("Sessão não encontrada. Saia, entre novamente e repita a operação.");
 
   const response = await fetch(`${baseUrl}/rest/v1/rpc/create_tracked_mission`, {
@@ -105,8 +111,9 @@ async function createTrackedMissionRaw(payload: Record<string, unknown>, diagnos
 async function confirmMissionExists(missionId: string, clientId: string) {
   const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
   const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  const accessToken = getStoredAccessToken();
-  if (!baseUrl || !apiKey || !accessToken) return false;
+  if (!baseUrl || !apiKey) return false;
+  const accessToken = getStoredAccessToken(baseUrl);
+  if (!accessToken) return false;
   const query = new URLSearchParams({ select: "id", id: `eq.${missionId}`, client_id: `eq.${clientId}`, limit: "1" });
   const response = await fetch(`${baseUrl}/rest/v1/portal_missions?${query}`, {
     headers: { apikey: apiKey, Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
