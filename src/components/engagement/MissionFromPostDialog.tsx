@@ -36,6 +36,90 @@ function parsePlatformFromUrl(url: string): "facebook" | "instagram" | null {
   return null;
 }
 
+function getStoredAccessToken(): string | null {
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const storageKey = localStorage.key(index);
+      if (!storageKey?.startsWith("sb-") || !storageKey.endsWith("-auth-token")) continue;
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as {
+        access_token?: string;
+        currentSession?: { access_token?: string };
+      };
+      const token = parsed.currentSession?.access_token || parsed.access_token;
+      if (token) return token;
+    }
+  } catch {
+    // O chamador exibe uma mensagem de sessão expirada.
+  }
+  return null;
+}
+
+type MissionRpcResult = { ok?: boolean; mission_id?: string; links_created?: number };
+
+async function createTrackedMissionRaw(payload: Record<string, unknown>, diagnosticId: string) {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const accessToken = getStoredAccessToken();
+  if (!baseUrl || !apiKey) throw new Error("Configuração do banco indisponível");
+  if (!accessToken) throw new Error("Sessão não encontrada. Saia, entre novamente e repita a operação.");
+
+  const response = await fetch(`${baseUrl}/rest/v1/rpc/create_tracked_mission`, {
+    method: "POST",
+    headers: {
+      apikey: apiKey,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Client-Info": `sentinel-prime-mission/${diagnosticId}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const responseText = await response.text();
+  const requestId = response.headers.get("x-request-id") || response.headers.get("cf-ray") || "sem-request-id";
+
+  if (!response.ok) {
+    let serverMessage = responseText.trim() || `HTTP ${response.status}`;
+    try {
+      const parsed = JSON.parse(responseText) as { message?: string; details?: string; hint?: string };
+      serverMessage = parsed.message || parsed.details || parsed.hint || serverMessage;
+    } catch {
+      // Preserva a resposta original quando o gateway não devolve JSON.
+    }
+    throw new Error(`${serverMessage} (HTTP ${response.status}; req ${requestId})`);
+  }
+
+  if (!responseText.trim()) {
+    throw new Error(`O banco respondeu sucesso sem conteúdo (HTTP ${response.status}; req ${requestId})`);
+  }
+  try {
+    return JSON.parse(responseText) as MissionRpcResult;
+  } catch {
+    throw new Error(
+      `Resposta inválida do banco (HTTP ${response.status}; ${response.headers.get("content-type") || "sem content-type"}; req ${requestId})`,
+    );
+  }
+}
+
+async function confirmMissionExists(missionId: string, clientId: string) {
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const accessToken = getStoredAccessToken();
+  if (!baseUrl || !apiKey || !accessToken) return false;
+  const query = new URLSearchParams({ select: "id", id: `eq.${missionId}`, client_id: `eq.${clientId}`, limit: "1" });
+  const response = await fetch(`${baseUrl}/rest/v1/portal_missions?${query}`, {
+    headers: { apikey: apiKey, Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+  });
+  if (!response.ok) return false;
+  try {
+    const rows = JSON.parse(await response.text()) as Array<{ id?: string }>;
+    return rows.some((row) => row.id === missionId);
+  } catch {
+    return false;
+  }
+}
+
 export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -150,11 +234,12 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
           kind: detectLinkKind(link.url),
         })),
       };
-      const { data, error } = await supabase.rpc("create_tracked_mission", payload);
-      if (error) throw error;
-      const result = data as { ok?: boolean; mission_id?: string } | null;
+      const result = await createTrackedMissionRaw(payload, diagnosticId);
       if (!result?.ok || !result.mission_id) throw new Error("O banco não retornou o ID da missão criada");
       const missionId = result.mission_id;
+      if (!(await confirmMissionExists(missionId, clientId))) {
+        throw new Error("A operação respondeu sucesso, mas a missão não foi encontrada na conferência final");
+      }
       qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
       qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
       toast.success("Missão criada com rastreamento — gere o link abaixo e envie no grupo.");
