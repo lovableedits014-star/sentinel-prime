@@ -36,6 +36,38 @@ function parsePlatformFromUrl(url: string): "facebook" | "instagram" | null {
   return null;
 }
 
+async function insertRowsWithoutResponse(table: string, rows: Record<string, unknown> | Record<string, unknown>[]) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !publishableKey) throw new Error("Configuração do banco indisponível");
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Sua sessão expirou. Entre novamente e tente criar a missão.");
+
+  const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/${table}`, {
+    method: "POST",
+    headers: {
+      apikey: publishableKey,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(rows),
+  });
+
+  if (response.ok) return;
+  const raw = await response.text();
+  let message = raw || `Erro HTTP ${response.status}`;
+  try {
+    const payload = JSON.parse(raw);
+    message = payload.message || payload.error_description || payload.error || message;
+  } catch {
+    // O servidor pode responder texto simples em erros de proxy.
+  }
+  throw new Error(message);
+}
+
 export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -137,26 +169,24 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       // Manter o ID no cliente evita depender do corpo JSON devolvido pelo
       // PostgREST no insert (alguns proxies devolvem 201/204 com corpo vazio).
       const missionId = crypto.randomUUID();
-      const { error } = await (supabase as any)
-        .from("portal_missions")
-        .insert({
-          id: missionId,
-          client_id: clientId,
-          platform,
-          post_url: extraFb || extraIg || linksToCreate[0]?.url || null,
-          title: autoTitle,
-          description: null,
-          display_order: 0,
-          is_active: true,
-          tracking_enabled: true,
-          link_facebook: extraFb,
-          link_instagram: extraIg,
-          link_avulso: null,
-          instructions: instrucoes.trim() || null,
-        });
-      if (error) throw error;
+      await insertRowsWithoutResponse("portal_missions", {
+        id: missionId,
+        client_id: clientId,
+        platform,
+        post_url: extraFb || extraIg || linksToCreate[0]?.url || null,
+        title: autoTitle,
+        description: null,
+        display_order: 0,
+        is_active: true,
+        tracking_enabled: true,
+        link_facebook: extraFb,
+        link_instagram: extraIg,
+        link_avulso: null,
+        instructions: instrucoes.trim() || null,
+      });
       if (linksToCreate.length > 0) {
-        const { error: linkErr } = await (supabase as any).from("portal_mission_links").insert(
+        await insertRowsWithoutResponse(
+          "portal_mission_links",
           linksToCreate.map((l, i) => ({
             mission_id: missionId,
             client_id: clientId,
@@ -166,7 +196,6 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
             display_order: i,
           })),
         );
-        if (linkErr) throw linkErr;
       }
       qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
       qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
