@@ -1,5 +1,5 @@
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,8 @@ export default function MissaoPublica() {
   const [justRecognized, setJustRecognized] = useState(false);
   const [clickedLinks, setClickedLinks] = useState<Set<string>>(new Set());
   const [backReminder, setBackReminder] = useState(false);
+  const [autoConfirmRetry, setAutoConfirmRetry] = useState(0);
+  const autoConfirmAttemptRef = useRef("");
   const codeInvalid = code === "invalid";
 
   const clickedKey = missionId ? `sm_missao_clicks_${missionId}` : "";
@@ -111,7 +113,10 @@ export default function MissaoPublica() {
   useEffect(() => {
     if (declared || clickedLinks.size === 0) return;
     const onBack = () => {
-      if (document.visibilityState === "visible") setBackReminder(true);
+      if (document.visibilityState === "visible") {
+        setBackReminder(true);
+        setAutoConfirmRetry((value) => value + 1);
+      }
     };
     document.addEventListener("visibilitychange", onBack);
     window.addEventListener("focus", onBack);
@@ -307,6 +312,10 @@ export default function MissaoPublica() {
   };
 
   const handleDeclare = async () => {
+    const clicksToSync: Array<{
+      type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link";
+      linkId?: string;
+    }> = [];
     if (config) {
       const mission = config.mission;
       const required = [
@@ -320,8 +329,24 @@ export default function MissaoPublica() {
         toast.error(`Abra ${pending === 1 ? "o link pendente" : `os ${pending} links pendentes`} antes de confirmar.`);
         return;
       }
+
+      // O navegador pode suspender/cancelar a requisição quando abre o app do
+      // Facebook/Instagram. A interface já guardou o clique localmente, então
+      // sincronizamos novamente antes da validação definitiva no servidor.
+      if (clickedLinks.has("click_facebook")) clicksToSync.push({ type: "click_facebook" });
+      if (clickedLinks.has("click_instagram")) clicksToSync.push({ type: "click_instagram" });
+      if (clickedLinks.has("click_avulso")) clicksToSync.push({ type: "click_avulso" });
+      for (const link of config.links || []) {
+        if (clickedLinks.has(link.id)) clicksToSync.push({ type: "click_link", linkId: link.id });
+      }
     }
     setDeclaring(true);
+    const synced = await Promise.all(clicksToSync.map(({ type, linkId }) => registerEvent(type, linkId)));
+    if (synced.some((ok) => !ok)) {
+      setDeclaring(false);
+      toast.error("Não foi possível registrar os acessos. Verifique sua conexão e tente novamente.");
+      return;
+    }
     const registered = await registerEvent("declared_done");
     if (!registered) {
       setDeclaring(false);
@@ -338,6 +363,27 @@ export default function MissaoPublica() {
     setDeclaring(false);
     toast.success("Participação confirmada — obrigado!");
   };
+
+  // Assim que o último link for acessado, registra a conclusão sem exigir
+  // uma segunda ação da pessoa. Ao voltar de um app externo, tentamos de novo
+  // caso o navegador tenha suspendido as requisições em segundo plano.
+  useEffect(() => {
+    if (!config?.participant || declared || declaring) return;
+    const mission = config.mission;
+    const required = [
+      ...(mission.link_facebook || (mission.legacy_platform === "facebook" && mission.legacy_post_url) ? ["click_facebook"] : []),
+      ...(mission.link_instagram || (mission.legacy_platform === "instagram" && mission.legacy_post_url) ? ["click_instagram"] : []),
+      ...(mission.link_avulso ? ["click_avulso"] : []),
+      ...(config.links || []).map((link) => link.id),
+    ];
+    if (required.length === 0 || required.some((key) => !clickedLinks.has(key))) return;
+
+    const attemptKey = `${token}:${[...required].sort().join(",")}:${autoConfirmRetry}`;
+    if (autoConfirmAttemptRef.current === attemptKey) return;
+    autoConfirmAttemptRef.current = attemptKey;
+    void handleDeclare();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, clickedLinks, declared, declaring, token, autoConfirmRetry]);
 
 
   if (loading) {
@@ -383,7 +429,7 @@ export default function MissaoPublica() {
   const clickedRequiredCount = requiredLinkKeys.filter((key) => clickedLinks.has(key)).length;
   const remainingLinks = requiredLinkKeys.length - clickedRequiredCount;
   const allLinksClicked = remainingLinks === 0;
-  const showStickyBar = !!p && !declared && allLinksClicked && requiredLinkKeys.length > 0;
+  const showStickyBar = false;
   const isClicked = (key: string) => clickedLinks.has(key);
 
   const linkBtnClass = (key: string) =>
@@ -614,15 +660,14 @@ export default function MissaoPublica() {
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/15 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
                         2
                       </span>
-                      <p className="text-sm font-medium">Confirme que você cumpriu</p>
+                      <p className="text-sm font-medium">Conclusão automática</p>
                     </div>
 
                     {backReminder && allLinksClicked && (
                       <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-xs flex gap-2 animate-pulse">
                         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                         <span>
-                          <strong>Falta só confirmar!</strong> Toque no botão verde abaixo para sua
-                          participação ser registrada.
+                          <strong>Registrando sua participação.</strong> Aguarde um instante nesta tela.
                         </span>
                       </div>
                     )}
@@ -635,25 +680,19 @@ export default function MissaoPublica() {
                       </div>
                     )}
 
-                    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-muted-foreground">
-                      Sua participação <strong>só conta depois de confirmar</strong> aqui. Abrir o link
-                      não é suficiente.
+                    <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
+                      Depois que todos os links forem acessados, sua participação será
+                      <strong> confirmada automaticamente</strong>.
                     </div>
 
-                    <Button
-                      className={`w-full gap-2 h-14 text-base ${allLinksClicked ? "bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse" : ""}`}
-                      onClick={handleDeclare}
-                      disabled={declaring || !allLinksClicked}
-                    >
-                      {declaring ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        allLinksClicked ? <CheckCircle2 className="w-5 h-5" /> : <Lock className="w-5 h-5" />
-                      )}
+                    <div className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-md px-4 text-sm font-medium ${
+                      allLinksClicked ? "bg-emerald-600 text-white" : "border bg-muted/30 text-muted-foreground"
+                    }`}>
+                      {allLinksClicked ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
                       {allLinksClicked
-                        ? "Confirmar que cumpri"
-                        : `Acesse ${remainingLinks} ${remainingLinks === 1 ? "link" : "links"} para liberar`}
-                    </Button>
+                        ? "Confirmando automaticamente..."
+                        : `Acesse ${remainingLinks} ${remainingLinks === 1 ? "link" : "links"}`}
+                    </div>
                   </div>
                 )}
 

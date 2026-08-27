@@ -848,10 +848,10 @@ export default function Telemarketing() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
+    <div className="min-h-screen w-full max-w-2xl min-w-0 overflow-x-hidden bg-muted/30 p-4 sm:p-6 mx-auto space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
+      <div className="flex min-w-0 items-center justify-between flex-wrap gap-2">
+        <div className="min-w-0 max-w-full">
           <h1 className="text-lg font-bold flex items-center gap-2">
             <Phone className="w-5 h-5 text-primary" />
             Telemarketing e Verificação
@@ -859,7 +859,7 @@ export default function Telemarketing() {
           <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight max-w-sm mb-2">
             Central de atendimento para validar indicações e intenção de voto. Utilize o click-to-call para ligar diretamente do seu celular e registre o resultado para alimentar sua inteligência eleitoral em tempo real.
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground break-words">
             Operador: <span className="font-medium text-foreground">{operadorNome}</span>
             {campanhaNome && <> · Fila: <span className="font-medium text-foreground">{campanhaNome}</span></>}
             {current?.lista_id && (
@@ -870,7 +870,7 @@ export default function Telemarketing() {
             )}
           </p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex max-w-full flex-wrap gap-2 items-center">
           {!current?.lista_id && !campanhaIdParam && scripts.length > 1 && (
             <Button size="sm" variant="outline" onClick={() => setPickingCampanha(true)}>
               Trocar campanha
@@ -981,10 +981,10 @@ export default function Telemarketing() {
         <>
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-base flex items-center gap-2">
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <CardTitle className="text-base flex min-w-0 items-center gap-2 break-words">
                   <User className="w-4 h-4 text-primary" />
-                  {current.nome}
+                  <span className="min-w-0 break-words">{current.nome}</span>
                 </CardTitle>
                 <div className="flex gap-1.5 shrink-0">
                   <Badge variant={tipoBadgeVariant(current.tipo)} className="text-[10px]">

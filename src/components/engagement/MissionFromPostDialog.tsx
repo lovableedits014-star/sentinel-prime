@@ -134,9 +134,13 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
 
     setSaving(true);
     try {
-      const { data, error } = await (supabase as any)
+      // Manter o ID no cliente evita depender do corpo JSON devolvido pelo
+      // PostgREST no insert (alguns proxies devolvem 201/204 com corpo vazio).
+      const missionId = crypto.randomUUID();
+      const { error } = await (supabase as any)
         .from("portal_missions")
         .insert({
+          id: missionId,
           client_id: clientId,
           platform,
           post_url: extraFb || extraIg || linksToCreate[0]?.url || null,
@@ -149,14 +153,12 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
           link_instagram: extraIg,
           link_avulso: null,
           instructions: instrucoes.trim() || null,
-        })
-        .select("id")
-        .single();
+        });
       if (error) throw error;
       if (linksToCreate.length > 0) {
         const { error: linkErr } = await (supabase as any).from("portal_mission_links").insert(
           linksToCreate.map((l, i) => ({
-            mission_id: data.id,
+            mission_id: missionId,
             client_id: clientId,
             label: l.label,
             url: l.url,
@@ -171,7 +173,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
       toast.success("Missão criada com rastreamento — gere o link abaixo e envie no grupo.");
       setOpen(false);
       reset();
-      onCreated(data.id as string);
+      onCreated(missionId);
     } catch (e: any) {
       toast.error("Erro ao criar missão: " + (e?.message || "tente novamente"));
     } finally {
