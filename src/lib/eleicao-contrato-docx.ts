@@ -404,7 +404,7 @@ export async function gerarLoteZip(
   const zip = new JSZip();
   const pulados: string[] = [];
   for (const p of pessoas) {
-    if (p.is_voluntario) continue;
+    
     const full = { ...(byId.get(p.id) ?? {}), ...p } as PessoaContratada;
     let ok = false;
     for (const kind of kindsFor(modo)) {
