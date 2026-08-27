@@ -129,6 +129,17 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
     return c;
   }, [filtered]);
 
+  // pessoas que casam com a busca mas estão em outra aba (voluntários / com valor)
+  const outraAba = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const inBase = new Set(base.map(r => r.id));
+    return rows.filter(r =>
+      !inBase.has(r.id) &&
+      (r.nome.toLowerCase().includes(q) || (r.telefone || "").includes(search.trim()))
+    );
+  }, [rows, base, search]);
+
   async function marcarVoluntario(ids: string[]) {
     if (ids.length === 0) return;
     setSavingBulk(true);
@@ -226,27 +237,24 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
   }
 
   async function gerarContrato(p: PessoaRow) {
-    if (!p.valor_contratacao || p.valor_contratacao <= 0) {
-      toast.error("Defina o valor antes de gerar o contrato.");
-      return;
-    }
     try {
+      const semValor = !p.valor_contratacao || p.valor_contratacao <= 0;
       const r = await gerarContratoIndividual(p, clientId, modoDoc);
       if (r.faltando.length > 0) toast.warning(`Modelo de ${r.faltando.join(" e ")} não encontrado. Crie em "Modelos de contrato".`);
+      else if (semValor) toast.success("Documento gerado sem valor (R$ 0,00).");
       else toast.success(r.gerados.length > 1 ? "Contrato e distrato baixados (.zip)!" : "Documento gerado!");
     }
     catch (e: any) { toast.error(e.message); }
   }
 
   async function gerarLote() {
-    const comValor = selectedRows.filter(r => r.valor_contratacao && r.valor_contratacao > 0);
-    if (comValor.length === 0) { toast.error("Defina o valor antes de gerar contratos."); return; }
+    if (selectedRows.length === 0) { toast.error("Selecione ao menos uma pessoa"); return; }
     setGeneratingZip(true);
     try {
-      const { blob, pulados } = await gerarLoteZip(comValor, clientId, modoDoc);
+      const { blob, pulados } = await gerarLoteZip(selectedRows, clientId, modoDoc);
       downloadBlob(blob, `Contratos-Eleicao-${new Date().toISOString().slice(0, 10)}.zip`);
       if (pulados.length > 0) toast.warning(`${pulados.length} sem modelo de contrato`);
-      else toast.success(`${comValor.length} contrato(s) gerados`);
+      else toast.success(`${selectedRows.length} contrato(s) gerados`);
     } catch (e: any) { toast.error(e.message); }
     finally { setGeneratingZip(false); }
   }
@@ -346,6 +354,29 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
         </Select>
       </div>
 
+      {/* Aviso: pessoa buscada está em outra aba */}
+      {search.trim().length >= 2 && outraAba.length > 0 && (
+        <Card className="p-2.5 border-amber-500/40 bg-amber-500/5 text-xs flex flex-wrap items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+          <span>
+            {outraAba.map(r => r.nome).slice(0, 3).join(", ")}
+            {outraAba.length > 3 ? ` +${outraAba.length - 3}` : ""} não está nesta aba
+            {outraAba.some(r => r.is_voluntario) ? " (marcado como voluntário)" : " (já tem valor definido)"}.
+          </span>
+          {outraAba.some(r => r.is_voluntario) && (
+            <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={() => { setView("voluntarios"); setSelected(new Set()); }}>
+              Ver voluntários
+            </Button>
+          )}
+          {outraAba.some(r => !r.is_voluntario) && (
+            <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={() => { setView("definidos"); setSelected(new Set()); }}>
+              Ver com valor
+            </Button>
+          )}
+        </Card>
+      )}
+
+
 
       {/* Barra de ações em massa */}
       {selected.size > 0 && (
@@ -444,6 +475,15 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                       {p.is_voluntario && p.voluntario_obs ? ` · ${p.voluntario_obs}` : ""}
                     </p>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs gap-1"
+                    title="Imprimir documento (mesmo sem valor)"
+                    onClick={() => gerarContrato(p)}
+                  >
+                    <FileText className="w-3 h-3" /> Contrato
+                  </Button>
                   {p.is_voluntario ? (
                     <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => desmarcarVoluntario([p.id])}>
                       <HandCoins className="w-3 h-3" /> Voltar p/ pendentes
