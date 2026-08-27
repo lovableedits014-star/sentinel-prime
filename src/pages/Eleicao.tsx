@@ -936,7 +936,17 @@ export default function Eleicao() {
     // Filtro especial para Líderes Avulsos
     if (cfg.apenasAvulsos) {
       listaTipada = listaTipada.filter(p => p.tipo === "lider" && !p.parent_id);
+    } else if (!cfg.incluirAvulsos) {
+      // Remove líderes sem coordenador vinculado (avulsos) e os cabos abaixo deles
+      const avulsosIds = new Set(
+        pessoas.filter(p => p.tipo === "lider" && !p.parent_id).map(p => p.id),
+      );
+      const isAvulsoOuFilho = (p: Pessoa) =>
+        avulsosIds.has(p.id) || (!!p.parent_id && avulsosIds.has(p.parent_id));
+      listaTipada = listaTipada.filter(p => !isAvulsoOuFilho(p));
+      lista = lista.filter(p => !isAvulsoOuFilho(p));
     }
+
 
     // Filtro de voluntários (relatório separado)
     const volMode = cfg.voluntarios || "todos";
