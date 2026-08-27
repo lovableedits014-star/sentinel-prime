@@ -13,7 +13,7 @@ import {
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { Check, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { detectLinkKind, isValidHttpUrl } from "@/lib/mission-link-kind";
+import { detectLinkKind, isValidHttpUrl, sanitizeText, safeTruncate } from "@/lib/mission-link-kind";
 
 type PostOption = {
   post_id: string;
