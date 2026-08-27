@@ -180,7 +180,7 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         link_facebook: extraFb,
         link_instagram: extraIg,
         link_avulso: null,
-        instructions: instrucoes.trim() || null,
+        instructions: sanitizeText(instrucoes) || null,
       }, diagnosticId);
       missionInserted = true;
 
@@ -188,12 +188,13 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
         await restWrite("portal_mission_links", linksToCreate.map((link, index) => ({
           mission_id: missionId,
           client_id: clientId,
-          label: link.label,
-          url: link.url,
+          label: safeTruncate(link.label, 80) || "Abrir link",
+          url: link.url.trim(),
           kind: detectLinkKind(link.url),
           display_order: index,
         })), diagnosticId);
       }
+
 
       if (!(await confirmMissionExists(missionId, clientId))) {
         throw new Error("A operação respondeu sucesso, mas a missão não foi encontrada na conferência final");
