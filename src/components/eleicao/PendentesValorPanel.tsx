@@ -343,6 +343,29 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
         </Select>
       </div>
 
+      {/* Aviso: pessoa buscada está em outra aba */}
+      {search.trim().length >= 2 && outraAba.length > 0 && (
+        <Card className="p-2.5 border-amber-500/40 bg-amber-500/5 text-xs flex flex-wrap items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+          <span>
+            {outraAba.map(r => r.nome).slice(0, 3).join(", ")}
+            {outraAba.length > 3 ? ` +${outraAba.length - 3}` : ""} não está nesta aba
+            {outraAba.some(r => r.is_voluntario) ? " (marcado como voluntário)" : " (já tem valor definido)"}.
+          </span>
+          {outraAba.some(r => r.is_voluntario) && (
+            <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={() => { setView("voluntarios"); setSelected(new Set()); }}>
+              Ver voluntários
+            </Button>
+          )}
+          {outraAba.some(r => !r.is_voluntario) && (
+            <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={() => { setView("definidos"); setSelected(new Set()); }}>
+              Ver com valor
+            </Button>
+          )}
+        </Card>
+      )}
+
+
 
       {/* Barra de ações em massa */}
       {selected.size > 0 && (
