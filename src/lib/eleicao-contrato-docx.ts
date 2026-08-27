@@ -426,7 +426,7 @@ export async function gerarContratoIndividual(
   modo: DocModo = "ambos",
 ): Promise<{ gerados: DocKind[]; faltando: DocKind[] }> {
   const { tplByTipo, contratante, parents, byId } = await fetchTemplatesAndContext(clientId);
-  if (pessoa.is_voluntario) throw new Error(`${pessoa.nome} é voluntário(a) e não gera contrato de custo.`);
+  
   const full = { ...(byId.get(pessoa.id) ?? {}), ...pessoa } as PessoaContratada;
   const kinds = kindsFor(modo);
 
