@@ -441,6 +441,15 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
                       {p.is_voluntario && p.voluntario_obs ? ` · ${p.voluntario_obs}` : ""}
                     </p>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs gap-1"
+                    title="Imprimir documento (mesmo sem valor)"
+                    onClick={() => gerarContrato(p)}
+                  >
+                    <FileText className="w-3 h-3" /> Contrato
+                  </Button>
                   {p.is_voluntario ? (
                     <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => desmarcarVoluntario([p.id])}>
                       <HandCoins className="w-3 h-3" /> Voltar p/ pendentes
