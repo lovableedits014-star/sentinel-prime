@@ -95,6 +95,7 @@ export function renderTemplate(
   parents: Map<string, PessoaContratada>,
 ): string {
   const valor = pessoa.valor_contratacao || 0;
+  const semValor = !pessoa.valor_contratacao || pessoa.valor_contratacao <= 0 || pessoa.is_voluntario;
   const parent = pessoa.parent_id ? parents.get(pessoa.parent_id) : undefined;
   const lider = pessoa.tipo === "cabo" && parent?.tipo === "lider" ? parent.nome : "—";
   const coordenador =
@@ -105,6 +106,8 @@ export function renderTemplate(
   const LINHA = "____________________";
   const LINHA_CURTA = "____________";
   const LINHA_DATA = "____/____/______";
+  const VALOR_MANUAL = "(_______________)";
+  const VALOR_EXTENSO_MANUAL = "(a preencher à mão)";
   const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
     "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
   const fmtData = (s?: string | null) => {
@@ -138,8 +141,8 @@ export function renderTemplate(
     cidade_uf: pessoa.cidade ? `${pessoa.cidade}/MS` : `${LINHA}/MS`,
     regiao: pessoa.regiao ? (REGIAO_LABEL[pessoa.regiao] ?? pessoa.regiao) : "—",
     lider, coordenador,
-    valor: fmtBRL(valor),
-    valor_extenso: valorPorExtenso(valor),
+    valor: semValor ? VALOR_MANUAL : fmtBRL(valor),
+    valor_extenso: semValor ? VALOR_EXTENSO_MANUAL : valorPorExtenso(valor),
     contratante,
     // Data do documento é preenchida à mão (linhas em branco)
     data: LINHA_DATA,

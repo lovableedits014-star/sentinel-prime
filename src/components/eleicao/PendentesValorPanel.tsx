@@ -241,7 +241,7 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
       const semValor = !p.valor_contratacao || p.valor_contratacao <= 0;
       const r = await gerarContratoIndividual(p, clientId, modoDoc);
       if (r.faltando.length > 0) toast.warning(`Modelo de ${r.faltando.join(" e ")} não encontrado. Crie em "Modelos de contrato".`);
-      else if (semValor) toast.success("Documento gerado sem valor (R$ 0,00).");
+      else if (semValor) toast.success("Documento gerado com valor para preenchimento à mão.");
       else toast.success(r.gerados.length > 1 ? "Contrato e distrato baixados (.zip)!" : "Documento gerado!");
     }
     catch (e: any) { toast.error(e.message); }
