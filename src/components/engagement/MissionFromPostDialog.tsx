@@ -157,9 +157,10 @@ export default function MissionFromPostDialog({ clientId, onCreated }: Props) {
     }
     const platform: "facebook" | "instagram" = extraIg && !extraFb ? "instagram" : "facebook";
     const autoTitle =
-      titulo.trim() ||
-      (fb?.post_message || ig?.post_message || "").slice(0, 60).trim() ||
+      sanitizeText(titulo) ||
+      safeTruncate(fb?.post_message || ig?.post_message || "", 60) ||
       `Missão ${new Date().toLocaleDateString("pt-BR")}`;
+
 
     setSaving(true);
     const diagnosticId = crypto.randomUUID().slice(0, 8);
