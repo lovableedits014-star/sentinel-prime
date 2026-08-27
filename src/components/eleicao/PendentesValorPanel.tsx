@@ -226,27 +226,24 @@ export default function PendentesValorPanel({ clientId, onChanged }: Props) {
   }
 
   async function gerarContrato(p: PessoaRow) {
-    if (!p.valor_contratacao || p.valor_contratacao <= 0) {
-      toast.error("Defina o valor antes de gerar o contrato.");
-      return;
-    }
     try {
+      const semValor = !p.valor_contratacao || p.valor_contratacao <= 0;
       const r = await gerarContratoIndividual(p, clientId, modoDoc);
       if (r.faltando.length > 0) toast.warning(`Modelo de ${r.faltando.join(" e ")} não encontrado. Crie em "Modelos de contrato".`);
+      else if (semValor) toast.success("Documento gerado sem valor (R$ 0,00).");
       else toast.success(r.gerados.length > 1 ? "Contrato e distrato baixados (.zip)!" : "Documento gerado!");
     }
     catch (e: any) { toast.error(e.message); }
   }
 
   async function gerarLote() {
-    const comValor = selectedRows.filter(r => r.valor_contratacao && r.valor_contratacao > 0);
-    if (comValor.length === 0) { toast.error("Defina o valor antes de gerar contratos."); return; }
+    if (selectedRows.length === 0) { toast.error("Selecione ao menos uma pessoa"); return; }
     setGeneratingZip(true);
     try {
-      const { blob, pulados } = await gerarLoteZip(comValor, clientId, modoDoc);
+      const { blob, pulados } = await gerarLoteZip(selectedRows, clientId, modoDoc);
       downloadBlob(blob, `Contratos-Eleicao-${new Date().toISOString().slice(0, 10)}.zip`);
       if (pulados.length > 0) toast.warning(`${pulados.length} sem modelo de contrato`);
-      else toast.success(`${comValor.length} contrato(s) gerados`);
+      else toast.success(`${selectedRows.length} contrato(s) gerados`);
     } catch (e: any) { toast.error(e.message); }
     finally { setGeneratingZip(false); }
   }
