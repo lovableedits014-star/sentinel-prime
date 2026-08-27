@@ -986,7 +986,9 @@ export default function Eleicao() {
       if (cfg.apenasNaoReuniao) f.push({ label: "Reunião", value: "Apenas quem NÃO participou" });
       if (volMode === "apenas") f.push({ label: "Voluntários", value: "Apenas voluntários" });
       if (volMode === "excluir") f.push({ label: "Voluntários", value: "Excluídos (só remunerados)" });
+      if (!cfg.incluirAvulsos && !cfg.apenasAvulsos) f.push({ label: "Líderes avulsos", value: "Excluídos" });
       return f;
+
 
     };
 
