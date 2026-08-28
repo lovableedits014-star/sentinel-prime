@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ListFilter } from "lucide-react";
+import { ListFilter } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
-import TelemarketingReportsPanel from "@/components/contratados/TelemarketingReportsPanel";
 import TelemarketingSnapshotsPanel from "@/components/telemarketing/TelemarketingSnapshotsPanel";
 import TelemarketingIndicadorScorecard from "@/components/telemarketing/TelemarketingIndicadorScorecard";
 import TelemarketingFilaReportPanel from "@/components/telemarketing/TelemarketingFilaReportPanel";
 import TelemarketingFilaCompareCard from "@/components/telemarketing/TelemarketingFilaCompareCard";
-import { useTelemarketingAdminData } from "@/components/telemarketing/useTelemarketingAdminData";
+import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -15,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const ALL_FILAS = "__all__";
 
 export default function TelemarketingAdminRelatorios() {
-  const { clientId, contratados, indicados, loading, error } = useTelemarketingAdminData();
+  const { clientId } = useActiveClientId();
   const [filas, setFilas] = useState<{ id: string; nome: string }[]>([]);
   const [filaSel, setFilaSel] = useState(ALL_FILAS);
 
@@ -23,24 +22,17 @@ export default function TelemarketingAdminRelatorios() {
     if (!clientId) { setFilas([]); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.rpc("tele_fila_summary" as any, { _client_id: clientId });
+      const { data } = await supabase.rpc("tele_fila_summary" as never, { _client_id: clientId } as never);
       if (cancelled) return;
-      setFilas(((data as any[]) || []).map((r) => ({ id: r.campanha_id, nome: r.nome })));
+      setFilas(((data as unknown as { campanha_id: string; nome: string }[]) || []).map((r) => ({ id: r.campanha_id, nome: r.nome })));
     })();
     return () => { cancelled = true; };
   }, [clientId]);
 
   const campanhaId = filaSel === ALL_FILAS ? null : filaSel;
   const campanhaNome = useMemo(
-    () => (campanhaId ? filas.find((f) => f.id === campanhaId)?.nome || "Fila" : "Todas as filas"),
+    () => (campanhaId ? filas.find((f) => f.id === campanhaId)?.nome || "Fila" : "Toda a base"),
     [campanhaId, filas],
-  );
-
-  if (loading) return (
-    <div className="p-4 md:p-6">
-      <TelemarketingSubNav />
-      <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
-    </div>
   );
 
   return (
@@ -52,7 +44,6 @@ export default function TelemarketingAdminRelatorios() {
           Resultados de qualquer fila de ligação — planilhas, estrutura eleitoral, contratados, indicados e avulsos —
           com comparativo entre filas, ranking por bairro, candidatos alternativos e export Excel/PDF.
         </p>
-        {error && <p className="text-sm text-destructive mt-2">Erro ao carregar: {error}</p>}
       </div>
 
       {clientId && (
@@ -61,16 +52,16 @@ export default function TelemarketingAdminRelatorios() {
             <div className="min-w-[260px] space-y-1.5">
               <Label className="flex items-center gap-1.5 text-xs"><ListFilter className="size-3.5" /> Fila analisada</Label>
               <Select value={filaSel} onValueChange={setFilaSel}>
-                <SelectTrigger><SelectValue placeholder="Todas as filas" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Toda a base" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_FILAS}>Todas as filas</SelectItem>
+                  <SelectItem value={ALL_FILAS}>Toda a base (inclui contatos sem fila)</SelectItem>
                   {filas.map((f) => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <p className="text-xs text-muted-foreground max-w-md">
-              O filtro vale para todos os painéis abaixo. Escolha uma fila para medir só aquela lista, ou deixe em
-              “Todas as filas” para o resultado geral do cliente.
+              A seleção vale para o resultado geral, indicadores e snapshots. O comparativo continua mostrando todas
+              as filas lado a lado. Em “Toda a base”, contatos ainda sem fila também são contabilizados.
             </p>
           </CardContent>
         </Card>
@@ -82,8 +73,7 @@ export default function TelemarketingAdminRelatorios() {
           <TelemarketingFilaReportPanel clientId={clientId} campanhaId={campanhaId} campanhaNome={campanhaNome} />
         )}
         {clientId && <TelemarketingIndicadorScorecard clientId={clientId} campanhaId={campanhaId} />}
-        {clientId && <TelemarketingSnapshotsPanel clientId={clientId} />}
-        <TelemarketingReportsPanel contratados={contratados as any} indicados={indicados as any} />
+        {clientId && <TelemarketingSnapshotsPanel clientId={clientId} campanhaId={campanhaId} campanhaNome={campanhaNome} />}
       </div>
     </div>
   );

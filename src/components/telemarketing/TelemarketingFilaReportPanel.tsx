@@ -101,10 +101,12 @@ export default function TelemarketingFilaReportPanel({ clientId, campanhaId, cam
     while (true) {
       const fromRow = page * REPORT_PAGE_SIZE;
       const response = await supabase
-        .rpc("tele_fila_report_rows" as any, {
+        .rpc("tele_fila_report_rows_v2" as never, {
           _client_id: clientId,
           _campanha_id: campanhaId,
-        })
+        } as never)
+        .order("tabela", { ascending: true })
+        .order("contato_id", { ascending: true })
         .range(fromRow, fromRow + REPORT_PAGE_SIZE - 1);
 
       if (response.error) {
@@ -112,7 +114,7 @@ export default function TelemarketingFilaReportPanel({ clientId, campanhaId, cam
         break;
       }
 
-      const pageRows = ((response.data as any[]) || []) as FilaReportRow[];
+      const pageRows = ((response.data as unknown[]) || []) as FilaReportRow[];
       allRows.push(...pageRows);
       if (pageRows.length < REPORT_PAGE_SIZE) break;
       page += 1;
@@ -184,16 +186,17 @@ export default function TelemarketingFilaReportPanel({ clientId, campanhaId, cam
   }, [filtered]);
 
   const operatorChart = useMemo(() => {
-    const map = new Map<string, { nome: string; ligados: number; sim: number }>();
+    const map = new Map<string, { nome: string; trabalhados: number; tentativas: number; sim: number }>();
     filtered.forEach((r) => {
       if (!r.ligacao_em && !r.total_tentativas) return;
       const nome = clean(r.operador_nome);
-      const cur = map.get(nome) || { nome, ligados: 0, sim: 0 };
-      cur.ligados += 1;
+      const cur = map.get(nome) || { nome, trabalhados: 0, tentativas: 0, sim: 0 };
+      cur.trabalhados += 1;
+      cur.tentativas += r.total_tentativas || 0;
       if (r.vota_candidato === "sim") cur.sim += 1;
       map.set(nome, cur);
     });
-    return [...map.values()].sort((a, b) => b.ligados - a.ligados).slice(0, 12);
+    return [...map.values()].sort((a, b) => b.tentativas - a.tentativas).slice(0, 12);
   }, [filtered]);
 
   const originChart = useMemo(() => {
@@ -260,7 +263,7 @@ export default function TelemarketingFilaReportPanel({ clientId, campanhaId, cam
     const wsDetail = XLSX.utils.json_to_sheet(detailRows());
     wsDetail["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 24 }, ...Array(9).fill({ wch: 18 })];
     XLSX.utils.book_append_sheet(wb, wsDetail, "Contatos");
-    const wsOps = XLSX.utils.json_to_sheet(operatorChart.map((o) => ({ Operador: o.nome, Ligados: o.ligados, "Vota sim": o.sim })));
+    const wsOps = XLSX.utils.json_to_sheet(operatorChart.map((o) => ({ Operador: o.nome, "Contatos trabalhados": o.trabalhados, Tentativas: o.tentativas, "Vota sim": o.sim })));
     XLSX.utils.book_append_sheet(wb, wsOps, "Operadores");
     const wsBairros = XLSX.utils.json_to_sheet(bairroRanking.map((b) => ({ Bairro: b.nome, Contatos: b.total, "Vota sim": b.sim })));
     XLSX.utils.book_append_sheet(wb, wsBairros, "Bairros");
@@ -280,8 +283,8 @@ export default function TelemarketingFilaReportPanel({ clientId, campanhaId, cam
       styles: { fontSize: 8 }, headStyles: { fillColor: [30, 64, 52] },
     });
     autoTable(doc, {
-      head: [["Operador", "Ligados", "Vota sim"]],
-      body: operatorChart.map((o) => [o.nome, o.ligados, o.sim]),
+      head: [["Operador", "Contatos trabalhados", "Tentativas", "Vota sim"]],
+      body: operatorChart.map((o) => [o.nome, o.trabalhados, o.tentativas, o.sim]),
       styles: { fontSize: 7.5 }, headStyles: { fillColor: [30, 64, 52] },
     });
     autoTable(doc, {
@@ -298,14 +301,18 @@ export default function TelemarketingFilaReportPanel({ clientId, campanhaId, cam
   };
 
   const metricCards = [
-    { label: "Contatos na fila", value: kpi.total, Icon: Users },
+    { label: campanhaId ? "Contatos na fila" : "Contatos na base", value: kpi.total, Icon: Users },
     { label: "Trabalhados", value: `${kpi.trabalhados} (${kpi.cobertura}%)`, Icon: Phone },
     { label: "Pendentes", value: kpi.pendentes, Icon: ListChecks },
     { label: "Atendidos", value: `${kpi.atendidos} (${kpi.taxaContato}%)`, Icon: UserCheck },
+    { label: "Tentativas realizadas", value: kpi.tentativas, Icon: Phone },
     { label: "Vota (sim)", value: kpi.sim, Icon: CheckCircle2 },
     { label: "Não vota", value: kpi.nao, Icon: Vote },
     { label: "Indecisos", value: kpi.indeciso, Icon: Vote },
     { label: "Não atendeu", value: kpi.naoAtendeu, Icon: Phone },
+    { label: "Não quis opinar", value: kpi.naoQuisOpinar, Icon: Vote },
+    { label: "Inválidos", value: kpi.invalidos, Icon: ListChecks },
+    { label: "Conversão / atendidos", value: `${kpi.conversao}%`, Icon: CheckCircle2 },
   ];
 
   return (
@@ -430,7 +437,8 @@ export default function TelemarketingFilaReportPanel({ clientId, campanhaId, cam
                     <YAxis type="category" dataKey="nome" width={110} tick={{ fontSize: 11 }} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="ligados" name="Ligados" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="trabalhados" name="Contatos trabalhados" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="tentativas" name="Tentativas" fill="#0ea5e9" radius={[0, 4, 4, 0]} />
                     <Bar dataKey="sim" name="Vota sim" fill="#22c55e" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

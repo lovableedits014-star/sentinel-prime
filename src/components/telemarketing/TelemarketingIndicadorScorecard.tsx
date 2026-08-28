@@ -63,6 +63,7 @@ interface Summary {
 }
 
 const ALL = "__all__";
+const INDICATOR_PAGE_SIZE = 1000;
 const TIPO_LABEL: Record<string, string> = { coordenador: "Coordenador", lider: "Líder", cabo: "Cabo" };
 const RESULT_LABEL: Record<string, string> = {
   atendeu: "Atendeu", nao_atendeu: "Não atendeu", recusou: "Recusou",
@@ -118,10 +119,25 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
 
   const load = useCallback(async (notify = false) => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("tele_indicador_report_rows", { _client_id: clientId });
+    const allRows: ReportRow[] = [];
+    let page = 0;
+    let error: { message: string } | null = null;
+    while (true) {
+      const fromRow = page * INDICATOR_PAGE_SIZE;
+      const response = await supabase
+        .rpc("tele_indicador_report_rows", { _client_id: clientId })
+        .order("indicador_id", { ascending: true })
+        .order("contato_id", { ascending: true })
+        .range(fromRow, fromRow + INDICATOR_PAGE_SIZE - 1);
+      if (response.error) { error = response.error; break; }
+      const pageRows = (response.data || []) as ReportRow[];
+      allRows.push(...pageRows);
+      if (pageRows.length < INDICATOR_PAGE_SIZE) break;
+      page += 1;
+    }
     setLoading(false);
     if (error) { toast.error(`Erro ao carregar relatório: ${error.message}`); return; }
-    setRows((data || []) as ReportRow[]);
+    setRows(allRows);
     if (notify) toast.success("Relatório atualizado");
   }, [clientId]);
 

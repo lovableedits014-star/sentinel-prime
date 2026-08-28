@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,38 +20,40 @@ interface Snapshot {
   campanha_id: string | null;
 }
 
-interface Props { clientId: string; }
+interface Props { clientId: string; campanhaId: string | null; campanhaNome: string; }
 
 const pct = (a: number, b: number) => b > 0 ? Math.round((a / b) * 100) : 0;
 
-export default function TelemarketingSnapshotsPanel({ clientId }: Props) {
+export default function TelemarketingSnapshotsPanel({ clientId, campanhaId, campanhaNome }: Props) {
   const [snaps, setSnaps] = useState<Snapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [rotulo, setRotulo] = useState("");
   const [capturing, setCapturing] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("telemarketing_relatorio_snapshots" as any)
+    let query = supabase
+      .from("telemarketing_relatorio_snapshots" as never)
       .select("id,rotulo,captured_at,total,ligados,atendeu,vota_sim,vota_nao,indeciso,campanha_id")
       .eq("client_id", clientId)
       .order("captured_at", { ascending: false })
       .limit(20);
-    setSnaps((data as any[]) || []);
+    query = campanhaId ? query.eq("campanha_id", campanhaId) : query.is("campanha_id", null);
+    const { data } = await query;
+    setSnaps((data as unknown as Snapshot[]) || []);
     setLoading(false);
-  };
+  }, [campanhaId, clientId]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
+  useEffect(() => { void load(); }, [load]);
 
   const capture = async () => {
     if (!rotulo.trim()) { toast.error("Dê um rótulo (ex: Rodada 1 - 08/jun)"); return; }
     setCapturing(true);
-    const { error } = await supabase.rpc("tele_capture_snapshot" as any, {
+    const { error } = await supabase.rpc("tele_capture_snapshot" as never, {
       _client_id: clientId,
       _rotulo: rotulo.trim(),
-      _campanha_id: null,
-    });
+      _campanha_id: campanhaId,
+    } as never);
     setCapturing(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Snapshot capturado");
@@ -61,7 +63,7 @@ export default function TelemarketingSnapshotsPanel({ clientId }: Props) {
 
   const remove = async (id: string) => {
     if (!confirm("Remover snapshot?")) return;
-    await supabase.from("telemarketing_relatorio_snapshots" as any).delete().eq("id", id);
+    await supabase.from("telemarketing_relatorio_snapshots" as never).delete().eq("id", id);
     load();
   };
 
@@ -76,7 +78,7 @@ export default function TelemarketingSnapshotsPanel({ clientId }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2"><Camera className="w-4 h-4 text-primary" /> Rodadas / snapshots</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2"><Camera className="w-4 h-4 text-primary" /> Rodadas / snapshots — {campanhaNome}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex gap-2">
