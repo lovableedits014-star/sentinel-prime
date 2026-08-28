@@ -405,11 +405,29 @@ export default function Telemarketing() {
   // A fila pode ser atualizada enquanto o operador alterna entre dispositivos.
   // Nunca deixe um índice antigo esconder os contatos que chegaram da RPC.
   const safeCurrentIndex = currentIndex >= 0 && currentIndex < filteredContatos.length ? currentIndex : 0;
-  const current = filteredContatos[safeCurrentIndex] as ContatoTele | undefined;
+  const contatoDaChave = currentKey
+    ? filteredContatos.find((c) => c.id === currentKey.id && c.tabela === currentKey.tabela)
+    : undefined;
+  // Se o contato travado saiu da lista (reagendado por outro dispositivo, fila
+  // recarregada etc.), mantemos a última cópia dele em tela para o operador
+  // conseguir registrar o que ouviu na ligação.
+  const current = (currentKey
+    ? contatoDaChave ?? pinnedContatoRef.current ?? undefined
+    : filteredContatos[safeCurrentIndex]) as ContatoTele | undefined;
 
   useEffect(() => {
-    if (currentIndex !== safeCurrentIndex) setCurrentIndex(safeCurrentIndex);
-  }, [currentIndex, safeCurrentIndex]);
+    if (current) pinnedContatoRef.current = current;
+  }, [current]);
+
+  // Sem contato travado (login, troca de filtro/fila): trava o primeiro da fila.
+  useEffect(() => {
+    if (!currentKey && current) setCurrentKey({ id: current.id, tabela: current.tabela });
+  }, [currentKey, current]);
+
+  const selecionarContato = (row: { id: string; tabela: string } | null) => {
+    setCurrentKey(row ? { id: row.id, tabela: row.tabela } : null);
+    if (row) pinnedContatoRef.current = null;
+  };
 
   const totalPendentes = filteredContatos.filter(
     (i) => !i.ligacao_status || i.ligacao_status === "pendente"
