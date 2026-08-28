@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 
@@ -22,6 +22,8 @@ export interface AdminTeleRow {
   is_lider: boolean;
 }
 
+const ADMIN_REPORT_PAGE_SIZE = 1000;
+
 /**
  * Carrega contatos de todas as origens (contratados, indicados, eleição-pessoas,
  * eleição-indicados, avulsos) já com o status mais recente da ligação para os
@@ -35,8 +37,10 @@ export function useTelemarketingAdminData() {
   const [rows, setRows] = useState<AdminTeleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     if (!clientId) {
       setRows([]);
       setLoading(false);
@@ -44,22 +48,45 @@ export function useTelemarketingAdminData() {
     }
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase.rpc(
-      "tele_admin_listar_contatos_full" as any,
-      { _client_id: clientId },
-    );
+    const allRows: AdminTeleRow[] = [];
+    let page = 0;
+    let err: { message: string } | null = null;
+
+    // O PostgREST limita cada resposta a 1.000 linhas. Busca todas as paginas
+    // para que KPIs, graficos e exportacoes representem a base completa.
+    while (true) {
+      const from = page * ADMIN_REPORT_PAGE_SIZE;
+      const response = await supabase
+        .rpc("tele_admin_listar_contatos_full" as never, { _client_id: clientId } as never)
+        .order("tabela", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + ADMIN_REPORT_PAGE_SIZE - 1);
+
+      if (requestId !== requestIdRef.current) return;
+      if (response.error) {
+        err = response.error;
+        break;
+      }
+      const pageRows = ((response.data as unknown[]) || []) as AdminTeleRow[];
+      allRows.push(...pageRows);
+      if (pageRows.length < ADMIN_REPORT_PAGE_SIZE) break;
+      page += 1;
+    }
+
+    if (requestId !== requestIdRef.current) return;
     if (err) {
       console.error("[useTelemarketingAdminData]", err);
       setError(err.message);
       setRows([]);
     } else {
-      setRows(((data as any[]) || []) as AdminTeleRow[]);
+      setRows(allRows);
     }
     setLoading(false);
   }, [clientId]);
 
   useEffect(() => {
     void load();
+    return () => { requestIdRef.current += 1; };
   }, [load]);
 
   // Adapta para o shape esperado pelos painéis existentes.
