@@ -61,6 +61,7 @@ const TelemarketingAdmin = lazy(() => import("./pages/TelemarketingAdmin"));
 const TelemarketingAdminFila = lazy(() => import("./pages/TelemarketingAdminFila"));
 const TelemarketingAdminResultados = lazy(() => import("./pages/TelemarketingAdminResultados"));
 const TelemarketingAdminRelatorios = lazy(() => import("./pages/TelemarketingAdminRelatorios"));
+const TelemarketingAdminProdutividade = lazy(() => import("./pages/TelemarketingAdminProdutividade"));
 const TelemarketingAdminRanking = lazy(() => import("./pages/TelemarketingAdminRanking"));
 const TelemarketingAdminOperadores = lazy(() => import("./pages/TelemarketingAdminOperadores"));
 const TelemarketingAdminConfig = lazy(() => import("./pages/TelemarketingAdminConfig"));
@@ -172,6 +173,7 @@ const RoutesWithBoundary = () => {
               <Route path="/telemarketing-admin/fila" element={<TelemarketingAdminFila />} />
               <Route path="/telemarketing-admin/resultados" element={<TelemarketingAdminResultados />} />
               <Route path="/telemarketing-admin/relatorios" element={<TelemarketingAdminRelatorios />} />
+              <Route path="/telemarketing-admin/produtividade" element={<TelemarketingAdminProdutividade />} />
               <Route path="/telemarketing-admin/ranking" element={<TelemarketingAdminRanking />} />
               <Route path="/telemarketing-admin/operadores" element={<TelemarketingAdminOperadores />} />
               <Route path="/telemarketing-admin/configuracoes" element={<TelemarketingAdminConfig />} />

@@ -26,6 +26,11 @@ export const TELE_TAB_HELP: { path: string; title: string; text: string }[] = [
       "Números consolidados da operação (ligações por dia, taxa de atendimento, intenção de voto) para exportar e apresentar.",
   },
   {
+    path: "/telemarketing-admin/produtividade",
+    title: "Produtividade dos operadores",
+    text: "Acompanhe dia a dia o volume, a qualidade e os resultados de cada operador. Clique em um nome para auditar as ligações consideradas.",
+  },
+  {
     path: "/telemarketing-admin/ranking",
     title: "Ranking",
     text:
