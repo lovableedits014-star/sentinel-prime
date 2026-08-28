@@ -2,7 +2,7 @@ import { Trophy, TrendingUp, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RankingRow } from "./useRankingIndicadores";
 
-export default function RankingHighlights({ rows }: { rows: RankingRow[] }) {
+export default function RankingHighlights({ rows, universo }: { rows: RankingRow[]; universo: "eleicao" | "contratados" }) {
   const coordenadores = rows.filter((r) => r.pessoa_tipo === "coordenador" || r.pessoa_tipo === "lider" && !r.coordenador_id);
   const lideres = rows.filter((r) => r.pessoa_tipo === "lider" || r.pessoa_tipo === "liderado");
 
@@ -22,7 +22,7 @@ export default function RankingHighlights({ rows }: { rows: RankingRow[] }) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Trophy className="w-4 h-4 text-yellow-500" /> Top coordenadores (confirmados)
+            <Trophy className="w-4 h-4 text-yellow-500" /> {universo === "eleicao" ? "Top coordenadores" : "Top líderes"} (confirmados)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
@@ -56,7 +56,7 @@ export default function RankingHighlights({ rows }: { rows: RankingRow[] }) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="w-4 h-4 text-orange-500" /> Coordenadores inativos (7d)
+            <AlertTriangle className="w-4 h-4 text-orange-500" /> {universo === "eleicao" ? "Coordenadores" : "Líderes"} inativos (7d)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">

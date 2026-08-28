@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router-dom";
 import { Loader2, AlertTriangle, Settings2 } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import RankingHighlights from "@/components/telemarketing/RankingHighlights";
@@ -100,7 +100,7 @@ export default function TelemarketingAdminRanking() {
           <Settings2 className="w-3.5 h-3.5" />
           Metas atuais — Coordenador: <strong className="text-foreground">{metaCfg.meta_coordenador}</strong> · Líder: <strong className="text-foreground">{metaCfg.meta_lider}</strong> · Cabo: <strong className="text-foreground">{metaCfg.meta_cabo}</strong>
           <Button asChild variant="link" size="sm" className="h-auto px-1 py-0">
-            <Link to="/$">Ajustar em Eleição → Indicações</Link>
+            <Link to="/eleicao">Abrir Eleição</Link>
           </Button>
         </div>
       )}
@@ -197,7 +197,7 @@ export default function TelemarketingAdminRanking() {
         <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
         <div className="space-y-6">
-          <RankingHighlights rows={rows} />
+          <RankingHighlights rows={rows} universo={universo} />
           <RankingTable rows={rows} tipoFiltro={tipoFiltro} onSelect={setSelected} />
         </div>
       )}

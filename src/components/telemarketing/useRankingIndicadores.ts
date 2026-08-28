@@ -38,7 +38,7 @@ export function useRankingIndicadores(clientId: string | null, filters: RankingF
     if (!clientId) { setRows([]); return; }
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase.rpc("tele_ranking_indicadores" as any, {
+    const { data, error: err } = await supabase.rpc("tele_ranking_indicadores_v2" as any, {
       _client_id: clientId,
       _campanha_id: filters.campanhaId || null,
       _data_de: filters.dataDe || null,

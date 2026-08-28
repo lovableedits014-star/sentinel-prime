@@ -15,9 +15,9 @@ export const TELE_TAB_HELP: { path: string; title: string; text: string }[] = [
   },
   {
     path: "/telemarketing-admin/resultados",
-    title: "Resultados detalhados",
+    title: "Contatos e resultados",
     text:
-      "Todas as ligações registradas, contato por contato: quem atendeu, o que respondeu e qual operador falou. Use para auditar o trabalho e revisar respostas.",
+      "Situação atual de cada contato em todas as origens e filas: último resultado, resposta, operador e total de tentativas. Para auditar cada tentativa, use Produtividade.",
   },
   {
     path: "/telemarketing-admin/relatorios",

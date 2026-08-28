@@ -58,14 +58,12 @@ const Militancia = lazy(() => import("./pages/Militancia"));
 const InteligenciaConteudo = lazy(() => import("./pages/InteligenciaConteudo"));
 const FotoPublica = lazy(() => import("./pages/FotoPublica"));
 const TelemarketingAdmin = lazy(() => import("./pages/TelemarketingAdmin"));
-const TelemarketingAdminFila = lazy(() => import("./pages/TelemarketingAdminFila"));
 const TelemarketingAdminResultados = lazy(() => import("./pages/TelemarketingAdminResultados"));
 const TelemarketingAdminRelatorios = lazy(() => import("./pages/TelemarketingAdminRelatorios"));
 const TelemarketingAdminProdutividade = lazy(() => import("./pages/TelemarketingAdminProdutividade"));
 const TelemarketingAdminRanking = lazy(() => import("./pages/TelemarketingAdminRanking"));
 const TelemarketingAdminOperadores = lazy(() => import("./pages/TelemarketingAdminOperadores"));
 const TelemarketingAdminConfig = lazy(() => import("./pages/TelemarketingAdminConfig"));
-const TelemarketingAdminCampanhas = lazy(() => import("./pages/TelemarketingAdminCampanhas"));
 const TelemarketingAdminFilas = lazy(() => import("./pages/TelemarketingAdminFilas"));
 const TelemarketingAdminListas = lazy(() => import("./pages/TelemarketingAdminListas"));
 const FotosCampanha = lazy(() => import("./pages/FotosCampanha"));
@@ -170,14 +168,14 @@ const RoutesWithBoundary = () => {
               <Route path="/trafego-pago" element={<TrafegoPago />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/telemarketing-admin" element={<TelemarketingAdmin />} />
-              <Route path="/telemarketing-admin/fila" element={<TelemarketingAdminFila />} />
+              <Route path="/telemarketing-admin/fila" element={<Navigate to="/telemarketing-admin/filas" replace />} />
               <Route path="/telemarketing-admin/resultados" element={<TelemarketingAdminResultados />} />
               <Route path="/telemarketing-admin/relatorios" element={<TelemarketingAdminRelatorios />} />
               <Route path="/telemarketing-admin/produtividade" element={<TelemarketingAdminProdutividade />} />
               <Route path="/telemarketing-admin/ranking" element={<TelemarketingAdminRanking />} />
               <Route path="/telemarketing-admin/operadores" element={<TelemarketingAdminOperadores />} />
               <Route path="/telemarketing-admin/configuracoes" element={<TelemarketingAdminConfig />} />
-              <Route path="/telemarketing-admin/campanhas" element={<TelemarketingAdminCampanhas />} />
+              <Route path="/telemarketing-admin/campanhas" element={<Navigate to="/telemarketing-admin/filas" replace />} />
             <Route path="/telemarketing-admin/filas" element={<TelemarketingAdminFilas />} />
             <Route path="/telemarketing-admin/listas" element={<TelemarketingAdminListas />} />
 

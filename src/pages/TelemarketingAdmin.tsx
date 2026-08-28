@@ -94,7 +94,7 @@ export default function TelemarketingAdmin() {
           </p>
         </div>
         <Button asChild size="sm">
-          <Link to="/telemarketing-admin/fila"><Phone className="w-4 h-4 mr-1" /> Ver fila pendente</Link>
+          <Link to="/telemarketing-admin/filas"><Phone className="w-4 h-4 mr-1" /> Gerenciar filas</Link>
         </Button>
       </div>
 

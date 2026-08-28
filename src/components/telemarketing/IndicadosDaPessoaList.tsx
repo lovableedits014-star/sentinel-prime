@@ -77,7 +77,7 @@ export default function IndicadosDaPessoaList({ clientId, pessoaId, pessoaNome, 
     let cancel = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase.rpc("tele_ranking_indicados_da_pessoa" as any, {
+      const { data, error } = await supabase.rpc("tele_ranking_indicados_da_pessoa_v2" as any, {
         _client_id: clientId,
         _pessoa_id: pessoaId,
         _universo: universo,
