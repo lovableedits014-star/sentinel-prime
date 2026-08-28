@@ -212,6 +212,8 @@ export default function MissaoPublica() {
         const response = await fetch(api("/api/public/missao/event"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          // Mantém o envio ativo quando o Safari entrega a navegação ao app social.
+          keepalive: true,
           body: JSON.stringify({ missionId, code, token, type, linkId: linkId || null }),
         });
         return response.ok;
@@ -291,11 +293,22 @@ export default function MissaoPublica() {
     setBackReminder(false);
   };
 
-  const handleExternal = async (
+  const handleExternal = (
     url: string,
     type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link",
     linkId?: string,
   ) => {
+    let destination: URL;
+    try {
+      destination = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+      if (!["http:", "https:"].includes(destination.protocol)) {
+        throw new Error("unsupported protocol");
+      }
+    } catch {
+      toast.error("Este link está inválido. Avise o responsável pela missão.");
+      return;
+    }
+
     const key = linkId || type;
     setClickedLinks((prev) => {
       const next = new Set(prev);
@@ -307,8 +320,10 @@ export default function MissaoPublica() {
       }
       return next;
     });
-    await registerEvent(type, linkId);
-    window.open(url, "_blank", "noopener,noreferrer");
+    // Não aguardamos a telemetria: no iPhone, qualquer await faz o Safari perder
+    // o gesto original do toque e bloquear a abertura do Facebook/Instagram.
+    void registerEvent(type, linkId);
+    window.location.assign(destination.toString());
   };
 
   const handleDeclare = async () => {

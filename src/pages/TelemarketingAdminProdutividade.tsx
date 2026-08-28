@@ -37,6 +37,7 @@ const statusLabel: Record<string, string> = {
   atendeu: "Atendeu", nao_atendeu: "Não atendeu", reagendou: "Reagendou",
   invalido: "Inválido", recusou: "Recusou", pendente: "Pendente",
 };
+const PRODUCTIVITY_PAGE_SIZE = 1000;
 
 function buildMetric(key: string, rows: CallRow[]): OperatorMetric {
   const sorted = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -82,13 +83,38 @@ export default function TelemarketingAdminProdutividade() {
     const to = new Date(`${fim}T00:00:00`); to.setDate(to.getDate() + 1);
     if (to <= from) { toast.error("A data final deve ser igual ou posterior à inicial."); return; }
     setLoading(true);
-    const { data, error } = await supabase.rpc("tele_produtividade_ligacoes" as never, {
-      _client_id: clientId, _inicio: from.toISOString(), _fim: to.toISOString(),
-      _campanha_id: campanha === ALL ? null : campanha,
-    } as never);
-    setLoading(false);
-    if (error) { toast.error(`Não foi possível carregar a produtividade: ${error.message}`); return; }
-    setRows(((data as unknown[]) || []) as CallRow[]);
+    try {
+      const allRows: CallRow[] = [];
+      let page = 0;
+
+      // O PostgREST limita cada resposta a 1.000 registros. Percorremos todas
+      // as páginas para que cartões, gráfico, auditoria e CSV usem o total real.
+      while (true) {
+        const start = page * PRODUCTIVITY_PAGE_SIZE;
+        const end = start + PRODUCTIVITY_PAGE_SIZE - 1;
+        const { data, error } = await (supabase.rpc("tele_produtividade_ligacoes" as never, {
+          _client_id: clientId,
+          _inicio: from.toISOString(),
+          _fim: to.toISOString(),
+          _campanha_id: campanha === ALL ? null : campanha,
+        } as never) as any)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(start, end);
+
+        if (error) throw error;
+        const batch = ((data as unknown[]) || []) as CallRow[];
+        allRows.push(...batch);
+        if (batch.length < PRODUCTIVITY_PAGE_SIZE) break;
+        page += 1;
+      }
+
+      setRows(allRows);
+    } catch (error: any) {
+      toast.error(`Não foi possível carregar a produtividade: ${error?.message || "erro desconhecido"}`);
+    } finally {
+      setLoading(false);
+    }
   }, [campanha, clientId, fim, inicio]);
 
   useEffect(() => {

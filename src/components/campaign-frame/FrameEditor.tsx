@@ -182,10 +182,10 @@ export default function FrameEditor({
     try {
       await saveBlob(resultBlob, `foto-campanha-${Date.now()}.jpg`, {
         title: "Foto de campanha",
-        preferDownload: true,
+        text: "Minha foto de campanha",
       });
       setDownloaded(true);
-      toast.success("Foto baixada! Procure na Galeria ou na pasta Downloads.", {
+      toast.success("Foto pronta para salvar ou compartilhar.", {
         duration: 6000,
       });
     } catch {
@@ -285,11 +285,11 @@ export default function FrameEditor({
                         ) : (
                           <Download className="w-4 h-4" />
                         )}
-                        {downloaded ? "Foto baixada com sucesso" : "Baixar JPG (1080x1080)"}
+                        {downloaded ? "Foto processada com sucesso" : "Salvar JPG (1080x1080)"}
                       </Button>
                       {downloaded && (
                         <p className="text-xs text-center text-emerald-600 font-medium">
-                          Confira a Galeria ou a pasta Downloads do celular.
+                          No iPhone, escolha “Salvar Imagem” ou “Salvar em Arquivos”.
                         </p>
                       )}
                     </>
