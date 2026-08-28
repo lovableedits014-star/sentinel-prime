@@ -95,6 +95,11 @@ export default function Telemarketing() {
   const [contatos, setContatos] = useState<ContatoTele[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Contato aberto fica "travado" pela identidade (id + tabela), nunca pela
+  // posição na lista: assim, quando o operador sai da tela para ligar e volta,
+  // a atualização da fila não troca o contato em atendimento.
+  const [currentKey, setCurrentKey] = useState<{ id: string; tabela: string } | null>(null);
+  const pinnedContatoRef = useRef<ContatoTele | null>(null);
   const [clientName, setClientName] = useState("");
   const [campanhaNome, setCampanhaNome] = useState<string | null>(null);
   const [selectedCampanhaId, setSelectedCampanhaId] = useState<string | null>(campanhaIdParam);
