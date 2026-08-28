@@ -586,7 +586,21 @@ export default function Telemarketing() {
   useEffect(() => {
     if (!loggedIn) return;
     const refreshWhenActive = () => {
-      if (document.visibilityState === "visible") void reloadContatos();
+      if (document.visibilityState !== "visible") return;
+      // Renova a trava do contato em atendimento antes de sincronizar a fila:
+      // o operador saiu para ligar e o contato precisa continuar dele.
+      if (current && clientId) {
+        void supabase.rpc("tele_heartbeat_contato" as any, {
+          _client_id: clientId,
+          _nome: operadorNome.trim(),
+          _senha: operadorSenha.trim(),
+          _tabela: current.tabela,
+          _id: current.id,
+          _ttl_seconds: 300,
+          _session_id: sessionIdRef.current,
+        });
+      }
+      void reloadContatos(current ? { id: current.id, tabela: current.tabela } : undefined);
     };
     window.addEventListener("online", refreshWhenActive);
     document.addEventListener("visibilitychange", refreshWhenActive);
