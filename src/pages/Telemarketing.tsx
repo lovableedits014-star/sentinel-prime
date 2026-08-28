@@ -5,9 +5,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Phone, User, MapPin, CheckCircle2, XCircle, PhoneOff, Clock, ArrowRight, LogIn, Users, CalendarClock, Lock, Search, RefreshCw, WifiOff } from "lucide-react";
+import {
+  Phone,
+  User,
+  MapPin,
+  CheckCircle2,
+  XCircle,
+  PhoneOff,
+  Clock,
+  ArrowRight,
+  LogIn,
+  Users,
+  CalendarClock,
+  Lock,
+  Search,
+  RefreshCw,
+  WifiOff,
+} from "lucide-react";
 import { toast } from "sonner";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 
@@ -23,7 +45,12 @@ interface ContatoTele {
   operador_nome: string | null;
   ligacao_em: string | null;
   tipo: "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura";
-  tabela: "contratados" | "contratado_indicados" | "contatos_avulsos" | "eleicao_indicados" | "eleicao_pessoas";
+  tabela:
+    | "contratados"
+    | "contratado_indicados"
+    | "contatos_avulsos"
+    | "eleicao_indicados"
+    | "eleicao_pessoas";
   proxima_tentativa_em: string | null;
   tentativas_count: number | null;
   observacao_tele: string | null;
@@ -52,19 +79,27 @@ interface FilaDiagnostico {
   reservados_ativos: number;
 }
 
-const TELE_APP_VERSION = "2026.08.26.1";
+const TELE_APP_VERSION = "2026.08.28.3";
+const CONTACT_LOCK_SECONDS = 30 * 60;
 
 const mapContato = (r: any): ContatoTele => ({
-  id: r.id, nome: r.nome, telefone: r.telefone,
-  cidade: r.cidade, bairro: r.bairro,
-  ligacao_status: r.ligacao_status, vota_candidato: r.vota_candidato,
-  candidato_alternativo: r.candidato_alternativo, operador_nome: r.operador_nome,
-  ligacao_em: r.ligacao_em, tipo: r.tipo as ContatoTele["tipo"],
+  id: r.id,
+  nome: r.nome,
+  telefone: r.telefone,
+  cidade: r.cidade,
+  bairro: r.bairro,
+  ligacao_status: r.ligacao_status,
+  vota_candidato: r.vota_candidato,
+  candidato_alternativo: r.candidato_alternativo,
+  operador_nome: r.operador_nome,
+  ligacao_em: r.ligacao_em,
+  tipo: r.tipo as ContatoTele["tipo"],
   tabela: r.tabela as ContatoTele["tabela"],
   proxima_tentativa_em: r.proxima_tentativa_em ?? null,
   tentativas_count: r.tentativas_count ?? 0,
   observacao_tele: r.observacao_tele ?? null,
-  locked_by: r.locked_by ?? null, locked_until: r.locked_until ?? null,
+  locked_by: r.locked_by ?? null,
+  locked_until: r.locked_until ?? null,
   campanha_id: r.campanha_id ?? null,
   indicador_nome: r.indicador_nome ?? null,
   indicador_tipo: r.indicador_tipo ?? null,
@@ -83,7 +118,6 @@ const isNaFila = (c: { ligacao_status: string | null; proxima_tentativa_em?: str
   }
   return false;
 };
-
 
 export default function Telemarketing() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -107,16 +141,19 @@ export default function Telemarketing() {
   const [filaError, setFilaError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [diagnostico, setDiagnostico] = useState<FilaDiagnostico | null>(null);
-  const [filtroTipo, setFiltroTipo] = useState<"todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura">("todos");
+  const [filtroTipo, setFiltroTipo] = useState<
+    "todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura"
+  >("todos");
   const autoLoginAttempted = useRef(false);
   const sessionIdRef = useRef("");
 
   if (!sessionIdRef.current && typeof window !== "undefined") {
     const storageKey = "sentinelle.telemarketing.session";
     const stored = window.sessionStorage.getItem(storageKey);
-    const generated = typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const generated =
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     sessionIdRef.current = stored || generated;
     if (!stored) window.sessionStorage.setItem(storageKey, generated);
   }
@@ -144,7 +181,6 @@ export default function Telemarketing() {
   const [buscaResultados, setBuscaResultados] = useState<ContatoTele[]>([]);
   const [buscouVazio, setBuscouVazio] = useState(false);
 
-
   useEffect(() => {
     // Force anon role to ensure RLS anon policies apply
     supabase.auth.signOut().then(() => {
@@ -159,11 +195,14 @@ export default function Telemarketing() {
           });
       }
       if (campanhaIdParam) {
-        supabase.from("telemarketing_campanhas" as any)
+        supabase
+          .from("telemarketing_campanhas" as any)
           .select("nome")
           .eq("id", campanhaIdParam)
           .maybeSingle()
-          .then(({ data }: any) => { if (data?.nome) setCampanhaNome(data.nome); });
+          .then(({ data }: any) => {
+            if (data?.nome) setCampanhaNome(data.nome);
+          });
       }
     });
   }, [clientId, campanhaIdParam]);
@@ -179,7 +218,6 @@ export default function Telemarketing() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
-
   const handleLogin = async () => {
     if (!operadorNome.trim() || !operadorSenha.trim()) {
       toast.error("Informe nome e senha para continuar");
@@ -189,16 +227,21 @@ export default function Telemarketing() {
     setFilaError(null);
 
     // Validate operator credentials via SECURITY DEFINER function (senha não trafega na tabela)
-    const { data: opRows, error: opErr } = await supabase.rpc("verify_telemarketing_operador" as any, {
-      _client_id: clientId!,
-      _nome: operadorNome.trim(),
-      _senha: operadorSenha.trim(),
-    });
+    const { data: opRows, error: opErr } = await supabase.rpc(
+      "verify_telemarketing_operador" as any,
+      {
+        _client_id: clientId!,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+      },
+    );
 
     if (opErr) {
       const msg = opErr.message || "";
       if (/bloque/i.test(msg)) {
-        toast.error("Conta bloqueada temporariamente por excesso de tentativas. Tente novamente em alguns minutos.");
+        toast.error(
+          "Conta bloqueada temporariamente por excesso de tentativas. Tente novamente em alguns minutos.",
+        );
       } else {
         toast.error("Nome ou senha inválidos");
       }
@@ -208,7 +251,9 @@ export default function Telemarketing() {
 
     const opData = Array.isArray(opRows) && opRows.length > 0 ? opRows[0] : null;
     if (!opData) {
-      toast.error("Nome ou senha inválidos. Após 5 tentativas, a conta é bloqueada por 15 minutos.");
+      toast.error(
+        "Nome ou senha inválidos. Após 5 tentativas, a conta é bloqueada por 15 minutos.",
+      );
       setLoading(false);
       return;
     }
@@ -232,7 +277,10 @@ export default function Telemarketing() {
     // uma fila válida e temporariamente vazia deve continuar selecionada.
     if (usedCampanhaId && (!rpcRows || (rpcRows as any[]).length === 0)) {
       const diag = await supabase.rpc("tele_diagnostico_fila" as any, {
-        _client_id: clientId!, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: usedCampanhaId,
+        _client_id: clientId!,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _campanha_id: usedCampanhaId,
       });
       const detail = diag.data as FilaDiagnostico | null;
       if (detail && !detail.fila_solicitada_valida) {
@@ -261,7 +309,10 @@ export default function Telemarketing() {
     setContatos(lista);
 
     const { data: diagData } = await supabase.rpc("tele_diagnostico_fila" as any, {
-      _client_id: clientId!, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: usedCampanhaId,
+      _client_id: clientId!,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: usedCampanhaId,
     });
     setDiagnostico((diagData as FilaDiagnostico | null) ?? null);
 
@@ -274,27 +325,28 @@ export default function Telemarketing() {
       );
     }
 
-
     // Load campaign scripts (best-effort)
     const { data: scriptRows } = await supabase.rpc("tele_list_campanhas_scripts" as any, {
       _client_id: clientId!,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
     });
-    setScripts(((scriptRows as any[]) || []).map((s) => ({
-      id: s.id,
-      nome: s.nome,
-      script_intro: s.script_intro,
-      script_perguntas: Array.isArray(s.script_perguntas) ? s.script_perguntas : [],
-      tags_rapidas: Array.isArray(s.tags_rapidas) ? s.tags_rapidas : [],
-    })));
+    setScripts(
+      ((scriptRows as any[]) || []).map((s) => ({
+        id: s.id,
+        nome: s.nome,
+        script_intro: s.script_intro,
+        script_perguntas: Array.isArray(s.script_perguntas) ? s.script_perguntas : [],
+        tags_rapidas: Array.isArray(s.tags_rapidas) ? s.tags_rapidas : [],
+      })),
+    );
 
     setLoggedIn(true);
     setLoading(false);
 
     // Se o operador tem múltiplas campanhas atribuídas e nenhuma foi passada por URL,
     // abre a tela de escolha em vez de já saltar para um contato.
-    const campanhasComContato = new Set(lista.map(c => c.campanha_id).filter(Boolean));
+    const campanhasComContato = new Set(lista.map((c) => c.campanha_id).filter(Boolean));
     if (!usedCampanhaId && campanhasComContato.size > 1) {
       setPickingCampanha(true);
       return;
@@ -306,20 +358,27 @@ export default function Telemarketing() {
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
       _campanha_id: usedCampanhaId,
-      _ttl_seconds: 300,
+      _ttl_seconds: CONTACT_LOCK_SECONDS,
       _session_id: sessionIdRef.current,
     });
-    const res = pick as { found: boolean; tabela?: string; contato_id?: string; lista_id?: string } | null;
-    
+    const res = pick as {
+      found: boolean;
+      tabela?: string;
+      contato_id?: string;
+      lista_id?: string;
+    } | null;
+
     // Se o operador tem lista travada, ignoramos escolha de campanha e focamos na lista
     if (res?.lista_id) {
       setPickingCampanha(false);
     }
 
     if (res?.found) {
-      const idx = lista.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+      const idx = lista.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
       setCurrentIndex(idx >= 0 ? idx : 0);
-      selecionarContato(res.contato_id && res.tabela ? { id: res.contato_id, tabela: res.tabela } : null);
+      selecionarContato(
+        res.contato_id && res.tabela ? { id: res.contato_id, tabela: res.tabela } : null,
+      );
     } else {
       setCurrentIndex(0);
       selecionarContato(null);
@@ -327,13 +386,24 @@ export default function Telemarketing() {
   };
 
   const pickCampanha = async (campanhaId: string | null) => {
+    const contatoAberto = pinnedContatoRef.current;
+    if (contatoAberto && clientId) {
+      await supabase.rpc("tele_release_contato" as any, {
+        _client_id: clientId,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _tabela: contatoAberto.tabela,
+        _id: contatoAberto.id,
+        _session_id: sessionIdRef.current,
+      });
+    }
     setSelectedCampanhaId(campanhaId);
     setPickingCampanha(false);
     setCurrentIndex(0);
     selecionarContato(null);
     setFiltroTipo("todos");
     resetForm();
-    const script = scripts.find(s => s.id === campanhaId);
+    const script = scripts.find((s) => s.id === campanhaId);
     setCampanhaNome(script?.nome || null);
     await reloadContatosWithCampanha(campanhaId);
     // salta para o próximo disponível dentro da campanha escolhida
@@ -343,15 +413,16 @@ export default function Telemarketing() {
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
       _campanha_id: campanhaId,
-      _ttl_seconds: 300,
+      _ttl_seconds: CONTACT_LOCK_SECONDS,
       _session_id: sessionIdRef.current,
     });
     const res = data as { found: boolean; tabela?: string; contato_id?: string } | null;
     if (res?.found) {
-      setContatos(prev => {
-        const idx = prev.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+      setContatos((prev) => {
+        const idx = prev.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
         if (idx >= 0) setCurrentIndex(idx);
-        if (res.contato_id && res.tabela) selecionarContato({ id: res.contato_id, tabela: res.tabela });
+        if (res.contato_id && res.tabela)
+          selecionarContato({ id: res.contato_id, tabela: res.tabela });
         return prev;
       });
     }
@@ -370,12 +441,18 @@ export default function Telemarketing() {
     });
     if (!error && campanhaId && ((rpcRows as any[]) || []).length === 0) {
       const diag = await supabase.rpc("tele_diagnostico_fila" as any, {
-        _client_id: clientId, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: campanhaId,
+        _client_id: clientId,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _campanha_id: campanhaId,
       });
       const detail = diag.data as FilaDiagnostico | null;
       if (detail && !detail.fila_solicitada_valida) {
         const fallback = await supabase.rpc("tele_list_contatos" as any, {
-          _client_id: clientId, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: null,
+          _client_id: clientId,
+          _nome: operadorNome.trim(),
+          _senha: operadorSenha.trim(),
+          _campanha_id: null,
         });
         if (!fallback.error) {
           rpcRows = fallback.data;
@@ -395,29 +472,33 @@ export default function Telemarketing() {
     const lista: ContatoTele[] = ((rpcRows as any[]) || []).map(mapContato).filter(isNaFila);
     setContatos(lista);
     const { data: diagData } = await supabase.rpc("tele_diagnostico_fila" as any, {
-      _client_id: clientId, _nome: operadorNome.trim(), _senha: operadorSenha.trim(), _campanha_id: resolvedCampanhaId,
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: resolvedCampanhaId,
     });
     setDiagnostico((diagData as FilaDiagnostico | null) ?? null);
     setRefreshing(false);
   };
 
-
-  const filteredContatos = filtroTipo === "todos"
-    ? contatos
-    : contatos.filter((c) => c.tipo === filtroTipo);
+  const filteredContatos =
+    filtroTipo === "todos" ? contatos : contatos.filter((c) => c.tipo === filtroTipo);
 
   // A fila pode ser atualizada enquanto o operador alterna entre dispositivos.
   // Nunca deixe um índice antigo esconder os contatos que chegaram da RPC.
-  const safeCurrentIndex = currentIndex >= 0 && currentIndex < filteredContatos.length ? currentIndex : 0;
+  const safeCurrentIndex =
+    currentIndex >= 0 && currentIndex < filteredContatos.length ? currentIndex : 0;
   const contatoDaChave = currentKey
     ? filteredContatos.find((c) => c.id === currentKey.id && c.tabela === currentKey.tabela)
     : undefined;
   // Se o contato travado saiu da lista (reagendado por outro dispositivo, fila
   // recarregada etc.), mantemos a última cópia dele em tela para o operador
   // conseguir registrar o que ouviu na ligação.
-  const current = (currentKey
-    ? contatoDaChave ?? pinnedContatoRef.current ?? undefined
-    : filteredContatos[safeCurrentIndex]) as ContatoTele | undefined;
+  const current = (
+    currentKey
+      ? (contatoDaChave ?? pinnedContatoRef.current ?? undefined)
+      : filteredContatos[safeCurrentIndex]
+  ) as ContatoTele | undefined;
 
   useEffect(() => {
     if (current) pinnedContatoRef.current = current;
@@ -434,22 +515,25 @@ export default function Telemarketing() {
   };
 
   const totalPendentes = filteredContatos.filter(
-    (i) => !i.ligacao_status || i.ligacao_status === "pendente"
+    (i) => !i.ligacao_status || i.ligacao_status === "pendente",
   ).length;
   const totalRetorno = filteredContatos.filter(
-    (i) => i.ligacao_status === "nao_atendeu" || i.ligacao_status === "reagendou"
+    (i) => i.ligacao_status === "nao_atendeu" || i.ligacao_status === "reagendou",
   ).length;
   const totalLigados = filteredContatos.filter(
-    (i) => i.ligacao_status && i.ligacao_status !== "pendente"
+    (i) => i.ligacao_status && i.ligacao_status !== "pendente",
   ).length;
 
   const resetForm = () => {
     setLigacaoStatus("");
     setVotaCandidato("");
     setCandidatoAlt("");
-    setCandFederal(""); setFederalNQ(false);
-    setCandSenador(""); setSenadorNQ(false);
-    setCandGovernador(""); setGovernadorNQ(false);
+    setCandFederal("");
+    setFederalNQ(false);
+    setCandSenador("");
+    setSenadorNQ(false);
+    setCandGovernador("");
+    setGovernadorNQ(false);
     setCidade("");
     setBairro("");
     setObservacao("");
@@ -475,7 +559,7 @@ export default function Telemarketing() {
     setFilaError(null);
     setContatos(lista);
     if (preserveId) {
-      const idx = lista.findIndex(c => c.id === preserveId.id && c.tabela === preserveId.tabela);
+      const idx = lista.findIndex((c) => c.id === preserveId.id && c.tabela === preserveId.tabela);
       if (idx >= 0) setCurrentIndex(idx);
       selecionarContato(preserveId);
     }
@@ -492,19 +576,22 @@ export default function Telemarketing() {
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
       _campanha_id: selectedCampanhaId,
-      _ttl_seconds: 300,
+      _ttl_seconds: CONTACT_LOCK_SECONDS,
       _session_id: sessionIdRef.current,
     });
-    if (error) { toast.error("Erro: " + error.message); return; }
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
     const res = data as { found: boolean; tabela?: string; contato_id?: string } | null;
     if (!res || !res.found) {
       toast.info("Fila vazia no momento — aguardando reagendamentos.");
       return;
     }
-    let idx = contatos.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+    let idx = contatos.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
     if (idx < 0) {
       const lista = await reloadContatos();
-      idx = lista.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
+      idx = lista.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
     }
     if (idx >= 0) {
       setFiltroTipo("todos");
@@ -514,36 +601,47 @@ export default function Telemarketing() {
     }
   };
 
-  // Reivindica trava de 5min ao abrir o contato; libera ao trocar/pular
+  // Reivindica a reserva de 30 min ao abrir o contato. A reserva é global por
+  // telefone, inclusive quando a mesma pessoa existe em mais de uma origem.
   useEffect(() => {
     if (current && clientId) {
       setCidade(current.cidade || "");
       setBairro(current.bairro || "");
-      setObservacao("");
+      // Mantém a observação já registrada visível e permite complementá-la.
+      setObservacao(current.observacao_tele || "");
       setProximaTentativa("");
       setLigacaoStatus("");
       setVotaCandidato("");
       setCandidatoAlt("");
-      setCandFederal(""); setFederalNQ(false);
-      setCandSenador(""); setSenadorNQ(false);
-      setCandGovernador(""); setGovernadorNQ(false);
-      supabase.rpc("tele_claim_contato" as any, {
-        _client_id: clientId,
-        _nome: operadorNome.trim(),
-        _senha: operadorSenha.trim(),
-        _tabela: current.tabela,
-        _id: current.id,
-        _ttl_seconds: 300,
-        _session_id: sessionIdRef.current,
-      }).then(({ data }: any) => {
-        if (data?.claimed === false) {
-          const sameOperator = data.operador_nome?.trim().toLocaleLowerCase("pt-BR") === operadorNome.trim().toLocaleLowerCase("pt-BR");
-          toast.warning(sameOperator
-            ? "Este contato está aberto em outro aparelho. Buscando o próximo…"
-            : `Este contato está em atendimento por ${data.operador_nome}. Buscando o próximo…`);
-          void jumpToProximoDisponivel();
-        }
-      });
+      setCandFederal("");
+      setFederalNQ(false);
+      setCandSenador("");
+      setSenadorNQ(false);
+      setCandGovernador("");
+      setGovernadorNQ(false);
+      supabase
+        .rpc("tele_claim_contato" as any, {
+          _client_id: clientId,
+          _nome: operadorNome.trim(),
+          _senha: operadorSenha.trim(),
+          _tabela: current.tabela,
+          _id: current.id,
+          _ttl_seconds: CONTACT_LOCK_SECONDS,
+          _session_id: sessionIdRef.current,
+        })
+        .then(({ data }: any) => {
+          if (data?.claimed === false) {
+            const sameOperator =
+              data.operador_nome?.trim().toLocaleLowerCase("pt-BR") ===
+              operadorNome.trim().toLocaleLowerCase("pt-BR");
+            toast.warning(
+              sameOperator
+                ? "Este contato está aberto em outro aparelho. Buscando o próximo…"
+                : `Este contato está em atendimento por ${data.operador_nome}. Buscando o próximo…`,
+            );
+            void jumpToProximoDisponivel();
+          }
+        });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
@@ -558,7 +656,7 @@ export default function Telemarketing() {
         _senha: operadorSenha.trim(),
         _tabela: current.tabela,
         _id: current.id,
-        _ttl_seconds: 300,
+        _ttl_seconds: CONTACT_LOCK_SECONDS,
         _session_id: sessionIdRef.current,
       });
     }, 60_000);
@@ -573,11 +671,20 @@ export default function Telemarketing() {
       .channel(`tele_assign_${clientId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "telemarketing_call_assignments", filter: `client_id=eq.${clientId}` },
-        () => { void reloadContatos(); },
+        {
+          event: "*",
+          schema: "public",
+          table: "telemarketing_call_assignments",
+          filter: `client_id=eq.${clientId}`,
+        },
+        () => {
+          void reloadContatos();
+        },
       )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      supabase.removeChannel(ch);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, clientId, selectedCampanhaId]);
 
@@ -585,23 +692,42 @@ export default function Telemarketing() {
   // Ao voltar para a tela ou recuperar a conexão, sincroniza sem apagar a lista atual.
   useEffect(() => {
     if (!loggedIn) return;
-    const refreshWhenActive = () => {
+    const refreshWhenActive = async () => {
       if (document.visibilityState !== "visible") return;
       // Renova a trava do contato em atendimento antes de sincronizar a fila:
       // o operador saiu para ligar e o contato precisa continuar dele.
       const aberto = pinnedContatoRef.current;
       if (aberto && clientId) {
-        void supabase.rpc("tele_heartbeat_contato" as any, {
+        const { data: heartbeat } = await supabase.rpc("tele_heartbeat_contato" as any, {
           _client_id: clientId,
           _nome: operadorNome.trim(),
           _senha: operadorSenha.trim(),
           _tabela: aberto.tabela,
           _id: aberto.id,
-          _ttl_seconds: 300,
+          _ttl_seconds: CONTACT_LOCK_SECONDS,
           _session_id: sessionIdRef.current,
         });
+        const heartbeatResult = heartbeat as { renewed?: boolean } | null;
+        if (!heartbeatResult?.renewed) {
+          const { data: claim } = await supabase.rpc("tele_claim_contato" as any, {
+            _client_id: clientId,
+            _nome: operadorNome.trim(),
+            _senha: operadorSenha.trim(),
+            _tabela: aberto.tabela,
+            _id: aberto.id,
+            _ttl_seconds: CONTACT_LOCK_SECONDS,
+            _session_id: sessionIdRef.current,
+          });
+          const claimResult = claim as { claimed?: boolean; operador_nome?: string } | null;
+          if (!claimResult?.claimed) {
+            toast.error(
+              `Este contato passou para ${claimResult?.operador_nome || "outro operador"}. A pesquisa foi preservada nesta tela para conferência.`,
+            );
+            return;
+          }
+        }
       }
-      void reloadContatos(aberto ? { id: aberto.id, tabela: aberto.tabela } : undefined);
+      await reloadContatos(aberto ? { id: aberto.id, tabela: aberto.tabela } : undefined);
     };
     window.addEventListener("online", refreshWhenActive);
     document.addEventListener("visibilitychange", refreshWhenActive);
@@ -626,7 +752,6 @@ export default function Telemarketing() {
       window.location.reload();
     }
   };
-
 
   // "Não quis opinar" no estadual encerra o fluxo: não pergunta os demais cargos.
   const perguntarDemaisCargos =
@@ -676,16 +801,26 @@ export default function Telemarketing() {
       _ligacao_status: ligacaoStatus,
       _cidade: cidade.trim() || "",
       _bairro: bairro.trim() || "",
-      _vota_candidato: atendeu ? (votaCandidato || null) : null,
-      _candidato_alternativo: atendeu ? (candidatoAlt.trim() || null) : null,
+      _vota_candidato: atendeu ? votaCandidato || null : null,
+      _candidato_alternativo: atendeu ? candidatoAlt.trim() || null : null,
       _observacao: observacao.trim() || null,
       _proxima_tentativa_em: proximaTs,
-      _candidato_federal: atendeu && perguntarDemaisCargos ? (candFederal.trim() || null) : null,
-      _federal_status: atendeu && perguntarDemaisCargos && !candFederal.trim() && federalNQ ? "nao_quis_responder" : null,
-      _candidato_senador: atendeu && perguntarDemaisCargos ? (candSenador.trim() || null) : null,
-      _senador_status: atendeu && perguntarDemaisCargos && !candSenador.trim() && senadorNQ ? "nao_quis_responder" : null,
-      _candidato_governador: atendeu && perguntarDemaisCargos ? (candGovernador.trim() || null) : null,
-      _governador_status: atendeu && perguntarDemaisCargos && !candGovernador.trim() && governadorNQ ? "nao_quis_responder" : null,
+      _candidato_federal: atendeu && perguntarDemaisCargos ? candFederal.trim() || null : null,
+      _federal_status:
+        atendeu && perguntarDemaisCargos && !candFederal.trim() && federalNQ
+          ? "nao_quis_responder"
+          : null,
+      _candidato_senador: atendeu && perguntarDemaisCargos ? candSenador.trim() || null : null,
+      _senador_status:
+        atendeu && perguntarDemaisCargos && !candSenador.trim() && senadorNQ
+          ? "nao_quis_responder"
+          : null,
+      _candidato_governador:
+        atendeu && perguntarDemaisCargos ? candGovernador.trim() || null : null,
+      _governador_status:
+        atendeu && perguntarDemaisCargos && !candGovernador.trim() && governadorNQ
+          ? "nao_quis_responder"
+          : null,
       _session_id: sessionIdRef.current,
     });
 
@@ -694,12 +829,16 @@ export default function Telemarketing() {
       setSaving(false);
       return;
     }
-    const result = rpcResult as { updated?: number; conflict?: boolean; lock_owner?: string } | null;
+    const result = rpcResult as {
+      updated?: number;
+      conflict?: boolean;
+      lock_owner?: string;
+    } | null;
     if (result?.conflict) {
-      toast.error(`Outro operador (${result.lock_owner}) atendeu este contato agora. Indo para o próximo…`);
+      toast.error(
+        `Não foi possível salvar: o contato está reservado para ${result.lock_owner || "outro operador"}. Os dados digitados foram mantidos para conferência.`,
+      );
       setSaving(false);
-      resetForm();
-      await jumpToProximoDisponivel();
       return;
     }
     if (!result || (result.updated ?? 0) === 0) {
@@ -717,13 +856,15 @@ export default function Telemarketing() {
 
   const skipToNext = async () => {
     if (current && clientId) {
-      await supabase.rpc("tele_release_contato" as any, {
+      await supabase.rpc("tele_skip_contato" as any, {
         _client_id: clientId,
         _nome: operadorNome.trim(),
         _senha: operadorSenha.trim(),
         _tabela: current.tabela,
         _id: current.id,
         _session_id: sessionIdRef.current,
+        _motivo: "pulado_pelo_operador",
+        _cooldown_seconds: 900,
       });
     }
     resetForm();
@@ -739,12 +880,13 @@ export default function Telemarketing() {
     if (!clientId) return;
     setBuscando(true);
     setBuscouVazio(false);
-    const { data, error } = await supabase.rpc("tele_buscar_contato" as any, {
+    const { data, error } = await supabase.rpc("tele_buscar_retorno" as any, {
       _client_id: clientId,
       _nome: operadorNome.trim(),
       _senha: operadorSenha.trim(),
       _termo: termo,
-      _campanha_id: selectedCampanhaId,
+      // Um retorno pode estar em outra fila liberada para este operador.
+      _campanha_id: null,
       _limite: 30,
     });
     setBuscando(false);
@@ -758,6 +900,12 @@ export default function Telemarketing() {
   };
 
   const abrirContatoBuscado = (row: ContatoTele) => {
+    if (row.locked_by && row.locked_by.trim() !== operadorNome.trim()) {
+      toast.warning(
+        `${row.nome} está em atendimento ativo por ${row.locked_by}. Tente novamente quando o atendimento terminar.`,
+      );
+      return;
+    }
     setFiltroTipo("todos");
     setContatos((prev) => {
       const rest = prev.filter((c) => !(c.id === row.id && c.tabela === row.tabela));
@@ -771,7 +919,6 @@ export default function Telemarketing() {
     setBuscouVazio(false);
     toast.success(`Contato aberto: ${row.nome}`);
   };
-
 
   const tipoLabel = (tipo: string) => {
     if (tipo === "lider") return "Líder";
@@ -798,9 +945,7 @@ export default function Telemarketing() {
               <Phone className="w-7 h-7 text-primary" />
             </div>
             <CardTitle className="text-xl">Central de Telemarketing</CardTitle>
-            {clientName && (
-              <p className="text-sm text-muted-foreground">{clientName}</p>
-            )}
+            {clientName && <p className="text-sm text-muted-foreground">{clientName}</p>}
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -827,7 +972,13 @@ export default function Telemarketing() {
             </Button>
             <div className="flex items-center justify-between pt-2 text-[10px] text-muted-foreground">
               <span>Versão {TELE_APP_VERSION}</span>
-              <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={forceAppUpdate}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[10px]"
+                onClick={forceAppUpdate}
+              >
                 <RefreshCw className="mr-1 h-3 w-3" /> Atualizar sistema
               </Button>
             </div>
@@ -842,8 +993,8 @@ export default function Telemarketing() {
     const contagens = new Map<string | null, number>();
     for (const c of contatos) contagens.set(c.campanha_id, (contagens.get(c.campanha_id) || 0) + 1);
     const opcoes = scripts
-      .map(s => ({ id: s.id, nome: s.nome, count: contagens.get(s.id) || 0 }))
-      .filter(o => o.count > 0)
+      .map((s) => ({ id: s.id, nome: s.nome, count: contagens.get(s.id) || 0 }))
+      .filter((o) => o.count > 0)
       .sort((a, b) => b.count - a.count);
     const semCampanha = contagens.get(null) || 0;
 
@@ -856,11 +1007,12 @@ export default function Telemarketing() {
               Escolha a campanha
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Olá, <strong>{operadorNome}</strong>. Você tem contatos em mais de uma campanha — selecione por qual quer começar. Você pode trocar a qualquer momento.
+              Olá, <strong>{operadorNome}</strong>. Você tem contatos em mais de uma campanha —
+              selecione por qual quer começar. Você pode trocar a qualquer momento.
             </p>
           </CardHeader>
           <CardContent className="space-y-2">
-            {opcoes.map(o => (
+            {opcoes.map((o) => (
               <Button
                 key={o.id}
                 variant="outline"
@@ -902,13 +1054,23 @@ export default function Telemarketing() {
             Telemarketing e Verificação
           </h1>
           <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight max-w-sm mb-2">
-            Central de atendimento para validar indicações e intenção de voto. Utilize o click-to-call para ligar diretamente do seu celular e registre o resultado para alimentar sua inteligência eleitoral em tempo real.
+            Central de atendimento para validar indicações e intenção de voto. Utilize o
+            click-to-call para ligar diretamente do seu celular e registre o resultado para
+            alimentar sua inteligência eleitoral em tempo real.
           </p>
           <p className="text-xs text-muted-foreground break-words">
             Operador: <span className="font-medium text-foreground">{operadorNome}</span>
-            {campanhaNome && <> · Fila: <span className="font-medium text-foreground">{campanhaNome}</span></>}
+            {campanhaNome && (
+              <>
+                {" "}
+                · Fila: <span className="font-medium text-foreground">{campanhaNome}</span>
+              </>
+            )}
             {current?.lista_id && (
-              <Badge variant="outline" className="ml-2 bg-amber-500/10 text-amber-700 border-amber-500/20 animate-pulse">
+              <Badge
+                variant="outline"
+                className="ml-2 bg-amber-500/10 text-amber-700 border-amber-500/20 animate-pulse"
+              >
                 <Lock className="w-3 h-3 mr-1" />
                 Lista Designada
               </Badge>
@@ -945,9 +1107,18 @@ export default function Telemarketing() {
 
       {filaError && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          <span className="flex items-center gap-2"><WifiOff className="h-4 w-4 shrink-0" />{filaError}</span>
-          <Button variant="outline" size="sm" onClick={() => void reloadContatos()} disabled={refreshing}>
-            <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Tentar novamente
+          <span className="flex items-center gap-2">
+            <WifiOff className="h-4 w-4 shrink-0" />
+            {filaError}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void reloadContatos()}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Tentar
+            novamente
           </Button>
         </div>
       )}
@@ -969,7 +1140,8 @@ export default function Telemarketing() {
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground leading-tight">
-            Use quando a pessoa retornar a ligação: localize o contato (mesmo já trabalhado ou agendado) e registre o resultado da pesquisa.
+            Use quando a pessoa retornar a ligação: localize o contato (mesmo já trabalhado ou
+            agendado) e registre o resultado da pesquisa.
           </p>
           {buscaResultados.length > 0 && (
             <div className="space-y-1 pt-1">
@@ -982,19 +1154,25 @@ export default function Telemarketing() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium truncate">{r.nome}</span>
-                    <Badge variant="outline" className="text-[10px] shrink-0">{tipoLabel(r.tipo)}</Badge>
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                      {tipoLabel(r.tipo)}
+                    </Badge>
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     {fmtPhoneBR(toWhatsAppBR(r.telefone) || r.telefone)}
                     {r.cidade ? ` · ${r.cidade}` : ""}
-                    {r.ligacao_status && r.ligacao_status !== "pendente" ? ` · ${r.ligacao_status}` : " · pendente"}
+                    {r.ligacao_status && r.ligacao_status !== "pendente"
+                      ? ` · ${r.ligacao_status}`
+                      : " · pendente"}
                   </div>
                 </button>
               ))}
             </div>
           )}
           {buscouVazio && (
-            <p className="text-[11px] text-muted-foreground">Nenhum contato encontrado na sua carteira.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Nenhum contato encontrado nas filas liberadas para este operador.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -1003,22 +1181,42 @@ export default function Telemarketing() {
 
       {!current?.lista_id && (
         <div className="flex gap-2 flex-wrap">
-        {(["todos", "lider", "liderado", "indicado", "avulso", "eleicao_indicado", "estrutura"] as const).map((f) => (
-          <Button
-            key={f}
-            variant={filtroTipo === f ? "default" : "outline"}
-            size="sm"
-            className="text-xs"
-            onClick={() => { setFiltroTipo(f); setCurrentIndex(0); selecionarContato(null); resetForm(); }}
-          >
-            {f === "todos" ? (
-              <><Users className="w-3.5 h-3.5 mr-1" />Todos ({contatos.length})</>
-            ) : (
-              <>{tipoLabel(f)} ({contatos.filter(c => c.tipo === f).length})</>
-            )}
-          </Button>
-        ))}
-      </div>
+          {(
+            [
+              "todos",
+              "lider",
+              "liderado",
+              "indicado",
+              "avulso",
+              "eleicao_indicado",
+              "estrutura",
+            ] as const
+          ).map((f) => (
+            <Button
+              key={f}
+              variant={filtroTipo === f ? "default" : "outline"}
+              size="sm"
+              className="text-xs"
+              onClick={() => {
+                setFiltroTipo(f);
+                setCurrentIndex(0);
+                selecionarContato(null);
+                resetForm();
+              }}
+            >
+              {f === "todos" ? (
+                <>
+                  <Users className="w-3.5 h-3.5 mr-1" />
+                  Todos ({contatos.length})
+                </>
+              ) : (
+                <>
+                  {tipoLabel(f)} ({contatos.filter((c) => c.tipo === f).length})
+                </>
+              )}
+            </Button>
+          ))}
+        </div>
       )}
 
       {/* Current contact */}
@@ -1040,22 +1238,25 @@ export default function Telemarketing() {
                       current.ligacao_status === "atendeu"
                         ? "default"
                         : current.ligacao_status === "nao_atendeu"
-                        ? "secondary"
-                        : current.ligacao_status === "recusou"
-                        ? "destructive"
-                        : "outline"
+                          ? "secondary"
+                          : current.ligacao_status === "recusou" ||
+                              current.ligacao_status === "invalido"
+                            ? "destructive"
+                            : "outline"
                     }
                     className="text-[10px]"
                   >
                     {!current.ligacao_status || current.ligacao_status === "pendente"
                       ? "Pendente"
                       : current.ligacao_status === "atendeu"
-                      ? "Atendeu"
-                      : current.ligacao_status === "nao_atendeu"
-                      ? "Não atendeu"
-                      : current.ligacao_status === "recusou"
-                      ? "Recusou"
-                      : current.ligacao_status}
+                        ? "Atendeu"
+                        : current.ligacao_status === "nao_atendeu"
+                          ? "Não atendeu"
+                          : current.ligacao_status === "recusou"
+                            ? "Recusou"
+                            : current.ligacao_status === "invalido"
+                              ? "Número inexistente"
+                            : current.ligacao_status}
                   </Badge>
                 </div>
               </div>
@@ -1064,15 +1265,23 @@ export default function Telemarketing() {
               {/* Phone + WhatsApp */}
               {(() => {
                 const wa = toWhatsAppBR(current.telefone);
-                const telLink = wa ? `+${wa}` : (current.telefone || "");
-                const template = current.campanha_id ? scripts.find(s => s.id === current.campanha_id)?.whatsapp_template : null;
-                const msg = template ? String(template).replace(/\{\{\s*nome\s*\}\}/gi, current.nome || "").replace(/\{\{\s*operador\s*\}\}/gi, operadorNome.trim()) : "";
+                const telLink = wa ? `+${wa}` : current.telefone || "";
+                const template = current.campanha_id
+                  ? scripts.find((s) => s.id === current.campanha_id)?.whatsapp_template
+                  : null;
+                const msg = template
+                  ? String(template)
+                      .replace(/\{\{\s*nome\s*\}\}/gi, current.nome || "")
+                      .replace(/\{\{\s*operador\s*\}\}/gi, operadorNome.trim())
+                  : "";
                 const waUrl = `https://wa.me/${wa}${msg ? `?text=${encodeURIComponent(msg)}` : ""}`;
                 return (
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg">
                       <Phone className="w-5 h-5 text-primary" />
-                      <span className="text-lg font-bold text-primary">{fmtPhoneBR(wa || current.telefone)}</span>
+                      <span className="text-lg font-bold text-primary">
+                        {fmtPhoneBR(wa || current.telefone)}
+                      </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
@@ -1082,18 +1291,39 @@ export default function Telemarketing() {
                         className="bg-emerald-600 hover:bg-emerald-700 text-white h-11"
                       >
                         {wa ? (
-                        <a href={waUrl} target="_blank" rel="noopener noreferrer" aria-label="Abrir conversa no WhatsApp">
-
-                          <svg viewBox="0 0 24 24" className="w-4 h-4 mr-1 fill-current"><path d="M20.5 3.5A11 11 0 0 0 3.6 17.3L2 22l4.8-1.6a11 11 0 0 0 16.7-9.3 11 11 0 0 0-3-7.6ZM12 20.1a9 9 0 0 1-4.6-1.3l-.3-.2-2.8.9.9-2.8-.2-.3A9.1 9.1 0 1 1 12 20Zm5-6.7c-.3-.1-1.7-.8-2-1-.3-.1-.5-.1-.7.2l-1 1.2c-.2.2-.4.3-.7.1a7.4 7.4 0 0 1-3.6-3.2c-.3-.5.3-.4.8-1.4.1-.2 0-.4-.1-.5l-1-2.4c-.2-.5-.5-.4-.7-.4H7c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.2.2 2 3.1 5 4.3.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3Z"/></svg>
-                          WhatsApp
-                        </a>
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Abrir conversa no WhatsApp"
+                          >
+                            <svg viewBox="0 0 24 24" className="w-4 h-4 mr-1 fill-current">
+                              <path d="M20.5 3.5A11 11 0 0 0 3.6 17.3L2 22l4.8-1.6a11 11 0 0 0 16.7-9.3 11 11 0 0 0-3-7.6ZM12 20.1a9 9 0 0 1-4.6-1.3l-.3-.2-2.8.9.9-2.8-.2-.3A9.1 9.1 0 1 1 12 20Zm5-6.7c-.3-.1-1.7-.8-2-1-.3-.1-.5-.1-.7.2l-1 1.2c-.2.2-.4.3-.7.1a7.4 7.4 0 0 1-3.6-3.2c-.3-.5.3-.4.8-1.4.1-.2 0-.4-.1-.5l-1-2.4c-.2-.5-.5-.4-.7-.4H7c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.2.2 2 3.1 5 4.3.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3Z" />
+                            </svg>
+                            WhatsApp
+                          </a>
                         ) : (
                           <span className="flex items-center">WhatsApp</span>
                         )}
                       </Button>
 
                       <Button asChild variant="outline" className="h-11">
-                        <a href={`tel:${telLink}`} aria-label="Ligar por telefone">
+                        <a
+                          href={`tel:${telLink}`}
+                          aria-label="Ligar por telefone"
+                          onClick={() => {
+                            if (!clientId) return;
+                            void supabase.rpc("tele_heartbeat_contato" as any, {
+                              _client_id: clientId,
+                              _nome: operadorNome.trim(),
+                              _senha: operadorSenha.trim(),
+                              _tabela: current.tabela,
+                              _id: current.id,
+                              _ttl_seconds: CONTACT_LOCK_SECONDS,
+                              _session_id: sessionIdRef.current,
+                            });
+                          }}
+                        >
                           <Phone className="w-4 h-4 mr-1" />
                           Ligar
                         </a>
@@ -1102,7 +1332,6 @@ export default function Telemarketing() {
                   </div>
                 );
               })()}
-
 
               {(current.cidade || current.bairro) && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1118,7 +1347,9 @@ export default function Telemarketing() {
                   <Users className="w-3.5 h-3.5" />
                   Indicado por <span className="font-semibold">{current.indicador_nome}</span>
                   {current.indicador_tipo && (
-                    <Badge variant="outline" className="text-[10px] capitalize">{current.indicador_tipo}</Badge>
+                    <Badge variant="outline" className="text-[10px] capitalize">
+                      {current.indicador_tipo}
+                    </Badge>
                   )}
                 </div>
               )}
@@ -1126,7 +1357,10 @@ export default function Telemarketing() {
               {current.tipo === "estrutura" && current.indicador_tipo && (
                 <div className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 p-2 rounded flex items-center gap-2">
                   <Users className="w-3.5 h-3.5" />
-                  Membro da estrutura: <Badge variant="outline" className="text-[10px] capitalize">{current.indicador_tipo}</Badge>
+                  Membro da estrutura:{" "}
+                  <Badge variant="outline" className="text-[10px] capitalize">
+                    {current.indicador_tipo}
+                  </Badge>
                 </div>
               )}
 
@@ -1139,31 +1373,49 @@ export default function Telemarketing() {
               )}
               {(current.tentativas_count ?? 0) > 0 && (
                 <div className="text-[11px] text-muted-foreground">
-                  Tentativas anteriores: <span className="font-medium">{current.tentativas_count}</span>
+                  Tentativas anteriores:{" "}
+                  <span className="font-medium">{current.tentativas_count}</span>
                   {current.proxima_tentativa_em && (
-                    <> · Reagendado para {new Date(current.proxima_tentativa_em).toLocaleString("pt-BR")}</>
+                    <>
+                      {" "}
+                      · Reagendado para{" "}
+                      {new Date(current.proxima_tentativa_em).toLocaleString("pt-BR")}
+                    </>
                   )}
                 </div>
               )}
               {current.observacao_tele && (
                 <div className="text-xs bg-muted/50 p-2 rounded border">
-                  <span className="font-medium">Observação anterior:</span> {current.observacao_tele}
+                  <span className="font-medium">Observação anterior:</span>{" "}
+                  {current.observacao_tele}
                 </div>
               )}
 
               {/* Script da campanha */}
               {(() => {
-                const script = current.campanha_id ? scripts.find(s => s.id === current.campanha_id) : null;
-                if (!script || (!script.script_intro && !(script.script_perguntas || []).length && !(script.tags_rapidas || []).length)) return null;
+                const script = current.campanha_id
+                  ? scripts.find((s) => s.id === current.campanha_id)
+                  : null;
+                if (
+                  !script ||
+                  (!script.script_intro &&
+                    !(script.script_perguntas || []).length &&
+                    !(script.tags_rapidas || []).length)
+                )
+                  return null;
                 return (
                   <div className="bg-primary/5 border border-primary/20 rounded p-3 space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Script — {script.nome}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                      Script — {script.nome}
+                    </p>
                     {script.script_intro && (
                       <p className="text-xs whitespace-pre-wrap">{script.script_intro}</p>
                     )}
                     {(script.script_perguntas || []).length > 0 && (
                       <ol className="text-xs list-decimal pl-4 space-y-0.5">
-                        {(script.script_perguntas || []).map((q, i) => <li key={i}>{q}</li>)}
+                        {(script.script_perguntas || []).map((q, i) => (
+                          <li key={i}>{q}</li>
+                        ))}
                       </ol>
                     )}
                     {(script.tags_rapidas || []).length > 0 && (
@@ -1175,8 +1427,10 @@ export default function Telemarketing() {
                             variant="outline"
                             size="sm"
                             className="h-6 text-[10px] px-2"
-                            onClick={() => setObservacao((prev) => prev ? `${prev}; ${t}` : t)}
-                          >+ {t}</Button>
+                            onClick={() => setObservacao((prev) => (prev ? `${prev}; ${t}` : t))}
+                          >
+                            + {t}
+                          </Button>
                         ))}
                       </div>
                     )}
@@ -1184,12 +1438,11 @@ export default function Telemarketing() {
                 );
               })()}
 
-
               {/* Call result form */}
               <div className="border-t pt-4 space-y-3">
                 <p className="font-medium text-sm">Resultado da ligação</p>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <Button
                     variant={ligacaoStatus === "atendeu" ? "default" : "outline"}
                     size="sm"
@@ -1206,13 +1459,14 @@ export default function Telemarketing() {
                       setLigacaoStatus("nao_atendeu");
                       const d = new Date(Date.now() + 6 * 60 * 60 * 1000);
                       const pad = (n: number) => String(n).padStart(2, "0");
-                      setProximaTentativa(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                      setProximaTentativa(
+                        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
+                      );
                     }}
                     className="text-xs"
                   >
                     <PhoneOff className="w-3.5 h-3.5 mr-1" />
                     Não atendeu (+6h)
-
                   </Button>
                   <Button
                     variant={ligacaoStatus === "reagendou" ? "default" : "outline"}
@@ -1223,12 +1477,25 @@ export default function Telemarketing() {
                     <CalendarClock className="w-3.5 h-3.5 mr-1" />
                     Reagendar
                   </Button>
+                  <Button
+                    variant={ligacaoStatus === "invalido" ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setLigacaoStatus("invalido");
+                      setProximaTentativa("");
+                    }}
+                    className="text-xs"
+                  >
+                    <XCircle className="w-3.5 h-3.5 mr-1" />
+                    Número inexistente
+                  </Button>
                 </div>
 
                 {(ligacaoStatus === "reagendou" || ligacaoStatus === "nao_atendeu") && (
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">
-                      Próxima tentativa {ligacaoStatus === "reagendou" ? "(obrigatório)" : "(opcional)"}
+                      Próxima tentativa{" "}
+                      {ligacaoStatus === "reagendou" ? "(obrigatório)" : "(opcional)"}
                     </label>
                     <Input
                       type="datetime-local"
@@ -1264,7 +1531,8 @@ export default function Telemarketing() {
                   <div className="space-y-3 bg-muted/50 p-3 rounded-lg">
                     <div>
                       <label className="text-xs font-medium mb-1.5 block">
-                        1. Deputado Estadual (nosso candidato) <span className="text-destructive">*</span>
+                        1. Deputado Estadual (nosso candidato){" "}
+                        <span className="text-destructive">*</span>
                       </label>
                       <Select value={votaCandidato} onValueChange={setVotaCandidato}>
                         <SelectTrigger className="h-9 text-sm">
@@ -1274,7 +1542,9 @@ export default function Telemarketing() {
                           <SelectItem value="sim">✅ Vota (confirmado)</SelectItem>
                           <SelectItem value="nao">❌ Não vota</SelectItem>
                           <SelectItem value="indeciso">🤔 Indeciso</SelectItem>
-                          <SelectItem value="nao_quis_opinar">🚫 Não quis opinar (encerra)</SelectItem>
+                          <SelectItem value="nao_quis_opinar">
+                            🚫 Não quis opinar (encerra)
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1282,9 +1552,12 @@ export default function Telemarketing() {
                     {(votaCandidato === "nao" || votaCandidato === "indeciso") && (
                       <div>
                         <label className="text-xs font-medium mb-1.5 block">
-                          Qual estadual vota? {votaCandidato === "nao" ? (
+                          Qual estadual vota?{" "}
+                          {votaCandidato === "nao" ? (
                             <span className="text-destructive">(obrigatório)</span>
-                          ) : "(opcional)"}
+                          ) : (
+                            "(opcional)"
+                          )}
                         </label>
                         <Input
                           placeholder="Nome do deputado estadual..."
@@ -1308,11 +1581,34 @@ export default function Telemarketing() {
 
                     {perguntarDemaisCargos && (
                       <div className="space-y-3 border-t pt-3">
-                        {([
-                          { key: "federal", label: "2. Deputado Federal", value: candFederal, setValue: setCandFederal, nq: federalNQ, setNq: setFederalNQ },
-                          { key: "senador", label: "3. Senador", value: candSenador, setValue: setCandSenador, nq: senadorNQ, setNq: setSenadorNQ },
-                          { key: "governador", label: "4. Governador", value: candGovernador, setValue: setCandGovernador, nq: governadorNQ, setNq: setGovernadorNQ },
-                        ] as const).map((c) => {
+                        {(
+                          [
+                            {
+                              key: "federal",
+                              label: "2. Deputado Federal",
+                              value: candFederal,
+                              setValue: setCandFederal,
+                              nq: federalNQ,
+                              setNq: setFederalNQ,
+                            },
+                            {
+                              key: "senador",
+                              label: "3. Senador",
+                              value: candSenador,
+                              setValue: setCandSenador,
+                              nq: senadorNQ,
+                              setNq: setSenadorNQ,
+                            },
+                            {
+                              key: "governador",
+                              label: "4. Governador",
+                              value: candGovernador,
+                              setValue: setCandGovernador,
+                              nq: governadorNQ,
+                              setNq: setGovernadorNQ,
+                            },
+                          ] as const
+                        ).map((c) => {
                           const pendente = !c.value.trim() && !c.nq;
                           return (
                             <div key={c.key}>
@@ -1322,7 +1618,10 @@ export default function Telemarketing() {
                               <Input
                                 placeholder="Nome do candidato..."
                                 value={c.value}
-                                onChange={(e) => { c.setValue(e.target.value); if (e.target.value.trim()) c.setNq(false); }}
+                                onChange={(e) => {
+                                  c.setValue(e.target.value);
+                                  if (e.target.value.trim()) c.setNq(false);
+                                }}
                                 disabled={c.nq}
                                 className={`h-9 text-sm ${pendente ? "border-destructive" : ""}`}
                               />
@@ -1331,7 +1630,10 @@ export default function Telemarketing() {
                                 size="sm"
                                 variant={c.nq ? "secondary" : "ghost"}
                                 className="h-7 text-[11px] mt-1"
-                                onClick={() => { c.setNq(!c.nq); if (!c.nq) c.setValue(""); }}
+                                onClick={() => {
+                                  c.setNq(!c.nq);
+                                  if (!c.nq) c.setValue("");
+                                }}
                               >
                                 {c.nq ? "✔ Não quis responder" : "Não quis responder"}
                               </Button>
@@ -1339,16 +1641,18 @@ export default function Telemarketing() {
                           );
                         })}
                         <p className="text-[11px] text-muted-foreground">
-                          Preencha o nome ou marque "Não quis responder" nos três cargos para salvar.
+                          Preencha o nome ou marque "Não quis responder" nos três cargos para
+                          salvar.
                         </p>
                       </div>
                     )}
                   </div>
                 )}
 
-
                 <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Observação (opcional)</label>
+                  <label className="text-xs text-muted-foreground mb-1 block">
+                    Observação (opcional)
+                  </label>
                   <Textarea
                     placeholder="Ex: pediu retorno depois das 18h, número errado, mudou-se..."
                     value={observacao}
@@ -1366,12 +1670,13 @@ export default function Telemarketing() {
                       !ligacaoStatus ||
                       (ligacaoStatus === "reagendou" && !proximaTentativa) ||
                       (ligacaoStatus === "atendeu" && !votaCandidato) ||
-                      (ligacaoStatus === "atendeu" && votaCandidato === "nao" && !candidatoAlt.trim()) ||
-                      (perguntarDemaisCargos && (
-                        (!candFederal.trim() && !federalNQ) ||
-                        (!candSenador.trim() && !senadorNQ) ||
-                        (!candGovernador.trim() && !governadorNQ)
-                      ))
+                      (ligacaoStatus === "atendeu" &&
+                        votaCandidato === "nao" &&
+                        !candidatoAlt.trim()) ||
+                      (perguntarDemaisCargos &&
+                        ((!candFederal.trim() && !federalNQ) ||
+                          (!candSenador.trim() && !senadorNQ) ||
+                          (!candGovernador.trim() && !governadorNQ)))
                     }
                     className="flex-1"
                   >
@@ -1408,8 +1713,15 @@ export default function Telemarketing() {
                   ? `${diagnostico.aguardando_retorno} contato(s) voltarão à fila no horário agendado.`
                   : "A fila pode estar concluída ou os contatos podem estar em atendimento."}
             </p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={() => void reloadContatos()} disabled={refreshing}>
-              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Atualizar fila
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => void reloadContatos()}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />{" "}
+              Atualizar fila
             </Button>
           </CardContent>
         </Card>
@@ -1417,7 +1729,15 @@ export default function Telemarketing() {
       <div className="flex items-center justify-center gap-2 pb-3 text-[10px] text-muted-foreground">
         <span>Versão {TELE_APP_VERSION}</span>
         <span>·</span>
-        <Button type="button" variant="link" size="sm" className="h-auto p-0 text-[10px]" onClick={forceAppUpdate}>Atualizar sistema neste aparelho</Button>
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-[10px]"
+          onClick={forceAppUpdate}
+        >
+          Atualizar sistema neste aparelho
+        </Button>
       </div>
     </div>
   );
