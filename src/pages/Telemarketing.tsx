@@ -319,8 +319,10 @@ export default function Telemarketing() {
     if (res?.found) {
       const idx = lista.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
       setCurrentIndex(idx >= 0 ? idx : 0);
+      selecionarContato(res.contato_id && res.tabela ? { id: res.contato_id, tabela: res.tabela } : null);
     } else {
       setCurrentIndex(0);
+      selecionarContato(null);
     }
   };
 
@@ -328,6 +330,7 @@ export default function Telemarketing() {
     setSelectedCampanhaId(campanhaId);
     setPickingCampanha(false);
     setCurrentIndex(0);
+    selecionarContato(null);
     setFiltroTipo("todos");
     resetForm();
     const script = scripts.find(s => s.id === campanhaId);
@@ -348,6 +351,7 @@ export default function Telemarketing() {
       setContatos(prev => {
         const idx = prev.findIndex(c => c.id === res.contato_id && c.tabela === res.tabela);
         if (idx >= 0) setCurrentIndex(idx);
+        if (res.contato_id && res.tabela) selecionarContato({ id: res.contato_id, tabela: res.tabela });
         return prev;
       });
     }
@@ -473,6 +477,7 @@ export default function Telemarketing() {
     if (preserveId) {
       const idx = lista.findIndex(c => c.id === preserveId.id && c.tabela === preserveId.tabela);
       if (idx >= 0) setCurrentIndex(idx);
+      selecionarContato(preserveId);
     }
     setRefreshing(false);
     return lista;
@@ -504,6 +509,7 @@ export default function Telemarketing() {
     if (idx >= 0) {
       setFiltroTipo("todos");
       setCurrentIndex(idx);
+      selecionarContato({ id: res.contato_id!, tabela: res.tabela! });
       resetForm();
     }
   };
@@ -743,6 +749,7 @@ export default function Telemarketing() {
       return [row, ...rest];
     });
     setCurrentIndex(0);
+    selecionarContato({ id: row.id, tabela: row.tabela });
     resetForm();
     setBuscaResultados([]);
     setBuscaTermo("");
@@ -987,7 +994,7 @@ export default function Telemarketing() {
             variant={filtroTipo === f ? "default" : "outline"}
             size="sm"
             className="text-xs"
-            onClick={() => { setFiltroTipo(f); setCurrentIndex(0); resetForm(); }}
+            onClick={() => { setFiltroTipo(f); setCurrentIndex(0); selecionarContato(null); resetForm(); }}
           >
             {f === "todos" ? (
               <><Users className="w-3.5 h-3.5 mr-1" />Todos ({contatos.length})</>
