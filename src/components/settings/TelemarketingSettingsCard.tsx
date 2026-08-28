@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,17 @@ interface Operador {
   created_at: string;
 }
 
-export default function TelemarketingSettingsCard({ clientId }: { clientId: string }) {
+type TelemarketingSettingsCardProps = {
+  clientId: string;
+  showAccessLink?: boolean;
+  showPasswordReset?: boolean;
+};
+
+export default function TelemarketingSettingsCard({
+  clientId,
+  showAccessLink = true,
+  showPasswordReset = true,
+}: TelemarketingSettingsCardProps) {
   const [operadores, setOperadores] = useState<Operador[]>([]);
   const [loading, setLoading] = useState(true);
   const [nome, setNome] = useState("");
@@ -27,19 +37,19 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
 
   const teleUrl = `${window.location.origin}/telemarketing/${clientId}`;
 
-  const fetchOps = async () => {
+  const fetchOps = useCallback(async () => {
     const { data } = await supabase
       .from("telemarketing_operadores")
       .select("id, nome, ativo, created_at")
       .eq("client_id", clientId)
       .order("created_at", { ascending: true });
-    setOperadores((data as any[]) || []);
+    setOperadores((data as unknown as Operador[]) || []);
     setLoading(false);
-  };
+  }, [clientId]);
 
   useEffect(() => {
-    fetchOps();
-  }, [clientId]);
+    void fetchOps();
+  }, [fetchOps]);
 
   const handleAdd = async () => {
     if (!nome.trim() || !senha.trim()) {
@@ -49,7 +59,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
     setAdding(true);
     const { error } = await supabase
       .from("telemarketing_operadores")
-      .insert({ client_id: clientId, nome: nome.trim(), senha: senha.trim() } as any);
+      .insert({ client_id: clientId, nome: nome.trim(), senha: senha.trim() } as never);
     if (error) {
       toast.error("Erro ao adicionar: " + error.message);
     } else {
@@ -64,7 +74,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
   const toggleAtivo = async (op: Operador) => {
     await supabase
       .from("telemarketing_operadores")
-      .update({ ativo: !op.ativo } as any)
+      .update({ ativo: !op.ativo } as never)
       .eq("id", op.id);
     fetchOps();
   };
@@ -123,11 +133,14 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
           toast.error("Nenhum outro operador ativo. Ative um operador antes de remover este.");
           return;
         }
-        const { error: rerr } = await supabase.rpc("tele_reassign_from_operador" as any, {
-          _client_id: clientId,
-          _from_operador_id: id,
-          _to_operador_ids: ativos,
-        });
+        const { error: rerr } = await supabase.rpc(
+          "tele_reassign_from_operador" as never,
+          {
+            _client_id: clientId,
+            _from_operador_id: id,
+            _to_operador_ids: ativos,
+          } as never,
+        );
         if (rerr) {
           toast.error("Erro ao redistribuir: " + rerr.message);
           return;
@@ -137,7 +150,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
         // Libera (assigned_operador_id = null)
         await supabase
           .from("telemarketing_contatos_avulsos")
-          .update({ assigned_operador_id: null } as any)
+          .update({ assigned_operador_id: null } as never)
           .eq("assigned_operador_id", id);
       }
     }
@@ -165,44 +178,50 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
             <Phone className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <CardTitle>Central de Telemarketing</CardTitle>
+            <CardTitle>
+              {showAccessLink ? "Central de Telemarketing" : "Cadastro de operadores"}
+            </CardTitle>
             <CardDescription>
-              Link de acesso, operadores cadastrados e controle de ligações
+              {showAccessLink
+                ? "Link de acesso, operadores cadastrados e controle de ligações"
+                : "Cadastre, ative, desative ou remova os acessos da operação"}
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Link de acesso */}
-        <div className="border rounded-lg p-4 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Link de acesso dos operadores
-          </p>
-          <div className="bg-muted rounded-md px-3 py-2 flex items-center justify-between gap-2">
-            <code className="text-xs text-muted-foreground truncate flex-1">{teleUrl}</code>
-            <div className="flex gap-1 shrink-0">
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={copyLink}>
-                {copiedLink ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                onClick={() => window.open(teleUrl, "_blank")}
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-              </Button>
+        {showAccessLink && (
+          <div className="border rounded-lg p-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Link de acesso dos operadores
+            </p>
+            <div className="bg-muted rounded-md px-3 py-2 flex items-center justify-between gap-2">
+              <code className="text-xs text-muted-foreground truncate flex-1">{teleUrl}</code>
+              <div className="flex gap-1 shrink-0">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={copyLink}>
+                  {copiedLink ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => window.open(teleUrl, "_blank")}
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Compartilhe este link com os operadores. Eles precisarão do nome e senha cadastrados
+              abaixo para acessar.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Compartilhe este link com os operadores. Eles precisarão do nome e senha cadastrados
-            abaixo para acessar.
-          </p>
-        </div>
+        )}
 
         {/* Cadastro de operadores */}
         <div className="space-y-3">
@@ -256,18 +275,20 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
                       {op.ativo ? "Ativo" : "Inativo"}
                     </Badge>
                     <Switch checked={op.ativo} onCheckedChange={() => toggleAtivo(op)} />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      title="Redefinir senha"
-                      onClick={() => {
-                        setResetTarget(op);
-                        setResetSenha("");
-                      }}
-                    >
-                      <KeyRound className="w-3.5 h-3.5" />
-                    </Button>
+                    {showPasswordReset && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        title="Redefinir senha"
+                        onClick={() => {
+                          setResetTarget(op);
+                          setResetSenha("");
+                        }}
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -283,7 +304,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
           )}
         </div>
 
-        {resetTarget && (
+        {showPasswordReset && resetTarget && (
           <div className="border rounded-lg p-3 space-y-2 bg-muted/30">
             <p className="text-sm font-medium">Redefinir senha de {resetTarget.nome}</p>
             <div className="flex gap-2">
@@ -302,7 +323,7 @@ export default function TelemarketingSettingsCard({ clientId }: { clientId: stri
                   }
                   const { error } = await supabase
                     .from("telemarketing_operadores")
-                    .update({ senha: resetSenha.trim() } as any)
+                    .update({ senha: resetSenha.trim() } as never)
                     .eq("id", resetTarget.id);
                   if (error) {
                     toast.error("Erro: " + error.message);

@@ -126,12 +126,12 @@ describe("SuperAdminClientSwitcher — integração", () => {
 });
 
 describe("SuperAdminClientSwitcher — sem clientes cadastrados", () => {
-  it("mostra mensagem 'Nenhum cliente cadastrado' e mantém o gate visível", async () => {
+  it("mostra mensagem 'Nenhum gerente cadastrado' e mantém o gate visível", async () => {
     resetMockState({ user: { id: "admin" }, isSuperAdmin: true, clientsById: {} });
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByTitle(/Trocar de gerente/i));
-    expect(await screen.findByText(/Nenhum cliente cadastrado/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Nenhum gerente cadastrado/i)).toBeInTheDocument();
     // Gate permanece — não fica em branco
     expect(screen.getByText(/Selecione um gerente/i)).toBeInTheDocument();
   });

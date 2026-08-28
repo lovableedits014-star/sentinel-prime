@@ -4,26 +4,22 @@ export const TELE_TAB_HELP: { path: string; title: string; text: string }[] = [
   {
     path: "/telemarketing-admin/filas",
     title: "Filas de ligação",
-    text:
-      "Cada fila é um pacote de contatos para os operadores ligarem. Aqui você cria filas a partir de uma planilha, da estrutura eleitoral ou dos indicados, adiciona mais contatos depois e distribui entre os operadores.",
+    text: "Cada fila é um pacote de contatos para os operadores ligarem. Aqui você cria filas a partir de uma planilha, da estrutura eleitoral ou dos indicados, adiciona mais contatos depois e distribui entre os operadores.",
   },
   {
     path: "/telemarketing-admin/listas",
     title: "Listas importadas",
-    text:
-      "Mostra as planilhas que você subiu, quantos contatos cada uma trouxe e a qual fila pertencem. Use para conferir importações e arquivar listas que não serão mais usadas.",
+    text: "Mostra as planilhas que você subiu, quantos contatos cada uma trouxe e a qual fila pertencem. Use para conferir importações e arquivar listas que não serão mais usadas.",
   },
   {
     path: "/telemarketing-admin/resultados",
     title: "Contatos e resultados",
-    text:
-      "Situação atual de cada contato em todas as origens e filas: último resultado, resposta, operador e total de tentativas. Para auditar cada tentativa, use Produtividade.",
+    text: "Situação atual de cada contato em todas as origens e filas: último resultado, resposta, operador e total de tentativas. Para auditar cada tentativa, use Produtividade.",
   },
   {
     path: "/telemarketing-admin/relatorios",
     title: "Relatórios",
-    text:
-      "Números consolidados da operação (ligações por dia, taxa de atendimento, intenção de voto) para exportar e apresentar.",
+    text: "Números consolidados da operação (ligações por dia, taxa de atendimento, intenção de voto) para exportar e apresentar.",
   },
   {
     path: "/telemarketing-admin/produtividade",
@@ -33,32 +29,30 @@ export const TELE_TAB_HELP: { path: string; title: string; text: string }[] = [
   {
     path: "/telemarketing-admin/ranking",
     title: "Ranking",
-    text:
-      "Compara o desempenho dos operadores e dos indicadores (quem indicou contatos de melhor qualidade). Clique em um nome para ver o detalhe.",
+    text: "Compara o desempenho dos operadores e dos indicadores (quem indicou contatos de melhor qualidade). Clique em um nome para ver o detalhe.",
   },
   {
     path: "/telemarketing-admin/operadores",
     title: "Operadores",
-    text:
-      "Cadastre quem vai ligar, defina nome de acesso e senha, ative ou desative. É com esse login que a pessoa acessa a fila no celular.",
+    text: "Cadastre quem vai ligar, defina nome de acesso e senha, ative ou desative. É com esse login que a pessoa acessa a fila no celular.",
   },
   {
     path: "/telemarketing-admin/configuracoes",
     title: "Configurações",
-    text:
-      "Regras gerais: tentativas por contato, tempo de reserva de um contato com o operador, opções de resposta e textos de apoio da ligação.",
+    text: "Consulte o link de atendimento, confira o status da estrutura e acesse a gestão de operadores, segurança e filas.",
   },
   {
     path: "/telemarketing-admin",
     title: "Visão geral",
-    text:
-      "Resumo do dia: ligações feitas, contatos pendentes, operadores online e resultados recentes. Comece por aqui para saber se a operação está andando.",
+    text: "Resumo da produção registrada hoje e da situação atual da base. Mostra atividade dos operadores sem confundir atividade recente com presença online.",
   },
 ];
 
 export function getTeleTabHelp(pathname: string) {
-  return TELE_TAB_HELP.find((h) => pathname === h.path)
-    ?? TELE_TAB_HELP.find((h) => pathname.startsWith(h.path));
+  return (
+    TELE_TAB_HELP.find((h) => pathname === h.path) ??
+    TELE_TAB_HELP.find((h) => pathname.startsWith(h.path))
+  );
 }
 
 export const TELE_HELP = {
