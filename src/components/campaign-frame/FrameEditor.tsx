@@ -3,12 +3,12 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { ImageIcon, Camera, CheckCircle2, Download, Loader2, Upload, Sparkles } from "lucide-react";
+import { ImageIcon, Camera, Download, Loader2, Upload, Sparkles, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_COMPOSITION, FrameComposition, preloadComposition, renderComposition } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BatchFrameGenerator from "./BatchFrameGenerator";
-import { saveBlob } from "@/lib/mobile-download";
+import { isInAppBrowser, isIOS, saveBlob, shareBlob } from "@/lib/mobile-download";
 
 interface Frame {
   id: string;
@@ -55,7 +55,7 @@ export default function FrameEditor({
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const photoImgRef = useRef<HTMLImageElement | null>(null);
@@ -111,6 +111,12 @@ export default function FrameEditor({
 
   useEffect(() => { redraw(); }, [redraw]);
 
+  useEffect(() => {
+    return () => {
+      if (resultUrl) URL.revokeObjectURL(resultUrl);
+    };
+  }, [resultUrl]);
+
   const handleFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
       toast.error("Selecione uma imagem");
@@ -127,7 +133,6 @@ export default function FrameEditor({
         setOffset({ x: 0, y: 0 });
         setResultUrl(null);
         setResultBlob(null);
-        setDownloaded(false);
         redraw();
       };
       img.src = url;
@@ -159,7 +164,6 @@ export default function FrameEditor({
       return;
     }
     setGenerating(true);
-    setDownloaded(false);
     redraw();
     requestAnimationFrame(() => {
       canvasRef.current?.toBlob((blob) => {
@@ -169,7 +173,7 @@ export default function FrameEditor({
           return;
         }
         setResultBlob(blob);
-        setResultUrl("ready");
+        setResultUrl(URL.createObjectURL(blob));
         setGenerating(false);
         toast.success("Foto pronta!");
       }, "image/jpeg", 0.82);
@@ -177,21 +181,38 @@ export default function FrameEditor({
   };
 
   const handleDownload = async () => {
-    if (!resultBlob || downloading || downloaded) return;
+    if (!resultBlob || downloading) return;
     setDownloading(true);
     try {
       await saveBlob(resultBlob, `foto-campanha-${Date.now()}.jpg`, {
         title: "Foto de campanha",
-        text: "Minha foto de campanha",
+        preferDownload: true,
       });
-      setDownloaded(true);
-      toast.success("Foto pronta para salvar ou compartilhar.", {
+      toast.success(isIOS() || isInAppBrowser()
+        ? "Se o arquivo não aparecer em Downloads, pressione a imagem abaixo para salvar."
+        : "Download iniciado. Confira a pasta Downloads.", {
         duration: 6000,
       });
     } catch {
       toast.error("Não foi possível salvar a foto. Abra a página no Safari ou Chrome e tente novamente.");
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!resultBlob || sharing) return;
+    setSharing(true);
+    try {
+      const shared = await shareBlob(resultBlob, `foto-campanha-${Date.now()}.jpg`, {
+        title: "Foto de campanha",
+        text: "Minha foto de campanha",
+      });
+      if (!shared) toast.info("O compartilhamento de arquivos não está disponível neste navegador. Baixe a foto primeiro.");
+    } catch {
+      toast.error("Não foi possível compartilhar. Baixe a foto e envie pela rede social.");
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -272,26 +293,33 @@ export default function FrameEditor({
                   </Button>
                   {resultUrl && (
                     <>
+                      <div className="rounded-lg border bg-muted/30 p-2">
+                        <img
+                          src={resultUrl}
+                          alt="Foto de campanha pronta para salvar"
+                          className="w-full rounded-md"
+                        />
+                        <p className="mt-2 text-center text-xs text-muted-foreground">
+                          No iPhone ou navegador do WhatsApp/Instagram, pressione a imagem e escolha “Salvar em Fotos”.
+                        </p>
+                      </div>
                       <Button
                         variant="default"
                         onClick={handleDownload}
-                        disabled={downloading || downloaded}
+                        disabled={downloading}
                         className="gap-2 bg-primary"
                       >
                         {downloading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : downloaded ? (
-                          <CheckCircle2 className="w-4 h-4" />
                         ) : (
                           <Download className="w-4 h-4" />
                         )}
-                        {downloaded ? "Foto processada com sucesso" : "Salvar JPG (1080x1080)"}
+                        Baixar JPG (1080x1080)
                       </Button>
-                      {downloaded && (
-                        <p className="text-xs text-center text-emerald-600 font-medium">
-                          No iPhone, escolha “Salvar Imagem” ou “Salvar em Arquivos”.
-                        </p>
-                      )}
+                      <Button variant="outline" onClick={handleShare} disabled={sharing} className="gap-2">
+                        {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                        Compartilhar foto
+                      </Button>
                     </>
                   )}
                 </div>

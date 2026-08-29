@@ -160,6 +160,28 @@ export async function saveBlob(blob: Blob, filename: string, opts: SaveOptions =
 }
 
 /**
+ * Compartilha um arquivo somente quando a pessoa escolheu explicitamente
+ * compartilhar. Retorna false quando o aparelho/navegador não oferece suporte.
+ */
+export async function shareBlob(blob: Blob, filename: string, opts: SaveOptions = {}): Promise<boolean> {
+  const type = blob.type || inferMime(filename);
+  const file = new File([blob], filename, { type });
+  if (!canShareFile(file) || typeof navigator.share !== "function") return false;
+
+  try {
+    await navigator.share({
+      files: [file],
+      title: opts.title ?? filename,
+      text: opts.text,
+    });
+    return true;
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === "AbortError") return true;
+    throw err;
+  }
+}
+
+/**
  * Faz fetch de uma URL pública e delega para saveBlob.
  * Em último caso (CORS bloqueando o fetch), abre a URL em nova aba.
  */

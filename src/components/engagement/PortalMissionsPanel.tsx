@@ -22,6 +22,7 @@ import {
   ExternalLink, ToggleLeft, ToggleRight, Loader2, Info, Check, Link, RefreshCw, X, BarChart3, Radar,
 } from "lucide-react";
 import { toast } from "sonner";
+import { normalizeExternalUrl } from "@/lib/external-social-link";
 import MissionReport from "./MissionReport";
 // sync-throttle removido: atualização de missões não tem mais cooldown
 
@@ -57,10 +58,18 @@ interface PortalMissionsPanelProps {
 
 function parsePlatformFromUrl(url: string): "facebook" | "instagram" | null {
   if (!url) return null;
-  if (url.includes("facebook.com") || url.includes("fb.com") || url.includes("fb.watch")) return "facebook";
-  if (url.includes("instagram.com")) return "instagram";
-  return null;
+  try {
+    const host = normalizeExternalUrl(url).hostname.toLowerCase().replace(/^www\./, "");
+    if (host === "facebook.com" || host === "fb.com" || host === "fb.watch") return "facebook";
+    if (host === "instagram.com") return "instagram";
+    return null;
+  } catch {
+    return null;
+  }
 }
+
+const canonicalUrl = (value: string) => value.trim() ? normalizeExternalUrl(value).toString() : null;
+const canonicalRequiredUrl = (value: string) => normalizeExternalUrl(value).toString();
 
 // ── Single-mission edit form state ──
 const EMPTY_EDIT = {
@@ -224,7 +233,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
         (detected === "facebook" && selectedFb?.post_permalink_url === manualUrl.trim()) ||
         (detected === "instagram" && selectedIg?.post_permalink_url === manualUrl.trim());
       if (!alreadySelected) {
-        toSave.push({ platform: detected, post_url: manualUrl.trim(), title: "" });
+        toSave.push({ platform: detected, post_url: canonicalRequiredUrl(manualUrl), title: "" });
       }
     }
 
@@ -239,16 +248,16 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       const payloads = toSave.map((item, idx) => ({
         client_id: clientId,
         platform: item.platform,
-        post_url: item.post_url,
+        post_url: canonicalRequiredUrl(item.post_url),
         title: item.title || null,
         description: null,
         display_order: baseOrder + idx,
         is_active: true,
         tracking_enabled: bulkTracking,
         // Preencher automaticamente o link da própria plataforma quando rastreamento está ligado
-        link_facebook: bulkTracking && item.platform === "facebook" ? item.post_url : null,
-        link_instagram: bulkTracking && item.platform === "instagram" ? item.post_url : null,
-        link_avulso: bulkTracking ? (bulkLinkAvulso.trim() || null) : null,
+        link_facebook: bulkTracking && item.platform === "facebook" ? canonicalUrl(item.post_url) : null,
+        link_instagram: bulkTracking && item.platform === "instagram" ? canonicalUrl(item.post_url) : null,
+        link_avulso: bulkTracking ? canonicalUrl(bulkLinkAvulso) : null,
         instructions: bulkTracking ? (bulkInstructions.trim() || null) : null,
       }));
 
@@ -280,13 +289,13 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
     mutationFn: async (values: typeof editForm & { id: string }) => {
       const payload = {
         platform: values.platform,
-        post_url: values.post_url.trim(),
+        post_url: canonicalRequiredUrl(values.post_url),
         title: values.title.trim() || null,
         description: values.description.trim() || null,
         tracking_enabled: !!values.tracking_enabled,
-        link_facebook: values.link_facebook.trim() || null,
-        link_instagram: values.link_instagram.trim() || null,
-        link_avulso: values.link_avulso.trim() || null,
+        link_facebook: canonicalUrl(values.link_facebook),
+        link_instagram: canonicalUrl(values.link_instagram),
+        link_avulso: canonicalUrl(values.link_avulso),
         instructions: values.instructions.trim() || null,
       };
       const { error } = await (supabase as any)

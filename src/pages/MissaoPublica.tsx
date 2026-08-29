@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
+import { normalizeExternalUrl, openExternalUrl } from "@/lib/external-social-link";
 
 type Participant = {
   id: string;
@@ -300,10 +301,7 @@ export default function MissaoPublica() {
   ) => {
     let destination: URL;
     try {
-      destination = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
-      if (!["http:", "https:"].includes(destination.protocol)) {
-        throw new Error("unsupported protocol");
-      }
+      destination = normalizeExternalUrl(url);
     } catch {
       toast.error("Este link está inválido. Avise o responsável pela missão.");
       return;
@@ -323,7 +321,7 @@ export default function MissaoPublica() {
     // Não aguardamos a telemetria: no iPhone, qualquer await faz o Safari perder
     // o gesto original do toque e bloquear a abertura do Facebook/Instagram.
     void registerEvent(type, linkId);
-    window.location.assign(destination.toString());
+    openExternalUrl(destination.toString());
   };
 
   const handleDeclare = async () => {
