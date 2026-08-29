@@ -27,6 +27,8 @@ type Mission = {
   link_instagram: string | null;
   instructions: string | null;
   audience_id?: string | null;
+  audience_snapshotted_at?: string | null;
+  eligible_count?: number | null;
 };
 
 
@@ -52,7 +54,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("portal_missions")
-        .select("id, title, created_at, publicado_em, post_url, link_facebook, link_instagram, instructions, audience_id")
+        .select("id, title, created_at, publicado_em, post_url, link_facebook, link_instagram, instructions, audience_id, audience_snapshotted_at, eligible_count")
         .eq("client_id", clientId)
         .is("archived_at", null)
         .order("created_at", { ascending: false })
@@ -86,9 +88,9 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
     if (!missionId) return;
     const next = value === "__none" ? null : value;
     try {
-      await setMissionAudience(missionId, next);
+      const total = await setMissionAudience(clientId, missionId, next);
       await qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
-      toast.success(next ? "Lista de obrigados aplicada à missão" : "Missão volta ao público padrão");
+      toast.success(`Público congelado com ${total} pessoa(s) elegíveis`);
     } catch (e: any) {
       toast.error(e?.message || "Falha ao aplicar a lista");
     }
@@ -167,7 +169,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Quem é obrigado nesta missão</Label>
-                    <Select value={audienceId ?? "__none"} onValueChange={escolherLista}>
+                    <Select disabled={!!mission?.audience_snapshotted_at} value={audienceId ?? "__none"} onValueChange={escolherLista}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none">Público padrão (contratos + voluntários)</SelectItem>
@@ -178,6 +180,11 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
                         ))}
                       </SelectContent>
                     </Select>
+                    {mission?.audience_snapshotted_at && (
+                      <p className="text-[11px] text-emerald-700">
+                        Público histórico congelado: {mission.eligible_count ?? 0} elegíveis. Novas entradas não recebem esta missão.
+                      </p>
+                    )}
                     <p className="text-[11px] text-muted-foreground">
                       Crie e edite listas na aba “Listas de obrigados”.
                     </p>

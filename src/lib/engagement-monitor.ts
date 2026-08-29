@@ -103,6 +103,18 @@ export type MissaoMonitorada = {
   post_id_instagram: string | null;
   created_at: string;
   is_active: boolean;
+  audience_snapshotted_at: string | null;
+  eligible_count: number | null;
+};
+
+export type EligibilityAuditRow = {
+  mission_id: string;
+  titulo: string | null;
+  publicado_em: string;
+  fotografia_em: string | null;
+  elegiveis: number;
+  dispensados_entrada_posterior: number;
+  sem_fotografia: boolean;
 };
 
 export const FAIXA_META: Record<Faixa, { label: string; className: string }> = {
@@ -147,6 +159,10 @@ export async function fetchRanking(clientId: string, limit = 500): Promise<Ranki
 
 export async function fetchAdesao(clientId: string, limit = 100): Promise<AdesaoRow[]> {
   return unwrap<AdesaoRow>(await db.rpc("engagement_adesao_publicacoes", { p_client_id: clientId, p_limit: limit }));
+}
+
+export async function fetchEligibilityAudit(clientId: string): Promise<EligibilityAuditRow[]> {
+  return unwrap<EligibilityAuditRow>(await db.rpc("engagement_eligibility_audit", { p_client_id: clientId }));
 }
 
 export async function fetchHistoricoPessoa(
@@ -204,7 +220,7 @@ export async function fetchMissoes(clientId: string): Promise<MissaoMonitorada[]
   const { data, error } = await db
     .from("portal_missions")
     .select(
-      "id, title, post_url, platform, monitorada, regra_id, prazo_horas, publicado_em, post_id_facebook, post_id_instagram, created_at, is_active",
+      "id, title, post_url, platform, monitorada, regra_id, prazo_horas, publicado_em, post_id_facebook, post_id_instagram, created_at, is_active, audience_snapshotted_at, eligible_count",
     )
     .eq("client_id", clientId)
     .is("archived_at", null)

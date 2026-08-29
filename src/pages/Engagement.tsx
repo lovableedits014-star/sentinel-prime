@@ -26,6 +26,7 @@ import CobrancaTimeTab from "@/components/engagement/CobrancaTimeTab";
 import MonitoramentoTab from "@/components/engagement/MonitoramentoTab";
 import PublicoMonitoradoTab from "@/components/engagement/PublicoMonitoradoTab";
 import MissionCheckinTab from "@/components/engagement/MissionCheckinTab";
+import EngagementOverviewTab from "@/components/engagement/EngagementOverviewTab";
 
 
 
@@ -39,12 +40,15 @@ type EngagementConfig = {
   inactivity_days: number;
 };
 
+type EngagementTab = "visao" | "publico" | "checkin" | "influenciadores" | "time" | "cobranca" | "monitoramento" | "config";
+
 type EngagementProps = {
-  initialTab?: "publico" | "checkin" | "influenciadores" | "time" | "cobranca" | "monitoramento" | "config";
+  initialTab?: EngagementTab;
 };
 
-export default function Engagement({ initialTab = "publico" }: EngagementProps) {
+export default function Engagement({ initialTab = "visao" }: EngagementProps) {
   const [configForm, setConfigForm] = useState<Partial<EngagementConfig>>({});
+  const [activeTab, setActiveTab] = useState<EngagementTab>(initialTab);
 
   const { data: client } = useQuery({
     queryKey: ["client-active", "engagement"],
@@ -110,8 +114,12 @@ export default function Engagement({ initialTab = "publico" }: EngagementProps) 
         </p>
       </div>
 
-      <Tabs defaultValue={initialTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EngagementTab)} className="space-y-4">
         <TabsList className="w-full sm:w-auto flex-wrap h-auto">
+          <TabsTrigger value="visao" className="text-xs sm:text-sm gap-1.5">
+            <Gauge className="h-4 w-4" />
+            Visão geral
+          </TabsTrigger>
           <TabsTrigger value="publico" className="text-xs sm:text-sm gap-1.5">
             <Users className="h-4 w-4" />
             Público monitorado
@@ -141,6 +149,14 @@ export default function Engagement({ initialTab = "publico" }: EngagementProps) 
             Config
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="visao">
+          {client?.id ? (
+            <EngagementOverviewTab clientId={client.id} onNavigate={setActiveTab} />
+          ) : (
+            <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Nenhum cliente vinculado a este usuário.</CardContent></Card>
+          )}
+        </TabsContent>
 
         <TabsContent value="publico">
           {client?.id ? (

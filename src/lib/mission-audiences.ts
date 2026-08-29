@@ -196,12 +196,14 @@ export async function removeAudienceMember(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export async function setMissionAudience(missionId: string, audienceId: string | null): Promise<void> {
-  const { error } = await db
-    .from("portal_missions")
-    .update({ audience_id: audienceId })
-    .eq("id", missionId);
+export async function setMissionAudience(clientId: string, missionId: string, audienceId: string | null): Promise<number> {
+  const { data, error } = await db.rpc("mission_snapshot_audience", {
+    p_client_id: clientId,
+    p_mission_id: missionId,
+    p_audience_id: audienceId,
+  });
   if (error) throw new Error(error.message);
+  return Number(data ?? 0);
 }
 
 export type PessoaOption = {

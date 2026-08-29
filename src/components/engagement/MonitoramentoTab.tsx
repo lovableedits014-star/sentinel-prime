@@ -22,10 +22,10 @@ import {
   fetchGrupos, fetchPendencias, fetchPrevia, type PreviaPublico, type PublicoGrupo,
   atualizarMissaoMonitoramento, casarInteracoes, excluirRegra, fetchAdesao, fetchHistoricoPessoa,
   fetchMissoes, fetchMonitorOverview, fetchRanking, fetchRegras, gerarObrigacoes, recalcularIndices,
-  registrarCobranca, salvarRegra, dispensarObrigacao,
+  registrarCobranca, salvarRegra, dispensarObrigacao, fetchEligibilityAudit,
   EVIDENCIA_LABEL, FAIXA_META, STATUS_LABEL, TIPO_OBRIGACAO_LABEL,
   type AdesaoRow, type HistoricoRow, type MissaoMonitorada, type MonitorOverview,
-  type RankingRow, type Regra,
+  type RankingRow, type Regra, type EligibilityAuditRow,
 } from "@/lib/engagement-monitor";
 import DesempenhoPublicacoesPanel from "./desempenho/DesempenhoPublicacoesPanel";
 
@@ -65,17 +65,19 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
   const [grupos, setGrupos] = useState<PublicoGrupo[]>([]);
   const [previaPublico, setPreviaPublico] = useState<PreviaPublico | null>(null);
   const [semProva, setSemProva] = useState<Set<string>>(new Set());
+  const [eligibilityAudit, setEligibilityAudit] = useState<EligibilityAuditRow[]>([]);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [o, r, a, g, m, gr] = await Promise.all([
+      const [o, r, a, g, m, gr, audit] = await Promise.all([
         fetchMonitorOverview(clientId),
         fetchRanking(clientId),
         fetchAdesao(clientId),
         fetchRegras(clientId),
         fetchMissoes(clientId),
         fetchGrupos(clientId),
+        fetchEligibilityAudit(clientId),
       ]);
       setGrupos(gr);
       try {
@@ -89,6 +91,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
       setAdesao(a);
       setRegras(g);
       setMissoes(m);
+      setEligibilityAudit(audit);
     } catch (e) {
       toast.error("Erro ao carregar monitoramento: " + (e as Error).message);
     } finally {
@@ -215,15 +218,19 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
     if (!missaoEdit) return;
     try {
       await atualizarMissaoMonitoramento(missaoEdit.id, {
-        regra_id: missaoEdit.regra_id,
-        prazo_horas: missaoEdit.prazo_horas,
-        publicado_em: missaoEdit.publicado_em,
+        ...(missaoEdit.audience_snapshotted_at ? {} : {
+          regra_id: missaoEdit.regra_id,
+          prazo_horas: missaoEdit.prazo_horas,
+          publicado_em: missaoEdit.publicado_em,
+        }),
         post_id_facebook: missaoEdit.post_id_facebook,
         post_id_instagram: missaoEdit.post_id_instagram,
       });
       const n = await gerarObrigacoes(clientId, missaoEdit.id, missaoEdit.regra_id);
       await casarInteracoes(clientId, missaoEdit.id);
-      toast.success(`${n} obrigações geradas para esta publicação`);
+      toast.success(missaoEdit.audience_snapshotted_at
+        ? `Configuração atualizada; o público histórico continua com ${n} elegíveis`
+        : `${n} obrigações geradas para esta publicação`);
       setMissaoEdit(null);
       await load();
     } catch (e) {
@@ -258,6 +265,25 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
   return (
     <div className="space-y-4">
       <DesempenhoPublicacoesPanel clientId={clientId} />
+
+      <Card className="border-emerald-500/30 bg-emerald-500/5">
+        <CardContent className="flex flex-wrap items-center gap-3 p-4 text-sm">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-emerald-700">Cobrança temporal protegida</p>
+            <p className="text-xs text-muted-foreground">
+              Cada missão usa a lista congelada na ativação. Pessoas que entraram depois não recebem faltas antigas.
+            </p>
+          </div>
+          <Badge variant="outline" className="border-emerald-500/30 bg-background">
+            {eligibilityAudit.reduce((n, row) => n + row.dispensados_entrada_posterior, 0)} faltas retroativas corrigidas
+          </Badge>
+          {eligibilityAudit.some((row) => row.sem_fotografia) && (
+            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700">
+              {eligibilityAudit.filter((row) => row.sem_fotografia).length} missão(ões) aguardando fotografia
+            </Badge>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="px-3 sm:px-6">
@@ -446,10 +472,15 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
                         <div className="text-xs text-muted-foreground">
                           {cap(m.platform)} · {fmtDate(m.publicado_em || m.created_at)}
                           {m.monitorada && <Badge variant="outline" className="ml-2 bg-primary/10 text-primary border-primary/30">Monitorada</Badge>}
+                          {m.audience_snapshotted_at && (
+                            <Badge variant="outline" className="ml-2 bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
+                              {m.eligible_count ?? 0} elegíveis congelados
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <Button size="sm" variant="outline" className="gap-2" onClick={() => setMissaoEdit(m)}>
-                        <Settings2 className="h-4 w-4" /> {m.monitorada ? "Ajustar" : "Monitorar"}
+                        <Settings2 className="h-4 w-4" /> {m.audience_snapshotted_at ? "Ver configuração" : m.monitorada ? "Ajustar" : "Monitorar"}
                       </Button>
                     </div>
                   ))}
@@ -602,14 +633,15 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
           <DialogHeader>
             <DialogTitle>Monitorar publicação</DialogTitle>
             <DialogDescription className="text-xs">
-              Ao salvar, o sistema cria uma obrigação para cada pessoa do público da regra e já tenta casar as
-              interações existentes.
+              {missaoEdit?.audience_snapshotted_at
+                ? "O público desta missão já foi congelado. Você pode corrigir os IDs dos posts, sem criar cobranças retroativas."
+                : "Ao salvar, o sistema congela o público elegível desta data e tenta casar as interações existentes."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs">Regra aplicada</Label>
-              <Select value={missaoEdit?.regra_id || ""} onValueChange={(v) => setMissaoEdit(missaoEdit ? { ...missaoEdit, regra_id: v } : null)}>
+              <Select disabled={!!missaoEdit?.audience_snapshotted_at} value={missaoEdit?.regra_id || ""} onValueChange={(v) => setMissaoEdit(missaoEdit ? { ...missaoEdit, regra_id: v } : null)}>
                 <SelectTrigger><SelectValue placeholder="Selecione a regra" /></SelectTrigger>
                 <SelectContent>
                   {regras.filter((r) => r.ativo).map((r) => <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>)}
@@ -619,12 +651,12 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Prazo (horas)</Label>
-                <Input type="number" min={1} value={missaoEdit?.prazo_horas ?? ""} placeholder="usa o da regra"
+                <Input disabled={!!missaoEdit?.audience_snapshotted_at} type="number" min={1} value={missaoEdit?.prazo_horas ?? ""} placeholder="usa o da regra"
                   onChange={(e) => setMissaoEdit(missaoEdit ? { ...missaoEdit, prazo_horas: e.target.value ? Number(e.target.value) : null } : null)} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Publicado em</Label>
-                <Input type="datetime-local"
+                <Input disabled={!!missaoEdit?.audience_snapshotted_at} type="datetime-local"
                   value={missaoEdit?.publicado_em ? new Date(missaoEdit.publicado_em).toISOString().slice(0, 16) : ""}
                   onChange={(e) => setMissaoEdit(missaoEdit ? { ...missaoEdit, publicado_em: e.target.value ? new Date(e.target.value).toISOString() : null } : null)} />
               </div>
@@ -651,6 +683,12 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
                 )}
               </div>
             )}
+            {missaoEdit?.audience_snapshotted_at && (
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs text-emerald-800">
+                Fotografia criada em {fmtDate(missaoEdit.audience_snapshotted_at)} com {missaoEdit.eligible_count ?? 0} pessoa(s) elegíveis.
+                Entradas posteriores não alteram esta missão.
+              </div>
+            )}
 
             <p className="text-[11px] text-muted-foreground flex gap-1.5">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
@@ -660,7 +698,9 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMissaoEdit(null)}>Cancelar</Button>
-            <Button onClick={salvarMissaoAtual} className="gap-2"><ListChecks className="h-4 w-4" /> Salvar e gerar obrigações</Button>
+            <Button onClick={salvarMissaoAtual} className="gap-2"><ListChecks className="h-4 w-4" />
+              {missaoEdit?.audience_snapshotted_at ? "Salvar IDs dos posts" : "Congelar público e monitorar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
