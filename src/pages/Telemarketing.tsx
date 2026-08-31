@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
+import CandidateAutocomplete from "@/components/telemarketing/CandidateAutocomplete";
 
 interface ContatoTele {
   id: string;
@@ -79,7 +80,7 @@ interface FilaDiagnostico {
   reservados_ativos: number;
 }
 
-const TELE_APP_VERSION = "2026.08.28.3";
+const TELE_APP_VERSION = "2026.08.31.2";
 const CONTACT_LOCK_SECONDS = 30 * 60;
 
 const mapContato = (r: any): ContatoTele => ({
@@ -140,6 +141,7 @@ export default function Telemarketing() {
   const [pickingCampanha, setPickingCampanha] = useState(false);
   const [filaError, setFilaError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingInactive, setLoadingInactive] = useState(false);
   const [diagnostico, setDiagnostico] = useState<FilaDiagnostico | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<
     "todos" | "lider" | "liderado" | "indicado" | "avulso" | "eleicao_indicado" | "estrutura"
@@ -569,7 +571,7 @@ export default function Telemarketing() {
 
   // Picker atômico: servidor escolhe + trava o próximo disponível.
   // Garante que dois operadores nunca recebam o mesmo contato.
-  const jumpToProximoDisponivel = async () => {
+  const jumpToProximoDisponivel = async (knownContacts?: ContatoTele[]) => {
     if (!clientId) return;
     const { data, error } = await supabase.rpc("tele_proximo_contato" as any, {
       _client_id: clientId,
@@ -585,19 +587,28 @@ export default function Telemarketing() {
     }
     const res = data as { found: boolean; tabela?: string; contato_id?: string } | null;
     if (!res || !res.found) {
+      selecionarContato(null);
+      pinnedContatoRef.current = null;
+      setCurrentIndex(0);
       toast.info("Fila vazia no momento — aguardando reagendamentos.");
       return;
     }
-    let idx = contatos.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
+    let availableContacts = knownContacts ?? contatos;
+    let idx = availableContacts.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
     if (idx < 0) {
-      const lista = await reloadContatos();
-      idx = lista.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
+      availableContacts = await reloadContatos();
+      idx = availableContacts.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
     }
     if (idx >= 0) {
       setFiltroTipo("todos");
       setCurrentIndex(idx);
       selecionarContato({ id: res.contato_id!, tabela: res.tabela! });
       resetForm();
+    } else {
+      selecionarContato(null);
+      pinnedContatoRef.current = null;
+      setCurrentIndex(0);
+      setFilaError("O próximo contato foi reservado, mas não pôde ser carregado. Atualize a fila para tentar novamente.");
     }
   };
 
@@ -847,11 +858,18 @@ export default function Telemarketing() {
       return;
     }
 
-    setContatos((prev) => prev.filter((i) => i.id !== current.id));
+    const completedKey = { id: current.id, tabela: current.tabela };
+    setContatos((prev) => prev.filter((i) => !(i.id === completedKey.id && i.tabela === completedKey.tabela)));
+    selecionarContato(null);
+    pinnedContatoRef.current = null;
+    setCurrentIndex(0);
     toast.success("Ligação registrada!");
-    setSaving(false);
     resetForm();
-    await jumpToProximoDisponivel();
+    const refreshedContacts = await reloadContatos();
+    await jumpToProximoDisponivel(
+      refreshedContacts.filter((i) => !(i.id === completedKey.id && i.tabela === completedKey.tabela)),
+    );
+    setSaving(false);
   };
 
   const skipToNext = async () => {
@@ -869,6 +887,43 @@ export default function Telemarketing() {
     }
     resetForm();
     await jumpToProximoDisponivel();
+  };
+
+  const trabalharProximoInativo = async () => {
+    if (!clientId) return;
+    setLoadingInactive(true);
+    const contatoAberto = pinnedContatoRef.current;
+    const { data, error } = await supabase.rpc("tele_proximo_inativo" as any, {
+      _client_id: clientId,
+      _nome: operadorNome.trim(),
+      _senha: operadorSenha.trim(),
+      _campanha_id: selectedCampanhaId,
+      _ttl_seconds: CONTACT_LOCK_SECONDS,
+      _session_id: sessionIdRef.current,
+    });
+    if (error) {
+      toast.error("Erro ao buscar contato inativo: " + error.message);
+      setLoadingInactive(false);
+      return;
+    }
+    if (contatoAberto && !(contatoAberto.id === result.contato_id && contatoAberto.tabela === result.tabela)) {
+      await supabase.rpc("tele_release_contato" as any, {
+        _client_id: clientId, _nome: operadorNome.trim(), _senha: operadorSenha.trim(),
+        _tabela: contatoAberto.tabela, _id: contatoAberto.id, _session_id: sessionIdRef.current,
+      });
+    }
+    const result = data as { found?: boolean; tabela?: string; contato_id?: string } | null;
+    if (!result?.found || !result.tabela || !result.contato_id) {
+      toast.info("Não há contatos inativos disponíveis nesta fila.");
+      setLoadingInactive(false);
+      return;
+    }
+    await reloadContatosWithCampanha(selectedCampanhaId);
+    selecionarContato({ id: result.contato_id, tabela: result.tabela });
+    setCurrentIndex(0);
+    resetForm();
+    setLoadingInactive(false);
+    toast.success("Contato reativado para uma nova tentativa.");
   };
 
   const handleBuscar = async () => {
@@ -1083,9 +1138,13 @@ export default function Telemarketing() {
               Trocar campanha
             </Button>
           )}
-          <Button size="sm" variant="default" onClick={jumpToProximoDisponivel}>
+          <Button size="sm" variant="default" onClick={() => void jumpToProximoDisponivel()}>
             <ArrowRight className="w-3.5 h-3.5 mr-1" />
             Próximo disponível
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void trabalharProximoInativo()} disabled={loadingInactive}>
+            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loadingInactive ? "animate-spin" : ""}`} />
+            Trabalhar inativo
           </Button>
           <Badge variant="secondary" className="text-xs">
             <Clock className="w-3 h-3 mr-1" />
@@ -1559,10 +1618,14 @@ export default function Telemarketing() {
                             "(opcional)"
                           )}
                         </label>
-                        <Input
+                        <CandidateAutocomplete
+                          clientId={clientId!}
+                          operadorNome={operadorNome}
+                          operadorSenha={operadorSenha}
+                          cargo="estadual"
                           placeholder="Nome do deputado estadual..."
                           value={candidatoAlt}
-                          onChange={(e) => setCandidatoAlt(e.target.value)}
+                          onChange={setCandidatoAlt}
                           className={`h-9 text-sm ${votaCandidato === "nao" && !candidatoAlt.trim() ? "border-destructive" : ""}`}
                         />
                         {votaCandidato === "nao" && !candidatoAlt.trim() && (
@@ -1615,12 +1678,16 @@ export default function Telemarketing() {
                               <label className="text-xs font-medium mb-1.5 block">
                                 {c.label} <span className="text-destructive">*</span>
                               </label>
-                              <Input
+                              <CandidateAutocomplete
+                                clientId={clientId!}
+                                operadorNome={operadorNome}
+                                operadorSenha={operadorSenha}
+                                cargo={c.key}
                                 placeholder="Nome do candidato..."
                                 value={c.value}
-                                onChange={(e) => {
-                                  c.setValue(e.target.value);
-                                  if (e.target.value.trim()) c.setNq(false);
+                                onChange={(newValue) => {
+                                  c.setValue(newValue);
+                                  if (newValue.trim()) c.setNq(false);
                                 }}
                                 disabled={c.nq}
                                 className={`h-9 text-sm ${pendente ? "border-destructive" : ""}`}

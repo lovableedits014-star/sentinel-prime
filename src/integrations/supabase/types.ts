@@ -3472,6 +3472,10 @@ export type Database = {
           id: string
           is_favorito_regiao: boolean
           is_voluntario: boolean
+          arquivado_em: string | null
+          arquivado_por: string | null
+          arquivamento_motivo: string | null
+          arquivamento_lote_id: string | null
           lat: number | null
           ligacao_em: string | null
           ligacao_status: string | null
@@ -3538,6 +3542,10 @@ export type Database = {
           id?: string
           is_favorito_regiao?: boolean
           is_voluntario?: boolean
+          arquivado_em?: string | null
+          arquivado_por?: string | null
+          arquivamento_motivo?: string | null
+          arquivamento_lote_id?: string | null
           lat?: number | null
           ligacao_em?: string | null
           ligacao_status?: string | null
@@ -3604,6 +3612,10 @@ export type Database = {
           id?: string
           is_favorito_regiao?: boolean
           is_voluntario?: boolean
+          arquivado_em?: string | null
+          arquivado_por?: string | null
+          arquivamento_motivo?: string | null
+          arquivamento_lote_id?: string | null
           lat?: number | null
           ligacao_em?: string | null
           ligacao_status?: string | null

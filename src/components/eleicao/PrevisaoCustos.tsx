@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { isEleicaoContratado, isEleicaoVoluntario } from "@/lib/eleicao-situacao";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,7 @@ interface Pessoa {
   rateio_parceiro?: number | null;
   is_voluntario?: boolean | null;
   status_contratacao?: string | null;
+  arquivado_em?: string | null;
 }
 
 const fmt = (v: number) =>
@@ -77,8 +79,8 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
 
     // Pessoas relevantes ao filtro
     const pessoasBase = filtroEfetivacao === "confirmados" 
-      ? pessoas.filter(p => p.status_contratacao === "confirmado")
-      : pessoas;
+      ? pessoas.filter(isEleicaoContratado)
+      : pessoas.filter(p => !p.arquivado_em);
 
     const pessoasFiltradas = pessoasBase.filter(p => valorFiltrado(p) > 0 || filtroCandidato === "todos");
 
@@ -117,10 +119,10 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
     const byTipo = (t: Tipo) => pessoasFiltradas.filter(p => p.tipo === t);
     const porTipo = (["coordenador", "lider", "cabo"] as Tipo[]).map(t => {
       const list = byTipo(t);
-      const semVoluntarios = list.filter(p => !p.is_voluntario);
+      const semVoluntarios = list.filter(p => !isEleicaoVoluntario(p));
       const total = semVoluntarios.reduce((s, p) => s + valorFiltrado(p), 0);
       const pagos = semVoluntarios.filter(p => valorFiltrado(p) > 0).length;
-      const voluntarios = list.filter(p => p.is_voluntario).length;
+      const voluntarios = list.filter(isEleicaoVoluntario).length;
       const avulsos = t === "lider" ? list.filter(p => !p.parent_id && !p.is_voluntario) : [];
       const avulsosTotal = avulsos.reduce((s, p) => s + valorFiltrado(p), 0);
       return {
@@ -168,7 +170,7 @@ export default function PrevisaoCustos({ pessoas, clientId }: { pessoas: Pessoa[
       .filter(p => p.parceiro_id && (parteParceiro(p) > 0 || parteEstadual(p) > 0) && valor(p) > 0)
       .sort((a, b) => valor(b) - valor(a));
 
-    return { porTipo, totalGeral, porEscopo, top, porRegiao, porCandidato, totalGeralBruto, dobradinhas, pessoasFiltradas, totalConfirmados: pessoas.filter(p => p.status_contratacao === 'confirmado').length };
+    return { porTipo, totalGeral, porEscopo, top, porRegiao, porCandidato, totalGeralBruto, dobradinhas, pessoasFiltradas, totalConfirmados: pessoas.filter(isEleicaoContratado).length };
   }, [pessoas, parceiros, filtroCandidato, filtroEfetivacao]);
 
   const filtroLabel =

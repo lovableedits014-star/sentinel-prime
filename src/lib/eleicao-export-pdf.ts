@@ -18,6 +18,12 @@ export interface ExportPessoa {
   parent_nome?: string | null;
   participou_reuniao?: boolean;
   reuniao_em?: string | null;
+  is_voluntario?: boolean | null;
+  confirmado_em?: string | null;
+  vigencia_inicio?: string | null;
+  vigencia_fim?: string | null;
+  arquivado_em?: string | null;
+  arquivamento_motivo?: string | null;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -38,6 +44,9 @@ const fmtPhone = (s: string) => {
 
 const cap = (s?: string | null) =>
   (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+const situacaoOf = (p: ExportPessoa) =>
+  p.arquivado_em ? "Arquivado" : p.is_voluntario ? "Voluntário" : Number(p.valor_contratacao || 0) > 0 ? "Contratado" : "Sem contrato";
 
 const enderecoOf = (p: ExportPessoa) => {
   const linha = [p.rua, p.numero].filter(Boolean).join(", ");
@@ -211,14 +220,14 @@ export function exportEleicaoPdf(opts: ExportOptions) {
       p.nome,
       fmtPhone(p.telefone),
       p.regiao ? cap(p.regiao) : (p.cidade || "—"),
-      p.participou_reuniao ? "PRESENTE" : "FALTOU",
+      situacaoOf(p),
       p.parent_nome || (p.tipo === "lider" ? "— AVULSO —" : "—"),
       p.valor_contratacao && p.valor_contratacao > 0 ? fmtBRL(p.valor_contratacao) : "—",
     ]);
 
     autoTable(doc, {
       startY: y,
-      head: [["Nome", "Telefone", "Região/Cidade", "Reunião", "Vinculado a", "Valor"]],
+      head: [["Nome", "Telefone", "Região/Cidade", "Situação", "Vinculado a", "Valor"]],
       body: rows,
       theme: "striped",
       styles: { fontSize: 9, cellPadding: 5, valign: "middle" },
@@ -280,6 +289,13 @@ export function exportEleicaoCsv(opts: ExportOptions) {
     "Vinculado a",
     "Valor (R$)",
     "Observações",
+    "Situação",
+    "Tem contrato",
+    "Data da contratação",
+    "Início da vigência",
+    "Fim da vigência",
+    "Arquivado em",
+    "Motivo do arquivamento",
   ];
   const escapeCsv = (v: any) => {
     const s = v == null ? "" : String(v);
@@ -306,6 +322,13 @@ export function exportEleicaoCsv(opts: ExportOptions) {
         p.parent_nome || (p.tipo === "lider" ? "AVULSO" : ""),
         (p.valor_contratacao || 0).toFixed(2).replace(".", ","),
         (p.observacoes || "").replace(/\n/g, " "),
+        situacaoOf(p),
+        p.is_voluntario ? "Não se aplica" : Number(p.valor_contratacao || 0) > 0 ? "Sim" : "Não",
+        p.confirmado_em || "",
+        p.vigencia_inicio || "",
+        p.vigencia_fim || "",
+        p.arquivado_em || "",
+        p.arquivamento_motivo || "",
       ]
         .map(escapeCsv)
         .join(";"),
@@ -552,7 +575,7 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
   const equipes = montarEquipes(opts);
   const headers = [
     "Nivel", "Coordenador (raiz)", "Lider (raiz)",
-    "Tipo", "Nome", "Telefone", "Regiao", "Cidade", "Bairro", "Valor (R$)",
+    "Tipo", "Nome", "Telefone", "Regiao", "Cidade", "Bairro", "Valor (R$)", "Situacao", "Tem contrato", "Data da contratacao", "Inicio vigencia", "Fim vigencia",
   ];
   const escapeCsv = (v: any) => {
     const s = v == null ? "" : String(v);
@@ -569,6 +592,8 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
         TIPO_LABEL.coordenador, eq.coord.nome, fmtPhone(eq.coord.telefone),
         cap(eq.coord.regiao), eq.coord.cidade || "", eq.coord.bairro || "",
         (eq.coord.valor_contratacao || 0).toFixed(2).replace(".", ","),
+        situacaoOf(eq.coord), eq.coord.is_voluntario ? "Não se aplica" : Number(eq.coord.valor_contratacao || 0) > 0 ? "Sim" : "Não",
+        eq.coord.confirmado_em || "", eq.coord.vigencia_inicio || "", eq.coord.vigencia_fim || "",
       ]);
     }
     for (const { lider, cabos } of eq.lideres) {
@@ -578,6 +603,8 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
           TIPO_LABEL.lider, lider.nome, fmtPhone(lider.telefone),
           cap(lider.regiao), lider.cidade || "", lider.bairro || "",
           (lider.valor_contratacao || 0).toFixed(2).replace(".", ","),
+          situacaoOf(lider), lider.is_voluntario ? "Não se aplica" : Number(lider.valor_contratacao || 0) > 0 ? "Sim" : "Não",
+          lider.confirmado_em || "", lider.vigencia_inicio || "", lider.vigencia_fim || "",
         ]);
       }
       if (!opts.tipos || opts.tipos.includes("cabo")) {
@@ -587,6 +614,8 @@ export function exportEleicaoCsvRaiz(opts: RaizExportOptions) {
             TIPO_LABEL.cabo, c.nome, fmtPhone(c.telefone),
             cap(c.regiao), c.cidade || "", c.bairro || "",
             (c.valor_contratacao || 0).toFixed(2).replace(".", ","),
+            situacaoOf(c), c.is_voluntario ? "Não se aplica" : Number(c.valor_contratacao || 0) > 0 ? "Sim" : "Não",
+            c.confirmado_em || "", c.vigencia_inicio || "", c.vigencia_fim || "",
           ]);
         }
       }

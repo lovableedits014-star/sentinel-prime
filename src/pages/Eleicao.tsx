@@ -42,6 +42,7 @@ import DobradinhasManagerPanel from "@/components/eleicao/DobradinhasManagerPane
 import DobradinhaPropagarDialog from "@/components/eleicao/DobradinhaPropagarDialog";
 import DistribuicaoContatosTab from "@/components/eleicao/DistribuicaoContatosTab";
 import { FunnelManagement } from "@/components/eleicao/FunnelManagement";
+import { getEleicaoSituacao, isEleicaoContratado, isEleicaoSemContrato, isEleicaoVoluntario } from "@/lib/eleicao-situacao";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -196,6 +197,9 @@ interface Pessoa {
   participou_reuniao?: boolean;
   reuniao_em?: string | null;
   is_voluntario?: boolean;
+  arquivado_em?: string | null;
+  arquivado_por?: string | null;
+  arquivamento_motivo?: string | null;
   // pre_selecionado depreciado, mantido no tipo apenas para compatibilidade de leitura se necessário
   pre_selecionado?: boolean;
   created_at: string;
@@ -218,6 +222,7 @@ function genLocalPassword(len = 10) {
 type EleicaoActions = {
   onTogglePermissao: (p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") => void;
   onResendLiderFlow: (p: Pessoa) => void;
+  onArchive: (p: Pessoa) => void;
 };
 const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
 
@@ -639,6 +644,34 @@ export default function Eleicao() {
     load();
   }
 
+  async function toggleArchive(p: Pessoa) {
+    if (!p.arquivado_em) {
+      if (!isEleicaoSemContrato(p)) {
+        toast.error(p.is_voluntario ? "Voluntários ativos não podem ser arquivados." : "Somente pessoas sem contrato podem ser arquivadas.");
+        return;
+      }
+      const filhosAtivos = pessoas.filter(x => x.parent_id === p.id && !x.arquivado_em);
+      if (filhosAtivos.length > 0) {
+        toast.error(`Transfira ou desvincule os ${filhosAtivos.length} subordinado(s) ativos antes de arquivar.`);
+        return;
+      }
+      if (!confirm(`Arquivar ${p.nome}? O cadastro poderá ser restaurado depois.`)) return;
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase.from("eleicao_pessoas" as any).update({
+        arquivado_em: new Date().toISOString(),
+        arquivado_por: auth.user?.id || null,
+        arquivamento_motivo: "Não contratado ao final da seleção",
+      }).eq("id", p.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success(`${p.nome} foi arquivado(a)`);
+    } else {
+      const { error } = await supabase.from("eleicao_pessoas" as any).update({ arquivado_em: null }).eq("id", p.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success(`${p.nome} foi restaurado(a)`);
+    }
+    load();
+  }
+
   async function togglePermissaoCadastro(p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") {
     const novoValor = !(p[field] ?? true);
     // Otimismo: atualiza local antes do retorno do banco
@@ -748,20 +781,19 @@ export default function Eleicao() {
 
   const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "sem_valor" | "sem_acesso" | "avulsos" | "voluntarios" | "pendente" | "em_negociacao" | "confirmado" | "reuniao">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "contratados" | "sem_contrato" | "sem_acesso" | "avulsos" | "voluntarios" | "arquivados" | "reuniao">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
   const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
 
   const matchesStatus = (p: Pessoa) => {
-    if (statusFilter === "sem_valor") return !p.valor_contratacao || p.valor_contratacao === 0;
+    if (statusFilter === "contratados") return isEleicaoContratado(p);
+    if (statusFilter === "sem_contrato") return isEleicaoSemContrato(p);
     if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
     if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id && !p.is_voluntario;
-    if (statusFilter === "voluntarios") return !!p.is_voluntario;
-    if (statusFilter === "pendente") return p.status_contratacao === "pendente" || !p.status_contratacao;
-    if (statusFilter === "em_negociacao") return p.status_contratacao === "em_negociacao";
-    if (statusFilter === "confirmado") return p.status_contratacao === "confirmado";
+    if (statusFilter === "voluntarios") return isEleicaoVoluntario(p);
+    if (statusFilter === "arquivados") return !!p.arquivado_em;
     if (statusFilter === "reuniao") return !!p.participou_reuniao;
-    return true;
+    return !p.arquivado_em;
   };
   const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
 
@@ -842,7 +874,7 @@ export default function Eleicao() {
   }, [escopo, escopoList]);
 
   const stats = useMemo(() => {
-    const f = pessoas.filter(p => p.escopo === escopo);
+    const f = pessoas.filter(p => p.escopo === escopo && !p.arquivado_em);
     const isVol = (p: any) => !!p.is_voluntario;
     const remunerados = f.filter(p => !isVol(p));
     const valorTotal = remunerados.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
@@ -853,6 +885,9 @@ export default function Eleicao() {
       lider: remunerados.filter(p => p.tipo === "lider").length,
       cabo: remunerados.filter(p => p.tipo === "cabo").length,
       voluntarios: f.filter(isVol).length,
+      contratados: f.filter(isEleicaoContratado).length,
+      semContrato: f.filter(isEleicaoSemContrato).length,
+      arquivados: pessoas.filter(p => p.escopo === escopo && !!p.arquivado_em).length,
       total: f.length,
       valorTotal,
       semValor,
@@ -866,6 +901,7 @@ export default function Eleicao() {
     if (form.tipo === "coordenador") return [];
     const parentTipo: Tipo = form.tipo === "lider" ? "coordenador" : "lider";
     return pessoas.filter(p =>
+      !p.arquivado_em &&
       p.tipo === parentTipo &&
       p.escopo === form.escopo &&
       (form.escopo === "interior" ? p.cidade === form.cidade : p.regiao === form.regiao)
@@ -878,7 +914,13 @@ export default function Eleicao() {
   function handleExport(cfg: ExportConfig) {
     // Base: respeita escopo + busca atual (filtros de tela), mas IGNORA tipoFilter
     // pois o dialog tem seu próprio filtro de tipos.
-    let base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p));
+    let base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p));
+    const situacaoRelatorio = cfg.situacaoContrato || "ativos";
+    if (situacaoRelatorio === "ativos") base = base.filter(p => !p.arquivado_em);
+    if (situacaoRelatorio === "contratados") base = base.filter(isEleicaoContratado);
+    if (situacaoRelatorio === "sem_contrato") base = base.filter(isEleicaoSemContrato);
+    if (situacaoRelatorio === "voluntarios") base = base.filter(isEleicaoVoluntario);
+    if (situacaoRelatorio === "arquivados") base = base.filter(p => !!p.arquivado_em);
     
     // Filtro de reunião se vier do dialog
     if (cfg.apenasReuniao) {
@@ -986,6 +1028,7 @@ export default function Eleicao() {
       if (cfg.apenasNaoReuniao) f.push({ label: "Reunião", value: "Apenas quem NÃO participou" });
       if (volMode === "apenas") f.push({ label: "Voluntários", value: "Apenas voluntários" });
       if (volMode === "excluir") f.push({ label: "Voluntários", value: "Excluídos (só remunerados)" });
+      f.push({ label: "Situação", value: situacaoRelatorio === "ativos" ? "Todos os ativos" : situacaoRelatorio.replace("_", " ") });
       if (!cfg.incluirAvulsos && !cfg.apenasAvulsos) f.push({ label: "Líderes avulsos", value: "Excluídos" });
       return f;
 
@@ -1018,6 +1061,12 @@ export default function Eleicao() {
           valor_contratacao: p.valor_contratacao,
           participou_reuniao: p.participou_reuniao,
           reuniao_em: p.reuniao_em,
+          is_voluntario: p.is_voluntario,
+          confirmado_em: p.confirmado_em,
+          vigencia_inicio: p.vigencia_inicio,
+          vigencia_fim: p.vigencia_fim,
+          arquivado_em: p.arquivado_em,
+          arquivamento_motivo: p.arquivamento_motivo,
         }));
         const coordFiltro = cfg.coordenadorId
           ? { id: cfg.coordenadorId, nome: byId.get(cfg.coordenadorId) || "" }
@@ -1057,6 +1106,12 @@ export default function Eleicao() {
         valor_contratacao: p.valor_contratacao,
         participou_reuniao: p.participou_reuniao,
         reuniao_em: p.reuniao_em,
+        is_voluntario: p.is_voluntario,
+        confirmado_em: p.confirmado_em,
+        vigencia_inicio: p.vigencia_inicio,
+        vigencia_fim: p.vigencia_fim,
+        arquivado_em: p.arquivado_em,
+        arquivamento_motivo: p.arquivamento_motivo,
         parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
       }));
       const mode: "save" | "print" = cfg.formato === "print" ? "print" : "save";
@@ -1113,32 +1168,7 @@ export default function Eleicao() {
     const qtd = rodarExport(listaTipada, lista, dobradinhaLabel, sufixo);
 
     
-    // Config para exportação simples
-    const exportOpts = {
-      clientName: "", // pode ser preenchido se tivermos o nome do cliente
-      escopoLabel: escopo === "campo_grande" ? "Campo Grande" : "Interior",
-      pessoas: listaTipada.map(p => ({
-        ...p,
-        parent_nome: p.parent_id ? (pessoas.find(px => px.id === p.parent_id)?.nome || null) : null
-      })) as any,
-      filtros: baseFiltros(),
-      fileNameSuffix: sufixo,
-      mode: cfg.formato === "print" ? ("print" as const) : ("save" as const),
-      apenasAvulsos: cfg.apenasAvulsos,
-      apenasReuniao: cfg.apenasReuniao,
-      apenasNaoReuniao: cfg.apenasNaoReuniao,
-    };
-
-    if (cfg.formato === "csv") {
-      exportEleicaoCsv(exportOpts);
-      toast.success(`CSV exportado (${qtd} registros)`);
-    } else if (cfg.formato === "print") {
-      exportEleicaoPdf(exportOpts);
-      toast.success("PDF aberto para impressão em nova aba.");
-    } else {
-      exportEleicaoPdf(exportOpts);
-      toast.success(`PDF exportado (${qtd} registros)`);
-    }
+    toast.success(cfg.formato === "print" ? "PDF aberto para impressão em nova aba." : `${cfg.formato.toUpperCase()} exportado (${qtd} registros)`);
   }
 
   const coordenadoresEscopo = useMemo(
@@ -1165,7 +1195,7 @@ export default function Eleicao() {
   }, [pessoas, escopo, REGIOES]);
 
   return (
-    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow }}>
+    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow, onArchive: toggleArchive }}>
     <EleicaoSearchContext.Provider value={searchCtxValue}>
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
 
@@ -1228,7 +1258,10 @@ export default function Eleicao() {
         <PrevisaoCustos pessoas={pessoas as any} clientId={clientId || undefined} />
       ) : view === "funnel" ? (
         <FunnelManagement 
-          pessoas={pessoas as any} 
+          pessoas={pessoas.filter(p => !p.arquivado_em && !p.is_voluntario).map(p => ({
+            ...p,
+            status_contratacao: Number(p.valor_contratacao || 0) > 0 ? "confirmado" : "pendente",
+          })) as any}
           onEdit={openEdit} 
           onOpenExport={(reuniao, semReuniao) => {
             // Aqui poderíamos passar presets para o dialog, mas o dialog já tem o campo de reunião agora.
@@ -1261,13 +1294,12 @@ export default function Eleicao() {
         </TabsList>
 
         {/* KPIs com cards visuais */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-4">
           <KpiCard label="Total" value={stats.total} icon={Users} tone="neutral" />
-          <KpiCard label="Coordenadores" value={stats.coord} icon={Crown} tone="red" />
-          <KpiCard label="Líderes" value={stats.lider} icon={Users} tone="blue" />
-          <KpiCard label="Cabos" value={stats.cabo} icon={UserCheck} tone="green" />
+          <KpiCard label="Contratados" value={stats.contratados} icon={UserCheck} tone="blue" />
+          <KpiCard label="Sem contrato" value={stats.semContrato} icon={AlertCircle} tone="amber" />
           <KpiCard label="Voluntários" value={stats.voluntarios} icon={Heart} tone="emerald" />
-          <KpiCard label="Avulsos" value={stats.avulsos} icon={Star} tone="amber" />
+          <KpiCard label="Arquivados" value={stats.arquivados} icon={Trash2} tone="neutral" />
           <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" small />
 
         </div>
@@ -1297,13 +1329,12 @@ export default function Eleicao() {
               <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os status</SelectItem>
-                <SelectItem value="sem_valor">⚠ Sem valor</SelectItem>
+                <SelectItem value="contratados">✅ Contratados</SelectItem>
+                <SelectItem value="sem_contrato">⚠ Sem contrato</SelectItem>
                   <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
                   <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
                   <SelectItem value="voluntarios">❤️ Voluntários</SelectItem>
-                  <SelectItem value="pendente">⏳ Status: Pendente</SelectItem>
-                <SelectItem value="em_negociacao">🤝 Status: Em Negociação</SelectItem>
-                <SelectItem value="confirmado">✅ Status: Confirmado</SelectItem>
+                  <SelectItem value="arquivados">🗄 Arquivados</SelectItem>
                 <SelectItem value="reuniao">👥 Participou da Reunião</SelectItem>
                 {/* Item Pré-selecionado removido */}
               </SelectContent>
@@ -1602,33 +1633,11 @@ export default function Eleicao() {
 
             {/* Status e Reunião */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div className="rounded-md border border-border bg-muted/20 p-2 space-y-2">
-                <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  <Handshake className="w-3 h-3" /> Status
-                </Label>
-                <div className="grid grid-cols-3 gap-1">
-                  {[
-                    { id: "pendente", label: "Pend", icon: AlertCircle, color: "text-muted-foreground", activeColor: "bg-muted text-foreground border-muted-foreground/30" },
-                    { id: "em_negociacao", label: "Reuni", icon: MessageCircle, color: "text-amber-600", activeColor: "bg-amber-500/10 text-amber-700 border-amber-500/30" },
-                    { id: "confirmado", label: "Conf", icon: CheckCircle2, color: "text-emerald-600", activeColor: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" },
-                  ].map(s => {
-                    const active = form.status_contratacao === s.id;
-                    const Icon = s.icon;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, status_contratacao: s.id as any }))}
-                        className={cn(
-                          "flex flex-col items-center justify-center p-1 rounded-lg border transition-all gap-0.5 text-[9px] font-medium",
-                          active ? s.activeColor : "bg-background border-border hover:bg-muted/50 text-muted-foreground"
-                        )}
-                      >
-                        <Icon className={cn("w-3 h-3", active ? "" : s.color)} />
-                        {s.label}
-                      </button>
-                    );
-                  })}
+              <div className="rounded-md border border-border bg-muted/20 p-2 flex items-center gap-2">
+                <Handshake className="w-4 h-4 text-blue-600" />
+                <div>
+                  <p className="text-[11px] font-medium">Situação automática</p>
+                  <p className="text-[9px] text-muted-foreground">Ao definir o valor, passa para Contratados.</p>
                 </div>
               </div>
 
@@ -2361,6 +2370,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   const actions = React.useContext(EleicaoActionsContext);
   const onTogglePermissao = actions?.onTogglePermissao;
   const onResendLiderFlow = actions?.onResendLiderFlow;
+  const onArchive = actions?.onArchive;
   const { searchActive, matchedIds, nameById, tipoById } = React.useContext(EleicaoSearchContext);
   const isMatch = searchActive && matchedIds.has(p.id);
   const parentName = p.parent_id ? nameById.get(p.parent_id) : null;
@@ -2372,6 +2382,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   const Icon = meta.icon;
   const wa = waLink(p.telefone);
   const semValor = !p.valor_contratacao || p.valor_contratacao === 0;
+  const situacao = getEleicaoSituacao(p);
   const tipoBg: Record<Tipo, string> = {
     coordenador: "bg-red-500 text-white",
     lider: "bg-blue-500 text-white",
@@ -2422,6 +2433,12 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <span className={cn("text-sm truncate", indent === 0 ? "font-semibold" : "font-medium")}>{p.nome}</span>
           {/* Badge de pré-selecionado removida conforme plano */}
           {p.participou_reuniao && <Badge variant="outline" className="h-5 bg-blue-500/10 text-blue-600 border-blue-500/20 text-[9px] gap-1 px-1"><Users className="w-2.5 h-2.5" /> Reunião</Badge>}
+          <Badge variant="outline" className={cn("h-4 px-1 text-[9px] shrink-0",
+            situacao === "contratado" && "border-blue-500/30 text-blue-700 bg-blue-500/10",
+            situacao === "sem_contrato" && "border-amber-500/30 text-amber-700 bg-amber-500/10",
+            situacao === "voluntario" && "border-emerald-500/30 text-emerald-700 bg-emerald-500/10",
+            situacao === "arquivado" && "border-slate-500/30 text-slate-600 bg-slate-500/10",
+          )}>{situacao === "sem_contrato" ? "Sem contrato" : situacao === "voluntario" ? "Voluntário" : situacao === "arquivado" ? "Arquivado" : "Contratado"}</Badge>
           {p.tipo === "coordenador" && p.escopo === "campo_grande" && p.regiao && (
             <FavoritoToggle pessoa={p} />
           )}
@@ -2438,15 +2455,15 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               🔒 Cabos
             </Badge>
           )}
-          {semValor ? (
+          {situacao === "sem_contrato" ? (
             <Badge variant="outline" className="h-4 px-1 text-[9px] border-amber-500/40 text-amber-600 bg-amber-500/10 shrink-0 gap-0.5">
               <AlertCircle className="w-2.5 h-2.5" />sem valor
             </Badge>
-          ) : (
+          ) : situacao === "contratado" ? (
             <span className="text-[10px] font-bold tabular-nums text-emerald-700 bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">
               {fmtBRL(p.valor_contratacao)}
             </span>
-          )}
+          ) : null}
         </div>
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
           {p.telefone && (
@@ -2591,6 +2608,11 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           )}
 
           <DropdownMenuSeparator />
+          {onArchive && (p.arquivado_em || situacao === "sem_contrato") && (
+            <DropdownMenuItem onClick={() => onArchive(p)}>
+              <Trash2 className="w-3.5 h-3.5 mr-2" />{p.arquivado_em ? "Restaurar cadastro" : "Arquivar cadastro"}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => onDelete(p.id)} className="text-destructive focus:text-destructive">
             <Trash2 className="w-3.5 h-3.5 mr-2" />Excluir
           </DropdownMenuItem>
