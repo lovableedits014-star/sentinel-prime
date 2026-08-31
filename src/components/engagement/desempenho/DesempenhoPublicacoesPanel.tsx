@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart3, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
 import { fetchAudiences } from "@/lib/mission-audiences";
 import {
-  fetchEquipeDesempenho, fetchPubKpis, fetchPublicacoesDesempenho, fetchTeamRoots,
+  fetchEquipeDesempenho, fetchPubKpis, fetchPublicacoesAudit, fetchPublicacoesDesempenho, fetchTeamRoots,
 } from "@/lib/engagement-desempenho";
 import MonitorKpisHeader from "./MonitorKpisHeader";
 import MonitorCharts from "./MonitorCharts";
@@ -59,19 +59,26 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
     enabled: !!clientId,
   });
 
+  const audit = useQuery({
+    queryKey: ["eng-pub-audit", clientId, dias, aud, rootId, missionId],
+    queryFn: () => fetchPublicacoesAudit(clientId, dias, aud, filters),
+    enabled: !!clientId,
+  });
+
   const equipe = useQuery({
     queryKey: ["eng-equipe-desempenho", clientId, dias, aud, rootId, missionId],
     queryFn: () => fetchEquipeDesempenho(clientId, dias, aud, filters),
     enabled: !!clientId,
   });
 
-  const carregando = kpis.isLoading || publicacoes.isLoading || equipe.isLoading;
-  const erro = kpis.error || publicacoes.error || equipe.error;
+  const carregando = kpis.isLoading || publicacoes.isLoading || equipe.isLoading || audit.isLoading;
+  const erro = kpis.error || publicacoes.error || equipe.error || audit.error;
 
   const recarregar = () => {
     kpis.refetch();
     publicacoes.refetch();
     equipe.refetch();
+    audit.refetch();
   };
 
   return (
@@ -188,6 +195,7 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
                 audienceId={aud}
                 rows={publicacoes.data ?? []}
                 periodoLabel={periodoLabel}
+                audit={audit.data ?? []}
               />
             </TabsContent>
 

@@ -271,7 +271,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-emerald-700">Cobrança temporal protegida</p>
             <p className="text-xs text-muted-foreground">
-              Cada missão usa a lista congelada na ativação. Pessoas que entraram depois não recebem faltas antigas.
+              Cada missão cobra somente quem já estava contratado no momento do disparo. Novos contratos entram nas próximas missões.
             </p>
           </div>
           <Badge variant="outline" className="border-emerald-500/30 bg-background">
@@ -474,7 +474,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
                           {m.monitorada && <Badge variant="outline" className="ml-2 bg-primary/10 text-primary border-primary/30">Monitorada</Badge>}
                           {m.audience_snapshotted_at && (
                             <Badge variant="outline" className="ml-2 bg-emerald-500/10 text-emerald-700 border-emerald-500/30">
-                              {m.eligible_count ?? 0} elegíveis congelados
+                              {m.eligible_count ?? 0} contratados no disparo
                             </Badge>
                           )}
                         </div>
@@ -634,7 +634,7 @@ export default function MonitoramentoTab({ clientId, clientName }: { clientId: s
             <DialogTitle>Monitorar publicação</DialogTitle>
             <DialogDescription className="text-xs">
               {missaoEdit?.audience_snapshotted_at
-                ? "O público desta missão já foi congelado. Você pode corrigir os IDs dos posts, sem criar cobranças retroativas."
+                ? "A lista de contratados desta missão foi fixada no disparo. Você pode corrigir os IDs dos posts sem criar cobranças retroativas."
                 : "Ao salvar, o sistema congela o público elegível desta data e tenta casar as interações existentes."}
             </DialogDescription>
           </DialogHeader>

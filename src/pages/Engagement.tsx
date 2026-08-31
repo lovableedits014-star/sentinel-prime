@@ -19,6 +19,7 @@ import {
   ClipboardCheck,
   Gauge,
   Target,
+  ContactRound,
 } from "lucide-react";
 import InfluenciadoresTab from "@/components/engagement/InfluenciadoresTab";
 import PerfisTimeTab from "@/components/engagement/PerfisTimeTab";
@@ -27,6 +28,11 @@ import MonitoramentoTab from "@/components/engagement/MonitoramentoTab";
 import PublicoMonitoradoTab from "@/components/engagement/PublicoMonitoradoTab";
 import MissionCheckinTab from "@/components/engagement/MissionCheckinTab";
 import EngagementOverviewTab from "@/components/engagement/EngagementOverviewTab";
+import MissionAccessManagement from "@/components/engagement/MissionAccessManagement";
+import DailyEngagementOperations from "@/components/engagement/DailyEngagementOperations";
+import CampaignTeamManagement from "@/components/engagement/CampaignTeamManagement";
+import EngagementHistory from "@/components/engagement/EngagementHistory";
+import EngagementDailySettings from "@/components/engagement/EngagementDailySettings";
 
 
 
@@ -40,15 +46,17 @@ type EngagementConfig = {
   inactivity_days: number;
 };
 
-type EngagementTab = "visao" | "publico" | "checkin" | "influenciadores" | "time" | "cobranca" | "monitoramento" | "config";
+type EngagementTab = "hoje" | "equipe" | "historico" | "ajustes" | "visao" | "acessos" | "publico" | "checkin" | "influenciadores" | "time" | "cobranca" | "monitoramento" | "config";
 
 type EngagementProps = {
   initialTab?: EngagementTab;
 };
 
-export default function Engagement({ initialTab = "visao" }: EngagementProps) {
+export default function Engagement({ initialTab = "hoje" }: EngagementProps) {
   const [configForm, setConfigForm] = useState<Partial<EngagementConfig>>({});
-  const [activeTab, setActiveTab] = useState<EngagementTab>(initialTab);
+  const [activeTab, setActiveTab] = useState<EngagementTab>(
+    (["hoje", "equipe", "historico", "ajustes"] as EngagementTab[]).includes(initialTab) ? initialTab : "hoje",
+  );
 
   const { data: client } = useQuery({
     queryKey: ["client-active", "engagement"],
@@ -110,12 +118,18 @@ export default function Engagement({ initialTab = "visao" }: EngagementProps) {
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Engajamento</h1>
         <p className="text-sm text-muted-foreground">
-          Identifique automaticamente quem mais interage com suas publicações. O sistema detecta influenciadores e apoiadores ativos com base em curtidas, comentários e compartilhamentos — e permite configurar a pontuação de cada tipo de ação.
+          Acompanhe a missão diária dos contratados, cobre pendências e gerencie o desempenho por pessoa e por raiz.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EngagementTab)} className="space-y-4">
         <TabsList className="w-full sm:w-auto flex-wrap h-auto">
+          <TabsTrigger value="hoje" className="gap-1.5"><Gauge className="h-4 w-4" /> Hoje</TabsTrigger>
+          <TabsTrigger value="equipe" className="gap-1.5"><Users className="h-4 w-4" /> Equipe</TabsTrigger>
+          <TabsTrigger value="historico" className="gap-1.5"><Activity className="h-4 w-4" /> Histórico</TabsTrigger>
+          <TabsTrigger value="ajustes" className="gap-1.5"><Settings className="h-4 w-4" /> Configurações</TabsTrigger>
+        </TabsList>
+        <TabsList className="hidden">
           <TabsTrigger value="visao" className="text-xs sm:text-sm gap-1.5">
             <Gauge className="h-4 w-4" />
             Visão geral
@@ -123,6 +137,10 @@ export default function Engagement({ initialTab = "visao" }: EngagementProps) {
           <TabsTrigger value="publico" className="text-xs sm:text-sm gap-1.5">
             <Users className="h-4 w-4" />
             Público monitorado
+          </TabsTrigger>
+          <TabsTrigger value="acessos" className="text-xs sm:text-sm gap-1.5">
+            <ContactRound className="h-4 w-4" />
+            Acessos às missões
           </TabsTrigger>
           <TabsTrigger value="checkin" className="text-xs sm:text-sm gap-1.5">
             <Target className="h-4 w-4" />
@@ -150,6 +168,11 @@ export default function Engagement({ initialTab = "visao" }: EngagementProps) {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="hoje">{client?.id ? <DailyEngagementOperations clientId={client.id} /> : null}</TabsContent>
+        <TabsContent value="equipe">{client?.id ? <CampaignTeamManagement clientId={client.id} /> : null}</TabsContent>
+        <TabsContent value="historico">{client?.id ? <EngagementHistory clientId={client.id} /> : null}</TabsContent>
+        <TabsContent value="ajustes">{client?.id ? <EngagementDailySettings clientId={client.id} /> : null}</TabsContent>
+
         <TabsContent value="visao">
           {client?.id ? (
             <EngagementOverviewTab clientId={client.id} onNavigate={setActiveTab} />
@@ -168,6 +191,10 @@ export default function Engagement({ initialTab = "visao" }: EngagementProps) {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="acessos">
+          {client?.id ? <MissionAccessManagement clientId={client.id} /> : <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Nenhum cliente vinculado a este usuário.</CardContent></Card>}
         </TabsContent>
 
         <TabsContent value="checkin">

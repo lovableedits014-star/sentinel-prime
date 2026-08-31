@@ -90,7 +90,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
     try {
       const total = await setMissionAudience(clientId, missionId, next);
       await qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
-      toast.success(`Público congelado com ${total} pessoa(s) elegíveis`);
+      toast.success(`Missão iniciada com ${total} contratado(s) no disparo`);
     } catch (e: any) {
       toast.error(e?.message || "Falha ao aplicar a lista");
     }
@@ -182,7 +182,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
                     </Select>
                     {mission?.audience_snapshotted_at && (
                       <p className="text-[11px] text-emerald-700">
-                        Público histórico congelado: {mission.eligible_count ?? 0} elegíveis. Novas entradas não recebem esta missão.
+                        Contratados no momento do disparo: {mission.eligible_count ?? 0}. Novos contratos entram somente nas próximas missões.
                       </p>
                     )}
                     <p className="text-[11px] text-muted-foreground">

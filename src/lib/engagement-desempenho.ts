@@ -43,6 +43,11 @@ export type DetalheItem = {
   instagram_abriu?: boolean;
 };
 
+export type PublicacaoAudit = {
+  mission_id: string; publico_congelado: number; registros_ativos: number;
+  pessoas_unicas: number; dispensados: number; duplicados: number;
+};
+
 export type PessoaDesempenho = {
   pessoa_id: string;
   origem: string;
@@ -121,6 +126,15 @@ export async function fetchPublicacoesDesempenho(
       p_mission_id: filters.missionId ?? null,
     }),
   );
+}
+
+export async function fetchPublicacoesAudit(
+  clientId: string, dias: number, audienceId: string | null, filters: DesempenhoFilters = {},
+): Promise<PublicacaoAudit[]> {
+  return unwrap<PublicacaoAudit>(await db.rpc("engagement_publicacoes_audit", {
+    p_client_id: clientId, p_dias: dias, p_audience_id: audienceId,
+    p_root_id: filters.rootId ?? null, p_mission_id: filters.missionId ?? null,
+  }));
 }
 
 export async function fetchEquipeDesempenho(

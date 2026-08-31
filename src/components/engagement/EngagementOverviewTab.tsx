@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { toWhatsAppBR } from "@/lib/phone-utils";
-import { FAIXA_META, fetchAdesao, fetchEligibilityAudit, fetchMonitorOverview, fetchRanking, registrarCobranca, type Faixa, type RankingRow } from "@/lib/engagement-monitor";
+import { FAIXA_META, fetchAccessSummary, fetchAdesao, fetchEligibilityAudit, fetchMonitorOverview, fetchRanking, registrarCobranca, type Faixa, type RankingRow } from "@/lib/engagement-monitor";
 
-type Props = { clientId: string; onNavigate: (tab: "publico" | "checkin" | "cobranca" | "monitoramento") => void };
+type Props = { clientId: string; onNavigate: (tab: "acessos" | "publico" | "checkin" | "cobranca" | "monitoramento") => void };
 type StatusFilter = "todos" | Faixa;
 const fmtDate = (value: string | null) => value ? new Date(value).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—";
 const unique = (values: Array<string | null>) => Array.from(new Set(values.filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b, "pt-BR"));
@@ -29,12 +29,12 @@ export default function EngagementOverviewTab({ clientId, onNavigate }: Props) {
     queryKey: ["engagement-management-overview", clientId],
     queryFn: async () => {
       const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-      const [overview, ranking, missions, audit, newcomers] = await Promise.all([
-        fetchMonitorOverview(clientId), fetchRanking(clientId, 500), fetchAdesao(clientId, 100), fetchEligibilityAudit(clientId),
+      const [overview, access, ranking, missions, audit, newcomers] = await Promise.all([
+        fetchMonitorOverview(clientId), fetchAccessSummary(clientId), fetchRanking(clientId, 500), fetchAdesao(clientId, 100), fetchEligibilityAudit(clientId),
         supabase.from("engagement_memberships" as never).select("id", { count: "exact", head: true }).eq("client_id", clientId).is("effective_until", null).gte("effective_from", sevenDaysAgo),
       ]);
       if (newcomers.error) throw new Error(newcomers.error.message);
-      return { overview, ranking, missions, audit, newcomers: newcomers.count ?? 0 };
+      return { overview, access, ranking, missions, audit, newcomers: newcomers.count ?? 0 };
     },
     staleTime: 30_000,
   });
@@ -66,7 +66,7 @@ export default function EngagementOverviewTab({ clientId, onNavigate }: Props) {
 
   if (query.isLoading) return <Skeleton className="h-[620px] w-full" />;
   if (query.isError || !query.data) return <Card><CardContent className="py-10 text-center text-sm text-destructive">Não foi possível montar a visão gerencial. Atualize a página e tente novamente.</CardContent></Card>;
-  const { overview, missions, audit, newcomers } = query.data;
+  const { overview, access, missions, audit, newcomers } = query.data;
   const corrected = audit.reduce((sum, row) => sum + row.dispensados_entrada_posterior, 0);
   const missionsAtRisk = missions.filter((row) => row.obrigacoes > 0 && row.adesao < 70);
   const active = Number(overview?.obrigacoes ?? 0), completed = Number(overview?.cumpridas ?? 0);
@@ -82,8 +82,8 @@ export default function EngagementOverviewTab({ clientId, onNavigate }: Props) {
     </CardContent></Card>
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
-      ["Cumpridas", completed, "Resultado confirmado", CheckCircle2, "text-emerald-600", "bg-emerald-500/10"],
-      ["Pendentes", pending, "Dentro do prazo", Clock3, "text-amber-600", "bg-amber-500/10"],
+      ["Conclusões reais", access.conclusoes, `${access.pessoas_concluiram} pessoas pelo link`, CheckCircle2, "text-emerald-600", "bg-emerald-500/10"],
+      ["Acessaram missões", access.acessaram, `${access.aguardando_conclusao} aguardando conclusão`, Clock3, "text-amber-600", "bg-amber-500/10"],
       ["Atrasadas", overdue, "Cobrança prioritária", AlertTriangle, "text-red-600", "bg-red-500/10"],
       ["Novos em listas", newcomers, "Últimos 7 dias", UserPlus, "text-sky-600", "bg-sky-500/10"],
     ].map(([label, value, detail, Icon, tone, bg]) => <Card key={String(label)} className="shadow-sm"><CardContent className="flex items-center gap-4 p-4"><div className={`rounded-xl p-3 ${bg}`}><Icon className={`h-5 w-5 ${tone}`} /></div><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-2xl font-bold">{value}</p><p className="text-[11px] text-muted-foreground">{detail}</p></div></CardContent></Card>)}</div>
@@ -103,6 +103,6 @@ export default function EngagementOverviewTab({ clientId, onNavigate }: Props) {
       {queue.slice(0, 10).map((person, index) => { const key = `${person.origem}:${person.ref_id}`; return <div key={key} className="flex flex-wrap items-center gap-3 p-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold">{index + 1}</div><div className="min-w-44 flex-1"><p className="truncate text-sm font-semibold">{person.nome}</p><p className="text-[11px] text-muted-foreground">{[person.cargo, person.regiao || person.cidade].filter(Boolean).join(" · ") || "Sem segmento"}</p></div><div className="text-center"><p className="text-sm font-bold text-destructive">{person.nao_cumpridas}</p><p className="text-[10px] text-muted-foreground">faltas</p></div><Badge variant="outline" className={FAIXA_META[person.faixa].className}>{person.indice} pts</Badge><Button size="sm" disabled={charging === key || !person.telefone} onClick={() => charge(person)}><MessageCircle className="mr-1.5 h-4 w-4" /> Cobrar</Button></div>; })}
     </CardContent></Card>
       <Card><CardHeader><div className="flex items-start justify-between gap-2"><div><CardTitle className="flex items-center gap-2 text-base"><Target className="h-4 w-4" /> Missões em risco</CardTitle><CardDescription>Adesão abaixo de 70%.</CardDescription></div><Button size="sm" variant="ghost" onClick={() => onNavigate("monitoramento")}>Ver todas</Button></div></CardHeader><CardContent className="space-y-3">{!missionsAtRisk.length && <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma missão em risco.</p>}{missionsAtRisk.slice(0, 6).map((mission) => <div key={mission.mission_id} className="space-y-2 rounded-lg border p-3"><div className="flex items-center justify-between gap-2"><span className="truncate text-sm font-medium">{mission.titulo || "Missão"}</span><Badge variant="outline">{mission.adesao}%</Badge></div><Progress value={mission.adesao} className="h-1.5" /><p className="text-[11px] text-muted-foreground">{fmtDate(mission.publicado_em)} · {mission.nao_cumpridas} atrasadas · {mission.pendentes} pendentes</p></div>)}</CardContent></Card></div>
-    <div className="flex flex-wrap gap-2"><Button onClick={() => onNavigate("checkin")}><Target className="mr-2 h-4 w-4" /> Acompanhar missão</Button><Button variant="outline" onClick={() => onNavigate("publico")}><Users className="mr-2 h-4 w-4" /> Gerenciar público</Button><Button variant="outline" onClick={() => onNavigate("cobranca")}><AlertTriangle className="mr-2 h-4 w-4" /> Gestão detalhada</Button></div>
+    <div className="flex flex-wrap gap-2"><Button onClick={() => onNavigate("acessos")}><Users className="mr-2 h-4 w-4" /> Gerenciar acessos</Button><Button variant="outline" onClick={() => onNavigate("checkin")}><Target className="mr-2 h-4 w-4" /> Acompanhar missão</Button><Button variant="outline" onClick={() => onNavigate("publico")}><Users className="mr-2 h-4 w-4" /> Gerenciar público</Button><Button variant="outline" onClick={() => onNavigate("cobranca")}><AlertTriangle className="mr-2 h-4 w-4" /> Gestão detalhada</Button></div>
   </div>;
 }

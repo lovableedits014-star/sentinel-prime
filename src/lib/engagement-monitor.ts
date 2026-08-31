@@ -107,6 +107,17 @@ export type MissaoMonitorada = {
   eligible_count: number | null;
 };
 
+export type AccessSummary = {
+  cadastrados: number; vinculados: number; nao_vinculados: number; acessaram: number;
+  conclusoes: number; pessoas_concluiram: number; aguardando_conclusao: number; sem_acesso: number;
+};
+
+export type AccessPerson = {
+  participant_id: string; nome: string; telefone: string; cargo: string | null; regiao: string | null;
+  coordenador_id: string | null; coordenador_nome: string | null; coordenador_telefone: string | null;
+  missoes_acessadas: number; missoes_concluidas: number; pendentes: number; ultimo_acesso: string | null; vinculado: boolean;
+};
+
 export type EligibilityAuditRow = {
   mission_id: string;
   titulo: string | null;
@@ -159,6 +170,15 @@ export async function fetchRanking(clientId: string, limit = 500): Promise<Ranki
 
 export async function fetchAdesao(clientId: string, limit = 100): Promise<AdesaoRow[]> {
   return unwrap<AdesaoRow>(await db.rpc("engagement_adesao_publicacoes", { p_client_id: clientId, p_limit: limit }));
+}
+
+export async function fetchAccessSummary(clientId: string): Promise<AccessSummary> {
+  const rows = unwrap<AccessSummary>(await db.rpc("engagement_access_summary", { p_client_id: clientId }));
+  return rows[0] ?? { cadastrados: 0, vinculados: 0, nao_vinculados: 0, acessaram: 0, conclusoes: 0, pessoas_concluiram: 0, aguardando_conclusao: 0, sem_acesso: 0 };
+}
+
+export async function fetchAccessPeople(clientId: string): Promise<AccessPerson[]> {
+  return unwrap<AccessPerson>(await db.rpc("engagement_access_people", { p_client_id: clientId, p_limit: 3000 }));
 }
 
 export async function fetchEligibilityAudit(clientId: string): Promise<EligibilityAuditRow[]> {

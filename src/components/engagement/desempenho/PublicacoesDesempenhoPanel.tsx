@@ -11,7 +11,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   fetchFaltantes, fmtData, fmtPct, fmtTelefone, STATUS_PUB_LABEL, waLink,
-  type Faltante, type PublicacaoDesempenho,
+  type Faltante, type PublicacaoAudit, type PublicacaoDesempenho,
 } from "@/lib/engagement-desempenho";
 
 export default function PublicacoesDesempenhoPanel({
@@ -19,11 +19,13 @@ export default function PublicacoesDesempenhoPanel({
   audienceId,
   rows,
   periodoLabel,
+  audit,
 }: {
   clientId: string;
   audienceId: string | null;
   rows: PublicacaoDesempenho[];
   periodoLabel: string;
+  audit: PublicacaoAudit[];
 }) {
   const [alvo, setAlvo] = useState<PublicacaoDesempenho | null>(null);
   const [faltantes, setFaltantes] = useState<Faltante[]>([]);
@@ -43,11 +45,16 @@ export default function PublicacoesDesempenhoPanel({
   };
 
   const exportarExcel = () => {
-    const data = rows.map((p) => ({
+    const data = rows.map((p) => {
+      const a = audit.find((item) => item.mission_id === p.mission_id);
+      return ({
       Publicação: p.titulo || "—",
       Plataforma: p.plataforma || "—",
       Data: fmtData(p.publicado_em),
-      "Pessoas obrigadas": p.obrigados,
+      "Contratados no disparo": a?.publico_congelado ?? p.obrigados,
+      "Público válido (pessoas únicas)": p.obrigados,
+      Dispensados: a?.dispensados ?? 0,
+      "Duplicados consolidados": a?.duplicados ?? 0,
       Confirmaram: p.cumpriram,
       "Abriu sem confirmar": p.abriu_sem_confirmar,
       "Não abriu": p.faltaram,
@@ -55,7 +62,7 @@ export default function PublicacoesDesempenhoPanel({
       "Confirmou no portal": p.e2,
       "Evidência aprovada": p.e3,
       "Taxa de cumprimento %": Number(p.adesao),
-    }));
+    }); });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Publicações");
     XLSX.writeFile(wb, `publicacoes-desempenho-${periodoLabel}.xlsx`);
@@ -70,7 +77,7 @@ export default function PublicacoesDesempenhoPanel({
     autoTable(doc, {
       startY: 26,
       styles: { fontSize: 8 },
-      head: [["Missão", "Rede", "Data", "Obrigados", "Confirmaram", "Abriu s/ confirmar", "Não abriu", "Taxa"]],
+      head: [["Missão", "Rede", "Data", "Público válido", "Confirmaram", "Abriu s/ confirmar", "Não abriu", "Taxa"]],
       body: rows.map((p) => [
         (p.titulo || "—").slice(0, 60),
         p.plataforma || "—",
@@ -94,7 +101,7 @@ export default function PublicacoesDesempenhoPanel({
               <Megaphone className="h-4 w-4 text-primary" /> Desempenho por publicação
             </CardTitle>
             <CardDescription className="text-xs">
-              Cada linha é uma missão. Obrigados = confirmaram + abriram sem confirmar + não abriram.
+              “Contratados no disparo” é a quantidade que já estava contratada quando a missão foi publicada. Contratações posteriores entram somente nas próximas missões.
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -114,7 +121,8 @@ export default function PublicacoesDesempenhoPanel({
               <TableRow>
                 <TableHead>Publicação</TableHead>
                 <TableHead>Data</TableHead>
-                <TableHead className="text-right">Obrigados</TableHead>
+                <TableHead className="text-right">Contratados no disparo</TableHead>
+                <TableHead className="text-right">Público válido</TableHead>
                 <TableHead className="text-right">Confirmaram</TableHead>
                 <TableHead className="text-right">Abriu s/ confirmar</TableHead>
                 <TableHead className="text-right">Não abriram</TableHead>
@@ -125,21 +133,25 @@ export default function PublicacoesDesempenhoPanel({
             <TableBody>
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
                     Nenhuma publicação no período selecionado.
                   </TableCell>
                 </TableRow>
               )}
-              {rows.map((p) => (
-                <TableRow key={p.mission_id}>
+              {rows.map((p) => {
+                const a = audit.find((item) => item.mission_id === p.mission_id);
+                return <TableRow key={p.mission_id}>
                   <TableCell className="max-w-[280px]">
                     <p className="truncate font-medium">{p.titulo || "Publicação sem título"}</p>
                     <p className="text-[11px] text-muted-foreground">
                       {p.plataforma || "—"} · Portal {p.e2} · Comprovadas {p.e1 + p.e3}
+                      {!!a?.dispensados && ` · ${a.dispensados} dispensados`}
+                      {!!a?.duplicados && ` · ${a.duplicados} duplicados consolidados`}
                     </p>
                   </TableCell>
                   <TableCell className="text-xs">{fmtData(p.publicado_em)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.obrigados}</TableCell>
+                  <TableCell className="text-right tabular-nums">{a?.publico_congelado ?? p.obrigados}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">{p.obrigados}</TableCell>
                   <TableCell className="text-right font-semibold tabular-nums text-emerald-600">{p.cumpriram}</TableCell>
                   <TableCell className="text-right tabular-nums text-amber-600">{p.abriu_sem_confirmar}</TableCell>
                   <TableCell className="text-right tabular-nums text-destructive">{p.faltaram}</TableCell>
@@ -151,8 +163,8 @@ export default function PublicacoesDesempenhoPanel({
                       <MessageCircle className="h-4 w-4" /> Cobrar
                     </Button>
                   </TableCell>
-                </TableRow>
-              ))}
+                </TableRow>;
+              })}
             </TableBody>
           </Table>
         </div>
