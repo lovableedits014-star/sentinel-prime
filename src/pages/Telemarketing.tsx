@@ -496,20 +496,15 @@ export default function Telemarketing() {
   // Se o contato travado saiu da lista (reagendado por outro dispositivo, fila
   // recarregada etc.), mantemos a última cópia dele em tela para o operador
   // conseguir registrar o que ouviu na ligação.
+  // A tela nunca escolhe o primeiro item local por conta propria. Somente o
+  // contato devolvido e reservado atomicamente pelo servidor pode virar atual.
   const current = (
-    currentKey
-      ? (contatoDaChave ?? pinnedContatoRef.current ?? undefined)
-      : filteredContatos[safeCurrentIndex]
+    currentKey ? (contatoDaChave ?? pinnedContatoRef.current ?? undefined) : undefined
   ) as ContatoTele | undefined;
 
   useEffect(() => {
     if (current) pinnedContatoRef.current = current;
   }, [current]);
-
-  // Sem contato travado (login, troca de filtro/fila): trava o primeiro da fila.
-  useEffect(() => {
-    if (!currentKey && current) setCurrentKey({ id: current.id, tabela: current.tabela });
-  }, [currentKey, current]);
 
   const selecionarContato = (row: { id: string; tabela: string } | null) => {
     setCurrentKey(row ? { id: row.id, tabela: row.tabela } : null);
@@ -873,20 +868,40 @@ export default function Telemarketing() {
   };
 
   const skipToNext = async () => {
-    if (current && clientId) {
-      await supabase.rpc("tele_skip_contato" as any, {
+    if (!current || !clientId) return;
+    const skippedKey = { id: current.id, tabela: current.tabela };
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.rpc("tele_skip_contato" as any, {
         _client_id: clientId,
         _nome: operadorNome.trim(),
         _senha: operadorSenha.trim(),
-        _tabela: current.tabela,
-        _id: current.id,
+        _tabela: skippedKey.tabela,
+        _id: skippedKey.id,
         _session_id: sessionIdRef.current,
         _motivo: "pulado_pelo_operador",
         _cooldown_seconds: 900,
       });
+      if (error) throw new Error(error.message);
+      const result = data as { skipped?: boolean; released?: boolean } | null;
+      if (!result?.skipped) throw new Error("O contato atual não foi liberado.");
+
+      // Retira imediatamente o contato pulado da tela. O cooldown no servidor
+      // impede que esta mesma sessão o receba novamente durante 15 minutos.
+      const remaining = contatos.filter(
+        (row) => !(row.id === skippedKey.id && row.tabela === skippedKey.tabela),
+      );
+      setContatos(remaining);
+      selecionarContato(null);
+      pinnedContatoRef.current = null;
+      setCurrentIndex(0);
+      resetForm();
+      await jumpToProximoDisponivel(remaining);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível pular o contato.");
+    } finally {
+      setSaving(false);
     }
-    resetForm();
-    await jumpToProximoDisponivel();
   };
 
   const trabalharProximoInativo = async () => {
