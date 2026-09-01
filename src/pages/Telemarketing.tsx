@@ -607,6 +607,16 @@ export default function Telemarketing() {
     }
   };
 
+  // Atualizar os dados, por si so, nao abre um contato: a tela exige que ele
+  // tenha sido reservado atomicamente pelo servidor. Quando nao ha contato em
+  // atendimento, completa a atualizacao buscando e selecionando essa reserva.
+  const atualizarFila = async () => {
+    const refreshedContacts = await reloadContatos(
+      currentKey ? { id: currentKey.id, tabela: currentKey.tabela } : undefined,
+    );
+    if (!currentKey) await jumpToProximoDisponivel(refreshedContacts);
+  };
+
   // Reivindica a reserva de 30 min ao abrir o contato. A reserva é global por
   // telefone, inclusive quando a mesma pessoa existe em mais de uma origem.
   useEffect(() => {
@@ -1188,7 +1198,7 @@ export default function Telemarketing() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void reloadContatos()}
+            onClick={() => void atualizarFila()}
             disabled={refreshing}
           >
             <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Tentar
@@ -1799,7 +1809,7 @@ export default function Telemarketing() {
               variant="outline"
               size="sm"
               className="mt-4"
-              onClick={() => void reloadContatos()}
+              onClick={() => void atualizarFila()}
               disabled={refreshing}
             >
               <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />{" "}
