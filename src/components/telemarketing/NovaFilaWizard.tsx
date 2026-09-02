@@ -257,18 +257,66 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        data = XLSX.utils.sheet_to_json<Row>(ws, { defval: "", raw: false });
+        const matrix = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+          header: 1,
+          defval: "",
+          raw: false,
+        });
+        const normalizeHeader = (value: unknown) =>
+          String(value || "")
+            .trim()
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+        const headerIndex = matrix.slice(0, 30).reduce(
+          (best, row, index) => {
+            const cells = row.map(normalizeHeader);
+            const score = [
+              cells.some((v) => v.includes("pessoa") || v.includes("instituicao") || v === "nome"),
+              cells.some(
+                (v) => v.includes("contato") || v.includes("telefone") || v.includes("celular"),
+              ),
+              cells.some((v) => v.includes("data") && v.includes("atendimento")),
+              cells.some((v) => v.includes("area") && v.includes("atendimento")),
+              cells.some((v) => v.includes("bairro")),
+              cells.some((v) => v.includes("regiao")),
+            ].filter(Boolean).length;
+            return score > best.score ? { index, score } : best;
+          },
+          { index: 0, score: -1 },
+        ).index;
+        const rawHeaders = (matrix[headerIndex] || []).map(
+          (value, index) => String(value || "").trim() || `Coluna ${index + 1}`,
+        );
+        const used = new Map<string, number>();
+        const uniqueHeaders = rawHeaders.map((header) => {
+          const count = used.get(header) || 0;
+          used.set(header, count + 1);
+          return count ? `${header} (${count + 1})` : header;
+        });
+        data = matrix
+          .slice(headerIndex + 1)
+          .filter((row) => row.some((value) => String(value || "").trim()))
+          .map((row) => {
+            const item: Row = {};
+            uniqueHeaders.forEach((header, index) => {
+              item[header] = row[index] ?? "";
+            });
+            return item;
+          });
         if (!data.length) {
           toast.warning("Planilha vazia");
           return;
         }
-        setHeaders(Object.keys(data[0]));
+        setHeaders(uniqueHeaders);
       }
       setRows(data);
       setFileName(file.name);
       const hs = data.length ? Object.keys(data[0]) : [];
-      setColNome(guessCol(hs, ["nome", "name"]) || hs[0] || "");
-      setColTel(guessCol(hs, ["telefone", "celular", "phone", "whats", "fone"]) || hs[1] || "");
+      setColNome(guessCol(hs, ["nome", "pessoa", "instituicao", "name"]) || hs[0] || "");
+      setColTel(
+        guessCol(hs, ["telefone", "contato", "celular", "phone", "whats", "fone"]) || hs[1] || "",
+      );
       const cid = guessCol(hs, ["cidade", "city"]);
       const bar = guessCol(hs, ["bairro"]);
       setColCidade(cid || NONE);
