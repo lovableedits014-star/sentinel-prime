@@ -55,6 +55,18 @@ export async function exportCoordinatorMissionPdf(args: {
   teams.forEach((team, index) => {
     header(team, index);
     const pending = Number(team.abriu_sem_concluir) + Number(team.nao_abriu);
+    const ownDone=team.coordenador_status==="cumpriu";
+    const ownOpened=team.coordenador_status==="abriu";
+    const ownLabel=ownDone?"COORDENADOR CONCLUIU A MISSÃO":ownOpened?"COORDENADOR ABRIU, MAS NÃO CONCLUIU":"COORDENADOR AINDA NÃO ABRIU A MISSÃO";
+    const ownColor:[number,number,number]=ownDone?[220,252,231]:ownOpened?[254,243,199]:[254,226,226];
+    doc.setFillColor(...ownColor);
+    doc.roundedRect(margin,94,width-margin*2,54,6,6,"F");
+    doc.setTextColor(ownDone?21:ownOpened?146:185,ownDone?128:ownOpened?64:28,ownDone?61:ownOpened?14:28);
+    doc.setFont("helvetica","bold");doc.setFontSize(13);doc.text(ownLabel,margin+14,117);
+    doc.setFont("helvetica","normal");doc.setFontSize(9);
+    doc.text(ownDone?"Situação pessoal regular nesta missão.":"O próprio coordenador precisa ser cobrado pela participação pessoal.",margin+14,135);
+
+    doc.setTextColor(15,23,42);doc.setFont("helvetica","bold");doc.setFontSize(10);doc.text("DESEMPENHO DA EQUIPE",margin,172);
     const cards = [
       ["Contratados", team.total_lideres, [232, 240, 254]],
       ["Concluíram", team.concluidos, [220, 252, 231]],
@@ -66,35 +78,34 @@ export async function exportCoordinatorMissionPdf(args: {
     cards.forEach(([label, value, color], cardIndex) => {
       const x = margin + cardIndex * (cardWidth + gap);
       doc.setFillColor(...color);
-      doc.roundedRect(x, 96, cardWidth, 52, 5, 5, "F");
+      doc.roundedRect(x, 181, cardWidth, 52, 5, 5, "F");
       doc.setTextColor(71, 85, 105);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
-      doc.text(label.toUpperCase(), x + 8, 111, { maxWidth: cardWidth - 16 });
+      doc.text(label.toUpperCase(), x + 8, 196, { maxWidth: cardWidth - 16 });
       doc.setTextColor(15, 23, 42);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.text(String(value), x + 8, 138);
+      doc.text(String(value), x + 8, 223);
     });
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text(`Adesão: ${Number(team.taxa).toFixed(1)}%`, margin, 172);
+    doc.text(`Adesão da equipe: ${Number(team.taxa).toFixed(1)}%`, margin, 257);
     doc.setFillColor(226, 232, 240);
-    doc.roundedRect(margin, 181, width - margin * 2, 9, 4, 4, "F");
+    doc.roundedRect(margin, 266, width - margin * 2, 9, 4, 4, "F");
     if (Number(team.taxa) > 0) {
       doc.setFillColor(22, 101, 216);
-      doc.roundedRect(margin, 181, (width - margin * 2) * Math.min(100, Number(team.taxa)) / 100, 9, 4, 4, "F");
+      doc.roundedRect(margin, 266, (width - margin * 2) * Math.min(100, Number(team.taxa)) / 100, 9, 4, 4, "F");
     }
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    const ownStatus=team.coordenador_status==="cumpriu"?"Coordenador concluiu":team.coordenador_status==="abriu"?"Coordenador abriu, mas não concluiu":"Coordenador ainda não abriu";
-    doc.text(`${ownStatus}. ${pending ? `${pending} contratado(s) ainda precisam de acompanhamento.` : "Equipe com 100% de conclusão."}`, margin, 210);
+    doc.text(pending?`${pending} contratado(s) da equipe ainda precisam de acompanhamento.`:"Equipe com 100% de conclusão.",margin,295);
 
     autoTable(doc, {
-      startY: 228,
+      startY: 312,
       head: [["Situação", "Quantidade", "Integrantes"]],
       body: [
         ["Concluíram", team.concluidos, team.concluidos_nomes.join(", ") || "Nenhum"],
@@ -135,11 +146,14 @@ export async function exportCoordinatorMissionSummaryPdf(args: {
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
   const margin = 36;
-  const teams = [...args.teams].sort((a, b) => b.taxa - a.taxa || b.total_lideres - a.total_lideres || a.coordenador_nome.localeCompare(b.coordenador_nome));
+  const statusRank=(row:CoordinatorMissionPdfRow)=>row.coordenador_status==="nao_abriu"?0:row.coordenador_status==="abriu"?1:2;
+  const teams = [...args.teams].sort((a, b) => statusRank(a)-statusRank(b) || a.taxa-b.taxa || a.coordenador_nome.localeCompare(b.coordenador_nome));
   const totalTeams = teams.reduce((sum, row) => sum + Number(row.total_lideres), 0);
   const totalDone = teams.reduce((sum, row) => sum + Number(row.concluidos), 0);
-  const totalPending = teams.reduce((sum, row) => sum + Number(row.abriu_sem_concluir) + Number(row.nao_abriu), 0);
   const overallRate = totalTeams ? 100 * totalDone / totalTeams : 0;
+  const coordinatorsDone=teams.filter(row=>row.coordenador_status==="cumpriu").length;
+  const coordinatorsOpened=teams.filter(row=>row.coordenador_status==="abriu").length;
+  const coordinatorsMissing=teams.length-coordinatorsDone-coordinatorsOpened;
 
   doc.setFillColor(15, 52, 120);
   doc.rect(0, 0, width, 76, "F");
@@ -154,14 +168,15 @@ export async function exportCoordinatorMissionSummaryPdf(args: {
   doc.text(`Missão publicada em ${new Date(args.publishedAt).toLocaleString("pt-BR")}`, width - margin, 50, { align: "right" });
 
   const cards = [
-    ["Coordenadores", teams.length], ["Contratados em equipes", totalTeams],
-    ["Concluíram", totalDone], ["Pendentes", totalPending], ["Adesão geral", `${overallRate.toFixed(1)}%`],
+    ["Coordenadores", teams.length], ["Coordenadores concluíram", coordinatorsDone],
+    ["Coord. abriram, não concluíram", coordinatorsOpened], ["Coord. não abriram", coordinatorsMissing],
+    ["Adesão das equipes", `${overallRate.toFixed(1)}%`],
   ] as const;
   const gap = 8;
   const cardWidth = (width - margin * 2 - gap * 4) / 5;
   cards.forEach(([label, value], index) => {
     const x = margin + index * (cardWidth + gap);
-    doc.setFillColor(index === 2 ? 220 : index === 3 ? 254 : 232, index === 2 ? 252 : index === 3 ? 226 : 240, index === 2 ? 231 : index === 3 ? 226 : 254);
+    doc.setFillColor(index === 1 ? 220 : index >= 2&&index <=3 ? 254 : 232, index === 1 ? 252 : index >= 2&&index <=3 ? (index===2?243:226) : 240, index === 1 ? 231 : index >= 2&&index <=3 ? (index===2?199:226) : 254);
     doc.roundedRect(x, 94, cardWidth, 50, 5, 5, "F");
     doc.setTextColor(71, 85, 105);
     doc.setFont("helvetica", "normal");
@@ -175,7 +190,7 @@ export async function exportCoordinatorMissionSummaryPdf(args: {
 
   autoTable(doc, {
     startY: 164,
-    head: [["Coordenador", "Situação pessoal", "Equipe", "Concluíram", "Abriram, não concluíram", "Não abriram", "Cumprimento"]],
+    head: [["Coordenador", "COORDENADOR FEZ?", "Equipe", "Concluíram", "Abriram, não concluíram", "Não abriram", "Equipe %"]],
     body: teams.map((team) => [
       team.coordenador_nome,
       team.coordenador_status==="cumpriu"?"Concluiu":team.coordenador_status==="abriu"?"Abriu, não concluiu":"Não abriu",
@@ -190,6 +205,7 @@ export async function exportCoordinatorMissionSummaryPdf(args: {
     styles: { fontSize: 8.5, cellPadding: 5, valign: "middle" },
     headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [248, 250, 252] },
+    didParseCell:(hook)=>{if(hook.section==="body"&&hook.column.index===1){const value=String(hook.cell.raw);hook.cell.styles.fontStyle="bold";hook.cell.styles.textColor=value==="Concluiu"?[21,128,61]:value.startsWith("Abriu")?[146,64,14]:[185,28,28];hook.cell.styles.fillColor=value==="Concluiu"?[220,252,231]:value.startsWith("Abriu")?[254,243,199]:[254,226,226];}},
     columnStyles: {
       0: { cellWidth: 175, fontStyle: "bold" },
       1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" },
