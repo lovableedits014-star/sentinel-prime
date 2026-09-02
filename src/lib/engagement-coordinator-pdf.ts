@@ -8,6 +8,7 @@ export type CoordinatorMissionPdfRow = {
   concluidos_nomes: string[];
   abriu_nomes: string[];
   nao_abriu_nomes: string[];
+  coordenador_status?: "cumpriu" | "abriu" | "nao_abriu";
 };
 
 export type StandaloneMissionPdfRow = {
@@ -89,7 +90,8 @@ export async function exportCoordinatorMissionPdf(args: {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text(pending ? `${pending} contratado(s) ainda precisam de acompanhamento.` : "Equipe com 100% de conclusão.", margin, 210);
+    const ownStatus=team.coordenador_status==="cumpriu"?"Coordenador concluiu":team.coordenador_status==="abriu"?"Coordenador abriu, mas não concluiu":"Coordenador ainda não abriu";
+    doc.text(`${ownStatus}. ${pending ? `${pending} contratado(s) ainda precisam de acompanhamento.` : "Equipe com 100% de conclusão."}`, margin, 210);
 
     autoTable(doc, {
       startY: 228,
@@ -173,14 +175,14 @@ export async function exportCoordinatorMissionSummaryPdf(args: {
 
   autoTable(doc, {
     startY: 164,
-    head: [["Coordenador", "Equipe", "Concluíram", "Abriram, não concluíram", "Não abriram", "Pendentes", "Cumprimento"]],
+    head: [["Coordenador", "Situação pessoal", "Equipe", "Concluíram", "Abriram, não concluíram", "Não abriram", "Cumprimento"]],
     body: teams.map((team) => [
       team.coordenador_nome,
+      team.coordenador_status==="cumpriu"?"Concluiu":team.coordenador_status==="abriu"?"Abriu, não concluiu":"Não abriu",
       team.total_lideres,
       team.concluidos,
       team.abriu_sem_concluir,
       team.nao_abriu,
-      Number(team.abriu_sem_concluir) + Number(team.nao_abriu),
       `${Number(team.taxa).toFixed(1)}%`,
     ]),
     theme: "striped",
@@ -189,7 +191,7 @@ export async function exportCoordinatorMissionSummaryPdf(args: {
     headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: {
-      0: { cellWidth: 205, fontStyle: "bold" },
+      0: { cellWidth: 175, fontStyle: "bold" },
       1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" },
       4: { halign: "center" }, 5: { halign: "center" }, 6: { halign: "center", fontStyle: "bold" },
     },
