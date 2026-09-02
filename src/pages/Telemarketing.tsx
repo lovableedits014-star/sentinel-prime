@@ -80,6 +80,16 @@ interface FilaDiagnostico {
   reservados_ativos: number;
 }
 
+interface GabineteContexto {
+  origem?: "gabinete_atendidos";
+  regiao?: string | null;
+  quantidade_atendimentos?: number;
+  primeiro_atendimento?: string | null;
+  ultimo_atendimento?: string | null;
+  areas?: string[];
+  historico?: { data: string | null; area: string | null }[];
+}
+
 const TELE_APP_VERSION = "2026.08.31.2";
 const CONTACT_LOCK_SECONDS = 30 * 60;
 
@@ -176,6 +186,7 @@ export default function Telemarketing() {
   const [proximaTentativa, setProximaTentativa] = useState("");
   const [saving, setSaving] = useState(false);
   const [scripts, setScripts] = useState<CampanhaScript[]>([]);
+  const [gabineteContexto, setGabineteContexto] = useState<GabineteContexto | null>(null);
 
   // Busca de contato (retorno de ligação)
   const [buscaTermo, setBuscaTermo] = useState("");
@@ -589,7 +600,9 @@ export default function Telemarketing() {
       return;
     }
     let availableContacts = knownContacts ?? contatos;
-    let idx = availableContacts.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
+    let idx = availableContacts.findIndex(
+      (c) => c.id === res.contato_id && c.tabela === res.tabela,
+    );
     if (idx < 0) {
       availableContacts = await reloadContatos();
       idx = availableContacts.findIndex((c) => c.id === res.contato_id && c.tabela === res.tabela);
@@ -603,7 +616,9 @@ export default function Telemarketing() {
       selecionarContato(null);
       pinnedContatoRef.current = null;
       setCurrentIndex(0);
-      setFilaError("O próximo contato foi reservado, mas não pôde ser carregado. Atualize a fila para tentar novamente.");
+      setFilaError(
+        "O próximo contato foi reservado, mas não pôde ser carregado. Atualize a fila para tentar novamente.",
+      );
     }
   };
 
@@ -621,6 +636,7 @@ export default function Telemarketing() {
   // telefone, inclusive quando a mesma pessoa existe em mais de uma origem.
   useEffect(() => {
     if (current && clientId) {
+      setGabineteContexto(null);
       setCidade(current.cidade || "");
       setBairro(current.bairro || "");
       // Mantém a observação já registrada visível e permite complementá-la.
@@ -658,6 +674,19 @@ export default function Telemarketing() {
             void jumpToProximoDisponivel();
           }
         });
+      if (current.tabela === "contatos_avulsos") {
+        supabase
+          .rpc("tele_gabinete_contexto" as any, {
+            _client_id: clientId,
+            _nome: operadorNome.trim(),
+            _senha: operadorSenha.trim(),
+            _contato_id: current.id,
+          })
+          .then(({ data }: any) => {
+            if (data?.origem === "gabinete_atendidos")
+              setGabineteContexto(data as GabineteContexto);
+          });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
@@ -864,7 +893,9 @@ export default function Telemarketing() {
     }
 
     const completedKey = { id: current.id, tabela: current.tabela };
-    setContatos((prev) => prev.filter((i) => !(i.id === completedKey.id && i.tabela === completedKey.tabela)));
+    setContatos((prev) =>
+      prev.filter((i) => !(i.id === completedKey.id && i.tabela === completedKey.tabela)),
+    );
     selecionarContato(null);
     pinnedContatoRef.current = null;
     setCurrentIndex(0);
@@ -872,7 +903,9 @@ export default function Telemarketing() {
     resetForm();
     const refreshedContacts = await reloadContatos();
     await jumpToProximoDisponivel(
-      refreshedContacts.filter((i) => !(i.id === completedKey.id && i.tabela === completedKey.tabela)),
+      refreshedContacts.filter(
+        (i) => !(i.id === completedKey.id && i.tabela === completedKey.tabela),
+      ),
     );
     setSaving(false);
   };
@@ -931,10 +964,17 @@ export default function Telemarketing() {
       setLoadingInactive(false);
       return;
     }
-    if (contatoAberto && !(contatoAberto.id === result.contato_id && contatoAberto.tabela === result.tabela)) {
+    if (
+      contatoAberto &&
+      !(contatoAberto.id === result.contato_id && contatoAberto.tabela === result.tabela)
+    ) {
       await supabase.rpc("tele_release_contato" as any, {
-        _client_id: clientId, _nome: operadorNome.trim(), _senha: operadorSenha.trim(),
-        _tabela: contatoAberto.tabela, _id: contatoAberto.id, _session_id: sessionIdRef.current,
+        _client_id: clientId,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _tabela: contatoAberto.tabela,
+        _id: contatoAberto.id,
+        _session_id: sessionIdRef.current,
       });
     }
     const result = data as { found?: boolean; tabela?: string; contato_id?: string } | null;
@@ -1167,7 +1207,12 @@ export default function Telemarketing() {
             <ArrowRight className="w-3.5 h-3.5 mr-1" />
             Próximo disponível
           </Button>
-          <Button size="sm" variant="outline" onClick={() => void trabalharProximoInativo()} disabled={loadingInactive}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void trabalharProximoInativo()}
+            disabled={loadingInactive}
+          >
             <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loadingInactive ? "animate-spin" : ""}`} />
             Trabalhar inativo
           </Button>
@@ -1340,12 +1385,72 @@ export default function Telemarketing() {
                             ? "Recusou"
                             : current.ligacao_status === "invalido"
                               ? "Número inexistente"
-                            : current.ligacao_status}
+                              : current.ligacao_status}
                   </Badge>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {gabineteContexto?.origem === "gabinete_atendidos" && (
+                <div className="rounded-lg border-2 border-blue-500/40 bg-blue-500/10 p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-semibold text-sm text-blue-800 dark:text-blue-200">
+                      Pessoa atendida pelo gabinete
+                    </div>
+                    <Badge className="bg-blue-700 text-white">Acao exclusiva do gabinete</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+                    <div>
+                      <span className="text-muted-foreground">Atendimentos</span>
+                      <div className="font-semibold">
+                        {gabineteContexto.quantidade_atendimentos || 0}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Ultimo atendimento</span>
+                      <div className="font-semibold">
+                        {gabineteContexto.ultimo_atendimento
+                          ? new Date(
+                              `${gabineteContexto.ultimo_atendimento}T12:00:00`,
+                            ).toLocaleDateString("pt-BR")
+                          : "Nao informado"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Regiao</span>
+                      <div className="font-semibold">
+                        {gabineteContexto.regiao || "Nao informada"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Areas</span>
+                      <div className="font-semibold">
+                        {(gabineteContexto.areas || []).join(", ") || "Nao informadas"}
+                      </div>
+                    </div>
+                  </div>
+                  {(gabineteContexto.historico || []).length > 0 && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer font-medium text-blue-800 dark:text-blue-200">
+                        Ver historico completo
+                      </summary>
+                      <div className="mt-2 space-y-1 border-l-2 border-blue-500/30 pl-3">
+                        {(gabineteContexto.historico || []).map((item, index) => (
+                          <div key={`${item.data}-${item.area}-${index}`}>
+                            <span className="font-medium">
+                              {item.data
+                                ? new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR")
+                                : "Data nao informada"}
+                            </span>
+                            {" - "}
+                            {item.area || "Area nao informada"}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )}
               {/* Phone + WhatsApp */}
               {(() => {
                 const wa = toWhatsAppBR(current.telefone);
