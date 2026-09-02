@@ -10,6 +10,11 @@ export type CoordinatorMissionPdfRow = {
   nao_abriu_nomes: string[];
 };
 
+export type StandaloneMissionPdfRow = {
+  nome: string; telefone: string | null; cargo: string | null; regiao: string | null; cidade: string | null;
+  status: "cumpriu" | "abriu" | "nao_abriu";
+};
+
 const slug = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
@@ -197,4 +202,31 @@ export async function exportCoordinatorMissionSummaryPdf(args: {
     },
   });
   doc.save(`resumo-equipes-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+export async function exportStandaloneMissionPdf(args: {
+  missionTitle: string; publishedAt: string; rows: StandaloneMissionPdfRow[];
+}) {
+  if (!args.rows.length) throw new Error("Nenhum contratado avulso disponível para exportação.");
+  const [{ default: jsPDF }, tableModule] = await Promise.all([import("jspdf"),import("jspdf-autotable")]);
+  const autoTable=tableModule.default;
+  const doc=new jsPDF({unit:"pt",format:"a4",orientation:"landscape"});
+  const width=doc.internal.pageSize.getWidth(),height=doc.internal.pageSize.getHeight(),margin=36;
+  const done=args.rows.filter(r=>r.status==="cumpriu").length;
+  const opened=args.rows.filter(r=>r.status==="abriu").length;
+  const unopened=args.rows.filter(r=>r.status==="nao_abriu").length;
+  doc.setFillColor(15,52,120);doc.rect(0,0,width,76,"F");doc.setTextColor(255);doc.setFont("helvetica","bold");doc.setFontSize(18);
+  doc.text("Desempenho dos contratados avulsos",margin,31);doc.setFont("helvetica","normal");doc.setFontSize(9);
+  doc.text(args.missionTitle.slice(0,100),margin,50);doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`,width-margin,31,{align:"right"});
+  doc.text(`Publicada em ${new Date(args.publishedAt).toLocaleString("pt-BR")}`,width-margin,50,{align:"right"});
+  const rate=args.rows.length?100*done/args.rows.length:0;
+  doc.setTextColor(15,23,42);doc.setFont("helvetica","bold");doc.setFontSize(11);
+  doc.text(`${args.rows.length} avulsos  |  ${done} concluíram  |  ${opened} abriram e não concluíram  |  ${unopened} não abriram  |  ${rate.toFixed(1)}% de cumprimento`,margin,104);
+  autoTable(doc,{startY:122,head:[["Nome","Cargo","Região","Telefone","Situação"]],body:args.rows.map(r=>[
+    r.nome,r.cargo||"-",r.regiao||r.cidade||"-",r.telefone||"-",r.status==="cumpriu"?"Concluiu":r.status==="abriu"?"Abriu, não concluiu":"Não abriu"
+  ]),theme:"striped",margin:{left:margin,right:margin,bottom:30},styles:{fontSize:9,cellPadding:5},
+    headStyles:{fillColor:[30,64,175],textColor:255,fontStyle:"bold"},columnStyles:{0:{cellWidth:230,fontStyle:"bold"},4:{cellWidth:120,fontStyle:"bold"}},
+    didDrawPage:()=>{doc.setFontSize(8);doc.setTextColor(100,116,139);doc.text("Relatório interno - Engajamento",margin,height-14);doc.text(`Página ${doc.getCurrentPageInfo().pageNumber}`,width-margin,height-14,{align:"right"});}
+  });
+  doc.save(`desempenho-avulsos-${new Date().toISOString().slice(0,10)}.pdf`);
 }
