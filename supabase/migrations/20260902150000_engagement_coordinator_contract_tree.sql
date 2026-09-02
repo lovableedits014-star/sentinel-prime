@@ -85,11 +85,14 @@ BEGIN
     coalesce(jsonb_agg(m.nome ORDER BY m.nome) FILTER(WHERE m.status='cumpriu'),'[]'::jsonb),
     coalesce(jsonb_agg(m.nome ORDER BY m.nome) FILTER(WHERE m.status='abriu'),'[]'::jsonb),
     coalesce(jsonb_agg(m.nome ORDER BY m.nome) FILTER(WHERE m.status='nao_abriu'),'[]'::jsonb)
+  -- Parte de todos os coordenadores ativos. O LEFT JOIN e intencional: quem
+  -- ainda nao possui contratado atribuido tambem precisa aparecer para que
+  -- vinculos ausentes ou incorretos fiquem visiveis na operacao.
   FROM eleicao_pessoas c
-  JOIN members m ON m.coordenador_id=c.id
+  LEFT JOIN members m ON m.coordenador_id=c.id
   WHERE c.client_id=p_client_id AND c.tipo::text='coordenador' AND c.arquivado_em IS NULL
   GROUP BY c.id,c.nome,c.telefone
-  ORDER BY count(*) FILTER(WHERE m.status<>'cumpriu') DESC,c.nome;
+  ORDER BY count(m.pessoa_id) DESC,c.nome;
 END;
 $function$;
 
