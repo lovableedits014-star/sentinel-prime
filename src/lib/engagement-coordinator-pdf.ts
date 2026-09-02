@@ -113,3 +113,88 @@ export async function exportCoordinatorMissionPdf(args: {
   const suffix = args.coordinatorName ? slug(args.coordinatorName) : "todos-os-coordenadores";
   doc.save(`desempenho-equipes-${suffix}-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
+export async function exportCoordinatorMissionSummaryPdf(args: {
+  missionTitle: string;
+  publishedAt: string;
+  teams: CoordinatorMissionPdfRow[];
+}) {
+  if (!args.teams.length) throw new Error("Nenhum coordenador disponível para exportação.");
+  const [{ default: jsPDF }, tableModule] = await Promise.all([
+    import("jspdf"), import("jspdf-autotable"),
+  ]);
+  const autoTable = tableModule.default;
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const margin = 36;
+  const teams = [...args.teams].sort((a, b) => b.taxa - a.taxa || b.total_lideres - a.total_lideres || a.coordenador_nome.localeCompare(b.coordenador_nome));
+  const totalTeams = teams.reduce((sum, row) => sum + Number(row.total_lideres), 0);
+  const totalDone = teams.reduce((sum, row) => sum + Number(row.concluidos), 0);
+  const totalPending = teams.reduce((sum, row) => sum + Number(row.abriu_sem_concluir) + Number(row.nao_abriu), 0);
+  const overallRate = totalTeams ? 100 * totalDone / totalTeams : 0;
+
+  doc.setFillColor(15, 52, 120);
+  doc.rect(0, 0, width, 76, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Visão geral das equipes", margin, 31);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(args.missionTitle.slice(0, 100), margin, 50);
+  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, width - margin, 31, { align: "right" });
+  doc.text(`Missão publicada em ${new Date(args.publishedAt).toLocaleString("pt-BR")}`, width - margin, 50, { align: "right" });
+
+  const cards = [
+    ["Coordenadores", teams.length], ["Contratados em equipes", totalTeams],
+    ["Concluíram", totalDone], ["Pendentes", totalPending], ["Adesão geral", `${overallRate.toFixed(1)}%`],
+  ] as const;
+  const gap = 8;
+  const cardWidth = (width - margin * 2 - gap * 4) / 5;
+  cards.forEach(([label, value], index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.setFillColor(index === 2 ? 220 : index === 3 ? 254 : 232, index === 2 ? 252 : index === 3 ? 226 : 240, index === 2 ? 231 : index === 3 ? 226 : 254);
+    doc.roundedRect(x, 94, cardWidth, 50, 5, 5, "F");
+    doc.setTextColor(71, 85, 105);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.text(label.toUpperCase(), x + 8, 109);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.text(String(value), x + 8, 134);
+  });
+
+  autoTable(doc, {
+    startY: 164,
+    head: [["Coordenador", "Equipe", "Concluíram", "Abriram, não concluíram", "Não abriram", "Pendentes", "Cumprimento"]],
+    body: teams.map((team) => [
+      team.coordenador_nome,
+      team.total_lideres,
+      team.concluidos,
+      team.abriu_sem_concluir,
+      team.nao_abriu,
+      Number(team.abriu_sem_concluir) + Number(team.nao_abriu),
+      `${Number(team.taxa).toFixed(1)}%`,
+    ]),
+    theme: "striped",
+    margin: { left: margin, right: margin, bottom: 32 },
+    styles: { fontSize: 8.5, cellPadding: 5, valign: "middle" },
+    headStyles: { fillColor: [30, 64, 175], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 205, fontStyle: "bold" },
+      1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" },
+      4: { halign: "center" }, 5: { halign: "center" }, 6: { halign: "center", fontStyle: "bold" },
+    },
+    didDrawPage: () => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text("Resumo executivo - Engajamento", margin, height - 14);
+      doc.text(`Página ${doc.getCurrentPageInfo().pageNumber}`, width - margin, height - 14, { align: "right" });
+    },
+  });
+  doc.save(`resumo-equipes-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
