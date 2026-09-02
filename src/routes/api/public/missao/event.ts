@@ -21,7 +21,9 @@ const ALLOWED = new Set([
 
 function detectBot(ua: string | null): boolean {
   if (!ua) return false;
-  return /(facebookexternalhit|WhatsApp\/|Twitterbot|LinkedInBot|Slackbot|TelegramBot|bot|crawler|spider|preview)/i.test(ua);
+  // O navegador interno do WhatsApp e uma pessoa real. Somente crawlers de
+  // preview devem ser excluidos das metricas.
+  return /(facebookexternalhit|Twitterbot|LinkedInBot|Slackbot|TelegramBot|bot|crawler|spider|preview)/i.test(ua);
 }
 
 function detectDevice(ua: string | null): string {

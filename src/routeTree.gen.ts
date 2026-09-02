@@ -17,6 +17,7 @@ import { Route as ApiPublicMissaoIdentifyRouteImport } from './routes/api/public
 import { Route as ApiPublicMissaoEventRouteImport } from './routes/api/public/missao/event'
 import { Route as ApiPublicHooksEleicaoCobrancaAutoRouteImport } from './routes/api/public/hooks/eleicao-cobranca-auto'
 import { Route as ApiPublicMissaoConfigMissionIdRouteImport } from './routes/api/public/missao/config.$missionId'
+import { Route as ApiPublicMissaoGoMissionIdLinkKeyRouteImport } from './routes/api/public/missao/go.$missionId.$linkKey'
 import { Route as ApiPublicMMissionIdDCodeRouteImport } from './routes/api/public/m.$missionId.d.$code'
 
 const SplatRoute = SplatRouteImport.update({
@@ -62,6 +63,12 @@ const ApiPublicMissaoConfigMissionIdRoute =
     path: '/api/public/missao/config/$missionId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicMissaoGoMissionIdLinkKeyRoute =
+  ApiPublicMissaoGoMissionIdLinkKeyRouteImport.update({
+    id: '/api/public/missao/go/$missionId/$linkKey',
+    path: '/api/public/missao/go/$missionId/$linkKey',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicMMissionIdDCodeRoute =
   ApiPublicMMissionIdDCodeRouteImport.update({
     id: '/api/public/m/$missionId/d/$code',
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/api/public/missao/switch': typeof ApiPublicMissaoSwitchRoute
   '/api/public/missao/config/$missionId': typeof ApiPublicMissaoConfigMissionIdRoute
   '/api/public/m/$missionId/d/$code': typeof ApiPublicMMissionIdDCodeRoute
+  '/api/public/missao/go/$missionId/$linkKey': typeof ApiPublicMissaoGoMissionIdLinkKeyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -90,6 +98,7 @@ export interface FileRoutesByTo {
   '/api/public/missao/switch': typeof ApiPublicMissaoSwitchRoute
   '/api/public/missao/config/$missionId': typeof ApiPublicMissaoConfigMissionIdRoute
   '/api/public/m/$missionId/d/$code': typeof ApiPublicMMissionIdDCodeRoute
+  '/api/public/missao/go/$missionId/$linkKey': typeof ApiPublicMissaoGoMissionIdLinkKeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -102,6 +111,7 @@ export interface FileRoutesById {
   '/api/public/missao/switch': typeof ApiPublicMissaoSwitchRoute
   '/api/public/missao/config/$missionId': typeof ApiPublicMissaoConfigMissionIdRoute
   '/api/public/m/$missionId/d/$code': typeof ApiPublicMMissionIdDCodeRoute
+  '/api/public/missao/go/$missionId/$linkKey': typeof ApiPublicMissaoGoMissionIdLinkKeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
     | '/api/public/missao/switch'
     | '/api/public/missao/config/$missionId'
     | '/api/public/m/$missionId/d/$code'
+    | '/api/public/missao/go/$missionId/$linkKey'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '/api/public/missao/switch'
     | '/api/public/missao/config/$missionId'
     | '/api/public/m/$missionId/d/$code'
+    | '/api/public/missao/go/$missionId/$linkKey'
   id:
     | '__root__'
     | '/'
@@ -137,6 +149,7 @@ export interface FileRouteTypes {
     | '/api/public/missao/switch'
     | '/api/public/missao/config/$missionId'
     | '/api/public/m/$missionId/d/$code'
+    | '/api/public/missao/go/$missionId/$linkKey'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -149,6 +162,7 @@ export interface RootRouteChildren {
   ApiPublicMissaoSwitchRoute: typeof ApiPublicMissaoSwitchRoute
   ApiPublicMissaoConfigMissionIdRoute: typeof ApiPublicMissaoConfigMissionIdRoute
   ApiPublicMMissionIdDCodeRoute: typeof ApiPublicMMissionIdDCodeRoute
+  ApiPublicMissaoGoMissionIdLinkKeyRoute: typeof ApiPublicMissaoGoMissionIdLinkKeyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -209,6 +223,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMissaoConfigMissionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/missao/go/$missionId/$linkKey': {
+      id: '/api/public/missao/go/$missionId/$linkKey'
+      path: '/api/public/missao/go/$missionId/$linkKey'
+      fullPath: '/api/public/missao/go/$missionId/$linkKey'
+      preLoaderRoute: typeof ApiPublicMissaoGoMissionIdLinkKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/m/$missionId/d/$code': {
       id: '/api/public/m/$missionId/d/$code'
       path: '/api/public/m/$missionId/d/$code'
@@ -231,6 +252,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicMissaoSwitchRoute: ApiPublicMissaoSwitchRoute,
   ApiPublicMissaoConfigMissionIdRoute: ApiPublicMissaoConfigMissionIdRoute,
   ApiPublicMMissionIdDCodeRoute: ApiPublicMMissionIdDCodeRoute,
+  ApiPublicMissaoGoMissionIdLinkKeyRoute:
+    ApiPublicMissaoGoMissionIdLinkKeyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

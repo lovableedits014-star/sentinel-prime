@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
-import { normalizeExternalUrl, openExternalUrl } from "@/lib/external-social-link";
+import { normalizeExternalUrl } from "@/lib/external-social-link";
 
 type Participant = {
   id: string;
@@ -104,7 +104,8 @@ export default function MissaoPublica() {
     try {
       const raw = localStorage.getItem(`sm_missao_clicks_${missionId}`);
       if (raw) setClickedLinks(new Set(JSON.parse(raw) as string[]));
-      if (localStorage.getItem(`sm_missao_done_${missionId}`) === "1") setDeclared(true);
+      // A conclusao exibida vem sempre do servidor. O armazenamento local
+      // guarda apenas progresso de cliques e nunca e fonte de verdade.
     } catch {
       // ignora storage indisponível
     }
@@ -176,7 +177,7 @@ export default function MissaoPublica() {
           const finalData = (await withTok.json()) as MissionConfig & { client_id?: string };
           if (cancelled) return;
           setConfig(finalData);
-          if (finalData.participant?.concluido_em) setDeclared(true);
+          setDeclared(Boolean(finalData.participant?.concluido_em));
           // token não reconhecido pelo servidor → limpa
           if (existing && !finalData.participant && cid) {
             localStorage.removeItem(clientTokenKey(cid));
@@ -299,9 +300,8 @@ export default function MissaoPublica() {
     type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link",
     linkId?: string,
   ) => {
-    let destination: URL;
     try {
-      destination = normalizeExternalUrl(url);
+      normalizeExternalUrl(url);
     } catch {
       toast.error("Este link está inválido. Avise o responsável pela missão.");
       return;
@@ -318,10 +318,15 @@ export default function MissaoPublica() {
       }
       return next;
     });
-    // Não aguardamos a telemetria: no iPhone, qualquer await faz o Safari perder
-    // o gesto original do toque e bloquear a abertura do Facebook/Instagram.
-    void registerEvent(type, linkId);
-    openExternalUrl(destination.toString());
+    // O servidor grava o clique (e, no ultimo link, a conclusao) antes de
+    // redirecionar. O registro nao depende de a pessoa voltar do app social.
+    const linkKey = linkId || (
+      type === "click_facebook" ? "facebook" :
+      type === "click_instagram" ? "instagram" : "avulso"
+    );
+    const trackedUrl = `/api/public/missao/go/${encodeURIComponent(missionId || "")}/${encodeURIComponent(linkKey)}` +
+      `?token=${encodeURIComponent(token)}&code=${encodeURIComponent(code)}`;
+    window.location.assign(trackedUrl);
   };
 
   const handleDeclare = async () => {
