@@ -92,6 +92,7 @@ interface GabineteContexto {
 
 const TELE_APP_VERSION = "2026.08.31.2";
 const CONTACT_LOCK_SECONDS = 30 * 60;
+const CONTACT_PAGE_SIZE = 1000;
 
 const mapContato = (r: any): ContatoTele => ({
   id: r.id,
@@ -194,6 +195,30 @@ export default function Telemarketing() {
   const [buscaResultados, setBuscaResultados] = useState<ContatoTele[]>([]);
   const [buscouVazio, setBuscouVazio] = useState(false);
 
+  // O PostgREST limita cada resposta a 1.000 linhas. Percorre todas as paginas
+  // para que contadores e reservas locais representem a fila completa.
+  const fetchContatosPaginados = async (campanhaId: string | null) => {
+    const allRows: any[] = [];
+    let page = 0;
+    while (true) {
+      const from = page * CONTACT_PAGE_SIZE;
+      const response = await supabase
+        .rpc("tele_list_contatos" as any, {
+          _client_id: clientId!,
+          _nome: operadorNome.trim(),
+          _senha: operadorSenha.trim(),
+          _campanha_id: campanhaId,
+        })
+        .range(from, from + CONTACT_PAGE_SIZE - 1);
+      if (response.error) return { data: allRows, error: response.error };
+      const rows = (response.data as any[]) || [];
+      allRows.push(...rows);
+      if (rows.length < CONTACT_PAGE_SIZE) break;
+      page += 1;
+    }
+    return { data: allRows, error: null };
+  };
+
   useEffect(() => {
     // Force anon role to ensure RLS anon policies apply
     supabase.auth.signOut().then(() => {
@@ -274,12 +299,7 @@ export default function Telemarketing() {
     // Fetch contacts via secure RPC (operator-authenticated). When opened from
     // the admin "Filas" page, ?campanha=ID restricts the list to that fila.
     let usedCampanhaId = selectedCampanhaId;
-    let { data: rpcRows, error: rpcErr } = await supabase.rpc("tele_list_contatos" as any, {
-      _client_id: clientId!,
-      _nome: operadorNome.trim(),
-      _senha: operadorSenha.trim(),
-      _campanha_id: usedCampanhaId,
-    });
+    let { data: rpcRows, error: rpcErr } = await fetchContatosPaginados(usedCampanhaId);
     if (rpcErr) {
       toast.error("Erro ao carregar contatos: " + rpcErr.message);
       setLoading(false);
@@ -297,12 +317,7 @@ export default function Telemarketing() {
       });
       const detail = diag.data as FilaDiagnostico | null;
       if (detail && !detail.fila_solicitada_valida) {
-        const retry = await supabase.rpc("tele_list_contatos" as any, {
-          _client_id: clientId!,
-          _nome: operadorNome.trim(),
-          _senha: operadorSenha.trim(),
-          _campanha_id: null,
-        });
+        const retry = await fetchContatosPaginados(null);
         if (!retry.error) {
           rpcRows = retry.data as any;
           usedCampanhaId = null;
@@ -446,12 +461,7 @@ export default function Telemarketing() {
     setRefreshing(true);
     setFilaError(null);
     let resolvedCampanhaId = campanhaId;
-    let { data: rpcRows, error } = await supabase.rpc("tele_list_contatos" as any, {
-      _client_id: clientId,
-      _nome: operadorNome.trim(),
-      _senha: operadorSenha.trim(),
-      _campanha_id: campanhaId,
-    });
+    let { data: rpcRows, error } = await fetchContatosPaginados(campanhaId);
     if (!error && campanhaId && ((rpcRows as any[]) || []).length === 0) {
       const diag = await supabase.rpc("tele_diagnostico_fila" as any, {
         _client_id: clientId,
@@ -461,12 +471,7 @@ export default function Telemarketing() {
       });
       const detail = diag.data as FilaDiagnostico | null;
       if (detail && !detail.fila_solicitada_valida) {
-        const fallback = await supabase.rpc("tele_list_contatos" as any, {
-          _client_id: clientId,
-          _nome: operadorNome.trim(),
-          _senha: operadorSenha.trim(),
-          _campanha_id: null,
-        });
+        const fallback = await fetchContatosPaginados(null);
         if (!fallback.error) {
           rpcRows = fallback.data;
           error = null;
@@ -552,12 +557,7 @@ export default function Telemarketing() {
   const reloadContatos = async (preserveId?: { id: string; tabela: string }) => {
     if (!clientId || !operadorNome.trim() || !operadorSenha.trim()) return [] as ContatoTele[];
     setRefreshing(true);
-    const { data: rpcRows, error } = await supabase.rpc("tele_list_contatos" as any, {
-      _client_id: clientId,
-      _nome: operadorNome.trim(),
-      _senha: operadorSenha.trim(),
-      _campanha_id: selectedCampanhaId,
-    });
+    const { data: rpcRows, error } = await fetchContatosPaginados(selectedCampanhaId);
     if (error) {
       setFilaError("A conexão oscilou. A lista anterior foi mantida; tente novamente.");
       setRefreshing(false);

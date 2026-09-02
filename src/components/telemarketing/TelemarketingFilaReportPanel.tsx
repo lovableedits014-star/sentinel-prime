@@ -96,6 +96,7 @@ interface GabineteReportRow {
   ligacao_status: string | null;
   vota_candidato: string | null;
   operador_nome: string | null;
+  ligacao_em: string | null;
   total_tentativas: number;
 }
 
@@ -209,19 +210,41 @@ export default function TelemarketingFilaReportPanel({
         toast.error(`Erro ao carregar relatório: ${error.message}`);
         return;
       }
-      setRows(allRows);
-      if (campanhaId) {
-        const gabinete = await supabase.rpc(
-          "tele_gabinete_report" as never,
-          {
-            _client_id: clientId,
-            _campanha_id: campanhaId,
-          } as never,
-        );
-        setGabineteRows(
-          gabinete.error ? [] : (((gabinete.data as unknown[]) || []) as GabineteReportRow[]),
-        );
-      } else setGabineteRows([]);
+      const allGabinete: GabineteReportRow[] = [];
+      let gabinetePage = 0;
+      while (true) {
+        const fromRow = gabinetePage * REPORT_PAGE_SIZE;
+        const gabinete = await supabase
+          .rpc(
+            "tele_gabinete_report" as never,
+            { _client_id: clientId, _campanha_id: campanhaId } as never,
+          )
+          .order("contato_id", { ascending: true })
+          .range(fromRow, fromRow + REPORT_PAGE_SIZE - 1);
+        if (gabinete.error) break;
+        const pageRows = ((gabinete.data as unknown[]) || []) as GabineteReportRow[];
+        allGabinete.push(...pageRows);
+        if (pageRows.length < REPORT_PAGE_SIZE) break;
+        gabinetePage += 1;
+      }
+      const gabineteById = new Map(allGabinete.map((row) => [row.contato_id, row]));
+      setRows(
+        allRows.map((row) => {
+          if (row.origem !== "Atendidos pelo gabinete") return row;
+          const audit = gabineteById.get(row.contato_id);
+          return audit
+            ? {
+                ...row,
+                ligacao_status: audit.ligacao_status,
+                vota_candidato: audit.vota_candidato,
+                operador_nome: audit.operador_nome,
+                ligacao_em: audit.ligacao_em,
+                total_tentativas: audit.total_tentativas,
+              }
+            : row;
+        }),
+      );
+      setGabineteRows(allGabinete);
       if (notify) toast.success("Relatório atualizado");
     },
     [clientId, campanhaId],
@@ -230,6 +253,26 @@ export default function TelemarketingFilaReportPanel({
   useEffect(() => {
     if (clientId) void load();
   }, [clientId, load]);
+
+  useEffect(() => {
+    if (!clientId) return;
+    const channel = supabase
+      .channel(`tele-report-live-${clientId}-${campanhaId || "all"}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "telemarketing_call_log",
+          filter: `client_id=eq.${clientId}`,
+        },
+        () => void load(),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [clientId, campanhaId, load]);
 
   const options = useMemo(
     () => ({
@@ -353,9 +396,18 @@ export default function TelemarketingFilaReportPanel({
     return [...map.values()].sort((a, b) => b.sim - a.sim || b.total - a.total).slice(0, 12);
   }, [filtered]);
 
+  const filteredGabineteRows = useMemo(() => {
+    const ids = new Set(
+      filtered
+        .filter((row) => row.origem === "Atendidos pelo gabinete")
+        .map((row) => row.contato_id),
+    );
+    return gabineteRows.filter((row) => ids.has(row.contato_id));
+  }, [filtered, gabineteRows]);
+
   const gabineteRegioes = useMemo(() => {
     const map = new Map<string, { nome: string; total: number; atendidos: number; sim: number }>();
-    gabineteRows.forEach((r) => {
+    filteredGabineteRows.forEach((r) => {
       const nome = clean(r.regiao);
       const cur = map.get(nome) || { nome, total: 0, atendidos: 0, sim: 0 };
       cur.total += 1;
@@ -364,11 +416,11 @@ export default function TelemarketingFilaReportPanel({
       map.set(nome, cur);
     });
     return [...map.values()].sort((a, b) => b.sim - a.sim || b.total - a.total);
-  }, [gabineteRows]);
+  }, [filteredGabineteRows]);
 
   const gabineteAreas = useMemo(() => {
     const map = new Map<string, { nome: string; total: number; sim: number }>();
-    gabineteRows.forEach((r) =>
+    filteredGabineteRows.forEach((r) =>
       (r.areas || "Sem area")
         .split(",")
         .map((v) => v.trim())
@@ -381,7 +433,7 @@ export default function TelemarketingFilaReportPanel({
         }),
     );
     return [...map.values()].sort((a, b) => b.sim - a.sim || b.total - a.total);
-  }, [gabineteRows]);
+  }, [filteredGabineteRows]);
 
   const federal = useMemo(() => topNames(filtered, "candidato_federal"), [filtered]);
   const senador = useMemo(() => topNames(filtered, "candidato_senador"), [filtered]);
@@ -477,7 +529,7 @@ export default function TelemarketingFilaReportPanel({
       bairroRanking.map((b) => ({ Bairro: b.nome, Contatos: b.total, "Vota sim": b.sim })),
     );
     XLSX.utils.book_append_sheet(wb, wsBairros, "Bairros");
-    if (gabineteRows.length) {
+    if (filteredGabineteRows.length) {
       XLSX.utils.book_append_sheet(
         wb,
         XLSX.utils.json_to_sheet(
@@ -506,7 +558,7 @@ export default function TelemarketingFilaReportPanel({
       XLSX.utils.book_append_sheet(
         wb,
         XLSX.utils.json_to_sheet(
-          gabineteRows.map((r) => ({
+          filteredGabineteRows.map((r) => ({
             Nome: r.nome,
             Telefone: r.telefone,
             Bairro: clean(r.bairro),
@@ -530,16 +582,30 @@ export default function TelemarketingFilaReportPanel({
 
   const exportPDF = () => {
     const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+    const segments = [
+      origin !== ALL ? `Origem: ${origin}` : null,
+      operator !== ALL ? `Operador: ${operator}` : null,
+      city !== ALL ? `Cidade: ${city}` : null,
+      neighborhood !== ALL ? `Bairro: ${neighborhood}` : null,
+      result !== ALL ? `Resultado: ${RESULT_LABEL[result] || result}` : null,
+      vote !== ALL ? `Intenção: ${VOTE_LABEL[vote] || vote}` : null,
+      from ? `Desde: ${new Date(`${from}T12:00:00`).toLocaleDateString("pt-BR")}` : null,
+      to ? `Até: ${new Date(`${to}T12:00:00`).toLocaleDateString("pt-BR")}` : null,
+    ].filter(Boolean) as string[];
+    const reportTitle = activeFilters
+      ? `Relatório segmentado — ${origin !== ALL ? origin : campanhaNome}`
+      : `Relatório da fila — ${campanhaNome}`;
     doc.setFontSize(16);
-    doc.text(`Relatório da fila — ${campanhaNome}`, 36, 38);
+    doc.text(reportTitle, 36, 38);
     doc.setFontSize(9);
     doc.text(
-      `Gerado em ${new Date().toLocaleString("pt-BR")} | ${filtered.length} contato(s)${activeFilters ? " | filtros aplicados" : ""}`,
+      `Gerado em ${new Date().toLocaleString("pt-BR")} | ${filtered.length} contato(s)`,
       36,
       55,
     );
+    if (segments.length) doc.text(`Segmentação: ${segments.join(" | ")}`, 36, 68);
     autoTable(doc, {
-      startY: 72,
+      startY: segments.length ? 82 : 72,
       head: [
         [
           "Contatos",
@@ -573,7 +639,7 @@ export default function TelemarketingFilaReportPanel({
       styles: { fontSize: 8 },
       headStyles: { fillColor: [30, 64, 52] },
     });
-    if (gabineteRows.length) {
+    if (filteredGabineteRows.length) {
       autoTable(doc, {
         head: [["Regiao", "Base", "Atendidos", "Apoios declarados", "Conversao"]],
         body: gabineteRegioes.map((r) => [
@@ -676,7 +742,7 @@ export default function TelemarketingFilaReportPanel({
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {gabineteRows.length > 0 && (
+        {filteredGabineteRows.length > 0 && (
           <div className="rounded-lg border-2 border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
             <div>
               <h3 className="font-semibold text-blue-800 dark:text-blue-200">
