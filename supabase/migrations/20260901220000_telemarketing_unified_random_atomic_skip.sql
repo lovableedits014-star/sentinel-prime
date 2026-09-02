@@ -46,7 +46,7 @@ CREATE OR REPLACE FUNCTION public.tele_proximo_contato(
 DECLARE
   v_expires timestamptz; v_cand record; v_inserted boolean; v_op_id uuid;
   v_lista_id uuid; v_session text; v_existing record; v_lock_key text;
-  v_shuffle_seed text;
+  v_shuffle_seed text; v_existing_visible boolean;
 BEGIN
   v_op_id:=public._tele_assert_operador(_client_id,_nome,_senha);
   v_session:=NULLIF(btrim(_session_id),'');
@@ -61,12 +61,27 @@ BEGIN
     AND session_id IS NOT DISTINCT FROM v_session AND expires_at>now()
   ORDER BY expires_at DESC LIMIT 1;
   IF v_existing.id IS NOT NULL THEN
-    UPDATE public.telemarketing_call_assignments
-    SET expires_at=now()+make_interval(secs=>GREATEST(_ttl_seconds,1800))
-    WHERE id=v_existing.id;
-    RETURN jsonb_build_object('found',true,'tabela',v_existing.tabela,
-      'contato_id',v_existing.contato_id,'expires_at',now()+make_interval(secs=>GREATEST(_ttl_seconds,1800)),
-      'resumed',true,'lista_id',v_lista_id);
+    -- A campanha ou a lista do operador pode ter mudado desde a reserva. Nao
+    -- devolva um ID que tele_list_contatos ja nao consegue carregar, pois isso
+    -- deixa a tela presa para sempre na mesma reserva invisivel.
+    SELECT EXISTS(
+      SELECT 1
+      FROM public.tele_list_contatos(_client_id,_nome,_senha,_campanha_id) c
+      WHERE c.id=v_existing.contato_id AND c.tabela=v_existing.tabela
+        AND COALESCE(c.ligacao_status,'pendente') IN('pendente','nao_atendeu','reagendou')
+        AND (c.proxima_tentativa_em IS NULL OR c.proxima_tentativa_em<=now())
+    ) INTO v_existing_visible;
+
+    IF v_existing_visible THEN
+      UPDATE public.telemarketing_call_assignments
+      SET expires_at=now()+make_interval(secs=>GREATEST(_ttl_seconds,1800))
+      WHERE id=v_existing.id;
+      RETURN jsonb_build_object('found',true,'tabela',v_existing.tabela,
+        'contato_id',v_existing.contato_id,'expires_at',now()+make_interval(secs=>GREATEST(_ttl_seconds,1800)),
+        'resumed',true,'lista_id',v_lista_id);
+    END IF;
+
+    DELETE FROM public.telemarketing_call_assignments WHERE id=v_existing.id;
   END IF;
 
   v_expires:=now()+make_interval(secs=>GREATEST(_ttl_seconds,1800));

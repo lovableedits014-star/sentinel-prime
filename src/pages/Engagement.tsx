@@ -55,7 +55,7 @@ type EngagementProps = {
 export default function Engagement({ initialTab = "hoje" }: EngagementProps) {
   const [configForm, setConfigForm] = useState<Partial<EngagementConfig>>({});
   const [activeTab, setActiveTab] = useState<EngagementTab>(
-    (["hoje", "equipe", "historico", "ajustes"] as EngagementTab[]).includes(initialTab) ? initialTab : "hoje",
+    (["hoje", "checkin", "equipe", "historico", "ajustes"] as EngagementTab[]).includes(initialTab) ? initialTab : "hoje",
   );
 
   const { data: client } = useQuery({
@@ -125,6 +125,7 @@ export default function Engagement({ initialTab = "hoje" }: EngagementProps) {
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EngagementTab)} className="space-y-4">
         <TabsList className="w-full sm:w-auto flex-wrap h-auto">
           <TabsTrigger value="hoje" className="gap-1.5"><Gauge className="h-4 w-4" /> Hoje</TabsTrigger>
+          <TabsTrigger value="checkin" className="gap-1.5"><Target className="h-4 w-4" /> Missões</TabsTrigger>
           <TabsTrigger value="equipe" className="gap-1.5"><Users className="h-4 w-4" /> Equipe</TabsTrigger>
           <TabsTrigger value="historico" className="gap-1.5"><Activity className="h-4 w-4" /> Histórico</TabsTrigger>
           <TabsTrigger value="ajustes" className="gap-1.5"><Settings className="h-4 w-4" /> Configurações</TabsTrigger>
@@ -141,10 +142,6 @@ export default function Engagement({ initialTab = "hoje" }: EngagementProps) {
           <TabsTrigger value="acessos" className="text-xs sm:text-sm gap-1.5">
             <ContactRound className="h-4 w-4" />
             Acessos às missões
-          </TabsTrigger>
-          <TabsTrigger value="checkin" className="text-xs sm:text-sm gap-1.5">
-            <Target className="h-4 w-4" />
-            Check-in de missões
           </TabsTrigger>
           <TabsTrigger value="influenciadores" className="text-xs sm:text-sm gap-1.5">
             <Activity className="h-4 w-4" />
