@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, CalendarDays, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
+import { BarChart3, CalendarDays, FileDown, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
 import { fetchAudiences } from "@/lib/mission-audiences";
 import {
   fetchEquipeDesempenhoPeriodo, fetchPubKpisPeriodo, fetchPublicacoesAuditPeriodo,
@@ -18,6 +18,7 @@ import MonitorCharts from "./MonitorCharts";
 import PublicacoesDesempenhoPanel from "./PublicacoesDesempenhoPanel";
 import EquipeRankingPanel from "./EquipeRankingPanel";
 import MatrizCumprimentoPanel from "./MatrizCumprimentoPanel";
+import ResumoEquipesPeriodoPanel, { type TeamPeriodSummary } from "./ResumoEquipesPeriodoPanel";
 
 const localIsoDate = (date: Date) => {
   const year = date.getFullYear();
@@ -98,6 +99,26 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
     enabled: !!clientId && periodValid,
   });
 
+  const resumoEquipes = useQuery({
+    queryKey: ["eng-resumo-equipes-periodo", clientId, dataInicio, dataFim, aud, missionId, teamRoots.data],
+    queryFn: async () => Promise.all((teamRoots.data ?? []).map(async (root): Promise<TeamPeriodSummary> => {
+      const equipeDaRaiz = await fetchEquipeDesempenhoPeriodo(clientId, period, aud, {
+        rootId: root.root_id,
+        missionId: filters.missionId,
+      });
+      // Líder avulso é mensurado individualmente; coordenador consolida a equipe inteira.
+      const membros = root.is_avulso
+        ? equipeDaRaiz.filter((person) => person.pessoa_id === root.root_id)
+        : equipeDaRaiz;
+      const atribuicoes = membros.reduce((sum, person) => sum + person.publicacoes, 0);
+      const cumpridas = membros.reduce((sum, person) => sum + person.cumpridas, 0);
+      const abriu = membros.reduce((sum, person) => sum + person.abriu_sem_confirmar, 0);
+      const faltas = membros.reduce((sum, person) => sum + person.faltas, 0);
+      return { ...root, membros, atribuicoes, cumpridas, abriu, faltas, adesao: atribuicoes ? cumpridas / atribuicoes * 100 : 0 };
+    })),
+    enabled: !!clientId && periodValid && teamRoots.isSuccess,
+  });
+
   const carregando = kpis.isLoading || publicacoes.isLoading || equipe.isLoading || audit.isLoading;
   const erro = kpis.error || publicacoes.error || equipe.error || audit.error;
 
@@ -106,6 +127,7 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
     publicacoes.refetch();
     equipe.refetch();
     audit.refetch();
+    resumoEquipes.refetch();
   };
 
   return (
@@ -234,6 +256,9 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
               <TabsTrigger value="matriz" className="gap-1.5 text-xs sm:text-sm">
                 <Grid3x3 className="h-4 w-4" /> Matriz
               </TabsTrigger>
+              <TabsTrigger value="relatorios" className="gap-1.5 text-xs sm:text-sm">
+                <FileDown className="h-4 w-4" /> Relatórios gerais
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="publicacoes">
@@ -255,6 +280,14 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
                 pessoas={equipe.data ?? []}
                 publicacoes={publicacoes.data ?? []}
                 periodoLabel={periodoLabel}
+              />
+            </TabsContent>
+
+            <TabsContent value="relatorios">
+              <ResumoEquipesPeriodoPanel
+                rows={resumoEquipes.data ?? []}
+                periodoLabel={periodoLabel}
+                loading={resumoEquipes.isLoading || resumoEquipes.isFetching}
               />
             </TabsContent>
           </Tabs>
