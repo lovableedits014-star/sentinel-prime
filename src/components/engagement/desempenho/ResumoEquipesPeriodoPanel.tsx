@@ -5,7 +5,7 @@ import { FileDown, Users } from "lucide-react";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { fmtPct, type PessoaDesempenho, type TeamRoot } from "@/lib/engagement-desempenho";
+import { fmtPct, fmtTelefone, type PessoaDesempenho, type TeamRoot } from "@/lib/engagement-desempenho";
 
 export type TeamPeriodSummary = TeamRoot & {
   membros: PessoaDesempenho[];
@@ -18,6 +18,7 @@ export type TeamPeriodSummary = TeamRoot & {
 
 const summaryRows = (rows: TeamPeriodSummary[]) => rows.map((r) => ({
   Responsável: r.nome,
+  Telefone: fmtTelefone(r.telefone),
   Tipo: r.is_avulso ? "Líder avulso" : "Coordenador",
   "Pessoas avaliadas": r.membros.length,
   "Missões atribuídas": r.atribuicoes,
@@ -50,8 +51,8 @@ export default function ResumoEquipesPeriodoPanel({ rows, periodoLabel, loading 
     autoTable(doc, {
       startY: 26,
       styles: { fontSize: 8 },
-      head: [["Responsável", "Pessoas", "Atribuições", "Cumpridas", "Abriu", "Não abriu", "%"]],
-      body: items.map((r) => [r.nome, r.membros.length, r.atribuicoes, r.cumpridas, r.abriu, r.faltas, fmtPct(r.adesao)]),
+      head: [["Responsável", "Telefone", "Pessoas", "Atribuições", "Cumpridas", "Abriu", "Não abriu", "%"]],
+      body: items.map((r) => [r.nome, fmtTelefone(r.telefone), r.membros.length, r.atribuicoes, r.cumpridas, r.abriu, r.faltas, fmtPct(r.adesao)]),
     });
     doc.save(`${filename}-${periodoLabel.replace(/\s+/g, "_")}.pdf`);
   };
@@ -65,8 +66,8 @@ export default function ResumoEquipesPeriodoPanel({ rows, periodoLabel, loading 
     autoTable(doc, {
       startY: 26,
       styles: { fontSize: 8 },
-      head: [["Pessoa", "Cargo", "Recebidas", "Cumpridas", "Abriu", "Não abriu", "%"]],
-      body: team.membros.map((p) => [p.nome, p.cargo || "—", p.publicacoes, p.cumpridas, p.abriu_sem_confirmar, p.faltas, fmtPct(p.pct)]),
+      head: [["Pessoa", "Telefone", "Cargo", "Recebidas", "Cumpridas", "Abriu", "Não abriu", "%"]],
+      body: team.membros.map((p) => [p.nome, fmtTelefone(p.telefone), p.cargo || "—", p.publicacoes, p.cumpridas, p.abriu_sem_confirmar, p.faltas, fmtPct(p.pct)]),
     });
     doc.save(`resultado-${team.nome.replace(/[^a-z0-9]+/gi, "-")}-${periodoLabel.replace(/\s+/g, "_")}.pdf`);
   };
@@ -85,7 +86,7 @@ export default function ResumoEquipesPeriodoPanel({ rows, periodoLabel, loading 
       <CardContent>
         {loading ? <p className="py-8 text-center text-sm text-muted-foreground">Calculando resultados do período…</p> :
           <div className="divide-y rounded-md border">{items.map((r) => <div key={r.root_id} className="flex flex-wrap items-center gap-3 p-3">
-            <div className="min-w-52 flex-1"><p className="font-medium">{r.nome}</p><p className="text-xs text-muted-foreground">{r.membros.length} pessoa(s) · {r.cumpridas}/{r.atribuicoes} cumpridas</p></div>
+            <div className="min-w-52 flex-1"><p className="font-medium">{r.nome}</p><p className="text-xs text-muted-foreground">{fmtTelefone(r.telefone)} · {r.membros.length} pessoa(s) · {r.cumpridas}/{r.atribuicoes} cumpridas</p></div>
             <Badge variant="outline">{fmtPct(r.adesao)}</Badge>
             <Button size="sm" variant="outline" onClick={() => exportIndividual(r)}><FileDown className="mr-1 h-4 w-4" />PDF individual</Button>
           </div>)}{!items.length && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum resultado neste período.</p>}</div>}

@@ -85,6 +85,7 @@ export type Faltante = {
 export type TeamRoot = {
   root_id: string;
   nome: string;
+  telefone: string | null;
   tipo: "coordenador" | "lider";
   is_avulso: boolean;
   pessoas: number;
@@ -98,7 +99,7 @@ export type DesempenhoFilters = {
 export type EngagementDatePeriod = { inicio: string; fim: string };
 
 export async function fetchTeamRoots(clientId: string): Promise<TeamRoot[]> {
-  return unwrap<TeamRoot>(await db.rpc("engagement_team_roots", { p_client_id: clientId }));
+  return unwrap<TeamRoot>(await db.rpc("engagement_team_roots_contacts", { p_client_id: clientId }));
 }
 
 function unwrap<T>(res: { data: unknown; error: { message: string } | null }): T[] {
