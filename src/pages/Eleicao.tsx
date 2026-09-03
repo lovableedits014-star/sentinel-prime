@@ -626,7 +626,12 @@ export default function Eleicao() {
       return;
     }
 
-    toast.success("Atualizado!");
+    const telefoneCorrigido = editing && onlyDigits(editing.telefone) !== onlyDigits(form.telefone);
+    toast.success(
+      telefoneCorrigido
+        ? "Telefone corrigido! As missões anteriores foram reprocessadas."
+        : "Atualizado!",
+    );
     setDialogOpen(false);
     load();
   }
@@ -810,7 +815,9 @@ export default function Eleicao() {
     return m;
   }, [pessoas]);
 
-  // Ids efetivamente visíveis no escopo: matches + ancestrais (coordenador/líder).
+  // Ids efetivamente visíveis no escopo: matches + ancestrais e descendentes.
+  // Ao buscar um coordenador/líder, a árvore precisa manter a equipe dele para
+  // que a raiz encontrada continue expansível.
   // Sem busca ativa, mantém comportamento antigo (todas as pessoas do escopo que passam nos filtros).
   const visibleIds = useMemo(() => {
     const visible = new Set<string>();
@@ -828,6 +835,27 @@ export default function Eleicao() {
           if (!parent) break;
           visible.add(parent.id);
           cur = parent.parent_id || null;
+        }
+      });
+
+      const childrenByParent = new Map<string, Pessoa[]>();
+      pessoas.forEach(p => {
+        if (p.escopo !== escopo || !p.parent_id) return;
+        const children = childrenByParent.get(p.parent_id) || [];
+        children.push(p);
+        childrenByParent.set(p.parent_id, children);
+      });
+      baseFiltered.forEach(match => {
+        const pending = [...(childrenByParent.get(match.id) || [])];
+        const visited = new Set<string>();
+        while (pending.length > 0) {
+          const child = pending.shift()!;
+          if (visited.has(child.id)) continue;
+          visited.add(child.id);
+          // Os filtros continuam valendo; somente o texto da busca é ignorado
+          // para a equipe que está abaixo da pessoa encontrada.
+          if (matchesStatus(child) && matchesTipo(child)) visible.add(child.id);
+          pending.push(...(childrenByParent.get(child.id) || []));
         }
       });
     }
@@ -2189,7 +2217,7 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
     if (!searchActive) return 0;
     return [...lideres, ...cabosDir, ...cabosLid].filter(p => matchedIds.has(p.id)).length;
   }, [searchActive, matchedIds, lideres, cabosDir, cabosLid]);
-  const autoExpand = searchActive && matchesNaEquipe > 0;
+  const autoExpand = searchActive && (matchedIds.has(coord.id) || matchesNaEquipe > 0);
   const [userToggled, setUserToggled] = useState(false);
   const [expanded, setExpanded] = useState(false);
   // Quando a busca muda e há matches dentro, abre. Quando a busca some, volta a fechar (a não ser que o usuário tenha aberto manualmente).
@@ -2260,8 +2288,8 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
   );
   const [open, setOpen] = useState(true);
   React.useEffect(() => {
-    if (searchActive && matchesNaEquipe > 0) setOpen(true);
-  }, [searchActive, matchesNaEquipe]);
+    if (searchActive && (matchedIds.has(lider.id) || matchesNaEquipe > 0)) setOpen(true);
+  }, [searchActive, matchedIds, lider.id, matchesNaEquipe]);
 
   return (
     <div className="border-t border-border/40">
