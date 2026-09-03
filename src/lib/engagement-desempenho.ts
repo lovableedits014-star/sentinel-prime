@@ -95,6 +95,8 @@ export type DesempenhoFilters = {
   missionId?: string | null;
 };
 
+export type EngagementDatePeriod = { inicio: string; fim: string };
+
 export async function fetchTeamRoots(clientId: string): Promise<TeamRoot[]> {
   return unwrap<TeamRoot>(await db.rpc("engagement_team_roots", { p_client_id: clientId }));
 }
@@ -152,6 +154,33 @@ export async function fetchEquipeDesempenho(
       p_mission_id: filters.missionId ?? null,
     }),
   );
+  return rows.map((r) => ({ ...r, detalhe: Array.isArray(r.detalhe) ? r.detalhe : [] })) as PessoaDesempenho[];
+}
+
+const periodArgs = (clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters) => ({
+  p_client_id: clientId,
+  p_data_inicio: period.inicio,
+  p_data_fim: period.fim,
+  p_audience_id: audienceId,
+  p_root_id: filters.rootId ?? null,
+  p_mission_id: filters.missionId ?? null,
+});
+
+export async function fetchPubKpisPeriodo(clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PubKpis | null> {
+  const rows = unwrap<PubKpis>(await db.rpc("engagement_pub_kpis_periodo_v2", periodArgs(clientId, period, audienceId, filters)));
+  return rows[0] ?? null;
+}
+
+export async function fetchPublicacoesDesempenhoPeriodo(clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PublicacaoDesempenho[]> {
+  return unwrap<PublicacaoDesempenho>(await db.rpc("engagement_publicacoes_desempenho_periodo_v2", periodArgs(clientId, period, audienceId, filters)));
+}
+
+export async function fetchPublicacoesAuditPeriodo(clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PublicacaoAudit[]> {
+  return unwrap<PublicacaoAudit>(await db.rpc("engagement_publicacoes_audit_periodo", periodArgs(clientId, period, audienceId, filters)));
+}
+
+export async function fetchEquipeDesempenhoPeriodo(clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PessoaDesempenho[]> {
+  const rows = unwrap<any>(await db.rpc("engagement_equipe_desempenho_periodo_v2", periodArgs(clientId, period, audienceId, filters)));
   return rows.map((r) => ({ ...r, detalhe: Array.isArray(r.detalhe) ? r.detalhe : [] })) as PessoaDesempenho[];
 }
 

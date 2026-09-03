@@ -2,14 +2,16 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
+import { BarChart3, CalendarDays, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
 import { fetchAudiences } from "@/lib/mission-audiences";
 import {
-  fetchEquipeDesempenho, fetchPubKpis, fetchPublicacoesAudit, fetchPublicacoesDesempenho, fetchTeamRoots,
+  fetchEquipeDesempenhoPeriodo, fetchPubKpisPeriodo, fetchPublicacoesAuditPeriodo,
+  fetchPublicacoesDesempenhoPeriodo, fetchTeamRoots,
 } from "@/lib/engagement-desempenho";
 import MonitorKpisHeader from "./MonitorKpisHeader";
 import MonitorCharts from "./MonitorCharts";
@@ -17,8 +19,25 @@ import PublicacoesDesempenhoPanel from "./PublicacoesDesempenhoPanel";
 import EquipeRankingPanel from "./EquipeRankingPanel";
 import MatrizCumprimentoPanel from "./MatrizCumprimentoPanel";
 
+const localIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const daysAgoIso = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return localIsoDate(date);
+};
+
+const dateLabel = (iso: string) => iso ? iso.split("-").reverse().join("-") : "—";
+
 export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: string }) {
-  const [dias, setDias] = useState(30);
+  const today = localIsoDate(new Date());
+  const [dataFim, setDataFim] = useState(today);
+  const [dataInicio, setDataInicio] = useState(() => daysAgoIso(6));
   const [audienceId, setAudienceId] = useState<string>("padrao");
   const [rootId, setRootId] = useState<string>("todos");
   const [missionId, setMissionId] = useState<string>("todas");
@@ -27,7 +46,15 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
     rootId: rootId === "todos" ? null : rootId,
     missionId: missionId === "todas" ? null : missionId,
   };
-  const periodoLabel = `${dias}d`;
+  const period = { inicio: dataInicio, fim: dataFim };
+  const periodValid = !!dataInicio && !!dataFim && dataInicio <= dataFim && dataFim <= today;
+  const periodoLabel = `${dateLabel(dataInicio)} a ${dateLabel(dataFim)}`;
+
+  const applyLastDays = (days: number) => {
+    setDataFim(today);
+    setDataInicio(daysAgoIso(days - 1));
+    setMissionId("todas");
+  };
 
   const audiences = useQuery({
     queryKey: ["mission-audiences", clientId],
@@ -42,33 +69,33 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
   });
 
   const missionOptions = useQuery({
-    queryKey: ["eng-pub-mission-options", clientId, dias, aud],
-    queryFn: () => fetchPublicacoesDesempenho(clientId, dias, aud),
-    enabled: !!clientId,
+    queryKey: ["eng-pub-mission-options", clientId, dataInicio, dataFim, aud],
+    queryFn: () => fetchPublicacoesDesempenhoPeriodo(clientId, period, aud),
+    enabled: !!clientId && periodValid,
   });
 
   const kpis = useQuery({
-    queryKey: ["eng-pub-kpis", clientId, dias, aud, rootId, missionId],
-    queryFn: () => fetchPubKpis(clientId, dias, aud, filters),
-    enabled: !!clientId,
+    queryKey: ["eng-pub-kpis", clientId, dataInicio, dataFim, aud, rootId, missionId],
+    queryFn: () => fetchPubKpisPeriodo(clientId, period, aud, filters),
+    enabled: !!clientId && periodValid,
   });
 
   const publicacoes = useQuery({
-    queryKey: ["eng-pub-desempenho", clientId, dias, aud, rootId, missionId],
-    queryFn: () => fetchPublicacoesDesempenho(clientId, dias, aud, filters),
-    enabled: !!clientId,
+    queryKey: ["eng-pub-desempenho", clientId, dataInicio, dataFim, aud, rootId, missionId],
+    queryFn: () => fetchPublicacoesDesempenhoPeriodo(clientId, period, aud, filters),
+    enabled: !!clientId && periodValid,
   });
 
   const audit = useQuery({
-    queryKey: ["eng-pub-audit", clientId, dias, aud, rootId, missionId],
-    queryFn: () => fetchPublicacoesAudit(clientId, dias, aud, filters),
-    enabled: !!clientId,
+    queryKey: ["eng-pub-audit", clientId, dataInicio, dataFim, aud, rootId, missionId],
+    queryFn: () => fetchPublicacoesAuditPeriodo(clientId, period, aud, filters),
+    enabled: !!clientId && periodValid,
   });
 
   const equipe = useQuery({
-    queryKey: ["eng-equipe-desempenho", clientId, dias, aud, rootId, missionId],
-    queryFn: () => fetchEquipeDesempenho(clientId, dias, aud, filters),
-    enabled: !!clientId,
+    queryKey: ["eng-equipe-desempenho", clientId, dataInicio, dataFim, aud, rootId, missionId],
+    queryFn: () => fetchEquipeDesempenhoPeriodo(clientId, period, aud, filters),
+    enabled: !!clientId && periodValid,
   });
 
   const carregando = kpis.isLoading || publicacoes.isLoading || equipe.isLoading || audit.isLoading;
@@ -97,10 +124,11 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3 px-3 sm:px-6">
           <div className="space-y-1">
-            <Label className="text-xs">Período</Label>
-            <Select value={String(dias)} onValueChange={(v) => { setDias(Number(v)); setMissionId("todas"); }}>
-              <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+            <Label className="text-xs">Atalho de período</Label>
+            <Select value="personalizado" onValueChange={(v) => v !== "personalizado" && applyLastDays(Number(v))}>
+              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="personalizado">Personalizado</SelectItem>
                 <SelectItem value="7">7 dias</SelectItem>
                 <SelectItem value="30">30 dias</SelectItem>
                 <SelectItem value="90">90 dias</SelectItem>
@@ -119,6 +147,20 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Data inicial</Label>
+            <Input
+              type="date" value={dataInicio} max={dataFim || today} className="w-[160px]"
+              onChange={(e) => { setDataInicio(e.target.value); setMissionId("todas"); }}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Data final</Label>
+            <Input
+              type="date" value={dataFim} min={dataInicio} max={today} className="w-[160px]"
+              onChange={(e) => { setDataFim(e.target.value); setMissionId("todas"); }}
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Equipe responsável</Label>
@@ -151,8 +193,13 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
           <Button variant="outline" onClick={recarregar} disabled={carregando} className="gap-2">
             <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} /> Atualizar
           </Button>
+          <div className="flex h-9 items-center gap-1.5 rounded-md bg-muted px-3 text-xs font-medium">
+            <CalendarDays className="h-3.5 w-3.5" /> {periodoLabel}
+          </div>
         </CardContent>
       </Card>
+
+      {!periodValid && <p className="text-sm text-destructive">Escolha um período válido, sem datas futuras.</p>}
 
       {erro && (
         <Card>
