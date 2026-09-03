@@ -91,6 +91,16 @@ export type TeamRoot = {
   pessoas: number;
 };
 
+export type TeamHierarchyMember = {
+  root_id: string;
+  pessoa_id: string;
+  parent_id: string | null;
+  nome: string;
+  telefone: string | null;
+  tipo: string;
+  nivel: number;
+};
+
 export type DesempenhoFilters = {
   rootId?: string | null;
   missionId?: string | null;
@@ -100,6 +110,10 @@ export type EngagementDatePeriod = { inicio: string; fim: string };
 
 export async function fetchTeamRoots(clientId: string): Promise<TeamRoot[]> {
   return unwrap<TeamRoot>(await db.rpc("engagement_team_roots_contacts", { p_client_id: clientId }));
+}
+
+export async function fetchTeamHierarchy(clientId: string): Promise<TeamHierarchyMember[]> {
+  return unwrap<TeamHierarchyMember>(await db.rpc("engagement_report_team_hierarchy", { p_client_id: clientId }));
 }
 
 function unwrap<T>(res: { data: unknown; error: { message: string } | null }): T[] {

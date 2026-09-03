@@ -11,7 +11,7 @@ import { BarChart3, CalendarDays, FileDown, Gauge, Grid3x3, Megaphone, RefreshCw
 import { fetchAudiences } from "@/lib/mission-audiences";
 import {
   fetchEquipeDesempenhoPeriodo, fetchPubKpisPeriodo, fetchPublicacoesAuditPeriodo,
-  fetchPublicacoesDesempenhoPeriodo, fetchTeamRoots,
+  fetchPublicacoesDesempenhoPeriodo, fetchTeamHierarchy, fetchTeamRoots,
 } from "@/lib/engagement-desempenho";
 import MonitorKpisHeader from "./MonitorKpisHeader";
 import MonitorCharts from "./MonitorCharts";
@@ -69,6 +69,12 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
     enabled: !!clientId,
   });
 
+  const teamHierarchy = useQuery({
+    queryKey: ["eng-team-hierarchy", clientId],
+    queryFn: () => fetchTeamHierarchy(clientId),
+    enabled: !!clientId,
+  });
+
   const missionOptions = useQuery({
     queryKey: ["eng-pub-mission-options", clientId, dataInicio, dataFim, aud],
     queryFn: () => fetchPublicacoesDesempenhoPeriodo(clientId, period, aud),
@@ -100,7 +106,7 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
   });
 
   const resumoEquipes = useQuery({
-    queryKey: ["eng-resumo-equipes-periodo", clientId, dataInicio, dataFim, aud, missionId, teamRoots.data],
+    queryKey: ["eng-resumo-equipes-periodo", clientId, dataInicio, dataFim, aud, missionId, teamRoots.data, teamHierarchy.data],
     queryFn: async () => Promise.all((teamRoots.data ?? []).map(async (root): Promise<TeamPeriodSummary> => {
       const equipeDaRaiz = await fetchEquipeDesempenhoPeriodo(clientId, period, aud, {
         rootId: root.root_id,
@@ -114,9 +120,25 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
       const cumpridas = membros.reduce((sum, person) => sum + person.cumpridas, 0);
       const abriu = membros.reduce((sum, person) => sum + person.abriu_sem_confirmar, 0);
       const faltas = membros.reduce((sum, person) => sum + person.faltas, 0);
-      return { ...root, membros, atribuicoes, cumpridas, abriu, faltas, adesao: atribuicoes ? cumpridas / atribuicoes * 100 : 0 };
+      const desempenho = new Map(equipeDaRaiz.map((person) => [person.pessoa_id, person]));
+      const estrutura = (teamHierarchy.data ?? []).filter((person) => person.root_id === root.root_id);
+      const asResult = (person: { pessoa_id: string; nome: string; telefone: string | null; tipo: string }) => {
+        const result = desempenho.get(person.pessoa_id);
+        return {
+          pessoa_id: person.pessoa_id, nome: person.nome, telefone: person.telefone,
+          cargo: person.tipo, publicacoes: result?.publicacoes ?? 0,
+          cumpridas: result?.cumpridas ?? 0, abriu_sem_confirmar: result?.abriu_sem_confirmar ?? 0,
+          faltas: result?.faltas ?? 0, pct: result?.pct ?? 0,
+        };
+      };
+      const rootPerson = estrutura.find((person) => person.pessoa_id === root.root_id) ?? root;
+      const responsavel = asResult({ ...rootPerson, pessoa_id: root.root_id, tipo: root.tipo });
+      const lideres = root.is_avulso ? [] : estrutura
+        .filter((person) => person.tipo === "lider")
+        .map(asResult);
+      return { ...root, membros, responsavel, lideres, atribuicoes, cumpridas, abriu, faltas, adesao: atribuicoes ? cumpridas / atribuicoes * 100 : 0 };
     })),
-    enabled: !!clientId && periodValid && teamRoots.isSuccess,
+    enabled: !!clientId && periodValid && teamRoots.isSuccess && teamHierarchy.isSuccess,
   });
 
   const carregando = kpis.isLoading || publicacoes.isLoading || equipe.isLoading || audit.isLoading;
