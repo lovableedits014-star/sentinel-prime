@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock } from "lucide-react";
+import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock, RefreshCw } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import { normalizeExternalUrl } from "@/lib/external-social-link";
@@ -71,6 +71,40 @@ function api(path: string) {
   return path;
 }
 
+class MissionConfigError extends Error {
+  constructor(message: string, readonly unavailable = false) {
+    super(message);
+  }
+}
+
+async function loadMissionConfig(url: string): Promise<MissionConfig & { client_id?: string }> {
+  let lastError: unknown;
+
+  // Ao sair do WhatsApp para o navegador, redes móveis às vezes falham na
+  // primeira conexão. Repetimos apenas falhas temporárias; 404 é definitivo.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload?.mission?.id) return payload;
+      if (response.status === 404) throw new MissionConfigError("Missão não encontrada", true);
+      lastError = new Error(payload?.error || `HTTP ${response.status}`);
+      if (response.status < 500 && response.status !== 408 && response.status !== 429) break;
+    } catch (requestError) {
+      if (requestError instanceof MissionConfigError) throw requestError;
+      lastError = requestError;
+    }
+
+    if (attempt < 2) {
+      await new Promise((resolve) => window.setTimeout(resolve, 400 * (attempt + 1)));
+    }
+  }
+
+  throw new MissionConfigError(
+    lastError instanceof Error ? lastError.message : "Falha temporária ao carregar a missão",
+  );
+}
+
 export default function MissaoPublica() {
   const { missionId } = useParams<{ missionId: string }>();
   const location = useLocation();
@@ -79,6 +113,8 @@ export default function MissaoPublica() {
   const [config, setConfig] = useState<MissionConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+  const [reloadAttempt, setReloadAttempt] = useState(0);
 
   const [clientId, setClientId] = useState<string>("");
   const [token, setToken] = useState<string>("");
@@ -140,18 +176,14 @@ export default function MissaoPublica() {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setUnavailable(false);
 
     (async () => {
       try {
         // 1) descobre o cliente da missão (sem token)
-        const boot = await fetch(
+        const bootData = await loadMissionConfig(
           api(`/api/public/missao/config/${encodeURIComponent(missionId)}?code=${encodeURIComponent(code)}`)
         );
-        if (!boot.ok) {
-          const err = await boot.json().catch(() => ({ error: "erro" }));
-          throw new Error(err.error || `HTTP ${boot.status}`);
-        }
-        const bootData = (await boot.json()) as MissionConfig & { client_id?: string };
         if (cancelled) return;
 
         const cid = bootData.client_id || "";
@@ -171,10 +203,9 @@ export default function MissaoPublica() {
 
         // 3) se tem token, revalida chamando config novamente com token
         if (existing) {
-          const withTok = await fetch(
+          const finalData = await loadMissionConfig(
             api(`/api/public/missao/config/${encodeURIComponent(missionId)}?code=${encodeURIComponent(code)}&token=${encodeURIComponent(existing)}`)
           );
-          const finalData = (await withTok.json()) as MissionConfig & { client_id?: string };
           if (cancelled) return;
           setConfig(finalData);
           setDeclared(Boolean(finalData.participant?.concluido_em));
@@ -187,7 +218,10 @@ export default function MissaoPublica() {
           setConfig(bootData);
         }
       } catch (e: any) {
-        if (!cancelled) setError(e.message || "Erro ao carregar missão");
+        if (!cancelled) {
+          setUnavailable(Boolean(e?.unavailable));
+          setError(e.message || "Erro ao carregar missão");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -196,7 +230,7 @@ export default function MissaoPublica() {
     return () => {
       cancelled = true;
     };
-  }, [missionId, code]);
+  }, [missionId, code, reloadAttempt]);
 
   const registerEvent = useCallback(
     async (
@@ -417,13 +451,23 @@ export default function MissaoPublica() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
-            <CardTitle>{codeInvalid ? "Link expirado ou digitado errado" : "Missão indisponível"}</CardTitle>
+            <CardTitle>{codeInvalid ? "Link expirado ou digitado errado" : unavailable ? "Missão indisponível" : "Não foi possível carregar"}</CardTitle>
             <CardDescription>
               {codeInvalid
                 ? "Peça um link novo para quem enviou a mensagem — o código anexado à URL não confere mais."
-                : "Este link pode ter expirado ou não é válido."}
+                : unavailable
+                  ? "Este link não corresponde a uma missão disponível."
+                  : "Sua conexão pode ter oscilado. Tente carregar novamente."}
             </CardDescription>
           </CardHeader>
+          {!codeInvalid && !unavailable && (
+            <CardContent>
+              <Button className="w-full" onClick={() => setReloadAttempt((value) => value + 1)}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Tentar novamente
+              </Button>
+            </CardContent>
+          )}
         </Card>
 
       </div>

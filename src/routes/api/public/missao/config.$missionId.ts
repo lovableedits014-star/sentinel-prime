@@ -9,7 +9,10 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
+  "Cache-Control": "no-store, max-age=0",
 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function makeClient() {
   const url = process.env.SUPABASE_URL!;
@@ -33,6 +36,9 @@ export const Route = createFileRoute("/api/public/missao/config/$missionId")({
       OPTIONS: async () => new Response(null, { status: 204, headers: corsHeaders }),
       GET: async ({ params, request }) => {
         try {
+          if (!UUID_RE.test(params.missionId)) {
+            return Response.json({ error: "not_found" }, { status: 404, headers: corsHeaders });
+          }
           const url = new URL(request.url);
           const code = (url.searchParams.get("code") || "").trim();
           const token = (url.searchParams.get("token") || "").trim();
