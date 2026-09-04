@@ -1,7 +1,16 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { endOfDay, format, startOfMonth } from "date-fns";
-import { AlertCircle, ChevronDown, Download, Loader2, Search } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronDown,
+  Crown,
+  FileDown,
+  Loader2,
+  Network,
+  Search,
+  UserRound,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +34,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { exportElectionContractReportPdf } from "@/lib/election-contract-report-pdf";
 
 type MissionDetail = {
   mission_id: string;
@@ -106,10 +117,6 @@ const area = (r: ReportRow) =>
   r.escopo === "interior" ? r.cidade || "Sem cidade" : r.regiao || "Sem região";
 const n = (v: unknown) => Number(v || 0);
 
-function csvCell(value: unknown) {
-  return `"${String(value ?? "").replace(/"/g, '""')}"`;
-}
-
 export default function ContratadosCumprimentoReport({ clientId }: { clientId: string }) {
   const today = format(endOfDay(new Date()), "yyyy-MM-dd");
   const [inicio, setInicio] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
@@ -118,6 +125,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   const [coordinator, setCoordinator] = useState("all");
   const [region, setRegion] = useState("all");
   const [status, setStatus] = useState("all");
+  const [exporting, setExporting] = useState(false);
 
   const query = useQuery({
     queryKey: ["election-contract-compliance", clientId, inicio, fim],
@@ -181,55 +189,18 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
     [filtered],
   );
   const adherence = totals.missions ? (100 * totals.done) / totals.missions : 0;
-  const byCoordinator = useMemo(
-    () => groupRows(filtered, (r) => r.coordenador_nome || "Sem coordenador"),
-    [filtered],
-  );
   const byRegion = useMemo(() => groupRows(filtered, area), [filtered]);
 
-  const exportCsv = () => {
-    const header = [
-      "Nome",
-      "Telefone",
-      "Cargo",
-      "Coordenador",
-      "Responsável direto",
-      "Região/Cidade",
-      "Missões",
-      "Cumpridas",
-      "Abriu sem concluir",
-      "Não abriu",
-      "Taxa",
-      "Indicados",
-      "Meta",
-      "Situação da lista",
-    ];
-    const body = filtered.map((r) => [
-      r.nome,
-      r.telefone,
-      r.cargo,
-      r.coordenador_nome || "Sem coordenador",
-      r.responsavel_nome || "",
-      area(r),
-      r.missoes,
-      r.cumpridas,
-      r.abriu_sem_concluir,
-      r.nao_abriu,
-      `${n(r.taxa).toFixed(1)}%`,
-      r.total_indicados,
-      r.meta_indicados,
-      listLabel[r.situacao_lista] || r.situacao_lista,
-    ]);
-    const blob = new Blob(
-      ["\ufeff" + [header, ...body].map((line) => line.map(csvCell).join(";")).join("\r\n")],
-      { type: "text/csv;charset=utf-8" },
-    );
-    const url = URL.createObjectURL(blob),
-      a = document.createElement("a");
-    a.href = url;
-    a.download = `relatorio-contratados-${inicio}-${fim}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportPdf = async () => {
+    setExporting(true);
+    try {
+      await exportElectionContractReportPdf({ inicio, fim, rows: filtered });
+      toast.success("PDF gerado com as equipes agrupadas.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar o PDF.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (query.isLoading)
@@ -262,9 +233,13 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
                 Missões e listas de indicados consolidadas pela estrutura da Eleição.
               </CardDescription>
             </div>
-            <Button variant="outline" onClick={exportCsv} disabled={!filtered.length}>
-              <Download className="mr-2 h-4 w-4" />
-              Exportar CSV
+            <Button variant="outline" onClick={exportPdf} disabled={!filtered.length || exporting}>
+              {exporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="mr-2 h-4 w-4" />
+              )}
+              Exportar PDF por equipe
             </Button>
           </div>
         </CardHeader>
@@ -367,12 +342,18 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
         />
       </div>
 
-      <Tabs defaultValue="people">
+      <Tabs defaultValue="teams">
         <TabsList>
-          <TabsTrigger value="people">Contratados ({filtered.length})</TabsTrigger>
-          <TabsTrigger value="coordinators">Por coordenador</TabsTrigger>
+          <TabsTrigger value="teams" className="gap-1.5">
+            <Network className="h-3.5 w-3.5" />
+            Equipes em árvore
+          </TabsTrigger>
+          <TabsTrigger value="people">Lista geral ({filtered.length})</TabsTrigger>
           <TabsTrigger value="regions">Por região</TabsTrigger>
         </TabsList>
+        <TabsContent value="teams">
+          <TeamForest rows={filtered} />
+        </TabsContent>
         <TabsContent value="people">
           <Card>
             <CardContent className="p-0">
@@ -402,9 +383,6 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-        <TabsContent value="coordinators">
-          <GroupTable rows={byCoordinator} label="Coordenador" />
         </TabsContent>
         <TabsContent value="regions">
           <GroupTable rows={byRegion} label="Região / cidade" />
@@ -439,6 +417,295 @@ function Metric({
         <p className="text-[11px] text-muted-foreground">{help}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function TeamForest({ rows }: { rows: ReportRow[] }) {
+  const teams = useMemo(() => {
+    const grouped = new Map<string, ReportRow[]>();
+    for (const row of rows) {
+      const key = row.coordenador_id || "standalone";
+      const current = grouped.get(key) || [];
+      current.push(row);
+      grouped.set(key, current);
+    }
+    return Array.from(grouped.entries()).sort(([, a], [, b]) => {
+      if (!a[0].coordenador_id) return 1;
+      if (!b[0].coordenador_id) return -1;
+      return (a[0].coordenador_nome || "").localeCompare(b[0].coordenador_nome || "");
+    });
+  }, [rows]);
+
+  if (!teams.length)
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          Nenhuma equipe encontrada nesses filtros.
+        </CardContent>
+      </Card>
+    );
+  return (
+    <div className="space-y-3">
+      {teams.map(([key, team]) => (
+        <TeamCard key={key} team={team} standalone={key === "standalone"} />
+      ))}
+    </div>
+  );
+}
+
+function TeamCard({ team, standalone }: { team: ReportRow[]; standalone: boolean }) {
+  const [open, setOpen] = useState(true);
+  const coordinator = team.find((r) => r.pessoa_id === r.coordenador_id);
+  const missions = team.reduce((s, r) => s + n(r.missoes), 0);
+  const done = team.reduce((s, r) => s + n(r.cumpridas), 0);
+  const pending = team.reduce((s, r) => s + n(r.abriu_sem_concluir) + n(r.nao_abriu), 0);
+  const indicated = team.reduce((s, r) => s + n(r.total_indicados), 0);
+  const rate = missions ? (100 * done) / missions : 0;
+  const members = team.filter((r) => r.pessoa_id !== coordinator?.pessoa_id);
+  const byParent = new Map<string, ReportRow[]>();
+  for (const member of members) {
+    const parentKey =
+      member.parent_id && team.some((r) => r.pessoa_id === member.parent_id)
+        ? member.parent_id
+        : "root";
+    const list = byParent.get(parentKey) || [];
+    list.push(member);
+    byParent.set(parentKey, list);
+  }
+  for (const list of byParent.values())
+    list.sort(
+      (a, b) =>
+        (a.cargo === "lider" ? -1 : 1) - (b.cargo === "lider" ? -1 : 1) ||
+        a.nome.localeCompare(b.nome),
+    );
+  const roots = standalone
+    ? members
+    : (byParent.get(coordinator?.pessoa_id || "root") || []).concat(byParent.get("root") || []);
+
+  return (
+    <Card className={standalone ? "border-amber-400/60" : "overflow-hidden border-primary/20"}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`flex w-full flex-wrap items-center gap-3 p-4 text-left transition-colors hover:bg-muted/40 ${standalone ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-primary/[0.04]"}`}
+      >
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-full ${standalone ? "bg-amber-500/15 text-amber-700" : "bg-primary/10 text-primary"}`}
+        >
+          {standalone ? <AlertCircle className="h-5 w-5" /> : <Crown className="h-5 w-5" />}
+        </div>
+        <div className="min-w-56 flex-1">
+          <p className="text-base font-bold">
+            {standalone ? "Sem coordenador" : coordinator?.nome || team[0].coordenador_nome}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {team.length} contratados · {area(coordinator || team[0])}
+          </p>
+        </div>
+        <TeamStat label="Cumpridas" value={done} tone="good" />
+        <TeamStat label="Pendentes" value={pending} tone="bad" />
+        <TeamStat label="Adesão" value={`${rate.toFixed(1)}%`} />
+        <TeamStat label="Indicados" value={indicated} />
+        <ChevronDown className={`h-5 w-5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <CardContent className="border-t p-3 md:p-5">
+          {!standalone && coordinator && (
+            <TreePerson row={coordinator} level={0} accent="coordinator" />
+          )}
+          <div
+            className={`${standalone ? "" : "ml-5 border-l-2 border-primary/20 pl-4"} space-y-2 pt-2`}
+          >
+            {roots.map((row) => (
+              <TreeBranch
+                key={row.pessoa_id}
+                row={row}
+                byParent={byParent}
+                level={standalone ? 0 : 1}
+              />
+            ))}
+            {!roots.length && (
+              <p className="py-4 text-sm text-muted-foreground">
+                Nenhum liderado contratado nesta equipe.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+function TreeBranch({
+  row,
+  byParent,
+  level,
+}: {
+  row: ReportRow;
+  byParent: Map<string, ReportRow[]>;
+  level: number;
+}) {
+  const children = byParent.get(row.pessoa_id) || [];
+  return (
+    <div className="relative">
+      <span className="absolute -left-4 top-5 h-px w-4 bg-border" />
+      <TreePerson row={row} level={level} accent={row.cargo === "lider" ? "leader" : "member"} />
+      {!!children.length && (
+        <div className="ml-5 space-y-2 border-l-2 border-blue-200/70 pl-4 pt-2 dark:border-blue-800/60">
+          {children.map((child) => (
+            <TreeBranch key={child.pessoa_id} row={child} byParent={byParent} level={level + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TreePerson({
+  row: r,
+  level,
+  accent,
+}: {
+  row: ReportRow;
+  level: number;
+  accent: "coordinator" | "leader" | "member";
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      className={`rounded-lg border ${accent === "coordinator" ? "border-primary/30 bg-primary/[0.035]" : accent === "leader" ? "border-blue-300/60 bg-blue-50/40 dark:bg-blue-950/20" : "bg-background"}`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="grid w-full items-center gap-3 p-3 text-left md:grid-cols-[minmax(220px,1fr)_110px_110px_135px_28px]"
+      >
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${accent === "coordinator" ? "bg-primary text-primary-foreground" : accent === "leader" ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"}`}
+          >
+            {accent === "coordinator" ? (
+              <Crown className="h-4 w-4" />
+            ) : (
+              <UserRound className="h-4 w-4" />
+            )}
+          </div>
+          <div>
+            <p className="font-semibold">{r.nome}</p>
+            <p className="text-xs text-muted-foreground">
+              {r.cargo} · {r.telefone || "sem telefone"}
+              {level > 0 && r.responsavel_nome ? ` · responde a ${r.responsavel_nome}` : ""}
+            </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-muted-foreground">Missões</p>
+          <p className="font-semibold">
+            {r.cumpridas}/{r.missoes}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-muted-foreground">Adesão</p>
+          <p
+            className={
+              n(r.taxa) >= 80
+                ? "font-bold text-emerald-700"
+                : n(r.taxa) < 50
+                  ? "font-bold text-destructive"
+                  : "font-bold text-amber-700"
+            }
+          >
+            {n(r.taxa).toFixed(1)}%
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-muted-foreground">Lista</p>
+          <p className="font-semibold">
+            {r.total_indicados}/{r.meta_indicados} indicados
+          </p>
+        </div>
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <PersonDetails row={r} />}
+    </div>
+  );
+}
+
+function TeamStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone?: "good" | "bad";
+}) {
+  return (
+    <div className="min-w-20 text-center">
+      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+      <p
+        className={`font-bold ${tone === "good" ? "text-emerald-700" : tone === "bad" ? "text-destructive" : ""}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function PersonDetails({ row: r }: { row: ReportRow }) {
+  return (
+    <div className="grid gap-4 border-t bg-muted/20 p-3 lg:grid-cols-2">
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+          Missões do período
+        </p>
+        {!r.missoes_detalhe.length ? (
+          <p className="text-sm text-muted-foreground">Não recebeu missão.</p>
+        ) : (
+          r.missoes_detalhe.map((m) => (
+            <div
+              key={m.mission_id}
+              className="mb-1 flex justify-between rounded bg-background p-2 text-xs"
+            >
+              <span>{m.titulo}</span>
+              <Badge
+                variant="outline"
+                className={
+                  m.status === "cumpriu"
+                    ? "text-emerald-700"
+                    : m.status === "abriu"
+                      ? "text-amber-700"
+                      : "text-destructive"
+                }
+              >
+                {m.status === "cumpriu"
+                  ? "Cumpriu"
+                  : m.status === "abriu"
+                    ? "Abriu, não concluiu"
+                    : "Não abriu"}
+              </Badge>
+            </div>
+          ))
+        )}
+      </div>
+      <div>
+        <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+          Indicados enviados
+        </p>
+        {!r.indicados_detalhe.length ? (
+          <p className="text-sm text-muted-foreground">Nenhum indicado.</p>
+        ) : (
+          r.indicados_detalhe.map((i) => (
+            <div key={i.id} className="mb-1 flex justify-between rounded bg-background p-2 text-xs">
+              <span>
+                <strong>{i.nome}</strong> · {i.telefone}
+              </span>
+              <span className="text-muted-foreground">{i.status_telemarketing}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 
