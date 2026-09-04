@@ -355,11 +355,14 @@ function ExportarContratadosDialog({ clientId, onClose }: { clientId: string; on
   useEffect(() => {
     let active = true;
     setLoading(true);
-    const listarContratados = supabase.rpc as unknown as (
-      fn: "eleicao_listar_contratados_exportacao",
-      args: { _client_id: string },
-    ) => PromiseLike<{ data: ContratadoExportRow[] | null; error: { message: string } | null }>;
-    listarContratados("eleicao_listar_contratados_exportacao", { _client_id: clientId })
+    const consulta = supabase.rpc(
+      "eleicao_listar_contratados_exportacao" as never,
+      { _client_id: clientId } as never,
+    ) as unknown as PromiseLike<{
+      data: ContratadoExportRow[] | null;
+      error: { message: string } | null;
+    }>;
+    Promise.resolve(consulta)
       .then(({ data, error }) => {
         if (!active) return;
         if (error) {
@@ -374,6 +377,13 @@ function ExportarContratadosDialog({ clientId, onClose }: { clientId: string; on
             bairro: d.bairro,
           })));
         }
+        setLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const message = error instanceof Error ? error.message : "Erro inesperado na consulta";
+        toast.error("Não foi possível carregar os contratados", { description: message });
+        setContatos([]);
         setLoading(false);
       });
     return () => { active = false; };
