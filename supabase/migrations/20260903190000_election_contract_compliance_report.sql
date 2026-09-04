@@ -70,7 +70,7 @@ BEGIN
     WHERE a.ancestor_tipo='coordenador'
     ORDER BY a.pessoa_id,a.depth
   ), mission_rows AS MATERIALIZED (
-    SELECT c.id pessoa_id,o.mission_id,m.titulo,
+    SELECT c.id pessoa_id,o.mission_id,m.title,
       coalesce(m.publicado_em,m.created_at) publicado_em,
       CASE WHEN o.status='cumprida' OR o.cumprida_em IS NOT NULL THEN 'cumpriu'
         WHEN EXISTS(
