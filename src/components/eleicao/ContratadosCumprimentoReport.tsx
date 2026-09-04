@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -268,14 +269,31 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           </div>
         </CardHeader>
         <CardContent className="grid gap-2 md:grid-cols-2 xl:grid-cols-6">
-          <Input type="date" value={inicio} max={fim} onChange={(e) => setInicio(e.target.value)} />
-          <Input
-            type="date"
-            value={fim}
-            min={inicio}
-            max={today}
-            onChange={(e) => setFim(e.target.value)}
-          />
+          <div className="space-y-1">
+            <Label htmlFor="report-date-start" className="text-xs">
+              Missões de
+            </Label>
+            <Input
+              id="report-date-start"
+              type="date"
+              value={inicio}
+              max={fim}
+              onChange={(e) => setInicio(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="report-date-end" className="text-xs">
+              Missões até
+            </Label>
+            <Input
+              id="report-date-end"
+              type="date"
+              value={fim}
+              min={inicio}
+              max={today}
+              onChange={(e) => setFim(e.target.value)}
+            />
+          </div>
           <Select value={coordinator} onValueChange={setCoordinator}>
             <SelectTrigger>
               <SelectValue placeholder="Coordenador" />

@@ -172,3 +172,4 @@ CREATE INDEX IF NOT EXISTS idx_eleicao_indicados_report_period
 REVOKE ALL ON FUNCTION public.election_contract_compliance_report(uuid,date,date) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.election_contract_compliance_report(uuid,date,date) TO authenticated;
 NOTIFY pgrst,'reload schema';
+
