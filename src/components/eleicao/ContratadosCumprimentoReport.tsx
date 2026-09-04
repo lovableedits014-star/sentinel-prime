@@ -90,6 +90,16 @@ type ReportRow = {
 };
 
 type RpcResult = { data: unknown; error: { message: string } | null };
+type VoteAudit = {
+  votos_confirmados: number;
+  devolutivas_negativas: number;
+  respostas_validas: number;
+  telefones_duplicados: number;
+  confirmados_vinculados_eleicao: number;
+  negativas_vinculadas_eleicao: number;
+  por_origem: Record<string, { confirmados: number; negativas: number; total: number }>;
+  atualizado_em: string;
+};
 const reportDb = supabase as unknown as {
   rpc: (name: string, args: Record<string, unknown>) => Promise<RpcResult>;
 };
@@ -140,7 +150,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
     refetchOnWindowFocus: true,
     staleTime: 0,
     queryFn: async () => {
-      const [{ data, error }, configResult] = await Promise.all([
+      const [{ data, error }, configResult, auditResult] = await Promise.all([
         reportDb.rpc("election_contract_compliance_report", {
           p_client_id: clientId,
           p_data_inicio: inicio,
@@ -151,11 +161,13 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           .select("meta_coordenador,meta_lider,meta_cabo")
           .eq("client_id", clientId)
           .maybeSingle(),
+        reportDb.rpc("telemarketing_vote_return_audit", { p_client_id: clientId }),
       ]);
       if (error) throw error;
       if (configResult.error) throw configResult.error;
+      if (auditResult.error) throw auditResult.error;
       const config = configResult.data;
-      return ((data || []) as ReportRow[]).map((r) => {
+      const people = ((data || []) as ReportRow[]).map((r) => {
         const details = Array.isArray(r.indicados_detalhe) ? r.indicados_detalhe : [];
         const currentMeta =
           r.cargo === "coordenador"
@@ -181,6 +193,8 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           devolutivas_negativas: details.filter((i) => i.vota_candidato === "nao").length,
         };
       });
+      const voteAudit = (auditResult.data as VoteAudit[] | null)?.[0] || null;
+      return { people, voteAudit };
     },
   });
   const refetchReport = query.refetch;
@@ -189,7 +203,8 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
     window.addEventListener("eleicao:indicacao-config-changed", refresh);
     return () => window.removeEventListener("eleicao:indicacao-config-changed", refresh);
   }, [refetchReport]);
-  const rows = useMemo(() => query.data || [], [query.data]);
+  const rows = useMemo(() => query.data?.people || [], [query.data]);
+  const voteAudit = query.data?.voteAudit;
   const coordinators = useMemo(
     () =>
       Array.from(
@@ -230,8 +245,8 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
       missed: filtered.reduce((s, r) => s + n(r.nao_abriu), 0),
       indicated: filtered.reduce((s, r) => s + n(r.total_indicados), 0),
       sent: filtered.filter((r) => n(r.total_indicados) > 0).length,
-      confirmed: filtered.reduce((s, r) => s + r.votos_confirmados, 0),
-      negative: filtered.reduce((s, r) => s + r.devolutivas_negativas, 0),
+      confirmedLinked: filtered.reduce((s, r) => s + r.votos_confirmados, 0),
+      negativeLinked: filtered.reduce((s, r) => s + r.devolutivas_negativas, 0),
     }),
     [filtered],
   );
@@ -398,17 +413,35 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
         />
         <Metric
           label="Votos confirmados"
-          value={totals.confirmed}
-          help="responderam sim · acumulado atual"
+          value={n(voteAudit?.votos_confirmados)}
+          help={`${totals.confirmedLinked} atribuídos às equipes filtradas · base inteira sem duplicar telefone`}
           good
         />
         <Metric
           label="Devolutivas negativas"
-          value={totals.negative}
-          help="responderam não · acumulado atual"
+          value={n(voteAudit?.devolutivas_negativas)}
+          help={`${totals.negativeLinked} atribuídas às equipes filtradas · base inteira sem duplicar telefone`}
           danger
         />
       </div>
+
+      {voteAudit && (
+        <Card className="border-slate-200 bg-slate-50/50 dark:bg-slate-950/20">
+          <CardContent className="flex flex-wrap items-center gap-x-5 gap-y-2 py-3 text-xs">
+            <strong>Auditoria das devolutivas:</strong>
+            {Object.entries(voteAudit.por_origem || {}).map(([origin, values]) => (
+              <span key={origin}>
+                {origin.replaceAll("_", " ")}:{" "}
+                <b className="text-emerald-700">{values.confirmados} sim</b> ·{" "}
+                <b className="text-destructive">{values.negativas} não</b>
+              </span>
+            ))}
+            <span className="text-muted-foreground">
+              {voteAudit.telefones_duplicados} registros duplicados removidos
+            </span>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="teams">
         <TabsList>
