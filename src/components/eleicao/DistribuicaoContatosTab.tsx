@@ -43,6 +43,11 @@ interface LoteHist {
   vcf_url: string | null;
 }
 
+interface ContratadoExportRow extends ContatoExport {
+  tipo: string | null;
+  bairro: string | null;
+}
+
 const fmtDateTime = (s?: string | null) => s ? new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 const onlyDigits = (s: string) => (s || "").replace(/\D/g, "");
 const waLinkText = (phone: string, text: string) => {
@@ -63,6 +68,7 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const [historico, setHistorico] = useState<LoteHist[]>([]);
   const [busca, setBusca] = useState("");
   const [open, setOpen] = useState<RegiaoRow | null>(null);
+  const [openContratados, setOpenContratados] = useState(false);
 
   // dialogs auxiliares
   const [openConfigInterior, setOpenConfigInterior] = useState(false);
@@ -156,6 +162,7 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
       <Tabs defaultValue="regioes">
         <TabsList>
           <TabsTrigger value="regioes">Regiões</TabsTrigger>
+          <TabsTrigger value="contratados">Contratados</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
           <TabsTrigger value="template">Mensagem padrão</TabsTrigger>
         </TabsList>
@@ -236,6 +243,29 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
           )}
         </TabsContent>
 
+        {/* ===================== CONTRATADOS ===================== */}
+        <TabsContent value="contratados" className="mt-3">
+          <Card className="overflow-hidden border-primary/30">
+            <div className="flex flex-col gap-4 bg-primary/5 p-5 sm:flex-row sm:items-center">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+                <Users className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold">Todos os contratados</h3>
+                  <Badge className="font-mono"><TagIcon className="mr-1 h-3 w-3" />CONTR</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Gera uma agenda única com coordenadores, líderes e cabos contratados ativos. Telefones repetidos são removidos automaticamente.
+                </p>
+              </div>
+              <Button onClick={() => setOpenContratados(true)}>
+                <Download className="mr-2 h-4 w-4" />Exportar contratados
+              </Button>
+            </div>
+          </Card>
+        </TabsContent>
+
         {/* ===================== HISTÓRICO ===================== */}
         <TabsContent value="historico" className="mt-3">
           {historico.length === 0 ? (
@@ -297,6 +327,10 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
         />
       )}
 
+      {openContratados && (
+        <ExportarContratadosDialog clientId={clientId} onClose={() => setOpenContratados(false)} />
+      )}
+
       <ConfigurarPrincipaisInteriorDialog
         clientId={clientId}
         open={openConfigInterior}
@@ -309,6 +343,119 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
         onClose={() => setOpenConverterLista(false)}
       />
     </div>
+  );
+}
+
+function ExportarContratadosDialog({ clientId, onClose }: { clientId: string; onClose: () => void }) {
+  const [contatos, setContatos] = useState<ContatoExport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [tag, setTag] = useState("CONTR");
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    const listarContratados = supabase.rpc as unknown as (
+      fn: "eleicao_listar_contratados_exportacao",
+      args: { _client_id: string },
+    ) => PromiseLike<{ data: ContratadoExportRow[] | null; error: { message: string } | null }>;
+    listarContratados("eleicao_listar_contratados_exportacao", { _client_id: clientId })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          toast.error("Não foi possível carregar os contratados", { description: error.message });
+          setContatos([]);
+        } else {
+          setContatos((data || []).map((d) => ({
+            pessoa_id: d.pessoa_id,
+            nome: d.nome,
+            telefone: d.telefone,
+            tipo: d.tipo,
+            bairro: d.bairro,
+          })));
+        }
+        setLoading(false);
+      });
+    return () => { active = false; };
+  }, [clientId]);
+
+  const baixarVcf = async () => {
+    setDownloading(true);
+    try {
+      const conteudo = gerarVcardLote({ contatos, tagPrefixo: tag, regiaoLabel: "Contratados" });
+      const totalGerado = contarVcardsNoConteudo(conteudo);
+      if (totalGerado !== contatos.length) {
+        toast.error("Falha na geração do VCF", { description: `Esperado ${contatos.length}, gerado ${totalGerado}.` });
+        return;
+      }
+      await saveBlob(
+        new Blob([conteudo], { type: "text/vcard;charset=utf-8" }),
+        `contratados_${Date.now()}.vcf`,
+        { title: "Contatos dos contratados" },
+      );
+      toast.success(`${totalGerado} contratados exportados com a TAG ${tag}`);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const baixarCsv = async () => {
+    const csv = gerarCsvGoogleContacts({ contatos, tagPrefixo: tag, regiaoLabel: "Contratados" });
+    await saveBlob(
+      new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }),
+      "contratados_google_contacts.csv",
+      { title: "Contratados - Google Contacts" },
+    );
+  };
+
+  return (
+    <Dialog open onOpenChange={(value) => { if (!value) onClose(); }}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Exportar todos os contratados</DialogTitle>
+          <DialogDescription>
+            A lista é atualizada sempre que esta janela é aberta e inclui somente contratados ativos, remunerados e não voluntários.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="flex items-center gap-1"><TagIcon className="h-3 w-3" />TAG dos contratados</Label>
+            <Input value={tag} onChange={(e) => setTag(normalizeTag(e.target.value))} maxLength={8} className="max-w-40 font-mono uppercase" />
+            <p className="mt-1 text-xs text-muted-foreground">Exemplo na agenda: <strong>{aplicarTag("João da Silva", tag)}</strong></p>
+          </div>
+
+          <Card className="p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium">Contatos encontrados</span>
+              <Badge variant="secondary">{loading ? "..." : contatos.length}</Badge>
+            </div>
+            <div className="max-h-64 overflow-y-auto rounded-md border bg-muted/30 p-2 text-xs">
+              {loading ? <Loader2 className="mx-auto my-5 h-5 w-5 animate-spin" /> : contatos.length === 0 ? (
+                <div className="py-5 text-center text-muted-foreground">Nenhum contratado com telefone foi encontrado.</div>
+              ) : (
+                <ul className="space-y-1">
+                  {contatos.slice(0, 100).map((contato) => (
+                    <li key={contato.pessoa_id} className="truncate">• <strong>{aplicarTag(contato.nome, tag)}</strong> — {contato.telefone} <span className="text-muted-foreground">({contato.tipo})</span></li>
+                  ))}
+                  {contatos.length > 100 && <li className="text-muted-foreground">…e mais {contatos.length - 100}</li>}
+                </ul>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={baixarCsv} disabled={loading || contatos.length === 0 || !tag}>
+            <FileText className="mr-2 h-4 w-4" />CSV Google
+          </Button>
+          <Button onClick={baixarVcf} disabled={loading || downloading || contatos.length === 0 || !tag}>
+            {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            {isIOS() ? "Gerar contatos no iPhone" : "Baixar .vcf"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
