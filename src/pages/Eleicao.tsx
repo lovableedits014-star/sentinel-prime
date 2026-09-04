@@ -43,6 +43,7 @@ import DobradinhaPropagarDialog from "@/components/eleicao/DobradinhaPropagarDia
 import DistribuicaoContatosTab from "@/components/eleicao/DistribuicaoContatosTab";
 import { FunnelManagement } from "@/components/eleicao/FunnelManagement";
 import { getEleicaoSituacao, isEleicaoContratado, isEleicaoSemContrato, isEleicaoVoluntario } from "@/lib/eleicao-situacao";
+import ContratadosCumprimentoReport from "@/components/eleicao/ContratadosCumprimentoReport";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -784,7 +785,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao">("cadastros");
+  const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao" | "relatorio_contratados">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "contratados" | "sem_contrato" | "sem_acesso" | "avulsos" | "voluntarios" | "arquivados" | "reuniao">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
@@ -1248,7 +1249,7 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid grid-cols-9 w-full max-w-6xl">
+        <TabsList className="grid h-auto grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 w-full max-w-7xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="funnel" className="gap-1.5">
             <Handshake className="w-3.5 h-3.5" />
@@ -1267,6 +1268,9 @@ export default function Eleicao() {
             )}
           </TabsTrigger>
           <TabsTrigger value="indicacoes">Indicações</TabsTrigger>
+          <TabsTrigger value="relatorio_contratados" className="gap-1.5">
+            <FileText className="w-3.5 h-3.5" />Relatório
+          </TabsTrigger>
           <TabsTrigger value="distribuicao" className="gap-1.5">
             <Send className="w-3.5 h-3.5" />
             Distribuição
@@ -1308,6 +1312,8 @@ export default function Eleicao() {
         clientId ? <PendentesValorPanel clientId={clientId} onChanged={load} /> : null
       ) : view === "indicacoes" ? (
         clientId ? <IndicacoesPanel clientId={clientId} /> : null
+      ) : view === "relatorio_contratados" ? (
+        clientId ? <ContratadosCumprimentoReport clientId={clientId} /> : null
       ) : view === "distribuicao" ? (
         clientId ? <DistribuicaoContatosTab clientId={clientId} /> : null
       ) : view === "dobradinhas" ? (
