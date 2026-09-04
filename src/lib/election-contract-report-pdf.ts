@@ -15,6 +15,8 @@ export type ContractReportPdfRow = {
   taxa: number;
   total_indicados: number;
   meta_indicados: number;
+  votos_confirmados: number;
+  devolutivas_negativas: number;
 };
 
 const slug = (value: string) =>
@@ -59,6 +61,8 @@ export async function exportElectionContractReportPdf(args: {
       0,
     );
     const indicated = team.reduce((sum, r) => sum + Number(r.total_indicados || 0), 0);
+    const confirmed = team.reduce((sum, r) => sum + Number(r.votos_confirmados || 0), 0);
+    const negative = team.reduce((sum, r) => sum + Number(r.devolutivas_negativas || 0), 0);
     const rate = missions ? (100 * done) / missions : 0;
 
     doc.setFillColor(
@@ -87,10 +91,12 @@ export async function exportElectionContractReportPdf(args: {
       ["Cumpridas", done],
       ["Pendentes", pending],
       ["Adesão", `${rate.toFixed(1)}%`],
+      ["Votos confirmados", confirmed],
+      ["Negativas", negative],
       ["Indicados", indicated],
     ] as const;
-    const gap = 8,
-      cardWidth = (width - margin * 2 - gap * 4) / 5;
+    const gap = 7,
+      cardWidth = (width - margin * 2 - gap * 6) / 7;
     cards.forEach(([label, value], index) => {
       const x = margin + index * (cardWidth + gap);
       doc.setFillColor(
@@ -139,6 +145,8 @@ export async function exportElectionContractReportPdf(args: {
           "Cumpridas",
           "Pendentes",
           "Taxa",
+          "Confirmados",
+          "Negativas",
           "Indicados / meta",
         ],
       ],
@@ -150,6 +158,8 @@ export async function exportElectionContractReportPdf(args: {
         r.cumpridas,
         Number(r.abriu_sem_concluir || 0) + Number(r.nao_abriu || 0),
         `${Number(r.taxa || 0).toFixed(1)}%`,
+        r.votos_confirmados,
+        r.devolutivas_negativas,
         `${r.total_indicados}/${r.meta_indicados}`,
       ]),
       theme: "striped",

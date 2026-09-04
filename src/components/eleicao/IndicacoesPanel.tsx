@@ -7,15 +7,52 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Copy, Link as LinkIcon, MessageCircle, RefreshCw, Search, Send, Target, TrendingUp, Users, History, FlaskConical, Clock, Palette, Upload, Trash2, Eye, UserPlus, Plus, ChevronDown, ChevronUp, FileSpreadsheet, FileText, AlertTriangle } from "lucide-react";
+import {
+  Loader2,
+  Copy,
+  Link as LinkIcon,
+  MessageCircle,
+  RefreshCw,
+  Search,
+  Send,
+  Target,
+  TrendingUp,
+  Users,
+  History,
+  FlaskConical,
+  Clock,
+  Palette,
+  Upload,
+  Trash2,
+  Eye,
+  UserPlus,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  FileSpreadsheet,
+  FileText,
+  AlertTriangle,
+} from "lucide-react";
 import CobrancaAutoConfig from "./CobrancaAutoConfig";
 import IndicarPaginaConfig from "./IndicarPaginaConfig";
 import ImportarIndicadosDialog from "./ImportarIndicadosDialog";
-
 
 type DispatchHist = {
   id: string;
@@ -65,7 +102,11 @@ type Config = {
   limite_diario_token: number;
 };
 
-const tipoLabel: Record<Tipo, string> = { coordenador: "Coordenador", lider: "Líder", cabo: "Cabo" };
+const tipoLabel: Record<Tipo, string> = {
+  coordenador: "Coordenador",
+  lider: "Líder",
+  cabo: "Cabo",
+};
 
 function buildLink(token: string) {
   return `${window.location.origin}/indicar/${token}`;
@@ -84,7 +125,6 @@ function waLink(telefone: string, msg: string) {
   return `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
 }
 
-
 export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [tab, setTab] = useState<"cobranca" | "config" | "pagina">("cobranca");
   const [rows, setRows] = useState<Row[]>([]);
@@ -92,7 +132,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState<"all" | Tipo>("all");
   const [filtroStatus, setFiltroStatus] = useState<"all" | "zerados" | "abaixo" | "ok">("all");
-  const [config, setConfig] = useState<Config>({ meta_coordenador: 40, meta_lider: 25, meta_cabo: 2, limite_diario_token: 999999 });
+  const [config, setConfig] = useState<Config>({
+    meta_coordenador: 40,
+    meta_lider: 25,
+    meta_cabo: 2,
+    limite_diario_token: 999999,
+  });
   const [savingConfig, setSavingConfig] = useState(false);
   const [gerando, setGerando] = useState<string | null>(null);
   const [candidatoNome, setCandidatoNome] = useState<string>("");
@@ -101,11 +146,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
   const [nowTick, setNowTick] = useState<number>(Date.now());
 
-
   // ===== Disparo em massa =====
   const TEMPLATE_PADRAO = {
-    zerados: "Oi {primeiro_nome}! Ainda não recebemos nenhuma indicação de voto voluntário sua para {candidato}. Lembrando: aqui você cadastra ELEITORES (pessoas que vão votar de verdade, não contratadas). Sua meta é {meta}. Use seu link: {link}",
-    abaixo: "Olá {primeiro_nome}! Faltam {faltam} indicações de votos voluntários (eleitores reais) para bater sua meta de {meta} em {candidato}. 👉 {link}",
+    zerados:
+      "Oi {primeiro_nome}! Ainda não recebemos nenhuma indicação de voto voluntário sua para {candidato}. Lembrando: aqui você cadastra ELEITORES (pessoas que vão votar de verdade, não contratadas). Sua meta é {meta}. Use seu link: {link}",
+    abaixo:
+      "Olá {primeiro_nome}! Faltam {faltam} indicações de votos voluntários (eleitores reais) para bater sua meta de {meta} em {candidato}. 👉 {link}",
     ok: "Obrigado pelas {total} indicações de votos voluntários, {primeiro_nome}! Continue cadastrando eleitores em {candidato}: {link}",
     all: "Olá {primeiro_nome}! Use seu link para cadastrar votos voluntários (eleitores) em {candidato}: {link}",
   } as const;
@@ -121,11 +167,20 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   async function load() {
     setLoading(true);
     const [cob, cfg, cli, hist] = await Promise.all([
-      supabase.from("v_eleicao_indicadores_cobranca").select("*").eq("client_id", clientId).order("total_indicacoes", { ascending: true }),
+      supabase
+        .from("v_eleicao_indicadores_cobranca")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("total_indicacoes", { ascending: true }),
       supabase.from("eleicao_indicacao_config").select("*").eq("client_id", clientId).maybeSingle(),
       supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
-      supabase.from("whatsapp_dispatches").select("id,titulo,status,total_destinatarios,enviados,falhas,created_at,completed_at")
-        .eq("client_id", clientId).eq("tipo", "indicadores_cobranca").order("created_at", { ascending: false }).limit(10),
+      supabase
+        .from("whatsapp_dispatches")
+        .select("id,titulo,status,total_destinatarios,enviados,falhas,created_at,completed_at")
+        .eq("client_id", clientId)
+        .eq("tipo", "indicadores_cobranca")
+        .order("created_at", { ascending: false })
+        .limit(10),
     ]);
     setRows((cob.data as any) || []);
     if (cfg.data) setConfig(cfg.data as any);
@@ -135,7 +190,9 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     setLoading(false);
   }
 
-  useEffect(() => { if (clientId) load(); }, [clientId]);
+  useEffect(() => {
+    if (clientId) load();
+  }, [clientId]);
 
   // Auto-refresh a cada 30s na aba de cobrança (quando a página está visível)
   useEffect(() => {
@@ -162,14 +219,23 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
       if (filtroStatus === "ok" && r.total_indicacoes < r.meta) return false;
       if (busca) {
         const q = busca.toLowerCase();
-        if (!r.nome.toLowerCase().includes(q) && !(r.cidade || "").toLowerCase().includes(q) && !(r.regiao || "").toLowerCase().includes(q)) return false;
+        if (
+          !r.nome.toLowerCase().includes(q) &&
+          !(r.cidade || "").toLowerCase().includes(q) &&
+          !(r.regiao || "").toLowerCase().includes(q)
+        )
+          return false;
       }
       return true;
     });
   }, [rows, filtroTipo, filtroStatus, busca]);
 
   const stats = useMemo(() => {
-    const agg = { coord: { total: 0, meta: 0, pessoas: 0 }, lider: { total: 0, meta: 0, pessoas: 0 }, cabo: { total: 0, meta: 0, pessoas: 0 } };
+    const agg = {
+      coord: { total: 0, meta: 0, pessoas: 0 },
+      lider: { total: 0, meta: 0, pessoas: 0 },
+      cabo: { total: 0, meta: 0, pessoas: 0 },
+    };
     for (const r of rows) {
       const k = r.tipo === "coordenador" ? "coord" : r.tipo === "lider" ? "lider" : "cabo";
       agg[k].total += r.total_indicacoes || 0;
@@ -182,12 +248,16 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     return { agg, grandTotal, grandMeta, foraDaMeta };
   }, [rows]);
 
-
   async function gerarToken(indicadorId: string) {
     setGerando(indicadorId);
-    const { data, error } = await supabase.rpc("eleicao_gerar_token_indicador", { _indicador_id: indicadorId });
+    const { data, error } = await supabase.rpc("eleicao_gerar_token_indicador", {
+      _indicador_id: indicadorId,
+    });
     setGerando(null);
-    if (error) { toast.error("Falha ao gerar link"); return; }
+    if (error) {
+      toast.error("Falha ao gerar link");
+      return;
+    }
     toast.success("Link gerado!");
     await load();
     if (data) await navigator.clipboard.writeText(buildLink(data as string)).catch(() => {});
@@ -201,9 +271,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   function whatsCobranca(r: Row) {
     const link = r.token ? buildLink(r.token) : "";
     const falta = Math.max(0, r.meta - r.total_indicacoes);
-    const msg = falta > 0
-      ? `Olá ${r.nome.split(" ")[0]}! Faltam ${falta} indicações de votos voluntários (eleitores reais, não contratados)${candidatoNome ? ` para ${candidatoNome}` : ""}. Use seu link: ${link}`
-      : `Olá ${r.nome.split(" ")[0]}! Obrigado pelas indicações de votos voluntários${candidatoNome ? ` para ${candidatoNome}` : ""}. Continue cadastrando eleitores: ${link}`;
+    const msg =
+      falta > 0
+        ? `Olá ${r.nome.split(" ")[0]}! Faltam ${falta} indicações de votos voluntários (eleitores reais, não contratados)${candidatoNome ? ` para ${candidatoNome}` : ""}. Use seu link: ${link}`
+        : `Olá ${r.nome.split(" ")[0]}! Obrigado pelas indicações de votos voluntários${candidatoNome ? ` para ${candidatoNome}` : ""}. Continue cadastrando eleitores: ${link}`;
     return waLink(r.telefone || "", msg);
   }
 
@@ -218,8 +289,12 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
       ativo: true,
     });
     setSavingConfig(false);
-    if (error) { toast.error("Falha ao salvar"); return; }
+    if (error) {
+      toast.error("Falha ao salvar");
+      return;
+    }
     toast.success("Metas salvas");
+    window.dispatchEvent(new Event("eleicao:indicacao-config-changed"));
     await load();
   }
 
@@ -228,7 +303,8 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     const cutoff = janelaHoras > 0 ? Date.now() - janelaHoras * 3600 * 1000 : 0;
     return filtered.filter((r) => {
       if (!r.telefone || r.telefone.replace(/\D/g, "").length < 8) return false;
-      if (cutoff && r.ultima_cobranca_em && new Date(r.ultima_cobranca_em).getTime() >= cutoff) return false;
+      if (cutoff && r.ultima_cobranca_em && new Date(r.ultima_cobranca_em).getTime() >= cutoff)
+        return false;
       return true;
     });
   }, [filtered, janelaHoras]);
@@ -236,7 +312,9 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   const massPuladosJanela = useMemo(() => {
     if (janelaHoras <= 0) return 0;
     const cutoff = Date.now() - janelaHoras * 3600 * 1000;
-    return filtered.filter((r) => r.ultima_cobranca_em && new Date(r.ultima_cobranca_em).getTime() >= cutoff).length;
+    return filtered.filter(
+      (r) => r.ultima_cobranca_em && new Date(r.ultima_cobranca_em).getTime() >= cutoff,
+    ).length;
   }, [filtered, janelaHoras]);
 
   function abrirMass() {
@@ -267,10 +345,19 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
   async function testarComigo() {
     const phone = testePhone.replace(/\D/g, "");
-    if (phone.length < 10) { toast.error("Informe um telefone válido (com DDD)."); return; }
-    if (!massTemplate.includes("{link}")) { toast.error("Inclua {link} na mensagem."); return; }
+    if (phone.length < 10) {
+      toast.error("Informe um telefone válido (com DDD).");
+      return;
+    }
+    if (!massTemplate.includes("{link}")) {
+      toast.error("Inclua {link} na mensagem.");
+      return;
+    }
     const base = filtered[0];
-    if (!base) { toast.error("Nenhum indicador no filtro para usar como base."); return; }
+    if (!base) {
+      toast.error("Nenhum indicador no filtro para usar como base.");
+      return;
+    }
     setTestando(true);
     try {
       const { error } = await supabase.functions.invoke("send-whatsapp-dispatch", {
@@ -288,7 +375,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           cobranca_origin: window.location.origin,
           cobranca_teste_telefone: phone,
           cobranca_cascata: cascata,
-          batch_size: 1, delay_min: 0, delay_max: 1, batch_pause: 0,
+          batch_size: 1,
+          delay_min: 0,
+          delay_max: 1,
+          batch_pause: 0,
         },
       });
       if (error) throw error;
@@ -301,7 +391,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
   }
 
   async function enviarMass() {
-    if (massElegiveis.length === 0) { toast.error("Nenhum destinatário elegível."); return; }
+    if (massElegiveis.length === 0) {
+      toast.error("Nenhum destinatário elegível.");
+      return;
+    }
     if (!massTemplate.includes("{link}")) {
       toast.error("Inclua {link} na mensagem para o destinatário receber o link de indicação.");
       return;
@@ -323,7 +416,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           cobranca_origin: window.location.origin,
           cobranca_janela_horas: janelaHoras,
           cobranca_cascata: cascata,
-          batch_size: 10, delay_min: 5, delay_max: 15, batch_pause: 60,
+          batch_size: 10,
+          delay_min: 5,
+          delay_max: 15,
+          batch_pause: 60,
         },
       });
       if (error) throw error;
@@ -354,10 +450,19 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
         Indicacoes: r.total_indicacoes || 0,
         Meta: r.meta || 0,
         Faltam: faltam,
-        Status: faltam > 0 ? (r.total_indicacoes === 0 ? "Sem indicações" : "Abaixo da meta") : "Meta cumprida",
+        Status:
+          faltam > 0
+            ? r.total_indicacoes === 0
+              ? "Sem indicações"
+              : "Abaixo da meta"
+            : "Meta cumprida",
         Cobrancas: r.cobrancas_enviadas || 0,
-        UltimaCobranca: r.ultima_cobranca_em ? new Date(r.ultima_cobranca_em).toLocaleString("pt-BR") : "",
-        UltimoAcesso: r.ultimo_acesso_em ? new Date(r.ultimo_acesso_em).toLocaleString("pt-BR") : "",
+        UltimaCobranca: r.ultima_cobranca_em
+          ? new Date(r.ultima_cobranca_em).toLocaleString("pt-BR")
+          : "",
+        UltimoAcesso: r.ultimo_acesso_em
+          ? new Date(r.ultimo_acesso_em).toLocaleString("pt-BR")
+          : "",
         Link: r.token ? buildLink(r.token) : "",
       };
     });
@@ -365,13 +470,26 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
   async function exportarExcel() {
     const data = exportRows();
-    if (!data.length) { toast.error("Nenhum indicador no filtro atual."); return; }
+    if (!data.length) {
+      toast.error("Nenhum indicador no filtro atual.");
+      return;
+    }
     const XLSX = await import("xlsx");
     const ws = XLSX.utils.json_to_sheet(data);
     ws["!cols"] = [
-      { wch: 28 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 18 },
-      { wch: 11 }, { wch: 8 }, { wch: 8 }, { wch: 16 }, { wch: 10 },
-      { wch: 20 }, { wch: 20 }, { wch: 45 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 11 },
+      { wch: 8 },
+      { wch: 8 },
+      { wch: 16 },
+      { wch: 10 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 45 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Indicacoes");
@@ -381,18 +499,27 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
   async function exportarPDF() {
     const data = exportRows();
-    if (!data.length) { toast.error("Nenhum indicador no filtro atual."); return; }
+    if (!data.length) {
+      toast.error("Nenhum indicador no filtro atual.");
+      return;
+    }
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
     const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
     const filtroDesc = [
       filtroTipo === "all" ? "Todos os cargos" : tipoLabel[filtroTipo as Tipo],
-      filtroStatus === "all" ? "Todos os status"
-        : filtroStatus === "zerados" ? "Sem indicações"
-        : filtroStatus === "abaixo" ? "Abaixo da meta" : "Meta cumprida",
+      filtroStatus === "all"
+        ? "Todos os status"
+        : filtroStatus === "zerados"
+          ? "Sem indicações"
+          : filtroStatus === "abaixo"
+            ? "Abaixo da meta"
+            : "Meta cumprida",
       busca ? `Busca: "${busca}"` : null,
-    ].filter(Boolean).join(" · ");
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
     doc.setFontSize(15);
     doc.text("Relatório de Indicações — Cobrança", 40, 40);
@@ -403,16 +530,35 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     const totalMeta = data.reduce((s, d) => s + d.Meta, 0);
     doc.text(
       `${data.length} indicadores · ${faltantes} fora da meta · ${totalInd} de ${totalMeta} indicações · Gerado em ${new Date().toLocaleString("pt-BR")}`,
-      40, 70,
+      40,
+      70,
     );
 
     autoTable(doc, {
       startY: 84,
-      head: [["Nome", "Cargo", "Telefone", "Região / Cidade", "Ind.", "Meta", "Faltam", "Status", "Última cobrança"]],
+      head: [
+        [
+          "Nome",
+          "Cargo",
+          "Telefone",
+          "Região / Cidade",
+          "Ind.",
+          "Meta",
+          "Faltam",
+          "Status",
+          "Última cobrança",
+        ],
+      ],
       body: data.map((d) => [
-        d.Nome, d.Cargo, d.Telefone,
+        d.Nome,
+        d.Cargo,
+        d.Telefone,
         [d.Regiao, d.Cidade].filter(Boolean).join(" · "),
-        String(d.Indicacoes), String(d.Meta), String(d.Faltam), d.Status, d.UltimaCobranca || "—",
+        String(d.Indicacoes),
+        String(d.Meta),
+        String(d.Faltam),
+        d.Status,
+        d.UltimaCobranca || "—",
       ]),
       styles: { fontSize: 8, cellPadding: 3 },
       headStyles: { fillColor: [16, 122, 87], textColor: 255 },
@@ -427,14 +573,22 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
     toast.success(`PDF exportado (${data.length} indicadores)`);
   }
 
-
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList>
-          <TabsTrigger value="cobranca"><Users className="w-4 h-4 mr-1.5" />Indicadores & Cobrança</TabsTrigger>
-          <TabsTrigger value="config"><Target className="w-4 h-4 mr-1.5" />Metas e configurações</TabsTrigger>
-          <TabsTrigger value="pagina"><Palette className="w-4 h-4 mr-1.5" />Página pública</TabsTrigger>
+          <TabsTrigger value="cobranca">
+            <Users className="w-4 h-4 mr-1.5" />
+            Indicadores & Cobrança
+          </TabsTrigger>
+          <TabsTrigger value="config">
+            <Target className="w-4 h-4 mr-1.5" />
+            Metas e configurações
+          </TabsTrigger>
+          <TabsTrigger value="pagina">
+            <Palette className="w-4 h-4 mr-1.5" />
+            Página pública
+          </TabsTrigger>
         </TabsList>
 
         {/* ──────────── COBRANÇA ──────────── */}
@@ -442,15 +596,22 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Card className="p-3">
-              <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Total geral</div>
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                Total geral
+              </div>
               <div className="text-2xl font-bold">{stats.grandTotal.toLocaleString("pt-BR")}</div>
-              <div className="text-[11px] text-muted-foreground">de {stats.grandMeta.toLocaleString("pt-BR")} esperadas</div>
+              <div className="text-[11px] text-muted-foreground">
+                de {stats.grandMeta.toLocaleString("pt-BR")} esperadas
+              </div>
             </Card>
             <Card className="p-3 border-amber-500/40">
               <div className="text-[11px] text-amber-600 uppercase tracking-wide flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />Fora da meta
+                <AlertTriangle className="w-3 h-3" />
+                Fora da meta
               </div>
-              <div className="text-2xl font-bold text-amber-600">{stats.foraDaMeta.toLocaleString("pt-BR")}</div>
+              <div className="text-2xl font-bold text-amber-600">
+                {stats.foraDaMeta.toLocaleString("pt-BR")}
+              </div>
               <div className="text-[11px] text-muted-foreground">de {rows.length} indicadores</div>
             </Card>
             {(["coord", "lider", "cabo"] as const).map((k) => {
@@ -459,23 +620,33 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               const labels = { coord: "Coordenadores", lider: "Líderes", cabo: "Cabos" };
               return (
                 <Card key={k} className="p-3">
-                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">{labels[k]}</div>
+                  <div className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    {labels[k]}
+                  </div>
                   <div className="text-2xl font-bold">{a.total.toLocaleString("pt-BR")}</div>
-                  <div className="text-[11px] text-muted-foreground">{a.pessoas} pessoas · {pct}% da meta</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {a.pessoas} pessoas · {pct}% da meta
+                  </div>
                 </Card>
               );
             })}
           </div>
 
-
           {/* Filtros */}
           <div className="flex flex-wrap gap-2 items-center">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-muted-foreground" />
-              <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar nome, cidade, região…" className="pl-8" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar nome, cidade, região…"
+                className="pl-8"
+              />
             </div>
             <Select value={filtroTipo} onValueChange={(v) => setFiltroTipo(v as any)}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os tipos</SelectItem>
                 <SelectItem value="coordenador">Coordenadores</SelectItem>
@@ -484,7 +655,9 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </SelectContent>
             </Select>
             <Select value={filtroStatus} onValueChange={(v) => setFiltroStatus(v as any)}>
-              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="zerados">Sem indicações</SelectItem>
@@ -492,15 +665,34 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                 <SelectItem value="ok">Meta cumprida</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4 mr-1.5" />Atualizar</Button>
-            <Button variant="outline" size="sm" onClick={exportarExcel} title="Exportar a lista filtrada (com telefones) para Excel">
-              <FileSpreadsheet className="w-4 h-4 mr-1.5" />Excel
+            <Button variant="outline" size="sm" onClick={load}>
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              Atualizar
             </Button>
-            <Button variant="outline" size="sm" onClick={exportarPDF} title="Exportar a lista filtrada (com telefones) em PDF para cobrança presencial">
-              <FileText className="w-4 h-4 mr-1.5" />PDF
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportarExcel}
+              title="Exportar a lista filtrada (com telefones) para Excel"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+              Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportarPDF}
+              title="Exportar a lista filtrada (com telefones) em PDF para cobrança presencial"
+            >
+              <FileText className="w-4 h-4 mr-1.5" />
+              PDF
             </Button>
 
-            <Button size="sm" onClick={abrirMass} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button
+              size="sm"
+              onClick={abrirMass}
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
               <Send className="w-4 h-4" />
               Enviar cobrança em massa
             </Button>
@@ -509,14 +701,27 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           {/* Tabela */}
           <Card className="overflow-hidden">
             {loading ? (
-              <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+              <div className="p-8 flex justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
             ) : filtered.length === 0 ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum indicador encontrado com esses filtros.</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">
+                Nenhum indicador encontrado com esses filtros.
+              </div>
             ) : (
               <div className="divide-y max-h-[600px] overflow-y-auto">
                 {filtered.map((r) => {
-                  const pct = r.meta ? Math.min(100, Math.round((r.total_indicacoes / r.meta) * 100)) : 0;
-                  const cor = r.total_indicacoes === 0 ? "bg-red-500" : pct < 50 ? "bg-amber-500" : pct < 100 ? "bg-blue-500" : "bg-emerald-500";
+                  const pct = r.meta
+                    ? Math.min(100, Math.round((r.total_indicacoes / r.meta) * 100))
+                    : 0;
+                  const cor =
+                    r.total_indicacoes === 0
+                      ? "bg-red-500"
+                      : pct < 50
+                        ? "bg-amber-500"
+                        : pct < 100
+                          ? "bg-blue-500"
+                          : "bg-emerald-500";
                   const faltam = Math.max(0, (r.meta || 0) - (r.total_indicacoes || 0));
                   return (
                     <div key={r.indicador_id} className="p-3 hover:bg-muted/40 transition-colors">
@@ -524,7 +729,9 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium truncate">{r.nome}</span>
-                            <Badge variant="outline" className="text-[10px]">{tipoLabel[r.tipo]}</Badge>
+                            <Badge variant="outline" className="text-[10px]">
+                              {tipoLabel[r.tipo]}
+                            </Badge>
                             {faltam > 0 ? (
                               <Badge
                                 variant="outline"
@@ -535,26 +742,45 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                                 Fora da meta — faltam {faltam}
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-[10px] border-emerald-500/60 text-emerald-600">Meta ok</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] border-emerald-500/60 text-emerald-600"
+                              >
+                                Meta ok
+                              </Badge>
                             )}
                             {r.telefone && (
                               <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">
                                 {fmtTelBR(r.telefone)}
                               </span>
                             )}
-                            {r.regiao && <span className="text-xs text-muted-foreground">{r.regiao}{r.cidade ? ` · ${r.cidade}` : ""}</span>}
-
+                            {r.regiao && (
+                              <span className="text-xs text-muted-foreground">
+                                {r.regiao}
+                                {r.cidade ? ` · ${r.cidade}` : ""}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-1.5">
                             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[200px]">
-                              <div className={`h-full ${cor} transition-all`} style={{ width: `${pct}%` }} />
+                              <div
+                                className={`h-full ${cor} transition-all`}
+                                style={{ width: `${pct}%` }}
+                              />
                             </div>
                             <span className="text-xs tabular-nums">
                               <strong>{r.total_indicacoes}</strong>
                               <span className="text-muted-foreground"> / {r.meta}</span>
                             </span>
                             {(r.cobrancas_enviadas > 0 || r.ultima_cobranca_em) && (
-                              <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1" title={r.ultima_cobranca_em ? `Última cobrança: ${new Date(r.ultima_cobranca_em).toLocaleString("pt-BR")}` : ""}>
+                              <span
+                                className="text-[10px] text-muted-foreground inline-flex items-center gap-1"
+                                title={
+                                  r.ultima_cobranca_em
+                                    ? `Última cobrança: ${new Date(r.ultima_cobranca_em).toLocaleString("pt-BR")}`
+                                    : ""
+                                }
+                              >
                                 <Clock className="w-3 h-3" />
                                 {r.cobrancas_enviadas}× · {fmtAgo(r.ultima_cobranca_em)}
                               </span>
@@ -567,10 +793,16 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                               size="sm"
                               variant={addingFor === r.indicador_id ? "secondary" : "ghost"}
                               title="Cadastrar voto voluntário em nome desta pessoa"
-                              onClick={() => setAddingFor(addingFor === r.indicador_id ? null : r.indicador_id)}
+                              onClick={() =>
+                                setAddingFor(addingFor === r.indicador_id ? null : r.indicador_id)
+                              }
                             >
                               <UserPlus className="w-4 h-4" />
-                              {addingFor === r.indicador_id ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+                              {addingFor === r.indicador_id ? (
+                                <ChevronUp className="w-3 h-3 ml-1" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 ml-1" />
+                              )}
                             </Button>
                           )}
                           <Button
@@ -582,25 +814,56 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                             <FileSpreadsheet className="w-4 h-4" />
                           </Button>
                           {r.token ? (
-
                             <>
-                              <Button size="sm" variant="ghost" title="Copiar link" onClick={() => copiarLink(r.token!)}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Copiar link"
+                                onClick={() => copiarLink(r.token!)}
+                              >
                                 <Copy className="w-4 h-4" />
                               </Button>
                               {r.telefone && (
                                 <a href={whatsCobranca(r)} target="_blank" rel="noreferrer">
-                                  <Button size="sm" variant="ghost" title="Enviar link via WhatsApp">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    title="Enviar link via WhatsApp"
+                                  >
                                     <MessageCircle className="w-4 h-4 text-emerald-600" />
                                   </Button>
                                 </a>
                               )}
-                              <Button size="sm" variant="ghost" title="Regenerar link (avançado — invalida o anterior)" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id}>
-                                {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Regenerar link (avançado — invalida o anterior)"
+                                onClick={() => gerarToken(r.indicador_id)}
+                                disabled={gerando === r.indicador_id}
+                              >
+                                {gerando === r.indicador_id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-4 h-4" />
+                                )}
                               </Button>
                             </>
                           ) : (
-                            <Button size="sm" variant="outline" onClick={() => gerarToken(r.indicador_id)} disabled={gerando === r.indicador_id} title="Link ainda não criado">
-                              {gerando === r.indicador_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><LinkIcon className="w-4 h-4 mr-1.5" />Criar link</>}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => gerarToken(r.indicador_id)}
+                              disabled={gerando === r.indicador_id}
+                              title="Link ainda não criado"
+                            >
+                              {gerando === r.indicador_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <LinkIcon className="w-4 h-4 mr-1.5" />
+                                  Criar link
+                                </>
+                              )}
                             </Button>
                           )}
                         </div>
@@ -609,7 +872,9 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                         <QuickAddIndicadoInline
                           token={r.token}
                           nomePessoa={r.nome}
-                          onSaved={async () => { await load(); }}
+                          onSaved={async () => {
+                            await load();
+                          }}
                         />
                       )}
                     </div>
@@ -618,10 +883,13 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               </div>
             )}
             <div className="p-2 text-[11px] text-muted-foreground border-t bg-muted/30 flex items-center justify-between">
-              <span>Mostrando {filtered.length} de {rows.length} indicadores</span>
+              <span>
+                Mostrando {filtered.length} de {rows.length} indicadores
+              </span>
               <span className="inline-flex items-center gap-1">
                 <RefreshCw className="w-3 h-3" />
-                atualizado há {Math.max(0, Math.floor((nowTick - lastRefresh) / 1000))}s · auto a cada 30s
+                atualizado há {Math.max(0, Math.floor((nowTick - lastRefresh) / 1000))}s · auto a
+                cada 30s
               </span>
             </div>
           </Card>
@@ -630,30 +898,44 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           {historico.length > 0 && (
             <Card className="p-3">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm flex items-center gap-2"><History className="w-4 h-4" />Histórico de cobranças</h3>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <History className="w-4 h-4" />
+                  Histórico de cobranças
+                </h3>
                 <span className="text-[11px] text-muted-foreground">últimos 10 disparos</span>
               </div>
               <div className="divide-y">
                 {historico.map((h) => {
                   const statusColor =
-                    h.status === "completed" ? "text-emerald-600" :
-                    h.status === "sending" ? "text-blue-600" :
-                    h.status === "failed" ? "text-red-600" :
-                    h.status === "queued" ? "text-amber-600" : "text-muted-foreground";
+                    h.status === "completed"
+                      ? "text-emerald-600"
+                      : h.status === "sending"
+                        ? "text-blue-600"
+                        : h.status === "failed"
+                          ? "text-red-600"
+                          : h.status === "queued"
+                            ? "text-amber-600"
+                            : "text-muted-foreground";
                   return (
                     <div key={h.id} className="py-2 flex items-center gap-3 text-sm">
                       <div className="flex-1 min-w-0">
                         <div className="truncate">{h.titulo}</div>
                         <div className="text-[11px] text-muted-foreground">
-                          {new Date(h.created_at).toLocaleString("pt-BR")} · {fmtAgo(h.completed_at || h.created_at)}
+                          {new Date(h.created_at).toLocaleString("pt-BR")} ·{" "}
+                          {fmtAgo(h.completed_at || h.created_at)}
                         </div>
                       </div>
                       <div className="text-xs tabular-nums text-right">
-                        <div><span className="text-emerald-600 font-medium">{h.enviados}</span> enviados</div>
+                        <div>
+                          <span className="text-emerald-600 font-medium">{h.enviados}</span>{" "}
+                          enviados
+                        </div>
                         {h.falhas > 0 && <div className="text-red-600">{h.falhas} falhas</div>}
                         <div className="text-muted-foreground">de {h.total_destinatarios}</div>
                       </div>
-                      <Badge variant="outline" className={`text-[10px] ${statusColor}`}>{h.status}</Badge>
+                      <Badge variant="outline" className={`text-[10px] ${statusColor}`}>
+                        {h.status}
+                      </Badge>
                     </div>
                   );
                 })}
@@ -662,45 +944,72 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
           )}
         </TabsContent>
 
-
         {/* ──────────── CONFIG DE METAS ──────────── */}
         <TabsContent value="config" className="space-y-4 mt-4">
           <Card className="p-5 space-y-4 max-w-2xl">
             <div>
-              <h3 className="font-semibold flex items-center gap-2"><TrendingUp className="w-4 h-4" />Metas de indicações por tipo</h3>
+              <h3 className="font-semibold flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                Metas de indicações por tipo
+              </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Defina quantas indicações cada tipo deve trazer. Você pode ajustar a qualquer momento — a cobrança automática usa esses valores.
+                Defina quantas indicações cada tipo deve trazer. Você pode ajustar a qualquer
+                momento — a cobrança automática usa esses valores.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label className="text-xs">Meta por Coordenador</Label>
-                <Input type="number" min={0} value={config.meta_coordenador}
-                  onChange={(e) => setConfig({ ...config, meta_coordenador: parseInt(e.target.value) || 0 })} />
-                <p className="text-[11px] text-muted-foreground mt-1">Indicações esperadas de cada coordenador</p>
+                <Input
+                  type="number"
+                  min={0}
+                  value={config.meta_coordenador}
+                  onChange={(e) =>
+                    setConfig({ ...config, meta_coordenador: parseInt(e.target.value) || 0 })
+                  }
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Indicações esperadas de cada coordenador
+                </p>
               </div>
               <div>
                 <Label className="text-xs">Meta por Líder</Label>
-                <Input type="number" min={0} value={config.meta_lider}
-                  onChange={(e) => setConfig({ ...config, meta_lider: parseInt(e.target.value) || 0 })} />
-                <p className="text-[11px] text-muted-foreground mt-1">Indicações esperadas de cada líder</p>
+                <Input
+                  type="number"
+                  min={0}
+                  value={config.meta_lider}
+                  onChange={(e) =>
+                    setConfig({ ...config, meta_lider: parseInt(e.target.value) || 0 })
+                  }
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Indicações esperadas de cada líder
+                </p>
               </div>
               <div>
                 <Label className="text-xs">Meta por Cabo eleitoral</Label>
-                <Input type="number" min={0} value={config.meta_cabo}
-                  onChange={(e) => setConfig({ ...config, meta_cabo: parseInt(e.target.value) || 0 })} />
-                <p className="text-[11px] text-muted-foreground mt-1">Indicações esperadas de cada cabo</p>
+                <Input
+                  type="number"
+                  min={0}
+                  value={config.meta_cabo}
+                  onChange={(e) =>
+                    setConfig({ ...config, meta_cabo: parseInt(e.target.value) || 0 })
+                  }
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Indicações esperadas de cada cabo
+                </p>
               </div>
             </div>
 
             <div className="border-t pt-4">
               <p className="text-[11px] text-muted-foreground">
-                Não existe limite de quantidade: coordenadores, líderes e cabos podem indicar à vontade.
-                As metas acima servem apenas como sinalização — quem estiver abaixo aparece marcado como
+                Não existe limite de quantidade: coordenadores, líderes e cabos podem indicar à
+                vontade. As metas acima servem apenas como sinalização — quem estiver abaixo aparece
+                marcado como
                 <strong> fora da meta</strong> na lista e entra nas cobranças.
               </p>
             </div>
-
 
             <div className="flex justify-end">
               <Button onClick={salvarConfig} disabled={savingConfig}>
@@ -728,8 +1037,8 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               Enviar cobrança em massa
             </DialogTitle>
             <DialogDescription>
-              Mensagem personalizada por indicador (com link, meta e contagem dele).
-              Respeita janela horária e ritmo configurados no cliente.
+              Mensagem personalizada por indicador (com link, meta e contagem dele). Respeita janela
+              horária e ritmo configurados no cliente.
             </DialogDescription>
           </DialogHeader>
 
@@ -741,37 +1050,59 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                 <div className="text-xl font-bold">{filtered.length}</div>
               </div>
               <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/30 p-2">
-                <div className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase">Serão enviados</div>
-                <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">{massElegiveis.length}</div>
+                <div className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase">
+                  Serão enviados
+                </div>
+                <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
+                  {massElegiveis.length}
+                </div>
               </div>
               <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 p-2">
-                <div className="text-[10px] text-amber-700 dark:text-amber-400 uppercase">Token será gerado</div>
-                <div className="text-xl font-bold text-amber-700 dark:text-amber-400">{massSemToken}</div>
+                <div className="text-[10px] text-amber-700 dark:text-amber-400 uppercase">
+                  Token será gerado
+                </div>
+                <div className="text-xl font-bold text-amber-700 dark:text-amber-400">
+                  {massSemToken}
+                </div>
               </div>
             </div>
 
             <div className="text-[11px] text-muted-foreground space-y-0.5">
               {filtered.length > massElegiveis.length && (
-                <p>{filtered.length - massElegiveis.length} indicador(es) serão ignorados (sem telefone ou já cobrados na janela).</p>
+                <p>
+                  {filtered.length - massElegiveis.length} indicador(es) serão ignorados (sem
+                  telefone ou já cobrados na janela).
+                </p>
               )}
               {massPuladosJanela > 0 && (
-                <p>⏱ {massPuladosJanela} pulados por já terem recebido cobrança nas últimas {janelaHoras}h.</p>
+                <p>
+                  ⏱ {massPuladosJanela} pulados por já terem recebido cobrança nas últimas{" "}
+                  {janelaHoras}h.
+                </p>
               )}
             </div>
 
             {/* Janela de não-reenvio */}
             <div className="grid grid-cols-2 gap-3 items-end">
               <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1"><Clock className="w-3 h-3" />Não reenviar nas últimas (horas)</Label>
+                <Label className="text-xs flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Não reenviar nas últimas (horas)
+                </Label>
                 <Input
-                  type="number" min={0} max={720}
+                  type="number"
+                  min={0}
+                  max={720}
                   value={janelaHoras}
                   onChange={(e) => setJanelaHoras(Math.max(0, parseInt(e.target.value) || 0))}
                 />
                 <p className="text-[10px] text-muted-foreground">0 = sem restrição. Padrão: 48h.</p>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1"><FlaskConical className="w-3 h-3" />Testar comigo</Label>
+                <Label className="text-xs flex items-center gap-1">
+                  <FlaskConical className="w-3 h-3" />
+                  Testar comigo
+                </Label>
                 <div className="flex gap-1.5">
                   <Input
                     placeholder="WhatsApp p/ teste (ex: 67999999999)"
@@ -779,22 +1110,30 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                     onChange={(e) => setTestePhone(e.target.value)}
                   />
                   <Button
-                    type="button" variant="outline" size="sm"
-                    onClick={testarComigo} disabled={testando || !testePhone}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={testarComigo}
+                    disabled={testando || !testePhone}
                   >
                     {testando ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enviar teste"}
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Envia 1 mensagem pra esse número usando o 1º indicador como base.</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Envia 1 mensagem pra esse número usando o 1º indicador como base.
+                </p>
               </div>
             </div>
 
             {/* Cobrar em cascata */}
             <div className="flex items-start justify-between gap-3 rounded-md border p-3 bg-muted/30">
               <div>
-                <Label htmlFor="mass-cascata" className="text-sm">Cobrar em cascata</Label>
+                <Label htmlFor="mass-cascata" className="text-sm">
+                  Cobrar em cascata
+                </Label>
                 <p className="text-[11px] text-muted-foreground mt-1 max-w-md">
-                  Inclui também líderes vinculados aos coordenadores e cabos vinculados aos líderes que estiverem no mesmo status. Útil para acionar a estrutura inteira de uma vez.
+                  Inclui também líderes vinculados aos coordenadores e cabos vinculados aos líderes
+                  que estiverem no mesmo status. Útil para acionar a estrutura inteira de uma vez.
                 </p>
               </div>
               <Switch id="mass-cascata" checked={cascata} onCheckedChange={setCascata} />
@@ -802,7 +1141,10 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
             {/* Template */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Mensagem (placeholders: {"{primeiro_nome}, {meta}, {faltam}, {total}, {link}, {candidato}"})</Label>
+              <Label className="text-xs">
+                Mensagem (placeholders:{" "}
+                {"{primeiro_nome}, {meta}, {faltam}, {total}, {link}, {candidato}"})
+              </Label>
               <Textarea
                 value={massTemplate}
                 onChange={(e) => setMassTemplate(e.target.value)}
@@ -831,7 +1173,11 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
               disabled={massSending || massElegiveis.length === 0}
               className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
             >
-              {massSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {massSending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
               Disparar {massElegiveis.length} mensagens
             </Button>
           </DialogFooter>
@@ -841,14 +1187,15 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
       {importFor && (
         <ImportarIndicadosDialog
           open={!!importFor}
-          onOpenChange={(v) => { if (!v) setImportFor(null); }}
+          onOpenChange={(v) => {
+            if (!v) setImportFor(null);
+          }}
           indicadorId={importFor.indicador_id}
           indicadorNome={importFor.nome}
           onImported={load}
         />
       )}
     </div>
-
   );
 }
 
@@ -869,8 +1216,14 @@ function QuickAddIndicadoInline({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const d = telefone.replace(/\D/g, "");
-    if (nome.trim().length < 2) { toast.error("Informe o nome completo"); return; }
-    if (d.length < 10 || d.length > 11) { toast.error("Telefone inválido — use DDD + número"); return; }
+    if (nome.trim().length < 2) {
+      toast.error("Informe o nome completo");
+      return;
+    }
+    if (d.length < 10 || d.length > 11) {
+      toast.error("Telefone inválido — use DDD + número");
+      return;
+    }
     setSaving(true);
     const payload: Record<string, any> = {
       _token: token,
@@ -880,7 +1233,11 @@ function QuickAddIndicadoInline({
     if (bairro.trim()) payload._bairro = bairro.trim();
     const { data, error } = await supabase.rpc("eleicao_indicar_via_token", payload as any);
     setSaving(false);
-    if (error) { console.error("[Indicacoes] indicar error", error); toast.error("Falha ao registrar"); return; }
+    if (error) {
+      console.error("[Indicacoes] indicar error", error);
+      toast.error("Falha ao registrar");
+      return;
+    }
     const r = data as any;
     if (!r?.ok) {
       const msg: Record<string, string> = {
@@ -895,7 +1252,9 @@ function QuickAddIndicadoInline({
       return;
     }
     toast.success(`Indicação registrada em nome de ${nomePessoa.split(" ")[0]} ✓`);
-    setNome(""); setTelefone(""); setBairro("");
+    setNome("");
+    setTelefone("");
+    setBairro("");
     await onSaved();
   }
 
@@ -903,17 +1262,38 @@ function QuickAddIndicadoInline({
     <form onSubmit={submit} className="mt-2 rounded-md border bg-muted/30 p-2.5 space-y-2">
       <div className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
         <UserPlus className="w-3.5 h-3.5" />
-        Cadastrar voto voluntário em nome de <strong className="text-foreground">{nomePessoa}</strong>
+        Cadastrar voto voluntário em nome de{" "}
+        <strong className="text-foreground">{nomePessoa}</strong>
         <span className="text-[10px]">(contabiliza na meta dele/dela)</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <Input placeholder="Nome completo do eleitor" value={nome} onChange={(e) => setNome(e.target.value)} className="h-9" />
-        <Input placeholder="Telefone com DDD" value={telefone} onChange={(e) => setTelefone(e.target.value)} className="h-9" inputMode="tel" />
+        <Input
+          placeholder="Nome completo do eleitor"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          className="h-9"
+        />
+        <Input
+          placeholder="Telefone com DDD"
+          value={telefone}
+          onChange={(e) => setTelefone(e.target.value)}
+          className="h-9"
+          inputMode="tel"
+        />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
-        <Input placeholder="Bairro (opcional)" value={bairro} onChange={(e) => setBairro(e.target.value)} className="h-9" />
+        <Input
+          placeholder="Bairro (opcional)"
+          value={bairro}
+          onChange={(e) => setBairro(e.target.value)}
+          className="h-9"
+        />
         <Button type="submit" size="sm" className="h-9 gap-1.5" disabled={saving}>
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          {saving ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Plus className="w-3.5 h-3.5" />
+          )}
           Cadastrar
         </Button>
       </div>

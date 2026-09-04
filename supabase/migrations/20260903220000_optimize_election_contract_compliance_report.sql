@@ -124,12 +124,11 @@ BEGIN
     SELECT i.indicador_id pessoa_id,count(*)::int total,max(i.created_at) ultima,
       jsonb_agg(jsonb_build_object('id',i.id,'nome',i.nome,'telefone',i.telefone,
         'cidade',i.cidade,'bairro',i.bairro,'origem',i.origem,
-        'status_telemarketing',i.status_telemarketing,'created_at',i.created_at)
+        'status_telemarketing',i.status_telemarketing,'vota_candidato',i.vota_candidato,
+        'candidato_alternativo',i.candidato_alternativo,'created_at',i.created_at)
         ORDER BY i.created_at DESC) detalhe
     FROM public.eleicao_indicados i
     WHERE i.client_id=p_client_id
-      AND i.created_at >= p_data_inicio::timestamp AT TIME ZONE 'America/Campo_Grande'
-      AND i.created_at < (p_data_fim+1)::timestamp AT TIME ZONE 'America/Campo_Grande'
     GROUP BY i.indicador_id
   ), cfg AS (
     SELECT coalesce(ic.meta_coordenador,30) mc,coalesce(ic.meta_lider,30) ml,
@@ -172,4 +171,3 @@ CREATE INDEX IF NOT EXISTS idx_eleicao_indicados_report_period
 REVOKE ALL ON FUNCTION public.election_contract_compliance_report(uuid,date,date) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.election_contract_compliance_report(uuid,date,date) TO authenticated;
 NOTIFY pgrst,'reload schema';
-

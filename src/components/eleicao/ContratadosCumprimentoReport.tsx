@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { endOfDay, format, startOfMonth } from "date-fns";
 import {
@@ -53,6 +53,8 @@ type IndicationDetail = {
   bairro?: string;
   origem: string;
   status_telemarketing: string;
+  vota_candidato?: string | null;
+  candidato_alternativo?: string | null;
   created_at: string;
 };
 type ReportRow = {
@@ -83,6 +85,8 @@ type ReportRow = {
   ultima_indicacao_em: string | null;
   missoes_detalhe: MissionDetail[];
   indicados_detalhe: IndicationDetail[];
+  votos_confirmados: number;
+  devolutivas_negativas: number;
 };
 
 type RpcResult = { data: unknown; error: { message: string } | null };
@@ -130,20 +134,61 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   const query = useQuery({
     queryKey: ["election-contract-compliance", clientId, inicio, fim],
     enabled: !!clientId && !!inicio && !!fim && fim >= inicio,
+    refetchOnMount: "always",
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
     queryFn: async () => {
-      const { data, error } = await reportDb.rpc("election_contract_compliance_report", {
-        p_client_id: clientId,
-        p_data_inicio: inicio,
-        p_data_fim: fim,
-      });
+      const [{ data, error }, configResult] = await Promise.all([
+        reportDb.rpc("election_contract_compliance_report", {
+          p_client_id: clientId,
+          p_data_inicio: inicio,
+          p_data_fim: fim,
+        }),
+        supabase
+          .from("eleicao_indicacao_config")
+          .select("meta_coordenador,meta_lider,meta_cabo")
+          .eq("client_id", clientId)
+          .maybeSingle(),
+      ]);
       if (error) throw error;
-      return ((data || []) as ReportRow[]).map((r) => ({
-        ...r,
-        missoes_detalhe: Array.isArray(r.missoes_detalhe) ? r.missoes_detalhe : [],
-        indicados_detalhe: Array.isArray(r.indicados_detalhe) ? r.indicados_detalhe : [],
-      }));
+      if (configResult.error) throw configResult.error;
+      const config = configResult.data;
+      return ((data || []) as ReportRow[]).map((r) => {
+        const details = Array.isArray(r.indicados_detalhe) ? r.indicados_detalhe : [];
+        const currentMeta =
+          r.cargo === "coordenador"
+            ? Number(config?.meta_coordenador ?? 30)
+            : r.cargo === "lider"
+              ? Number(config?.meta_lider ?? 30)
+              : Number(config?.meta_cabo ?? 5);
+        const listStatus =
+          n(r.total_indicados) === 0
+            ? "nao_iniciou"
+            : n(r.total_indicados) < currentMeta
+              ? "parcial"
+              : n(r.total_indicados) === currentMeta
+                ? "completa"
+                : "acima_meta";
+        return {
+          ...r,
+          meta_indicados: currentMeta,
+          situacao_lista: listStatus,
+          missoes_detalhe: Array.isArray(r.missoes_detalhe) ? r.missoes_detalhe : [],
+          indicados_detalhe: details,
+          votos_confirmados: details.filter((i) => i.vota_candidato === "sim").length,
+          devolutivas_negativas: details.filter((i) => i.vota_candidato === "nao").length,
+        };
+      });
     },
   });
+  const refetchReport = query.refetch;
+  useEffect(() => {
+    const refresh = () => refetchReport();
+    window.addEventListener("eleicao:indicacao-config-changed", refresh);
+    return () => window.removeEventListener("eleicao:indicacao-config-changed", refresh);
+  }, [refetchReport]);
   const rows = useMemo(() => query.data || [], [query.data]);
   const coordinators = useMemo(
     () =>
@@ -185,6 +230,8 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
       missed: filtered.reduce((s, r) => s + n(r.nao_abriu), 0),
       indicated: filtered.reduce((s, r) => s + n(r.total_indicados), 0),
       sent: filtered.filter((r) => n(r.total_indicados) > 0).length,
+      confirmed: filtered.reduce((s, r) => s + r.votos_confirmados, 0),
+      negative: filtered.reduce((s, r) => s + r.devolutivas_negativas, 0),
     }),
     [filtered],
   );
@@ -233,14 +280,23 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
                 Missões e listas de indicados consolidadas pela estrutura da Eleição.
               </CardDescription>
             </div>
-            <Button variant="outline" onClick={exportPdf} disabled={!filtered.length || exporting}>
-              {exporting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <FileDown className="mr-2 h-4 w-4" />
-              )}
-              Exportar PDF por equipe
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="text-emerald-700">
+                Telemarketing atualizado automaticamente a cada 30s
+              </Badge>
+              <Button
+                variant="outline"
+                onClick={exportPdf}
+                disabled={!filtered.length || exporting}
+              >
+                {exporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileDown className="mr-2 h-4 w-4" />
+                )}
+                Exportar PDF por equipe
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-2 md:grid-cols-2 xl:grid-cols-6">
@@ -321,7 +377,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
         <Metric
           label="Contratados"
           value={totals.people}
@@ -339,6 +395,18 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           label="Indicados"
           value={totals.indicated}
           help={`${totals.sent}/${totals.people} enviaram lista`}
+        />
+        <Metric
+          label="Votos confirmados"
+          value={totals.confirmed}
+          help="responderam sim · acumulado atual"
+          good
+        />
+        <Metric
+          label="Devolutivas negativas"
+          value={totals.negative}
+          help="responderam não · acumulado atual"
+          danger
         />
       </div>
 
@@ -460,6 +528,8 @@ function TeamCard({ team, standalone }: { team: ReportRow[]; standalone: boolean
   const done = team.reduce((s, r) => s + n(r.cumpridas), 0);
   const pending = team.reduce((s, r) => s + n(r.abriu_sem_concluir) + n(r.nao_abriu), 0);
   const indicated = team.reduce((s, r) => s + n(r.total_indicados), 0);
+  const confirmed = team.reduce((s, r) => s + r.votos_confirmados, 0);
+  const negative = team.reduce((s, r) => s + r.devolutivas_negativas, 0);
   const rate = missions ? (100 * done) / missions : 0;
   const members = team.filter((r) => r.pessoa_id !== coordinator?.pessoa_id);
   const byParent = new Map<string, ReportRow[]>();
@@ -506,6 +576,8 @@ function TeamCard({ team, standalone }: { team: ReportRow[]; standalone: boolean
         <TeamStat label="Pendentes" value={pending} tone="bad" />
         <TeamStat label="Adesão" value={`${rate.toFixed(1)}%`} />
         <TeamStat label="Indicados" value={indicated} />
+        <TeamStat label="Votos confirmados" value={confirmed} tone="good" />
+        <TeamStat label="Negativas" value={negative} tone="bad" />
         <ChevronDown className={`h-5 w-5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -578,7 +650,7 @@ function TreePerson({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="grid w-full items-center gap-3 p-3 text-left md:grid-cols-[minmax(220px,1fr)_110px_110px_135px_28px]"
+        className="grid w-full items-center gap-3 p-3 text-left md:grid-cols-[minmax(220px,1fr)_90px_90px_120px_120px_28px]"
       >
         <div className="flex items-center gap-2">
           <div
@@ -622,6 +694,14 @@ function TreePerson({
           <p className="text-[10px] uppercase text-muted-foreground">Lista</p>
           <p className="font-semibold">
             {r.total_indicados}/{r.meta_indicados} indicados
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-muted-foreground">Devolutivas</p>
+          <p className="font-semibold">
+            <span className="text-emerald-700">{r.votos_confirmados} sim</span>
+            {" · "}
+            <span className="text-destructive">{r.devolutivas_negativas} não</span>
           </p>
         </div>
         <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -700,7 +780,21 @@ function PersonDetails({ row: r }: { row: ReportRow }) {
               <span>
                 <strong>{i.nome}</strong> · {i.telefone}
               </span>
-              <span className="text-muted-foreground">{i.status_telemarketing}</span>
+              <span
+                className={
+                  i.vota_candidato === "sim"
+                    ? "font-semibold text-emerald-700"
+                    : i.vota_candidato === "nao"
+                      ? "font-semibold text-destructive"
+                      : "text-muted-foreground"
+                }
+              >
+                {i.vota_candidato === "sim"
+                  ? "Voto confirmado"
+                  : i.vota_candidato === "nao"
+                    ? `Negativa${i.candidato_alternativo ? ` · ${i.candidato_alternativo}` : ""}`
+                    : i.status_telemarketing}
+              </span>
             </div>
           ))
         )}
@@ -839,6 +933,8 @@ type Group = {
   missed: number;
   indicated: number;
   senders: number;
+  confirmed: number;
+  negative: number;
   rate: number;
 };
 function groupRows(rows: ReportRow[], key: (r: ReportRow) => string): Group[] {
@@ -854,6 +950,8 @@ function groupRows(rows: ReportRow[], key: (r: ReportRow) => string): Group[] {
       missed: 0,
       indicated: 0,
       senders: 0,
+      confirmed: 0,
+      negative: 0,
       rate: 0,
     };
     g.people++;
@@ -862,6 +960,8 @@ function groupRows(rows: ReportRow[], key: (r: ReportRow) => string): Group[] {
     g.opened += n(r.abriu_sem_concluir);
     g.missed += n(r.nao_abriu);
     g.indicated += n(r.total_indicados);
+    g.confirmed += r.votos_confirmados;
+    g.negative += r.devolutivas_negativas;
     if (n(r.total_indicados) > 0) g.senders++;
     map.set(name, g);
   }
@@ -883,6 +983,8 @@ function GroupTable({ rows, label }: { rows: Group[]; label: string }) {
               <TableHead>Pendentes</TableHead>
               <TableHead>Taxa</TableHead>
               <TableHead>Listas / indicados</TableHead>
+              <TableHead>Votos confirmados</TableHead>
+              <TableHead>Negativas</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -902,6 +1004,8 @@ function GroupTable({ rows, label }: { rows: Group[]; label: string }) {
                 <TableCell>
                   {g.senders}/{g.people} enviaram · {g.indicated} nomes
                 </TableCell>
+                <TableCell className="font-semibold text-emerald-700">{g.confirmed}</TableCell>
+                <TableCell className="font-semibold text-destructive">{g.negative}</TableCell>
               </TableRow>
             ))}
           </TableBody>

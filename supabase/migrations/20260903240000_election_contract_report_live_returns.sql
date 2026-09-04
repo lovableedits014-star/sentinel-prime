@@ -1,4 +1,4 @@
--- Relatorio gerencial dos contratados da Eleicao.
+-- Atualiza o relatorio para manter missoes no periodo e indicadores/devolutivas no acumulado atual.
 -- Une estrutura, obrigacoes/conclusoes das missoes e listas de indicados sem
 -- perder contratados com resultado zero no periodo.
 CREATE OR REPLACE FUNCTION public.election_contract_compliance_report(
@@ -171,3 +171,4 @@ CREATE INDEX IF NOT EXISTS idx_eleicao_indicados_report_period
 REVOKE ALL ON FUNCTION public.election_contract_compliance_report(uuid,date,date) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.election_contract_compliance_report(uuid,date,date) TO authenticated;
 NOTIFY pgrst,'reload schema';
+
