@@ -1,6 +1,5 @@
--- Hotfix para ambientes onde a migration 20260903190000 ja foi aplicada.
--- portal_missions usa a coluna "title"; o primeiro corpo da RPC referenciava
--- incorretamente "titulo" e a validacao ocorreu apenas na primeira chamada.
+-- Segundo hotfix para bancos que ja executaram 20260903200000.
+-- Preserva o nome "titulo" esperado pelas CTEs seguintes da funcao.
 DO $block$
 DECLARE
   v_function regprocedure := to_regprocedure(
@@ -13,7 +12,8 @@ BEGIN
   END IF;
 
   SELECT pg_get_functiondef(v_function) INTO v_definition;
-  v_definition := replace(v_definition, 'm.titulo', 'm.title AS titulo');
+  v_definition := replace(v_definition, 'm.titulo,', 'm.title AS titulo,');
+  v_definition := replace(v_definition, 'm.title,', 'm.title AS titulo,');
   EXECUTE v_definition;
 END;
 $block$;
