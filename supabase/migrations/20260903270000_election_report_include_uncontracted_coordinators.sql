@@ -31,4 +31,7 @@ BEGIN
 END;
 $block$;
 
+COMMENT ON FUNCTION public.election_contract_compliance_report(uuid,date,date) IS
+  'Relatorio eleitoral: o periodo filtra exclusivamente as missoes. Indicados e devolutivas de voto sao sempre acumulados, sem filtro de data.';
+
 NOTIFY pgrst,'reload schema';

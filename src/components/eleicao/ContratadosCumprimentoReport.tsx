@@ -923,7 +923,7 @@ function PersonRow({ row: r }: { row: ReportRow }) {
                 <h4 className="mb-2 font-semibold">Lista enviada por {r.nome}</h4>
                 {!r.indicados_detalhe.length ? (
                   <p className="text-sm text-muted-foreground">
-                    Nenhum indicado enviado no período.
+                    Nenhum indicado enviado.
                   </p>
                 ) : (
                   <div className="space-y-2">
