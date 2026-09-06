@@ -34,6 +34,7 @@ import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleic
 import { FileDown, Package, FileText, Printer, CalendarDays } from "lucide-react";
 import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
 import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/ExportEleicaoDialog";
+import { exportarCsvConfiguravel, exportarPdfConfiguravel, exportarZipPorCoordenador } from "@/lib/eleicao-export-configuravel";
 import { NotifyProgressDialog } from "@/components/eleicao/NotifyProgressDialog";
 import IndicacoesPanel from "@/components/eleicao/IndicacoesPanel";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
@@ -940,7 +941,7 @@ export default function Eleicao() {
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
-  function handleExport(cfg: ExportConfig) {
+  async function handleExport(cfg: ExportConfig) {
     // Base: respeita escopo + busca atual (filtros de tela), mas IGNORA tipoFilter
     // pois o dialog tem seu próprio filtro de tipos.
     let base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p));
@@ -1039,6 +1040,28 @@ export default function Eleicao() {
     const escopoLabel = escopo === "campo_grande" ? "Campo Grande" : "Interior";
     const parceiroById = new Map(PARCEIROS.map(p => [p.id, p]));
 
+    const toExportPessoa = (p: Pessoa): ExportPessoa => ({
+      id: p.id, parent_id: p.parent_id, nome: p.nome, tipo: p.tipo, telefone: p.telefone,
+      regiao: p.regiao, cidade: p.cidade, bairro: p.bairro, rua: p.rua, numero: p.numero,
+      email: p.email, observacoes: p.observacoes, valor_contratacao: p.valor_contratacao,
+      participou_reuniao: p.participou_reuniao, reuniao_em: p.reuniao_em,
+      is_voluntario: p.is_voluntario, confirmado_em: p.confirmado_em,
+      vigencia_inicio: p.vigencia_inicio, vigencia_fim: p.vigencia_fim,
+      arquivado_em: p.arquivado_em, arquivamento_motivo: p.arquivamento_motivo,
+      parent_nome: p.parent_id ? (byId.get(p.parent_id) || null) : null,
+    });
+
+    if (cfg.zipPorCoordenador) {
+      const toastId = toast.loading("Gerando PDFs por coordenador…");
+      try {
+        const qtd = await exportarZipPorCoordenador(listaTipada.map(toExportPessoa), cfg.campos, escopo === "campo_grande" ? "Campo Grande" : "Interior");
+        toast.dismiss(toastId); toast.success(`ZIP gerado com ${qtd} PDF(s).`);
+      } catch (error: any) {
+        toast.dismiss(toastId); toast.error(error?.message || "Não foi possível gerar o ZIP.");
+      }
+      return;
+    }
+
     const baseFiltros = (): { label: string; value: string }[] => {
       const f: { label: string; value: string }[] = [];
       if (search) f.push({ label: "Busca", value: search });
@@ -1072,6 +1095,16 @@ export default function Eleicao() {
     ) => {
       const filtros = baseFiltros();
       if (dobradinhaLabel) filtros.push({ label: "Dobradinha", value: dobradinhaLabel });
+
+      const configuraveis = pessoasFiltradas.map(toExportPessoa);
+      if (cfg.formato === "csv") {
+        exportarCsvConfiguravel(configuraveis, cfg.campos, `cadastros-eleicao-${fileNameSuffix || escopoLabel}`);
+        return configuraveis.length;
+      }
+      if (cfg.formato === "pdf" || cfg.formato === "print") {
+        exportarPdfConfiguravel(configuraveis, cfg.campos, cfg.modo === "raiz" ? "Estrutura por Coordenador" : "Cadastros da Eleição", escopoLabel, cfg.formato === "print");
+        return configuraveis.length;
+      }
 
       if (cfg.modo === "raiz") {
         const itemsRaiz: ExportPessoa[] = listaBase.map(p => ({

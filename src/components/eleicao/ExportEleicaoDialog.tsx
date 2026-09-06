@@ -6,13 +6,24 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { Archive, BriefcaseBusiness, ChevronDown, FileText, Heart, List as ListIcon, Network, Package, Printer, SlidersHorizontal, UserRoundX, Users } from "lucide-react";
+import { Archive, BriefcaseBusiness, ChevronDown, FileText, FolderArchive, Heart, List as ListIcon, Network, Package, Printer, SlidersHorizontal, UserRoundX, Users } from "lucide-react";
 
 export type ExportTipo = "coordenador" | "lider" | "cabo";
 export type ExportFormato = "pdf" | "csv" | "print";
 export type ExportModo = "lista" | "raiz";
 export type ExportSituacao = "ativos" | "contratados" | "sem_contrato" | "voluntarios" | "arquivados";
 export const PARCEIRO_SEM = "__none";
+export type ExportCampo = "nome" | "tipo" | "telefone" | "coordenador" | "lider" | "regiao" | "cidade" | "rua" | "numero" | "bairro" | "endereco_completo" | "qtd_lideres" | "qtd_cabos" | "valor" | "situacao" | "reuniao" | "vigencia" | "observacoes";
+export const CAMPOS_COMPARTILHAVEL: ExportCampo[] = ["nome", "tipo", "telefone", "bairro", "qtd_cabos"];
+const CAMPOS: Array<{ id: ExportCampo; label: string }> = [
+  { id: "nome", label: "Nome" }, { id: "tipo", label: "Cargo" }, { id: "telefone", label: "Telefone" },
+  { id: "coordenador", label: "Coordenador" }, { id: "lider", label: "Líder" }, { id: "regiao", label: "Região" },
+  { id: "cidade", label: "Cidade" }, { id: "rua", label: "Rua" }, { id: "numero", label: "Número" },
+  { id: "bairro", label: "Bairro" }, { id: "endereco_completo", label: "Endereço completo" },
+  { id: "qtd_lideres", label: "Quantidade de líderes" }, { id: "qtd_cabos", label: "Quantidade de cabos" },
+  { id: "valor", label: "Valor" }, { id: "situacao", label: "Situação" }, { id: "reuniao", label: "Participação em reunião" },
+  { id: "vigencia", label: "Vigência" }, { id: "observacoes", label: "Observações" },
+];
 
 export interface ExportConfig {
   formato: ExportFormato;
@@ -28,6 +39,8 @@ export interface ExportConfig {
   apenasNaoReuniao?: boolean;
   voluntarios?: "todos" | "apenas" | "excluir";
   situacaoContrato?: ExportSituacao;
+  campos: ExportCampo[];
+  zipPorCoordenador?: boolean;
 }
 
 interface CoordOption { id: string; nome: string; regiao?: string | null }
@@ -65,6 +78,7 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   const [porParceiro, setPorParceiro] = useState(false);
   const [reuniao, setReuniao] = useState<"__all" | "reuniao" | "sem_reuniao">("__all");
   const [avancados, setAvancados] = useState(false);
+  const [campos, setCampos] = useState<ExportCampo[]>(CAMPOS_COMPARTILHAVEL);
 
   const coords = useMemo(() => {
     const base = regiao === "__all" ? coordenadores : coordenadores.filter((c) => (c.regiao || "") === regiao);
@@ -80,10 +94,11 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
   useEffect(() => { if (parceiroSel !== "__all") setPorParceiro(false); }, [parceiroSel]);
 
   const toggleTipo = (tipo: ExportTipo) => setTipos((atual) => atual.includes(tipo) ? atual.filter((item) => item !== tipo) : [...atual, tipo]);
+  const toggleCampo = (campo: ExportCampo) => setCampos((atual) => atual.includes(campo) ? atual.filter((item) => item !== campo) : [...atual, campo]);
   const filtrosAtivos = [regiao !== "__all", coordenadorId !== "__all", parceiroSel !== "__all", reuniao !== "__all", apenasAvulsos, !incluirAvulsos && tipos.includes("lider"), porParceiro].filter(Boolean).length;
 
-  function exportar(formato: ExportFormato) {
-    if (tipos.length === 0) return;
+  function exportar(formato: ExportFormato, zipPorCoordenador = false) {
+    if (tipos.length === 0 || campos.length === 0) return;
     onExport({
       formato, modo, tipos: apenasAvulsos ? ["lider"] : tipos,
       coordenadorId: coordenadorId === "__all" || apenasAvulsos ? null : coordenadorId,
@@ -96,6 +111,8 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
       apenasNaoReuniao: reuniao === "sem_reuniao",
       voluntarios: "todos",
       situacaoContrato: situacao,
+      campos,
+      zipPorCoordenador,
     });
     onOpenChange(false);
   }
@@ -134,9 +151,23 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
             </div>
           </section>
 
+          <section className="space-y-3 rounded-lg border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div><Label className="font-semibold">3. Campos incluídos</Label><p className="text-xs text-muted-foreground">O preset compartilhável oculta valores e observações.</p></div>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setCampos(CAMPOS_COMPARTILHAVEL)}>Compartilhável</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => setCampos(CAMPOS.map(c => c.id))}>Completo</Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {CAMPOS.map(c => <label key={c.id} className={cn("flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs cursor-pointer", campos.includes(c.id) && "border-primary/50 bg-primary/5")}><Checkbox checked={campos.includes(c.id)} onCheckedChange={() => toggleCampo(c.id)} />{c.label}</label>)}
+            </div>
+            {campos.length === 0 && <p className="text-xs text-destructive">Selecione pelo menos um campo.</p>}
+          </section>
+
           <section className="rounded-lg border overflow-hidden">
             <button type="button" className="w-full p-3 flex items-center gap-2 text-left hover:bg-muted/30" onClick={() => setAvancados((v) => !v)}>
-              <SlidersHorizontal className="w-4 h-4 text-primary" /><div className="flex-1"><p className="text-sm font-semibold">3. Refinar relatório</p><p className="text-xs text-muted-foreground">Região, equipe, reunião e dobradinha</p></div>
+              <SlidersHorizontal className="w-4 h-4 text-primary" /><div className="flex-1"><p className="text-sm font-semibold">4. Refinar relatório</p><p className="text-xs text-muted-foreground">Região, equipe, reunião e dobradinha</p></div>
               {filtrosAtivos > 0 && <span className="rounded-full bg-primary text-primary-foreground text-[10px] px-2 py-0.5">{filtrosAtivos} ativo(s)</span>}<ChevronDown className={cn("w-4 h-4 transition-transform", avancados && "rotate-180")} />
             </button>
             {avancados && <div className="border-t p-3 grid sm:grid-cols-2 gap-3 bg-muted/10">
@@ -152,9 +183,10 @@ export default function ExportEleicaoDialog({ open, onOpenChange, coordenadores,
 
         <DialogFooter className="gap-2 sm:gap-2 flex-wrap pt-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button variant="outline" disabled={tipos.length === 0} onClick={() => exportar("csv")}><Package className="w-4 h-4 mr-2" />CSV</Button>
-          <Button variant="outline" disabled={tipos.length === 0 || porParceiro} onClick={() => exportar("print")}><Printer className="w-4 h-4 mr-2" />Imprimir</Button>
-          <Button disabled={tipos.length === 0} onClick={() => exportar("pdf")}><FileText className="w-4 h-4 mr-2" />Gerar PDF</Button>
+          <Button variant="outline" disabled={tipos.length === 0 || campos.length === 0} onClick={() => exportar("csv")}><Package className="w-4 h-4 mr-2" />CSV</Button>
+          <Button variant="outline" disabled={tipos.length === 0 || campos.length === 0 || porParceiro} onClick={() => exportar("print")}><Printer className="w-4 h-4 mr-2" />Imprimir</Button>
+          <Button variant="outline" disabled={!tipos.includes("coordenador") || campos.length === 0 || apenasAvulsos} onClick={() => exportar("pdf", true)}><FolderArchive className="w-4 h-4 mr-2" />ZIP por coordenador</Button>
+          <Button disabled={tipos.length === 0 || campos.length === 0} onClick={() => exportar("pdf")}><FileText className="w-4 h-4 mr-2" />Gerar PDF</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
