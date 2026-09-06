@@ -66,8 +66,38 @@ function pdfBlob(pessoas: Linha[], campos: ExportCampo[], titulo: string, subtit
   return doc.output("blob");
 }
 
-export function exportarPdfConfiguravel(pessoas: ExportPessoa[], campos: ExportCampo[], titulo: string, escopo: string, imprimir = false) {
-  const blob = pdfBlob(enriquecerHierarquia(pessoas), campos, titulo, `${escopo} · ${pessoas.length} cadastro(s)`);
+function pdfEquipesBlob(pessoas: Linha[], campos: ExportCampo[], escopo: string) {
+  const cols = selecionar(campos); const landscape = cols.length > 6;
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: landscape ? "landscape" : "portrait" });
+  const width = doc.internal.pageSize.getWidth(); const height = doc.internal.pageSize.getHeight(); const margin = 28;
+  doc.setFillColor(15, 23, 42); doc.rect(0, 0, width, 68, "F"); doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Estrutura por Coordenador", margin, 29);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(`${escopo} · ${pessoas.length} cadastro(s)`, margin, 47); doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, width - margin, 47, { align: "right" });
+  let y = 84;
+  const coords = pessoas.filter(p => p.tipo === "coordenador").sort((a, b) => a.nome.localeCompare(b.nome));
+  const idsComEquipe = new Set<string>();
+  for (const coord of coords) {
+    const equipe = pessoas.filter(p => p.id === coord.id || p.coordenador_id === coord.id);
+    equipe.forEach(p => { if (p.id) idsComEquipe.add(p.id); });
+    if (y > height - 110) { doc.addPage(); y = margin; }
+    doc.setFillColor(30, 41, 59); doc.roundedRect(margin, y, width - margin * 2, 35, 4, 4, "F");
+    doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text(`Coordenador: ${coord.nome}`, margin + 10, y + 14);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.text(`${coord.qtd_lideres || 0} líder(es) · ${coord.qtd_cabos || 0} cabo(s) · ${coord.regiao || coord.cidade || "Local não informado"}`, margin + 10, y + 27);
+    autoTable(doc, { startY: y + 41, head: [cols.map(c => c.label)], body: equipe.map(p => cols.map(c => c.value(p))), theme: "striped", styles: { fontSize: cols.length > 8 ? 6.5 : 8, cellPadding: 3, overflow: "linebreak" }, headStyles: { fillColor: [71, 85, 105] }, margin: { left: margin, right: margin, bottom: 24 }, didParseCell: data => { if (data.section === "body" && equipe[data.row.index]?.id === coord.id) data.cell.styles.fontStyle = "bold"; } });
+    y = (doc as any).lastAutoTable.finalY + 18;
+  }
+  const avulsos = pessoas.filter(p => !p.id || !idsComEquipe.has(p.id));
+  if (avulsos.length) {
+    if (y > height - 110) { doc.addPage(); y = margin; }
+    doc.setFillColor(180, 83, 9); doc.roundedRect(margin, y, width - margin * 2, 28, 4, 4, "F"); doc.setTextColor(255); doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.text("Sem coordenador / vínculos avulsos", margin + 10, y + 18);
+    autoTable(doc, { startY: y + 34, head: [cols.map(c => c.label)], body: avulsos.map(p => cols.map(c => c.value(p))), theme: "striped", styles: { fontSize: cols.length > 8 ? 6.5 : 8, cellPadding: 3 }, headStyles: { fillColor: [146, 64, 14] }, margin: { left: margin, right: margin, bottom: 24 } });
+  }
+  const pages = doc.getNumberOfPages(); for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(7); doc.setTextColor(130); doc.text(`Estrutura por Coordenador · Página ${i} de ${pages}`, width / 2, height - 10, { align: "center" }); }
+  return doc.output("blob");
+}
+
+export function exportarPdfConfiguravel(pessoas: ExportPessoa[], campos: ExportCampo[], titulo: string, escopo: string, imprimir = false, porEquipe = false) {
+  const linhas = enriquecerHierarquia(pessoas);
+  const blob = porEquipe ? pdfEquipesBlob(linhas, campos, escopo) : pdfBlob(linhas, campos, titulo, `${escopo} · ${pessoas.length} cadastro(s)`);
   if (!imprimir) { baixar(blob, `${slug(titulo)}.pdf`); return; }
   const url = URL.createObjectURL(blob); const janela = window.open(url, "_blank");
   if (!janela) { baixar(blob, `${slug(titulo)}.pdf`); return; }

@@ -1108,7 +1108,7 @@ export default function Eleicao() {
         return configuraveis.length;
       }
       if (cfg.formato === "pdf" || cfg.formato === "print") {
-        exportarPdfConfiguravel(configuraveis, cfg.campos, cfg.modo === "raiz" ? "Estrutura por Coordenador" : "Cadastros da Eleição", escopoLabel, cfg.formato === "print");
+        exportarPdfConfiguravel(configuraveis, cfg.campos, cfg.modo === "raiz" ? "Estrutura por Coordenador" : "Cadastros da Eleição", escopoLabel, cfg.formato === "print", cfg.modo === "raiz");
         return configuraveis.length;
       }
 
