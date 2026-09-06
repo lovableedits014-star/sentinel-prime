@@ -54,6 +54,11 @@ const fmtBRL = (n?: number | null) =>
   (n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const onlyDigits = (s: string) => s.replace(/\D/g, "");
+const parseValorContratacao = (s: string) => {
+  const valor = s.trim();
+  if (valor.includes(",")) return Number(valor.replace(/\./g, "").replace(",", ".")) || 0;
+  return Number(valor) || 0;
+};
 
 const waLink = (telefone: string) => {
   const d = onlyDigits(telefone);
@@ -434,6 +439,8 @@ export default function Eleicao() {
     const bairro = form.bairro.trim();
     const enderecoConcat = [rua ? `${rua}${numero ? ", " + numero : ""}` : "", bairro].filter(Boolean).join(" - ");
     const isRaiz = form.tipo === "coordenador" || (form.tipo === "lider" && !form.parent_id);
+    const valorContratacao = parseValorContratacao(form.valor_contratacao);
+    const statusContratacao = valorContratacao > 0 ? "confirmado" : "pendente";
     const payload: any = {
       client_id: clientId,
       tipo: form.tipo,
@@ -454,11 +461,11 @@ export default function Eleicao() {
       parent_id: form.parent_id || null,
       observacoes: form.observacoes.trim() || null,
       email: form.tipo === "coordenador" && form.email.trim() ? form.email.trim().toLowerCase() : null,
-      valor_contratacao: form.valor_contratacao.trim() === "" ? 0 : Number(String(form.valor_contratacao).replace(",", ".")) || 0,
+      valor_contratacao: valorContratacao,
       vigencia_inicio: form.vigencia_inicio || null,
       vigencia_fim: form.vigencia_fim || null,
-      status_contratacao: form.status_contratacao,
-      confirmado_em: form.status_contratacao === "confirmado" ? new Date().toISOString() : (editing?.confirmado_em || null),
+      status_contratacao: statusContratacao,
+      confirmado_em: statusContratacao === "confirmado" ? (editing?.confirmado_em || new Date().toISOString()) : null,
       participou_reuniao: form.participou_reuniao,
       reuniao_em: form.participou_reuniao && !editing?.participou_reuniao ? new Date().toISOString() : (editing?.reuniao_em || null),
     };
@@ -1729,10 +1736,37 @@ export default function Eleicao() {
             <div>
               <Label>Telefone *</Label>
               <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                O valor de contratação é definido na aba <strong>Pendentes de valor</strong>.
-              </p>
             </div>
+            {editing && (
+              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
+                <Label htmlFor="edit-valor-contratacao" className="flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                  Valor da contratação
+                </Label>
+                <div className="relative mt-1.5">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                  <Input
+                    id="edit-valor-contratacao"
+                    className="pl-10"
+                    value={form.valor_contratacao}
+                    onChange={e => {
+                      const valor = e.target.value.replace(/[^\d,.]/g, "");
+                      const numero = parseValorContratacao(valor);
+                      setForm(f => ({
+                        ...f,
+                        valor_contratacao: valor,
+                        status_contratacao: numero > 0 ? "confirmado" : "pendente",
+                      }));
+                    }}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Use 0 ou deixe vazio para voltar a “Sem contrato”. A aba Pendentes de valor continuará disponível.
+                </p>
+              </div>
+            )}
             {form.tipo === "coordenador" && (
               <div className="space-y-3 rounded-md border border-border bg-muted/20 p-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
