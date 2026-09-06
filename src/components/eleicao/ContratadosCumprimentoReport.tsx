@@ -3,12 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { endOfDay, format, startOfMonth } from "date-fns";
 import {
   AlertCircle,
+  Award,
   ChevronDown,
   Crown,
   FileDown,
   Loader2,
   Network,
   Search,
+  Target,
+  Trophy,
   UserRound,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
@@ -35,7 +38,11 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { exportElectionContractReportPdf } from "@/lib/election-contract-report-pdf";
+import {
+  exportElectionContractReportPdf,
+  exportElectionRankingPdf,
+} from "@/lib/election-contract-report-pdf";
+import { buildElectionRanking, type ElectionRankingRow } from "@/lib/election-ranking";
 
 type MissionDetail = {
   mission_id: string;
@@ -140,6 +147,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   const [region, setRegion] = useState("all");
   const [status, setStatus] = useState("all");
   const [exporting, setExporting] = useState(false);
+  const [exportingRanking, setExportingRanking] = useState(false);
 
   const query = useQuery({
     queryKey: ["election-contract-compliance", clientId, inicio, fim],
@@ -252,6 +260,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   );
   const adherence = totals.missions ? (100 * totals.done) / totals.missions : 0;
   const byRegion = useMemo(() => groupRows(filtered, area), [filtered]);
+  const ranking = useMemo(() => buildElectionRanking(filtered), [filtered]);
 
   const exportPdf = async () => {
     setExporting(true);
@@ -262,6 +271,18 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
       toast.error(error instanceof Error ? error.message : "Não foi possível gerar o PDF.");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const exportRankingPdf = async () => {
+    setExportingRanking(true);
+    try {
+      await exportElectionRankingPdf({ inicio, fim, rows: ranking });
+      toast.success("Ranking executivo exportado em PDF.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar o ranking.");
+    } finally {
+      setExportingRanking(false);
     }
   };
 
@@ -443,8 +464,12 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
         </Card>
       )}
 
-      <Tabs defaultValue="teams">
-        <TabsList>
+      <Tabs defaultValue="ranking">
+        <TabsList className="h-auto flex-wrap justify-start">
+          <TabsTrigger value="ranking" className="gap-1.5">
+            <Trophy className="h-3.5 w-3.5" />
+            Ranking ({ranking.length})
+          </TabsTrigger>
           <TabsTrigger value="teams" className="gap-1.5">
             <Network className="h-3.5 w-3.5" />
             Equipes em árvore
@@ -452,6 +477,9 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           <TabsTrigger value="people">Lista geral ({filtered.length})</TabsTrigger>
           <TabsTrigger value="regions">Por região</TabsTrigger>
         </TabsList>
+        <TabsContent value="ranking">
+          <RankingPanel rows={ranking} exporting={exportingRanking} onExport={exportRankingPdf} />
+        </TabsContent>
         <TabsContent value="teams">
           <TeamForest rows={filtered} />
         </TabsContent>
@@ -489,6 +517,230 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           <GroupTable rows={byRegion} label="Região / cidade" />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+const actionConfig: Record<
+  ElectionRankingRow["action"],
+  { label: string; className: string; note: string }
+> = {
+  elogiar: {
+    label: "Elogiar",
+    className: "border-emerald-300 bg-emerald-50 text-emerald-800",
+    note: "Excelente ritmo",
+  },
+  acompanhar: {
+    label: "Acompanhar",
+    className: "border-sky-300 bg-sky-50 text-sky-800",
+    note: "Bom desempenho",
+  },
+  cobrar: {
+    label: "Cobrar",
+    className: "border-amber-300 bg-amber-50 text-amber-900",
+    note: "Precisa reagir",
+  },
+  urgente: {
+    label: "Cobrança urgente",
+    className: "border-red-300 bg-red-50 text-red-800",
+    note: "Prioridade de gestão",
+  },
+};
+
+function RankingPanel({
+  rows,
+  exporting,
+  onExport,
+}: {
+  rows: ElectionRankingRow[];
+  exporting: boolean;
+  onExport: () => void;
+}) {
+  const podium = rows.slice(0, 3);
+  const attention = rows.filter((row) => row.action === "cobrar" || row.action === "urgente");
+  return (
+    <div className="space-y-4">
+      <Card className="overflow-hidden border-indigo-200 bg-gradient-to-br from-indigo-950 via-indigo-900 to-violet-800 text-white">
+        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-semibold text-indigo-200">
+              <Award className="h-4 w-4" /> Placar de desempenho
+            </p>
+            <h3 className="mt-1 text-2xl font-bold">Quem reconhecer e quem cobrar agora</h3>
+            <p className="mt-1 max-w-2xl text-xs text-indigo-200">
+              Nota: 50% missões cumpridas + 30% meta de indicados + 20% conversão das devolutivas.
+              Os filtros acima também valem para este ranking.
+            </p>
+          </div>
+          <Button
+            className="shrink-0 bg-white text-indigo-950 hover:bg-indigo-50"
+            onClick={onExport}
+            disabled={!rows.length || exporting}
+          >
+            {exporting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="mr-2 h-4 w-4" />
+            )}
+            PDF executivo
+          </Button>
+        </CardContent>
+      </Card>
+
+      {podium.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-3">
+          {podium.map((row, index) => (
+            <Card
+              key={row.id}
+              className={
+                index === 0
+                  ? "border-amber-300 bg-gradient-to-b from-amber-50 to-background shadow-md"
+                  : "bg-card"
+              }
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-full font-black ${index === 0 ? "bg-amber-400 text-amber-950" : index === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-200 text-orange-900"}`}
+                  >
+                    {row.position}º
+                  </div>
+                  {index === 0 && <Crown className="h-6 w-6 text-amber-500" />}
+                </div>
+                <p className="mt-4 truncate text-lg font-bold">{row.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {row.area} · {row.people} pessoas
+                </p>
+                <div className="mt-4 flex items-end justify-between gap-3">
+                  <div>
+                    <span className="text-4xl font-black tabular-nums">{row.score}</span>
+                    <span className="text-sm text-muted-foreground">/100</span>
+                  </div>
+                  <Badge variant="outline" className={actionConfig[row.action].className}>
+                    {actionConfig[row.action].label}
+                  </Badge>
+                </div>
+                <Progress value={row.score} className="mt-3 h-2" />
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                  <MiniStat label="Missões" value={`${row.missionRate.toFixed(0)}%`} />
+                  <MiniStat label="Listas" value={`${row.listRate.toFixed(0)}%`} />
+                  <MiniStat label="Conversão" value={`${row.conversionRate.toFixed(0)}%`} />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Classificação completa</CardTitle>
+            <CardDescription>Resumo objetivo por coordenação</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-14">#</TableHead>
+                    <TableHead>Coordenação</TableHead>
+                    <TableHead>Nota</TableHead>
+                    <TableHead>Missões</TableHead>
+                    <TableHead>Indicados</TableHead>
+                    <TableHead>Votos</TableHead>
+                    <TableHead>Orientação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className={row.action === "urgente" ? "bg-red-50/60" : ""}
+                    >
+                      <TableCell className="text-lg font-black">{row.position}º</TableCell>
+                      <TableCell>
+                        <p className="font-semibold">{row.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {row.area} · {row.people} pessoas
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex min-w-24 items-center gap-2">
+                          <strong className="tabular-nums">{row.score}</strong>
+                          <Progress value={row.score} className="h-1.5 w-16" />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {row.done}/{row.missions}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          ({row.missionRate.toFixed(0)}%)
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {row.indicated}/{row.indicationGoal}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          ({row.listRate.toFixed(0)}%)
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-semibold text-emerald-700">{row.confirmed} sim</span>{" "}
+                        · <span className="text-destructive">{row.negative} não</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={actionConfig[row.action].className}>
+                          {actionConfig[row.action].label}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {!rows.length && (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                Nenhuma coordenação encontrada nesses filtros.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="h-fit border-amber-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Target className="h-4 w-4 text-amber-600" /> Foco da cobrança
+            </CardTitle>
+            <CardDescription>{attention.length} equipe(s) abaixo de 60 pontos</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {attention.slice(0, 6).map((row) => (
+              <div key={row.id} className="rounded-lg border bg-background p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-semibold">{row.name}</p>
+                  <strong className="text-sm tabular-nums">{row.score}</strong>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {actionConfig[row.action].note} · {row.missions - row.done} missão(ões)
+                  pendente(s)
+                </p>
+              </div>
+            ))}
+            {!attention.length && (
+              <p className="py-5 text-center text-sm text-emerald-700">
+                Todas as equipes estão acima da faixa de cobrança.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-muted/60 px-2 py-2">
+      <p className="font-bold">{value}</p>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -922,9 +1174,7 @@ function PersonRow({ row: r }: { row: ReportRow }) {
               <div>
                 <h4 className="mb-2 font-semibold">Lista enviada por {r.nome}</h4>
                 {!r.indicados_detalhe.length ? (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum indicado enviado.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Nenhum indicado enviado.</p>
                 ) : (
                   <div className="space-y-2">
                     {r.indicados_detalhe.map((i) => (

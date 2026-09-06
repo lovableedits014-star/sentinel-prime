@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock, RefreshCw } from "lucide-react";
+import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock, RefreshCw, Copy, CircleHelp } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import { normalizeExternalUrl } from "@/lib/external-social-link";
@@ -69,6 +69,17 @@ function clientTokenKey(clientId: string) {
 // Usa a origem atual (localhost em dev, domínio publicado em produção).
 function api(path: string) {
   return path;
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(value); return; } catch { /* fallback para WebViews antigos */ }
+  }
+  const input = document.createElement("textarea");
+  input.value = value; input.style.position = "fixed"; input.style.opacity = "0";
+  document.body.appendChild(input); input.focus(); input.select();
+  const copied = document.execCommand("copy"); input.remove();
+  if (!copied) throw new Error("copy unavailable");
 }
 
 class MissionConfigError extends Error {
@@ -133,6 +144,7 @@ export default function MissaoPublica() {
 
   const clickedKey = missionId ? `sm_missao_clicks_${missionId}` : "";
   const doneKey = missionId ? `sm_missao_done_${missionId}` : "";
+  const [showLinkHelp, setShowLinkHelp] = useState(false);
 
   // Restaura, no aparelho, o que a pessoa já clicou/confirmou nesta missão.
   useEffect(() => {
@@ -329,6 +341,15 @@ export default function MissaoPublica() {
     setBackReminder(false);
   };
 
+  const markLinkClicked = (key: string) => {
+    setClickedLinks((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      try { if (clickedKey) localStorage.setItem(clickedKey, JSON.stringify([...next])); } catch { /* ignora */ }
+      return next;
+    });
+  };
+
   const handleExternal = (
     url: string,
     type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link",
@@ -342,16 +363,7 @@ export default function MissaoPublica() {
     }
 
     const key = linkId || type;
-    setClickedLinks((prev) => {
-      const next = new Set(prev);
-      next.add(key);
-      try {
-        if (clickedKey) localStorage.setItem(clickedKey, JSON.stringify([...next]));
-      } catch {
-        // ignora
-      }
-      return next;
-    });
+    markLinkClicked(key);
     // O servidor grava o clique (e, no ultimo link, a conclusao) antes de
     // redirecionar. O registro nao depende de a pessoa voltar do app social.
     const linkKey = linkId || (
@@ -361,6 +373,22 @@ export default function MissaoPublica() {
     const trackedUrl = `/api/public/missao/go/${encodeURIComponent(missionId || "")}/${encodeURIComponent(linkKey)}` +
       `?token=${encodeURIComponent(token)}&code=${encodeURIComponent(code)}`;
     window.location.assign(trackedUrl);
+  };
+
+  const copyExternal = async (
+    url: string,
+    type: "click_facebook" | "click_instagram" | "click_avulso" | "click_link",
+    linkId?: string,
+  ) => {
+    try {
+      const destination = normalizeExternalUrl(url).toString();
+      await copyText(destination);
+      markLinkClicked(linkId || type);
+      await registerEvent(type, linkId);
+      toast.success("Link copiado! Cole no Chrome ou no aplicativo da rede social.");
+    } catch {
+      toast.error("Não foi possível copiar. Toque e segure o botão principal para abrir em outra opção.");
+    }
   };
 
   const handleDeclare = async () => {
@@ -714,6 +742,30 @@ export default function MissaoPublica() {
                       <ClickedMark k={l.id} />
                     </Button>
                   ))}
+                  {requiredLinkKeys.length > 0 && (
+                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+                      <button type="button" className="flex w-full items-center gap-2 text-left text-xs font-semibold text-amber-800 dark:text-amber-300" onClick={() => setShowLinkHelp(v => !v)}>
+                        <CircleHelp className="h-4 w-4 shrink-0" />
+                        A publicação apareceu como “Indisponível”?
+                      </button>
+                      {showLinkHelp && (
+                        <div className="mt-3 space-y-2 border-t border-amber-500/20 pt-3">
+                          <p className="text-xs text-muted-foreground">
+                            Isso pode acontecer no navegador interno do WhatsApp. Copie o link e cole no Chrome ou abra diretamente no aplicativo do Facebook/Instagram, já conectado à sua conta.
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {linkFb && <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => copyExternal(linkFb, "click_facebook")}><Copy className="h-3.5 w-3.5" />Copiar Facebook</Button>}
+                            {linkIg && <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => copyExternal(linkIg, "click_instagram")}><Copy className="h-3.5 w-3.5" />Copiar Instagram</Button>}
+                            {linkAv && <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => copyExternal(linkAv, "click_avulso")}><Copy className="h-3.5 w-3.5" />Copiar link</Button>}
+                            {extraLinks.map(l => <Button key={`copy-${l.id}`} type="button" size="sm" variant="outline" className="h-8 max-w-full gap-1.5 text-xs" onClick={() => copyExternal(l.url, "click_link", l.id)}><Copy className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Copiar {l.label}</span></Button>)}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Se continuar indisponível também no aplicativo, a publicação pode exigir login, ter restrição de público ou ter sido removida. Avise o responsável pela missão.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {!declared && (
