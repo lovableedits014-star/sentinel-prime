@@ -568,8 +568,9 @@ function RankingPanel({
             </p>
             <h3 className="mt-1 text-2xl font-bold">Quem reconhecer e quem cobrar agora</h3>
             <p className="mt-1 max-w-2xl text-xs text-indigo-200">
-              Nota: 50% missões cumpridas + 30% meta de indicados + 20% conversão das devolutivas.
-              Os filtros acima também valem para este ranking.
+              Nota: 45% missões + 45% indicados + 10% conversão após 10 devolutivas. Antes disso, a
+              nota provisória usa 50% missões + 50% indicados. Os filtros acima também valem para
+              este ranking.
             </p>
           </div>
           <Button
@@ -624,7 +625,12 @@ function RankingPanel({
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
                   <MiniStat label="Missões" value={`${row.missionRate.toFixed(0)}%`} />
                   <MiniStat label="Listas" value={`${row.listRate.toFixed(0)}%`} />
-                  <MiniStat label="Conversão" value={`${row.conversionRate.toFixed(0)}%`} />
+                  <MiniStat
+                    label="Conversão"
+                    value={
+                      row.conversionInReview ? "Em apuração" : `${row.conversionRate.toFixed(0)}%`
+                    }
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -686,6 +692,11 @@ function RankingPanel({
                       <TableCell>
                         <span className="font-semibold text-emerald-700">{row.confirmed} sim</span>{" "}
                         · <span className="text-destructive">{row.negative} não</span>
+                        {row.conversionInReview && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Em apuração ({row.validReturns}/10)
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={actionConfig[row.action].className}>

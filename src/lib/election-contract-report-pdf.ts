@@ -221,7 +221,7 @@ export async function exportElectionRankingPdf(args: {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(
-    `Missões de ${new Date(`${args.inicio}T12:00:00`).toLocaleDateString("pt-BR")} a ${new Date(`${args.fim}T12:00:00`).toLocaleDateString("pt-BR")} · 50% missões + 30% indicados + 20% conversão`,
+    `Missões de ${new Date(`${args.inicio}T12:00:00`).toLocaleDateString("pt-BR")} a ${new Date(`${args.fim}T12:00:00`).toLocaleDateString("pt-BR")} · 45% missões + 45% indicados + 10% conversão (após 10 respostas)`,
     margin,
     59,
   );
@@ -272,7 +272,9 @@ export async function exportElectionRankingPdf(args: {
       `${row.score}/100`,
       `${row.done}/${row.missions} (${row.missionRate.toFixed(0)}%)`,
       `${row.indicated}/${row.indicationGoal} (${row.listRate.toFixed(0)}%)`,
-      `${row.confirmed} sim · ${row.negative} não`,
+      row.conversionInReview
+        ? `${row.confirmed} sim · ${row.negative} não · Em apuração (${row.validReturns}/10)`
+        : `${row.confirmed} sim · ${row.negative} não · ${row.conversionRate.toFixed(0)}%`,
       row.action === "elogiar"
         ? "ELOGIAR"
         : row.action === "acompanhar"

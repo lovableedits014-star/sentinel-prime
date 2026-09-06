@@ -45,6 +45,18 @@ describe("buildElectionRanking", () => {
     const [result] = buildElectionRanking([row({ cumpridas: 15, total_indicados: 30 })]);
     expect(result.missionRate).toBe(100);
     expect(result.listRate).toBe(100);
-    expect(result.score).toBe(96);
+    expect(result.score).toBe(98);
+  });
+
+  it("usa nota provisoria 50/50 enquanto nao houver 10 devolutivas", () => {
+    const [result] = buildElectionRanking([
+      row({ cumpridas: 10, total_indicados: 0, votos_confirmados: 1, devolutivas_negativas: 0 }),
+    ]);
+    expect(result).toMatchObject({
+      conversionInReview: true,
+      validReturns: 1,
+      conversionRate: 100,
+      score: 50,
+    });
   });
 });

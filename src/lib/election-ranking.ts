@@ -28,6 +28,8 @@ export type ElectionRankingRow = {
   confirmed: number;
   negative: number;
   conversionRate: number;
+  validReturns: number;
+  conversionInReview: boolean;
   score: number;
   action: "elogiar" | "acompanhar" | "cobrar" | "urgente";
 };
@@ -41,7 +43,14 @@ export function buildElectionRanking(rows: ElectionRankingSource[]): ElectionRan
     string,
     Omit<
       ElectionRankingRow,
-      "position" | "score" | "action" | "missionRate" | "listRate" | "conversionRate"
+      | "position"
+      | "score"
+      | "action"
+      | "missionRate"
+      | "listRate"
+      | "conversionRate"
+      | "validReturns"
+      | "conversionInReview"
     >
   >();
 
@@ -75,11 +84,26 @@ export function buildElectionRanking(rows: ElectionRankingSource[]): ElectionRan
     .map((team) => {
       const missionRate = cap(percentage(team.done, team.missions));
       const listRate = cap(percentage(team.indicated, team.indicationGoal));
-      const conversionRate = cap(percentage(team.confirmed, team.confirmed + team.negative));
-      const score = Math.round(missionRate * 0.5 + listRate * 0.3 + conversionRate * 0.2);
+      const validReturns = team.confirmed + team.negative;
+      const conversionRate = cap(percentage(team.confirmed, validReturns));
+      const conversionInReview = validReturns < 10;
+      const score = Math.round(
+        conversionInReview
+          ? missionRate * 0.5 + listRate * 0.5
+          : missionRate * 0.45 + listRate * 0.45 + conversionRate * 0.1,
+      );
       const action =
         score >= 80 ? "elogiar" : score >= 60 ? "acompanhar" : score >= 40 ? "cobrar" : "urgente";
-      return { ...team, missionRate, listRate, conversionRate, score, action };
+      return {
+        ...team,
+        missionRate,
+        listRate,
+        conversionRate,
+        validReturns,
+        conversionInReview,
+        score,
+        action,
+      };
     })
     .sort(
       (a, b) =>
