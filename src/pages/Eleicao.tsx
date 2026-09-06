@@ -949,9 +949,10 @@ export default function Eleicao() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   async function handleExport(cfg: ExportConfig) {
-    // Base: respeita escopo + busca atual (filtros de tela), mas IGNORA tipoFilter
-    // pois o dialog tem seu próprio filtro de tipos.
-    let base = pessoas.filter(p => p.escopo === escopo && matchesSearch(p));
+    // O diálogo de exportação é a fonte única dos filtros do arquivo. A busca e
+    // os filtros visuais da tela não podem zerar silenciosamente uma exportação
+    // configurada como "todos".
+    let base = pessoas.filter(p => p.escopo === escopo);
     const situacaoRelatorio = cfg.situacaoContrato || "ativos";
     if (situacaoRelatorio === "ativos") base = base.filter(p => !p.arquivado_em);
     if (situacaoRelatorio === "contratados") base = base.filter(isEleicaoContratado);
@@ -1071,8 +1072,6 @@ export default function Eleicao() {
 
     const baseFiltros = (): { label: string; value: string }[] => {
       const f: { label: string; value: string }[] = [];
-      if (search) f.push({ label: "Busca", value: search });
-      if (regiaoFilter && regiaoFilter !== "all") f.push({ label: escopo === "interior" ? "Cidade" : "Região", value: String(regiaoFilter) });
       if (cfg.regiao) {
         const label = escopo === "interior" ? "Cidade" : "Região";
         const valor = escopo === "interior" ? cfg.regiao : (REGIOES.find(r => r.value === cfg.regiao)?.label || cfg.regiao);
