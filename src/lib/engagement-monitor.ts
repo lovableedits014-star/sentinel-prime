@@ -116,6 +116,7 @@ export type AccessPerson = {
   participant_id: string; nome: string; telefone: string; cargo: string | null; regiao: string | null;
   coordenador_id: string | null; coordenador_nome: string | null; coordenador_telefone: string | null;
   missoes_acessadas: number; missoes_concluidas: number; pendentes: number; ultimo_acesso: string | null; vinculado: boolean;
+  tem_contrato: boolean; origem_vinculo: "eleicao" | "contratado" | "funcionario" | "crm" | "nao_cadastrado";
 };
 
 export type EligibilityAuditRow = {
@@ -178,7 +179,7 @@ export async function fetchAccessSummary(clientId: string): Promise<AccessSummar
 }
 
 export async function fetchAccessPeople(clientId: string): Promise<AccessPerson[]> {
-  return unwrap<AccessPerson>(await db.rpc("engagement_access_people", { p_client_id: clientId, p_limit: 3000 }));
+  return unwrap<AccessPerson>(await db.rpc("engagement_access_people_v2", { p_client_id: clientId, p_limit: 3000 }));
 }
 
 export async function fetchEligibilityAudit(clientId: string): Promise<EligibilityAuditRow[]> {

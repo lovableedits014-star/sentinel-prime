@@ -158,7 +158,20 @@ BEGIN
         coalesce(ep.missao_facebook_ativo,true) facebook_ativo,
         coalesce(ep.missao_instagram_ativo,true) instagram_ativo
       INTO v_participant FROM mission_participants mp
-      LEFT JOIN eleicao_pessoas ep ON ep.id=mp.pessoa_id AND ep.client_id=mp.client_id
+      LEFT JOIN LATERAL (
+        SELECT person.* FROM eleicao_pessoas person
+        WHERE person.client_id=mp.client_id AND person.arquivado_em IS NULL AND (
+          person.id=mp.pessoa_id OR (
+            mp.pessoa_id IS NULL AND public.mission_phone_key(mp.phone_e164) IS NOT NULL
+            AND public.mission_phone_key(person.telefone)=public.mission_phone_key(mp.phone_e164)
+            AND 1=(SELECT count(*) FROM eleicao_pessoas unique_person
+              WHERE unique_person.client_id=mp.client_id AND unique_person.arquivado_em IS NULL
+                AND public.mission_phone_key(unique_person.telefone)=public.mission_phone_key(mp.phone_e164))
+          )
+        )
+        ORDER BY (person.id=mp.pessoa_id) DESC,person.updated_at DESC NULLS LAST
+        LIMIT 1
+      ) ep ON true
       WHERE mp.id=v_tok.participant_id;
       IF v_participant.id IS NOT NULL THEN
         v_facebook:=v_participant.facebook_ativo;v_instagram:=v_participant.instagram_ativo;
@@ -199,7 +212,20 @@ BEGIN
   SELECT t.participant_id,coalesce(ep.missao_facebook_ativo,true),coalesce(ep.missao_instagram_ativo,true)
     INTO v_participant,v_facebook,v_instagram
   FROM mission_visitor_tokens t JOIN mission_participants mp ON mp.id=t.participant_id
-  LEFT JOIN eleicao_pessoas ep ON ep.id=mp.pessoa_id AND ep.client_id=mp.client_id
+  LEFT JOIN LATERAL (
+    SELECT person.* FROM eleicao_pessoas person
+    WHERE person.client_id=mp.client_id AND person.arquivado_em IS NULL AND (
+      person.id=mp.pessoa_id OR (
+        mp.pessoa_id IS NULL AND public.mission_phone_key(mp.phone_e164) IS NOT NULL
+        AND public.mission_phone_key(person.telefone)=public.mission_phone_key(mp.phone_e164)
+        AND 1=(SELECT count(*) FROM eleicao_pessoas unique_person
+          WHERE unique_person.client_id=mp.client_id AND unique_person.arquivado_em IS NULL
+            AND public.mission_phone_key(unique_person.telefone)=public.mission_phone_key(mp.phone_e164))
+      )
+    )
+    ORDER BY (person.id=mp.pessoa_id) DESC,person.updated_at DESC NULLS LAST
+    LIMIT 1
+  ) ep ON true
   WHERE t.token=p_token AND t.revoked_at IS NULL AND t.client_id=v_m.client_id;
   IF v_participant IS NULL THEN RETURN jsonb_build_object('ok',false,'error','Identificacao invalida');END IF;
 

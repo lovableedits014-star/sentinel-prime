@@ -300,7 +300,15 @@ export default function MissaoPublica() {
       const data = await res.json();
       if (clientId) localStorage.setItem(clientTokenKey(clientId), data.token);
       setToken(data.token);
-      setConfig((prev) => (prev ? { ...prev, participant: data.participant } : prev));
+      // Recarrega a missão já com a identidade reconhecida. É neste retorno que
+      // o servidor remove Facebook ou Instagram conforme o cadastro individual.
+      // Sem isso, no primeiro acesso a tela ainda conservaria os dois links do
+      // carregamento anônimo feito antes da identificação.
+      const personalizedConfig = await loadMissionConfig(
+        api(`/api/public/missao/config/${encodeURIComponent(missionId || "")}?code=${encodeURIComponent(code)}&token=${encodeURIComponent(data.token)}`),
+      );
+      setConfig(personalizedConfig);
+      setDeclared(Boolean(personalizedConfig.participant?.concluido_em));
       setJustRecognized(true);
       toast.success(
         data.participant?.reconhecido

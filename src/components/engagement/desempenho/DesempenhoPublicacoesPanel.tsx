@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, CalendarDays, FileDown, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
+import { BarChart3, CalendarDays, ContactRound, FileDown, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
 import { fetchAudiences } from "@/lib/mission-audiences";
 import {
   fetchEquipeDesempenhoPeriodo, fetchPubKpisPeriodo, fetchPublicacoesAuditPeriodo,
@@ -19,6 +19,7 @@ import PublicacoesDesempenhoPanel from "./PublicacoesDesempenhoPanel";
 import EquipeRankingPanel from "./EquipeRankingPanel";
 import MatrizCumprimentoPanel from "./MatrizCumprimentoPanel";
 import ResumoEquipesPeriodoPanel, { type TeamPeriodSummary } from "./ResumoEquipesPeriodoPanel";
+import MissionAccessManagement from "@/components/engagement/MissionAccessManagement";
 
 const localIsoDate = (date: Date) => {
   const year = date.getFullYear();
@@ -278,6 +279,9 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
               <TabsTrigger value="matriz" className="gap-1.5 text-xs sm:text-sm">
                 <Grid3x3 className="h-4 w-4" /> Matriz
               </TabsTrigger>
+              <TabsTrigger value="participantes" className="gap-1.5 text-xs sm:text-sm">
+                <ContactRound className="h-4 w-4" /> Externos e sem contrato
+              </TabsTrigger>
               <TabsTrigger value="relatorios" className="gap-1.5 text-xs sm:text-sm">
                 <FileDown className="h-4 w-4" /> Relatórios gerais
               </TabsTrigger>
@@ -305,6 +309,10 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
                 periodoLabel={periodoLabel}
                 onChanged={recarregar}
               />
+            </TabsContent>
+
+            <TabsContent value="participantes">
+              <MissionAccessManagement clientId={clientId} />
             </TabsContent>
 
             <TabsContent value="relatorios">
