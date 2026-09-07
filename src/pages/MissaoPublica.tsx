@@ -540,6 +540,11 @@ export default function MissaoPublica() {
       <ExternalLink className="w-3 h-3 ml-auto opacity-60 shrink-0" />
     );
 
+  const linkButtonCopy = (key: string, platform: string) =>
+    isClicked(key)
+      ? { title: "MISSÃO CONCLUÍDA", subtitle: `Abrir novamente no ${platform}` }
+      : { title: "CLIQUE AQUI", subtitle: `Abrir publicação no ${platform}` };
+
   return (
     <div
       className={`min-h-screen bg-[radial-gradient(circle_at_top,hsl(214_40%_98%),hsl(210_30%_94%)_60%,hsl(210_25%_90%))] py-5 px-3 sm:py-8 sm:px-4 ${showStickyBar ? "pb-36" : ""}`}
@@ -681,7 +686,9 @@ export default function MissaoPublica() {
                     </div>
                   )}
                   {requiredLinkKeys.length > 0 && (
-                    <p className="pt-1 text-center text-sm font-extrabold text-blue-900">👇 TOQUE EM CADA REDE PARA FAZER A MISSÃO</p>
+                    <p className="pt-1 text-center text-sm font-extrabold text-blue-900">
+                      {allLinksClicked ? "✅ ESTA MISSÃO FOI CONCLUÍDA" : "👇 TOQUE EM CADA REDE PARA FAZER A MISSÃO"}
+                    </p>
                   )}
                   {linkFb && (
                     <div className="space-y-1.5">
@@ -692,8 +699,8 @@ export default function MissaoPublica() {
                       >
                         <FacebookIcon className="h-14 w-14 shrink-0 rounded-full bg-blue-600/70 p-2 text-white shadow-lg" />
                         <span className="flex-1">
-                          <span className="block text-xl font-extrabold tracking-tight">CLIQUE AQUI</span>
-                          <span className="block text-sm font-semibold opacity-95">Abrir publicação no Facebook</span>
+                          <span className="block text-xl font-extrabold tracking-tight">{linkButtonCopy("click_facebook", "Facebook").title}</span>
+                          <span className="block text-sm font-semibold opacity-95">{linkButtonCopy("click_facebook", "Facebook").subtitle}</span>
                         </span>
                         <span className="flex flex-col items-center gap-1"><ExternalLink className="h-7 w-7" /><ClickedMark k="click_facebook" /></span>
                       </Button>
@@ -717,8 +724,8 @@ export default function MissaoPublica() {
                     >
                       <InstagramIcon className="h-14 w-14 shrink-0 rounded-[18px] bg-white/20 p-2 text-white shadow-lg" />
                       <span className="flex-1">
-                        <span className="block text-xl font-extrabold tracking-tight">CLIQUE AQUI</span>
-                        <span className="block text-sm font-semibold opacity-95">Abrir publicação no Instagram</span>
+                        <span className="block text-xl font-extrabold tracking-tight">{linkButtonCopy("click_instagram", "Instagram").title}</span>
+                        <span className="block text-sm font-semibold opacity-95">{linkButtonCopy("click_instagram", "Instagram").subtitle}</span>
                       </span>
                       <span className="flex flex-col items-center gap-1"><ExternalLink className="h-7 w-7" /><ClickedMark k="click_instagram" /></span>
                     </Button>
