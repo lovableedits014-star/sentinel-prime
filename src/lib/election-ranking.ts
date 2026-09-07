@@ -89,16 +89,10 @@ export function buildElectionRanking(
   }
 
   const aggregated = Array.from(teams.values());
-  const totalMissions = aggregated.reduce((sum, team) => sum + team.missions, 0);
-  const totalDone = aggregated.reduce((sum, team) => sum + team.done, 0);
-  const overallMissionRate = totalMissions ? totalDone / totalMissions : 0;
-  const confidenceWeight = 20;
-
   return aggregated
     .map((team) => {
       const missionRate = team.missions ? (100 * team.done) / team.missions : 0;
-      const adjustedMissionRate =
-        100 * (team.done + overallMissionRate * confidenceWeight) / (team.missions + confidenceWeight);
+      const adjustedMissionRate = missionRate;
       const listRate = team.indicationGoal ? (100 * team.indicated) / team.indicationGoal : 0;
       const validReturns = team.confirmed + team.negative;
       const conversionRate = team.indicated ? (100 * team.confirmed) / team.indicated : 0;
@@ -107,7 +101,7 @@ export function buildElectionRanking(
         pending: Math.max(team.missions - team.done, 0),
         missionRate,
         adjustedMissionRate,
-        missionRankingEligible: team.missions >= 5,
+        missionRankingEligible: team.missions > 0,
         listRate,
         validReturns,
         conversionRate,
@@ -119,9 +113,7 @@ export function buildElectionRanking(
     .sort((a, b) =>
       kind === "votes"
         ? b.confirmed - a.confirmed || a.name.localeCompare(b.name, "pt-BR")
-        : Number(b.missionRankingEligible) - Number(a.missionRankingEligible) ||
-          b.adjustedMissionRate - a.adjustedMissionRate ||
-          b.missionRate - a.missionRate ||
+        : b.missionRate - a.missionRate ||
           a.pending - b.pending ||
           b.done - a.done ||
           a.name.localeCompare(b.name, "pt-BR"),

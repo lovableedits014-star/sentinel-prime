@@ -62,21 +62,22 @@ describe("buildElectionRanking", () => {
     expect(result.conversionRate).toBe(25);
   });
 
-  it("compara equipes de tamanhos diferentes pelo desempenho ajustado e nao pelo volume", () => {
+  it("compara equipes de tamanhos diferentes somente pela taxa real", () => {
     const result = buildElectionRanking([
       row({ coordenador_id: "grande", coordenador_nome: "Grande", missoes: 100, cumpridas: 70 }),
       row({ coordenador_id: "pequena", coordenador_nome: "Pequena", missoes: 10, cumpridas: 9 }),
     ], "missions");
     expect(result.map((item) => item.name)).toEqual(["Pequena", "Grande"]);
-    expect(result[0].adjustedMissionRate).toBeGreaterThan(result[1].adjustedMissionRate);
+    expect(result[0].missionRate).toBe(90);
+    expect(result[1].missionRate).toBe(70);
   });
 
-  it("mantem equipes com menos de cinco obrigacoes em apuracao e fora do podio", () => {
+  it("considera qualquer equipe que tenha ao menos uma obrigacao", () => {
     const result = buildElectionRanking([
       row({ coordenador_id: "apuracao", coordenador_nome: "Apuração", missoes: 1, cumpridas: 1 }),
       row({ coordenador_id: "classificada", coordenador_nome: "Classificada", missoes: 5, cumpridas: 4 }),
     ], "missions");
-    expect(result[0]).toMatchObject({ name: "Classificada", missionRankingEligible: true });
-    expect(result[1]).toMatchObject({ name: "Apuração", missionRankingEligible: false });
+    expect(result[0]).toMatchObject({ name: "Apuração", missionRate: 100, missionRankingEligible: true });
+    expect(result[1]).toMatchObject({ name: "Classificada", missionRate: 80, missionRankingEligible: true });
   });
 });

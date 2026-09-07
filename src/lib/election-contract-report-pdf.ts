@@ -362,7 +362,7 @@ export async function exportElectionSeparatedRankingPdf(args: {
   doc.text(isMissions ? "Ranking de missões" : "Ranking de votos confirmados", margin, 38);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(`Período de ${new Date(`${args.inicio}T12:00:00`).toLocaleDateString("pt-BR")} a ${new Date(`${args.fim}T12:00:00`).toLocaleDateString("pt-BR")} · classificação por quantidade, sem porcentagens`, margin, 59);
+  doc.text(`Período de ${new Date(`${args.inicio}T12:00:00`).toLocaleDateString("pt-BR")} a ${new Date(`${args.fim}T12:00:00`).toLocaleDateString("pt-BR")} · ${isMissions ? "classificação pela taxa real de cumprimento" : "classificação pelo total de votos confirmados"}`, margin, 59);
   doc.setTextColor(199, 210, 254);
   doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, margin, 77);
 
@@ -386,10 +386,10 @@ export async function exportElectionSeparatedRankingPdf(args: {
   autoTable(doc, {
     startY: 184,
     head: [isMissions
-      ? ["#", "Coordenação", "Região", "Equipe", "Índice ajustado", "Taxa real", "Concluídas", "Atribuídas", "Pendentes", "Situação"]
+      ? ["#", "Coordenação", "Região", "Equipe", "Taxa real", "Concluídas", "Atribuídas", "Pendentes"]
       : ["#", "Coordenação", "Região", "Equipe", "Votos confirmados", "Indicados", "Conversão"]],
     body: args.rows.map((row) => isMissions
-      ? [`${row.position}º`, row.name, row.area, row.people, row.adjustedMissionRate.toFixed(1), `${row.missionRate.toFixed(1)}%`, row.done, row.missions, row.pending, row.missionRankingEligible ? "Classificado" : "Em apuração"]
+      ? [`${row.position}º`, row.name, row.area, row.people, `${row.missionRate.toFixed(1)}%`, row.done, row.missions, row.pending]
       : [`${row.position}º`, row.name, row.area, row.people, row.confirmed, row.indicated, `${row.conversionRate.toFixed(1)}%`]),
     theme: "striped",
     margin: { left: margin, right: margin, bottom: 28 },
