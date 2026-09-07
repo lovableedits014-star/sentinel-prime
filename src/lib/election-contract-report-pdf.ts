@@ -20,6 +20,7 @@ export type ContractReportPdfRow = {
 };
 
 import type { ElectionRankingRow } from "./election-ranking";
+import type { ElectionRankingKind } from "./election-ranking";
 
 const slug = (value: string) =>
   value
@@ -317,4 +318,76 @@ export async function exportElectionRankingPdf(args: {
     },
   });
   doc.save(`ranking-eleicao-${slug(args.inicio)}-a-${slug(args.fim)}.pdf`);
+}
+
+export async function exportElectionSeparatedRankingPdf(args: {
+  inicio: string;
+  fim: string;
+  rows: ElectionRankingRow[];
+  kind: ElectionRankingKind;
+}) {
+  if (!args.rows.length) throw new Error("Nenhuma coordenação disponível para o ranking.");
+  const [{ default: jsPDF }, tableModule] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+  const autoTable = tableModule.default;
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const margin = 34;
+  const isMissions = args.kind === "missions";
+  const primaryTotal = args.rows.reduce((sum, row) => sum + (isMissions ? row.done : row.confirmed), 0);
+  const secondaryTotal = args.rows.reduce((sum, row) => sum + (isMissions ? row.pending : row.indicated), 0);
+
+  doc.setFillColor(30, 27, 75);
+  doc.rect(0, 0, width, 96, "F");
+  doc.setTextColor(255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(22);
+  doc.text(isMissions ? "Ranking de missões" : "Ranking de votos confirmados", margin, 38);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(`Período de ${new Date(`${args.inicio}T12:00:00`).toLocaleDateString("pt-BR")} a ${new Date(`${args.fim}T12:00:00`).toLocaleDateString("pt-BR")} · classificação por quantidade, sem porcentagens`, margin, 59);
+  doc.setTextColor(199, 210, 254);
+  doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, margin, 77);
+
+  const summary: [string, string | number][] = [
+    ["Líder do ranking", args.rows[0].name],
+    [isMissions ? "Missões concluídas" : "Votos confirmados", primaryTotal],
+    [isMissions ? "Missões pendentes" : "Indicados (informativo)", secondaryTotal],
+    ["Coordenações", args.rows.length],
+  ];
+  const gap = 10;
+  const cardWidth = (width - margin * 2 - gap * 3) / 4;
+  summary.forEach(([label, value], index) => {
+    const x = margin + index * (cardWidth + gap);
+    doc.setFillColor(index === 0 ? 254 : 248, index === 0 ? 243 : 250, index === 0 ? 199 : 252);
+    doc.roundedRect(x, 112, cardWidth, 54, 6, 6, "F");
+    doc.setTextColor(71, 85, 105); doc.setFontSize(8); doc.text(label.toUpperCase(), x + 10, 130);
+    doc.setTextColor(15, 23, 42); doc.setFont("helvetica", "bold"); doc.setFontSize(index === 0 ? 13 : 18);
+    doc.text(String(value), x + 10, 153, { maxWidth: cardWidth - 20 });
+  });
+
+  autoTable(doc, {
+    startY: 184,
+    head: [["#", "Coordenação", "Região", "Equipe", isMissions ? "Concluídas" : "Votos confirmados", isMissions ? "Atribuídas" : "Indicados", isMissions ? "Pendentes" : "Observação"]],
+    body: args.rows.map((row) => [
+      `${row.position}º`, row.name, row.area, row.people,
+      isMissions ? row.done : row.confirmed,
+      isMissions ? row.missions : row.indicated,
+      isMissions ? row.pending : "Indicados não alteram a posição",
+    ]),
+    theme: "striped",
+    margin: { left: margin, right: margin, bottom: 28 },
+    styles: { fontSize: 8, cellPadding: 5, valign: "middle" },
+    headStyles: { fillColor: [67, 56, 202], textColor: 255, fontStyle: "bold" },
+    columnStyles: { 0: { halign: "center", fontStyle: "bold", cellWidth: 28 }, 1: { fontStyle: "bold", cellWidth: 145 }, 4: { halign: "center", fontStyle: "bold" } },
+    didDrawPage: () => {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
+      doc.text(isMissions ? "Ranking de missões · Eleição" : "Ranking de votos · Eleição", margin, height - 13);
+      doc.text(`Página ${doc.getCurrentPageInfo().pageNumber}`, width - margin, height - 13, { align: "right" });
+    },
+  });
+  doc.save(`ranking-${isMissions ? "missoes" : "votos"}-${slug(args.inicio)}-a-${slug(args.fim)}.pdf`);
 }

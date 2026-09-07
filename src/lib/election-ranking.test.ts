@@ -18,45 +18,40 @@ const row = (values: Partial<ElectionRankingSource>): ElectionRankingSource => (
 });
 
 describe("buildElectionRanking", () => {
-  it("consolida a equipe e calcula a nota ponderada", () => {
-    const result = buildElectionRanking([row({}), row({ pessoa_id: "lider-1" })]);
+  it("consolida a equipe no ranking de missoes", () => {
+    const result = buildElectionRanking([row({}), row({ pessoa_id: "lider-1" })], "missions");
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ score: 80, action: "elogiar", people: 2, position: 1 });
+    expect(result[0]).toMatchObject({ done: 16, missions: 20, pending: 4, people: 2, position: 1 });
   });
 
-  it("ordena pela nota e ignora pessoas sem coordenador", () => {
+  it("ordena missoes apenas pela quantidade concluida e ignora pessoas sem coordenador", () => {
     const result = buildElectionRanking([
       row({
         coordenador_id: "baixo",
         coordenador_nome: "Baixo",
         cumpridas: 2,
-        total_indicados: 2,
-        votos_confirmados: 1,
-        devolutivas_negativas: 9,
+        total_indicados: 999,
+        votos_confirmados: 999,
       }),
       row({ coordenador_id: "alto", coordenador_nome: "Alto" }),
       row({ coordenador_id: null, coordenador_nome: null }),
-    ]);
+    ], "missions");
     expect(result.map((item) => item.name)).toEqual(["Alto", "Baixo"]);
-    expect(result[1].action).toBe("urgente");
   });
 
-  it("limita percentuais acima da meta a 100", () => {
-    const [result] = buildElectionRanking([row({ cumpridas: 15, total_indicados: 30 })]);
-    expect(result.missionRate).toBe(100);
-    expect(result.listRate).toBe(100);
-    expect(result.score).toBe(98);
+  it("ordena votos somente pela quantidade confirmada", () => {
+    const result = buildElectionRanking([
+      row({ coordenador_id: "mais-indicados", coordenador_nome: "Mais indicados", total_indicados: 500, votos_confirmados: 4 }),
+      row({ coordenador_id: "mais-votos", coordenador_nome: "Mais votos", total_indicados: 10, votos_confirmados: 5 }),
+    ], "votes");
+    expect(result.map((item) => item.name)).toEqual(["Mais votos", "Mais indicados"]);
   });
 
-  it("usa nota provisoria 50/50 enquanto nao houver 10 devolutivas", () => {
-    const [result] = buildElectionRanking([
-      row({ cumpridas: 10, total_indicados: 0, votos_confirmados: 1, devolutivas_negativas: 0 }),
-    ]);
-    expect(result).toMatchObject({
-      conversionInReview: true,
-      validReturns: 1,
-      conversionRate: 100,
-      score: 50,
-    });
+  it("nao usa indicados para desempatar votos", () => {
+    const result = buildElectionRanking([
+      row({ coordenador_id: "z", coordenador_nome: "Zeca", total_indicados: 500, votos_confirmados: 5 }),
+      row({ coordenador_id: "a", coordenador_nome: "Ana", total_indicados: 1, votos_confirmados: 5 }),
+    ], "votes");
+    expect(result.map((item) => item.name)).toEqual(["Ana", "Zeca"]);
   });
 });

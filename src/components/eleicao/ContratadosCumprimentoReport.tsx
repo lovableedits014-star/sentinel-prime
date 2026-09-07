@@ -40,9 +40,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   exportElectionContractReportPdf,
-  exportElectionRankingPdf,
+  exportElectionSeparatedRankingPdf,
 } from "@/lib/election-contract-report-pdf";
-import { buildElectionRanking, type ElectionRankingRow } from "@/lib/election-ranking";
+import {
+  buildElectionRanking,
+  type ElectionRankingKind,
+  type ElectionRankingRow,
+} from "@/lib/election-ranking";
 
 type MissionDetail = {
   mission_id: string;
@@ -147,7 +151,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   const [region, setRegion] = useState("all");
   const [status, setStatus] = useState("all");
   const [exporting, setExporting] = useState(false);
-  const [exportingRanking, setExportingRanking] = useState(false);
+  const [exportingRanking, setExportingRanking] = useState<ElectionRankingKind | null>(null);
 
   const query = useQuery({
     queryKey: ["election-contract-compliance", clientId, inicio, fim],
@@ -260,7 +264,8 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   );
   const adherence = totals.missions ? (100 * totals.done) / totals.missions : 0;
   const byRegion = useMemo(() => groupRows(filtered, area), [filtered]);
-  const ranking = useMemo(() => buildElectionRanking(filtered), [filtered]);
+  const missionRanking = useMemo(() => buildElectionRanking(filtered, "missions"), [filtered]);
+  const voteRanking = useMemo(() => buildElectionRanking(filtered, "votes"), [filtered]);
 
   const exportPdf = async () => {
     setExporting(true);
@@ -274,15 +279,20 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
     }
   };
 
-  const exportRankingPdf = async () => {
-    setExportingRanking(true);
+  const exportRankingPdf = async (kind: ElectionRankingKind) => {
+    setExportingRanking(kind);
     try {
-      await exportElectionRankingPdf({ inicio, fim, rows: ranking });
-      toast.success("Ranking executivo exportado em PDF.");
+      await exportElectionSeparatedRankingPdf({
+        inicio,
+        fim,
+        rows: kind === "missions" ? missionRanking : voteRanking,
+        kind,
+      });
+      toast.success(`Ranking de ${kind === "missions" ? "missões" : "votos"} exportado em PDF.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível gerar o ranking.");
     } finally {
-      setExportingRanking(false);
+      setExportingRanking(null);
     }
   };
 
@@ -468,7 +478,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
         <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="ranking" className="gap-1.5">
             <Trophy className="h-3.5 w-3.5" />
-            Ranking ({ranking.length})
+            Ranking ({missionRanking.length})
           </TabsTrigger>
           <TabsTrigger value="teams" className="gap-1.5">
             <Network className="h-3.5 w-3.5" />
@@ -478,7 +488,12 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           <TabsTrigger value="regions">Por região</TabsTrigger>
         </TabsList>
         <TabsContent value="ranking">
-          <RankingPanel rows={ranking} exporting={exportingRanking} onExport={exportRankingPdf} />
+          <RankingPanel
+            missionRows={missionRanking}
+            voteRows={voteRanking}
+            exporting={exportingRanking}
+            onExport={exportRankingPdf}
+          />
         </TabsContent>
         <TabsContent value="teams">
           <TeamForest rows={filtered} />
@@ -521,6 +536,67 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   );
 }
 
+function RankingPanel({ missionRows, voteRows, exporting, onExport }: {
+  missionRows: ElectionRankingRow[];
+  voteRows: ElectionRankingRow[];
+  exporting: ElectionRankingKind | null;
+  onExport: (kind: ElectionRankingKind) => void;
+}) {
+  return (
+    <Tabs defaultValue="missions" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="missions">Ranking de missões</TabsTrigger>
+        <TabsTrigger value="votes">Ranking de votos confirmados</TabsTrigger>
+      </TabsList>
+      <TabsContent value="missions">
+        <RankingBoard kind="missions" rows={missionRows} exporting={exporting === "missions"} onExport={() => onExport("missions")} />
+      </TabsContent>
+      <TabsContent value="votes">
+        <RankingBoard kind="votes" rows={voteRows} exporting={exporting === "votes"} onExport={() => onExport("votes")} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function RankingBoard({ kind, rows, exporting, onExport }: {
+  kind: ElectionRankingKind;
+  rows: ElectionRankingRow[];
+  exporting: boolean;
+  onExport: () => void;
+}) {
+  const isMissions = kind === "missions";
+  return (
+    <div className="space-y-4">
+      <Card className="overflow-hidden border-indigo-200 bg-gradient-to-br from-indigo-950 via-indigo-900 to-violet-800 text-white">
+        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-semibold text-indigo-200"><Award className="h-4 w-4" /> {isMissions ? "Missões concluídas" : "Votos confirmados"}</p>
+            <h3 className="mt-1 text-2xl font-bold">{isMissions ? "Ranking por quantidade de missões" : "Ranking por quantidade de votos"}</h3>
+            <p className="mt-1 text-xs text-indigo-200">{isMissions ? "A posição considera somente o total de missões concluídas." : "A posição considera somente os votos confirmados. Os indicados são apenas informativos."}</p>
+          </div>
+          <Button className="shrink-0 bg-white text-indigo-950 hover:bg-indigo-50" onClick={onExport} disabled={!rows.length || exporting}>
+            {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />} Baixar PDF desta aba
+          </Button>
+        </CardContent>
+      </Card>
+      {!!rows.length && <div className="grid gap-3 md:grid-cols-3">{rows.slice(0, 3).map((row, index) => (
+        <Card key={row.id} className={index === 0 ? "border-amber-300 bg-gradient-to-b from-amber-50 to-background shadow-md" : "bg-card"}>
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between"><div className={`flex h-10 w-10 items-center justify-center rounded-full font-black ${index === 0 ? "bg-amber-400 text-amber-950" : index === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-200 text-orange-900"}`}>{row.position}º</div>{index === 0 && <Crown className="h-6 w-6 text-amber-500" />}</div>
+            <p className="mt-4 truncate text-lg font-bold">{row.name}</p><p className="text-xs text-muted-foreground">{row.area} · {row.people} pessoas</p>
+            <p className="mt-4 text-4xl font-black tabular-nums">{isMissions ? row.done : row.confirmed}</p><p className="text-xs text-muted-foreground">{isMissions ? "missões concluídas" : "votos confirmados"}</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs"><MiniStat label={isMissions ? "Total atribuído" : "Indicados"} value={String(isMissions ? row.missions : row.indicated)} /><MiniStat label={isMissions ? "Pendentes" : "Equipe"} value={String(isMissions ? row.pending : row.people)} /></div>
+          </CardContent>
+        </Card>
+      ))}</div>}
+      <Card><CardHeader className="pb-2"><CardTitle className="text-base">Classificação completa</CardTitle><CardDescription>Sem nota composta e sem porcentagens</CardDescription></CardHeader>
+        <CardContent className="p-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-14">#</TableHead><TableHead>Coordenação</TableHead>{isMissions ? <><TableHead>Concluídas</TableHead><TableHead>Atribuídas</TableHead><TableHead>Pendentes</TableHead></> : <><TableHead>Votos confirmados</TableHead><TableHead>Indicados</TableHead></>}<TableHead>Pessoas na equipe</TableHead></TableRow></TableHeader>
+          <TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell className="text-lg font-black">{row.position}º</TableCell><TableCell><p className="font-semibold">{row.name}</p><p className="text-xs text-muted-foreground">{row.area}</p></TableCell>{isMissions ? <><TableCell className="font-bold text-emerald-700">{row.done}</TableCell><TableCell>{row.missions}</TableCell><TableCell>{row.pending}</TableCell></> : <><TableCell className="font-bold text-emerald-700">{row.confirmed}</TableCell><TableCell>{row.indicated}</TableCell></>}<TableCell>{row.people}</TableCell></TableRow>)}</TableBody>
+        </Table></div>{!rows.length && <p className="py-12 text-center text-sm text-muted-foreground">Nenhuma coordenação encontrada nesses filtros.</p>}</CardContent></Card>
+    </div>
+  );
+}
+
 const actionConfig: Record<
   ElectionRankingRow["action"],
   { label: string; className: string; note: string }
@@ -547,7 +623,7 @@ const actionConfig: Record<
   },
 };
 
-function RankingPanel({
+function LegacyRankingPanel({
   rows,
   exporting,
   onExport,

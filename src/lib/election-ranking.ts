@@ -21,6 +21,7 @@ export type ElectionRankingRow = {
   people: number;
   missions: number;
   done: number;
+  pending: number;
   missionRate: number;
   indicated: number;
   indicationGoal: number;
@@ -34,23 +35,26 @@ export type ElectionRankingRow = {
   action: "elogiar" | "acompanhar" | "cobrar" | "urgente";
 };
 
-const number = (value: unknown) => Number(value || 0);
-const percentage = (part: number, total: number) => (total > 0 ? (100 * part) / total : 0);
-const cap = (value: number) => Math.max(0, Math.min(100, value));
+export type ElectionRankingKind = "missions" | "votes";
 
-export function buildElectionRanking(rows: ElectionRankingSource[]): ElectionRankingRow[] {
+const number = (value: unknown) => Number(value || 0);
+export function buildElectionRanking(
+  rows: ElectionRankingSource[],
+  kind: ElectionRankingKind = "missions",
+): ElectionRankingRow[] {
   const teams = new Map<
     string,
     Omit<
       ElectionRankingRow,
       | "position"
-      | "score"
-      | "action"
+      | "pending"
       | "missionRate"
       | "listRate"
       | "conversionRate"
       | "validReturns"
       | "conversionInReview"
+      | "score"
+      | "action"
     >
   >();
 
@@ -82,35 +86,26 @@ export function buildElectionRanking(rows: ElectionRankingSource[]): ElectionRan
 
   return Array.from(teams.values())
     .map((team) => {
-      const missionRate = cap(percentage(team.done, team.missions));
-      const listRate = cap(percentage(team.indicated, team.indicationGoal));
+      const missionRate = team.missions ? (100 * team.done) / team.missions : 0;
+      const listRate = team.indicationGoal ? (100 * team.indicated) / team.indicationGoal : 0;
       const validReturns = team.confirmed + team.negative;
-      const conversionRate = cap(percentage(team.confirmed, validReturns));
-      const conversionInReview = validReturns < 10;
-      const score = Math.round(
-        conversionInReview
-          ? missionRate * 0.5 + listRate * 0.5
-          : missionRate * 0.45 + listRate * 0.45 + conversionRate * 0.1,
-      );
-      const action =
-        score >= 80 ? "elogiar" : score >= 60 ? "acompanhar" : score >= 40 ? "cobrar" : "urgente";
+      const conversionRate = validReturns ? (100 * team.confirmed) / validReturns : 0;
       return {
         ...team,
+        pending: Math.max(team.missions - team.done, 0),
         missionRate,
         listRate,
-        conversionRate,
         validReturns,
-        conversionInReview,
-        score,
-        action,
+        conversionRate,
+        conversionInReview: false,
+        score: kind === "missions" ? team.done : team.confirmed,
+        action: "acompanhar" as const,
       };
     })
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        b.confirmed - a.confirmed ||
-        b.missionRate - a.missionRate ||
-        a.name.localeCompare(b.name, "pt-BR"),
+    .sort((a, b) =>
+      kind === "votes"
+        ? b.confirmed - a.confirmed || a.name.localeCompare(b.name, "pt-BR")
+        : b.done - a.done || a.name.localeCompare(b.name, "pt-BR"),
     )
     .map((row, index) => ({ ...row, position: index + 1 }));
 }
