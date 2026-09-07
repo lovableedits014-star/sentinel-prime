@@ -149,7 +149,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
         qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] }),
         qc.invalidateQueries({ queryKey: ["portal-missions", clientId] }),
       ]);
-      toast.success("MissÃ£o excluÃ­da dos relatÃ³rios");
+      toast.success("MissÃ£o excluÃ­da definitivamente");
     },
     onError: (e: any) => toast.error(e?.message || "NÃ£o foi possÃ­vel excluir a missÃ£o"),
   });
@@ -215,7 +215,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
                       <Pencil className="h-3.5 w-3.5" /> Editar texto e links
                     </Button>
                     <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => setDeleteOpen(true)}>
-                      <Trash2 className="h-3.5 w-3.5" /> Excluir dos relatÃ³rios
+                      <Trash2 className="h-3.5 w-3.5" /> Excluir missÃ£o
                     </Button>
                   </div>
                 )}
@@ -357,8 +357,8 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Excluir esta missÃ£o dos relatÃ³rios?</AlertDialogTitle><AlertDialogDescription>Ela deixarÃ¡ de contar como pendÃªncia ou resultado negativo e sairÃ¡ das telas de missÃµes. Esta aÃ§Ã£o nÃ£o pode ser desfeita pela tela.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => excludeMission.mutate()} disabled={excludeMission.isPending}>{excludeMission.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Excluir dos relatÃ³rios</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Excluir esta missÃ£o definitivamente?</AlertDialogTitle><AlertDialogDescription>A missÃ£o e todos os seus registros serÃ£o apagados, inclusive dos relatÃ³rios e indicadores de desempenho. Esta aÃ§Ã£o nÃ£o pode ser desfeita.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => excludeMission.mutate()} disabled={excludeMission.isPending}>{excludeMission.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Excluir definitivamente</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </Tabs>

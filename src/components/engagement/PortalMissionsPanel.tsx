@@ -334,7 +334,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
       setDeleteId(null);
-      toast.success("Missão excluída dos relatórios.");
+      toast.success("Missão excluída definitivamente.");
     },
     onError: () => toast.error("Erro ao excluir missão dos relatórios"),
   });
@@ -793,8 +793,8 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       <AlertDialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir missão dos relatórios?</AlertDialogTitle>
-            <AlertDialogDescription>A missão sairá do portal e deixará de contar como pendência ou resultado negativo nos relatórios. Os registros brutos ficam preservados somente para auditoria.</AlertDialogDescription>
+            <AlertDialogTitle>Excluir missão definitivamente?</AlertDialogTitle>
+            <AlertDialogDescription>A missão e todos os seus registros serão apagados, inclusive dos relatórios e indicadores de desempenho. Esta ação não pode ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -803,7 +803,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Excluir dos relatórios
+              Excluir definitivamente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

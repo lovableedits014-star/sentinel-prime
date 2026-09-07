@@ -1,5 +1,5 @@
--- Remove uma missao criada por engano das apuracoes sem apagar os registros
--- brutos de auditoria (acessos e cliques).
+-- Exclui por completo uma missao criada por engano e todos os dados que ela
+-- gerou. Assim ela nao permanece em nenhum relatorio ou indicador.
 CREATE OR REPLACE FUNCTION public.mission_exclude_from_reports(
   p_client_id uuid,
   p_mission_id uuid
@@ -20,16 +20,27 @@ BEGIN
     RAISE EXCEPTION 'Missao nao encontrada';
   END IF;
 
-  -- As obrigacoes formam o denominador dos relatorios de cumprimento. Apaga-las
-  -- retira a missao incorreta dos resultados negativos.
+  -- Algumas relacoes antigas usam ON DELETE SET NULL ou nao possuem FK. A
+  -- remocao explicita impede que dados orfaos entrem em relatorios agregados.
+  DELETE FROM public.mission_checkins
+  WHERE client_id = p_client_id AND mission_id = p_mission_id;
+
   DELETE FROM public.engagement_obrigacoes
   WHERE client_id = p_client_id AND mission_id = p_mission_id;
 
-  UPDATE public.portal_missions
-  SET archived_at = coalesce(archived_at, now()),
-      is_active = false,
-      tracking_enabled = false,
-      updated_at = now()
+  DELETE FROM public.mission_events
+  WHERE client_id = p_client_id AND mission_id = p_mission_id;
+
+  DELETE FROM public.mission_distributions
+  WHERE client_id = p_client_id AND mission_id = p_mission_id;
+
+  DELETE FROM public.portal_mission_links
+  WHERE client_id = p_client_id AND mission_id = p_mission_id;
+
+  DELETE FROM public.contratado_missao_dispatches
+  WHERE client_id = p_client_id AND mission_id = p_mission_id;
+
+  DELETE FROM public.portal_missions
   WHERE id = p_mission_id AND client_id = p_client_id;
 END;
 $$;
@@ -38,4 +49,6 @@ REVOKE ALL ON FUNCTION public.mission_exclude_from_reports(uuid, uuid) FROM PUBL
 GRANT EXECUTE ON FUNCTION public.mission_exclude_from_reports(uuid, uuid) TO authenticated;
 
 COMMENT ON FUNCTION public.mission_exclude_from_reports(uuid, uuid) IS
-  'Arquiva uma missao criada por engano e remove suas obrigacoes das apuracoes, preservando eventos para auditoria.';
+  'Exclui definitivamente uma missao e todos os dados relacionados para remove-la dos relatorios.';
+
+NOTIFY pgrst, 'reload schema';
