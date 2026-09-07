@@ -116,7 +116,28 @@ Deno.serve(async (req) => {
 
       const fbData = await fbResponse.json();
       postId = fbData.id;
-      postUrl = `https://facebook.com/${postId}`;
+      // Nunca dependa apenas de uma URL montada a partir do ID composto
+      // (pageId_postId). Em especial no app do Facebook para iOS, esse formato
+      // pode abrir a tela genérica "Indisponível" embora o post esteja público.
+      const [ownerId, objectId] = String(postId).split('_');
+      const stableFallback = ownerId && objectId
+        ? `https://www.facebook.com/${ownerId}/posts/${objectId}`
+        : `https://www.facebook.com/${postId}`;
+      postUrl = stableFallback;
+
+      try {
+        const permalinkResponse = await fetch(
+          `https://graph.facebook.com/v21.0/${encodeURIComponent(postId)}?fields=permalink_url&access_token=${encodeURIComponent(pageAccessToken)}`
+        );
+        if (permalinkResponse.ok) {
+          const postInfo = await permalinkResponse.json();
+          if (typeof postInfo.permalink_url === 'string' && /^https?:\/\//i.test(postInfo.permalink_url)) {
+            postUrl = postInfo.permalink_url;
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch the official Facebook permalink:', error);
+      }
     } else if (platform === 'instagram') {
       if (!integration.meta_instagram_id) {
         return new Response(

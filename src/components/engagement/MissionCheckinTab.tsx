@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { BarChart3, Filter, Link2, ListChecks, Loader2, Target, ExternalLink } from "lucide-react";
+import { BarChart3, Filter, Link2, ListChecks, Loader2, Target, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { FacebookIcon, InstagramIcon } from "@/components/icons/SocialIcons";
 import { resolvePublicBaseUrl } from "@/lib/public-base-url";
 import { fetchAudiences, setMissionAudience, type MissionAudience } from "@/lib/mission-audiences";
@@ -25,6 +30,7 @@ type Mission = {
   post_url: string | null;
   link_facebook: string | null;
   link_instagram: string | null;
+  link_avulso?: string | null;
   instructions: string | null;
   audience_id?: string | null;
   audience_snapshotted_at?: string | null;
@@ -34,6 +40,9 @@ type Mission = {
 
 export default function MissionCheckinTab({ clientId }: { clientId: string }) {
   const [missionId, setMissionId] = useState<string>("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ title: "", post_url: "", link_facebook: "", link_instagram: "", link_avulso: "", instructions: "" });
   const qc = useQueryClient();
 
   const { data: client } = useQuery({
@@ -54,7 +63,7 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("portal_missions")
-        .select("id, title, created_at, publicado_em, post_url, link_facebook, link_instagram, instructions, audience_id, audience_snapshotted_at, eligible_count")
+        .select("id, title, created_at, publicado_em, post_url, link_facebook, link_instagram, link_avulso, instructions, audience_id, audience_snapshotted_at, eligible_count")
         .eq("client_id", clientId)
         .is("archived_at", null)
         .order("created_at", { ascending: false })
@@ -95,6 +104,55 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
       toast.error(e?.message || "Falha ao aplicar a lista");
     }
   };
+
+  const openEdit = () => {
+    if (!mission) return;
+    setEditForm({
+      title: mission.title || "", post_url: mission.post_url || "",
+      link_facebook: mission.link_facebook || "", link_instagram: mission.link_instagram || "",
+      link_avulso: mission.link_avulso || "", instructions: mission.instructions || "",
+    });
+    setEditOpen(true);
+  };
+
+  const editMission = useMutation({
+    mutationFn: async () => {
+      if (!missionId || !editForm.post_url.trim()) throw new Error("Informe o link principal da missÃ£o");
+      const clean = (value: string) => value.trim() || null;
+      const { error } = await (supabase as any).from("portal_missions").update({
+        title: clean(editForm.title), post_url: editForm.post_url.trim(),
+        link_facebook: clean(editForm.link_facebook), link_instagram: clean(editForm.link_instagram),
+        link_avulso: clean(editForm.link_avulso), instructions: clean(editForm.instructions),
+      }).eq("id", missionId).eq("client_id", clientId);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] });
+      await qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
+      setEditOpen(false);
+      toast.success("MissÃ£o atualizada");
+    },
+    onError: (e: any) => toast.error(e?.message || "NÃ£o foi possÃ­vel editar a missÃ£o"),
+  });
+
+  const excludeMission = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).rpc("mission_exclude_from_reports", {
+        p_client_id: clientId, p_mission_id: missionId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      setDeleteOpen(false);
+      setMissionId("");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["checkin-missions", clientId] }),
+        qc.invalidateQueries({ queryKey: ["portal-missions", clientId] }),
+      ]);
+      toast.success("MissÃ£o excluÃ­da dos relatÃ³rios");
+    },
+    onError: (e: any) => toast.error(e?.message || "NÃ£o foi possÃ­vel excluir a missÃ£o"),
+  });
 
 
 
@@ -150,6 +208,17 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
                   </div>
                   <MissionFromPostDialog clientId={clientId} onCreated={setMissionId} />
                 </div>
+
+                {mission && (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={openEdit}>
+                      <Pencil className="h-3.5 w-3.5" /> Editar texto e links
+                    </Button>
+                    <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => setDeleteOpen(true)}>
+                      <Trash2 className="h-3.5 w-3.5" /> Excluir dos relatÃ³rios
+                    </Button>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -270,6 +339,28 @@ export default function MissionCheckinTab({ clientId }: { clientId: string }) {
           </>
         )}
       </TabsContent>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+          <DialogHeader><DialogTitle>Editar missÃ£o</DialogTitle><DialogDescription>Troque o texto e os links mesmo depois de criar a missÃ£o.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label>TÃ­tulo</Label><Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Link principal</Label><Input value={editForm.post_url} onChange={(e) => setEditForm((f) => ({ ...f, post_url: e.target.value }))} placeholder="https://..." /></div>
+            <div className="space-y-1.5"><Label>Link do Facebook</Label><Input value={editForm.link_facebook} onChange={(e) => setEditForm((f) => ({ ...f, link_facebook: e.target.value }))} placeholder="https://..." /></div>
+            <div className="space-y-1.5"><Label>Link do Instagram</Label><Input value={editForm.link_instagram} onChange={(e) => setEditForm((f) => ({ ...f, link_instagram: e.target.value }))} placeholder="https://..." /></div>
+            <div className="space-y-1.5"><Label>Outro link</Label><Input value={editForm.link_avulso} onChange={(e) => setEditForm((f) => ({ ...f, link_avulso: e.target.value }))} placeholder="https://..." /></div>
+            <div className="space-y-1.5"><Label>Texto/instruÃ§Ãµes</Label><Textarea rows={4} value={editForm.instructions} onChange={(e) => setEditForm((f) => ({ ...f, instructions: e.target.value }))} /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button><Button onClick={() => editMission.mutate()} disabled={editMission.isPending}>{editMission.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar alteraÃ§Ãµes</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Excluir esta missÃ£o dos relatÃ³rios?</AlertDialogTitle><AlertDialogDescription>Ela deixarÃ¡ de contar como pendÃªncia ou resultado negativo e sairÃ¡ das telas de missÃµes. Esta aÃ§Ã£o nÃ£o pode ser desfeita pela tela.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => excludeMission.mutate()} disabled={excludeMission.isPending}>{excludeMission.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Excluir dos relatÃ³rios</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Tabs>
   );
 }

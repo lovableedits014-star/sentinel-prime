@@ -325,19 +325,18 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Soft-delete: archive to preserve historical tracking events
-      const { error } = await (supabase as any)
-        .from("portal_missions")
-        .update({ archived_at: new Date().toISOString(), is_active: false })
-        .eq("id", id);
+      const { error } = await (supabase as any).rpc("mission_exclude_from_reports", {
+        p_client_id: clientId,
+        p_mission_id: id,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["portal-missions", clientId] });
       setDeleteId(null);
-      toast.success("Missão arquivada — o histórico continua disponível em Relatórios.");
+      toast.success("Missão excluída dos relatórios.");
     },
-    onError: () => toast.error("Erro ao arquivar missão"),
+    onError: () => toast.error("Erro ao excluir missão dos relatórios"),
   });
 
   const openEdit = (m: Mission) => {
@@ -794,8 +793,8 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
       <AlertDialog open={!!deleteId} onOpenChange={(v) => { if (!v) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Arquivar missão?</AlertDialogTitle>
-            <AlertDialogDescription>A missão sai do portal dos apoiadores, mas todo o histórico de acessos, cliques e participantes fica preservado na aba <strong>Relatórios</strong>.</AlertDialogDescription>
+            <AlertDialogTitle>Excluir missão dos relatórios?</AlertDialogTitle>
+            <AlertDialogDescription>A missão sairá do portal e deixará de contar como pendência ou resultado negativo nos relatórios. Os registros brutos ficam preservados somente para auditoria.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -804,7 +803,7 @@ export function PortalMissionsPanel({ clientId }: PortalMissionsPanelProps) {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Arquivar
+              Excluir dos relatórios
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -522,11 +522,15 @@ export default function MissaoPublica() {
   const showStickyBar = false;
   const isClicked = (key: string) => clickedLinks.has(key);
 
-  const linkBtnClass = (key: string) =>
-    `w-full min-h-16 h-auto justify-start gap-3 border-2 px-4 py-3 text-left shadow-sm transition-all ${
+  const linkBtnClass = (key: string, kind: "facebook" | "instagram" | "default" = "default") =>
+    `group relative w-full min-h-[100px] h-auto justify-start gap-4 overflow-hidden rounded-[22px] border-4 px-4 py-3 text-left text-white shadow-[0_5px_0_rgba(15,23,42,0.12),0_8px_18px_rgba(15,23,42,0.16)] transition-all active:translate-y-0.5 ${
       isClicked(key)
-        ? "border-emerald-500 bg-emerald-500/10"
-        : "border-primary/50 bg-primary/5 hover:border-primary hover:bg-primary/10"
+        ? "border-emerald-300 bg-emerald-600 hover:bg-emerald-700"
+        : kind === "facebook"
+          ? "border-white bg-gradient-to-br from-[#1264c5] via-[#087ee9] to-[#168cf5] hover:brightness-105"
+          : kind === "instagram"
+            ? "border-white bg-gradient-to-br from-[#5140d8] via-[#d31891] to-[#ff7410] hover:brightness-105"
+            : "border-primary/30 bg-gradient-to-r from-primary to-accent hover:brightness-105"
     }`;
 
   const ClickedMark = ({ k }: { k: string }) =>
@@ -538,23 +542,20 @@ export default function MissaoPublica() {
 
   return (
     <div
-      className={`min-h-screen bg-gradient-to-b from-background to-muted/30 py-8 px-4 ${showStickyBar ? "pb-36" : ""}`}
+      className={`min-h-screen bg-[radial-gradient(circle_at_top,hsl(214_40%_98%),hsl(210_30%_94%)_60%,hsl(210_25%_90%))] py-5 px-3 sm:py-8 sm:px-4 ${showStickyBar ? "pb-36" : ""}`}
     >
-      <div className="max-w-md mx-auto space-y-4">
-        {config.client_name && (
-          <p className="text-center text-xs text-muted-foreground uppercase tracking-wide">
-            {config.client_name}
-          </p>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">{m.title || "Missão"}</CardTitle>
+      <div className="max-w-[620px] mx-auto space-y-4">
+        <Card className="overflow-hidden rounded-[26px] border-slate-200/90 bg-white/95 shadow-[0_12px_35px_rgba(15,23,42,0.12)]">
+          <CardHeader className="px-5 pb-3 pt-5 sm:px-8 sm:pt-8">
+            <CardTitle className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-slate-800 sm:text-2xl">
+              <span aria-hidden="true" className="text-2xl">🇧🇷</span>
+              {m.title || "Missão"}
+            </CardTitle>
             {config.group_name && (
               <CardDescription>Vindo do grupo: <strong>{config.group_name}</strong></CardDescription>
             )}
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5 px-5 pb-6 sm:px-8 sm:pb-8">
             {!p ? (
               <form onSubmit={handleIdentify} className="space-y-3" autoComplete="off">
                 <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground flex gap-2">
@@ -606,7 +607,7 @@ export default function MissaoPublica() {
               </form>
             ) : (
               <>
-                <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                <div className="rounded-[18px] border border-slate-200 bg-slate-50/80 p-4 shadow-inner space-y-3">
                   <div className="flex items-start gap-2">
                     {p.reconhecido ? (
                       <BadgeCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
@@ -642,7 +643,7 @@ export default function MissaoPublica() {
                     variant="outline"
                     size="sm"
                     onClick={handleSwitch}
-                    className="w-full gap-1.5 text-xs"
+                    className="h-11 w-full gap-1.5 rounded-xl border-slate-200 bg-white text-sm text-slate-700 shadow-sm hover:bg-slate-50"
                   >
                     <UserCog className="w-3.5 h-3.5" />
                     Não sou eu — quero me identificar
@@ -654,19 +655,19 @@ export default function MissaoPublica() {
                 )}
 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
+                  <div className="flex items-center gap-2 text-slate-700">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700">
                       1
                     </span>
-                    <p className="text-sm font-medium">Abra todos os links e realize as ações</p>
+                    <p className="text-base font-medium">Abra todos os links e realize as ações</p>
                   </div>
                   {requiredLinkKeys.length > 0 && (
-                    <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-3">
+                    <div className="rounded-[18px] border-2 border-blue-300 bg-blue-50/60 p-4">
                       <div className="flex items-center justify-between gap-2 text-sm font-semibold">
                         <span>Progresso da missão</span>
                         <span>{clickedRequiredCount} de {requiredLinkKeys.length} links</span>
                       </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-300">
                         <div
                           className="h-full rounded-full bg-emerald-500 transition-all"
                           style={{ width: `${(clickedRequiredCount / requiredLinkKeys.length) * 100}%` }}
@@ -679,32 +680,47 @@ export default function MissaoPublica() {
                       </p>
                     </div>
                   )}
+                  {requiredLinkKeys.length > 0 && (
+                    <p className="pt-1 text-center text-sm font-extrabold text-blue-900">👇 TOQUE EM CADA REDE PARA FAZER A MISSÃO</p>
+                  )}
                   {linkFb && (
-                    <Button
-                      variant="outline"
-                      className={linkBtnClass("click_facebook")}
-                      onClick={() => handleExternal(linkFb, "click_facebook")}
-                    >
-                      <FacebookIcon className="w-7 h-7 shrink-0 text-blue-600" />
-                      <span className="flex-1">
-                        <span className="block font-bold">FACEBOOK</span>
-                        <span className="block text-xs font-normal text-muted-foreground">Abrir publicação e interagir</span>
-                      </span>
-                      <ClickedMark k="click_facebook" />
-                    </Button>
+                    <div className="space-y-1.5">
+                      <Button
+                        variant="outline"
+                        className={linkBtnClass("click_facebook", "facebook")}
+                        onClick={() => handleExternal(linkFb, "click_facebook")}
+                      >
+                        <FacebookIcon className="h-14 w-14 shrink-0 rounded-full bg-blue-600/70 p-2 text-white shadow-lg" />
+                        <span className="flex-1">
+                          <span className="block text-xl font-extrabold tracking-tight">CLIQUE AQUI</span>
+                          <span className="block text-sm font-semibold opacity-95">Abrir publicação no Facebook</span>
+                        </span>
+                        <span className="flex flex-col items-center gap-1"><ExternalLink className="h-7 w-7" /><ClickedMark k="click_facebook" /></span>
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-auto w-full whitespace-normal py-1 text-[11px] text-muted-foreground"
+                        onClick={() => copyExternal(linkFb, "click_facebook")}
+                      >
+                        <Copy className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                        Apareceu “Indisponível”? Copie e abra no Safari ou Chrome
+                      </Button>
+                    </div>
                   )}
                   {linkIg && (
                     <Button
                       variant="outline"
-                      className={linkBtnClass("click_instagram")}
+                      className={linkBtnClass("click_instagram", "instagram")}
                       onClick={() => handleExternal(linkIg, "click_instagram")}
                     >
-                      <InstagramIcon className="w-7 h-7 shrink-0 text-pink-500" />
+                      <InstagramIcon className="h-14 w-14 shrink-0 rounded-[18px] bg-white/20 p-2 text-white shadow-lg" />
                       <span className="flex-1">
-                        <span className="block font-bold">INSTAGRAM</span>
-                        <span className="block text-xs font-normal text-muted-foreground">Abrir publicação e interagir</span>
+                        <span className="block text-xl font-extrabold tracking-tight">CLIQUE AQUI</span>
+                        <span className="block text-sm font-semibold opacity-95">Abrir publicação no Instagram</span>
                       </span>
-                      <ClickedMark k="click_instagram" />
+                      <span className="flex flex-col items-center gap-1"><ExternalLink className="h-7 w-7" /><ClickedMark k="click_instagram" /></span>
                     </Button>
                   )}
                   {linkAv && (
@@ -751,7 +767,7 @@ export default function MissaoPublica() {
                       {showLinkHelp && (
                         <div className="mt-3 space-y-2 border-t border-amber-500/20 pt-3">
                           <p className="text-xs text-muted-foreground">
-                            Isso pode acontecer no navegador interno do WhatsApp. Copie o link e cole no Chrome ou abra diretamente no aplicativo do Facebook/Instagram, já conectado à sua conta.
+                            Isso pode acontecer por causa da sessão ou do aplicativo do Facebook/Instagram. Copie o link e cole no Safari ou Chrome, já conectado à sua conta.
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {linkFb && <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => copyExternal(linkFb, "click_facebook")}><Copy className="h-3.5 w-3.5" />Copiar Facebook</Button>}

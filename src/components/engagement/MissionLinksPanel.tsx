@@ -29,6 +29,7 @@ export default function MissionLinksPanel({ clientId, missionId, missionTitle }:
   const qc = useQueryClient();
   const [groupName, setGroupName] = useState("");
   const [qrFor, setQrFor] = useState<string | null>(null);
+  const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>({});
 
   const { data: client } = useQuery({
     queryKey: ["client-public-base", clientId],
@@ -158,8 +159,8 @@ export default function MissionLinksPanel({ clientId, missionId, missionTitle }:
                     <Copy className="h-3.5 w-3.5" /> Copiar link
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1.5"
-                    onClick={() => copy(mensagemFor(d.short_code), "Mensagem copiada")}>
-                    <Copy className="h-3.5 w-3.5" /> Copiar mensagem pronta
+                    onClick={() => copy(messageDrafts[d.id] ?? mensagemFor(d.short_code), "Mensagem copiada")}>
+                    <Copy className="h-3.5 w-3.5" /> Copiar mensagem
                   </Button>
                   <Button size="sm" variant="ghost" className="gap-1.5"
                     onClick={() => setQrFor(qrFor === d.id ? null : d.id)}>
@@ -177,12 +178,14 @@ export default function MissionLinksPanel({ clientId, missionId, missionTitle }:
                     />
                   </div>
                 )}
-                <Textarea
-                  readOnly
-                  value={mensagemFor(d.short_code)}
-                  className="h-20 text-xs"
-                  onFocus={(e) => e.currentTarget.select()}
-                />
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Mensagem para enviar (vocÃª pode editar antes de copiar)</Label>
+                  <Textarea
+                    value={messageDrafts[d.id] ?? mensagemFor(d.short_code)}
+                    onChange={(e) => setMessageDrafts((current) => ({ ...current, [d.id]: e.target.value }))}
+                    className="min-h-24 text-xs"
+                  />
+                </div>
               </div>
             ))}
           </div>

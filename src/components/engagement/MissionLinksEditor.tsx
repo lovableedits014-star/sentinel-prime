@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, ExternalLink, Link2, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink, Link2, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { detectLinkKind, isValidHttpUrl } from "@/lib/mission-link-kind";
 
 export type MissionLinkRow = {
@@ -29,6 +29,7 @@ export default function MissionLinksEditor({
   const qc = useQueryClient();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const queryKey = ["mission-extra-links", missionId];
 
@@ -69,6 +70,30 @@ export default function MissionLinksEditor({
     },
     onError: (e: any) => toast.error(e?.message || "Não foi possível adicionar o link"),
   });
+
+  const saveEdit = useMutation({
+    mutationFn: async () => {
+      if (!editingId || !isValidHttpUrl(url.trim())) throw new Error("Informe um endereço começando com https://");
+      const { error } = await (supabase as any).from("portal_mission_links").update({
+        label: label.trim() || "Abrir link", url: url.trim(), kind: detectLinkKind(url.trim()),
+      }).eq("id", editingId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingId(null); setLabel(""); setUrl("");
+      qc.invalidateQueries({ queryKey });
+      toast.success("Link atualizado");
+    },
+    onError: (e: any) => toast.error(e?.message || "Não foi possível atualizar o link"),
+  });
+
+  const startEdit = (link: MissionLinkRow) => {
+    setEditingId(link.id); setLabel(link.label); setUrl(link.url);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null); setLabel(""); setUrl("");
+  };
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
@@ -120,10 +145,11 @@ export default function MissionLinksEditor({
             <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." />
           </div>
           <div className="flex items-end">
-            <Button className="w-full gap-1.5" onClick={() => add.mutate()} disabled={add.isPending || !url.trim()}>
-              {add.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Adicionar
+            <Button className="w-full gap-1.5" onClick={() => editingId ? saveEdit.mutate() : add.mutate()} disabled={add.isPending || saveEdit.isPending || !url.trim()}>
+              {(add.isPending || saveEdit.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : editingId ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {editingId ? "Salvar" : "Adicionar"}
             </Button>
+            {editingId && <Button size="icon" variant="ghost" onClick={cancelEdit} title="Cancelar edição"><X className="h-4 w-4" /></Button>}
           </div>
         </div>
 
@@ -156,6 +182,9 @@ export default function MissionLinksEditor({
                 <Button size="icon" variant="ghost" className="h-7 w-7" disabled={i === links.length - 1}
                   onClick={() => move.mutate({ index: i, dir: 1 })}>
                   <ArrowDown className="h-3.5 w-3.5" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(l)} title="Editar link">
+                  <Pencil className="h-3.5 w-3.5" />
                 </Button>
                 <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive"
                   onClick={() => remove.mutate(l.id)}>
