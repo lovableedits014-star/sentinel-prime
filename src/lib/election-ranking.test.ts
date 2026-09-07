@@ -61,4 +61,22 @@ describe("buildElectionRanking", () => {
     ], "votes");
     expect(result.conversionRate).toBe(25);
   });
+
+  it("compara equipes de tamanhos diferentes pelo desempenho ajustado e nao pelo volume", () => {
+    const result = buildElectionRanking([
+      row({ coordenador_id: "grande", coordenador_nome: "Grande", missoes: 100, cumpridas: 70 }),
+      row({ coordenador_id: "pequena", coordenador_nome: "Pequena", missoes: 10, cumpridas: 9 }),
+    ], "missions");
+    expect(result.map((item) => item.name)).toEqual(["Pequena", "Grande"]);
+    expect(result[0].adjustedMissionRate).toBeGreaterThan(result[1].adjustedMissionRate);
+  });
+
+  it("mantem equipes com menos de cinco obrigacoes em apuracao e fora do podio", () => {
+    const result = buildElectionRanking([
+      row({ coordenador_id: "apuracao", coordenador_nome: "Apuração", missoes: 1, cumpridas: 1 }),
+      row({ coordenador_id: "classificada", coordenador_nome: "Classificada", missoes: 5, cumpridas: 4 }),
+    ], "missions");
+    expect(result[0]).toMatchObject({ name: "Classificada", missionRankingEligible: true });
+    expect(result[1]).toMatchObject({ name: "Apuração", missionRankingEligible: false });
+  });
 });

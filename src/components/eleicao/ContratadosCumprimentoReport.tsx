@@ -565,6 +565,7 @@ function RankingBoard({ kind, rows, exporting, onExport }: {
   onExport: () => void;
 }) {
   const isMissions = kind === "missions";
+  const podiumRows = isMissions ? rows.filter((row) => row.missionRankingEligible).slice(0, 3) : rows.slice(0, 3);
   return (
     <div className="space-y-4">
       <Card className="overflow-hidden border-indigo-200 bg-gradient-to-br from-indigo-950 via-indigo-900 to-violet-800 text-white">
@@ -572,26 +573,26 @@ function RankingBoard({ kind, rows, exporting, onExport }: {
           <div>
             <p className="flex items-center gap-2 text-sm font-semibold text-indigo-200"><Award className="h-4 w-4" /> {isMissions ? "Missões concluídas" : "Votos confirmados"}</p>
             <h3 className="mt-1 text-2xl font-bold">{isMissions ? "Ranking por quantidade de missões" : "Ranking por quantidade de votos"}</h3>
-            <p className="mt-1 text-xs text-indigo-200">{isMissions ? "A posição considera somente o total de missões concluídas no período escolhido acima." : "A posição considera somente o total acumulado de votos confirmados. Indicados e conversão são apenas informativos."}</p>
+            <p className="mt-1 max-w-3xl text-xs text-indigo-200">{isMissions ? "Classificação justa por índice ajustado à média geral, independente do tamanho da equipe. Exige ao menos 5 obrigações para disputar o pódio; peso de confiança: 20 obrigações." : "A posição considera somente o total acumulado de votos confirmados. Indicados e conversão são apenas informativos."}</p>
           </div>
           <Button className="shrink-0 bg-white text-indigo-950 hover:bg-indigo-50" onClick={onExport} disabled={!rows.length || exporting}>
             {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />} Baixar PDF desta aba
           </Button>
         </CardContent>
       </Card>
-      {!!rows.length && <div className="grid gap-3 md:grid-cols-3">{rows.slice(0, 3).map((row, index) => (
+      {!!podiumRows.length && <div className="grid gap-3 md:grid-cols-3">{podiumRows.map((row, index) => (
         <Card key={row.id} className={index === 0 ? "border-amber-300 bg-gradient-to-b from-amber-50 to-background shadow-md" : "bg-card"}>
           <CardContent className="p-5">
             <div className="flex items-start justify-between"><div className={`flex h-10 w-10 items-center justify-center rounded-full font-black ${index === 0 ? "bg-amber-400 text-amber-950" : index === 1 ? "bg-slate-200 text-slate-700" : "bg-orange-200 text-orange-900"}`}>{row.position}º</div>{index === 0 && <Crown className="h-6 w-6 text-amber-500" />}</div>
             <p className="mt-4 truncate text-lg font-bold">{row.name}</p><p className="text-xs text-muted-foreground">{row.area} · {row.people} pessoas</p>
-            <p className="mt-4 text-4xl font-black tabular-nums">{isMissions ? row.done : row.confirmed}</p><p className="text-xs text-muted-foreground">{isMissions ? "missões concluídas" : "votos confirmados"}</p>
-            <div className={`mt-4 grid gap-2 text-center text-xs ${isMissions ? "grid-cols-2" : "grid-cols-3"}`}><MiniStat label={isMissions ? "Total atribuído" : "Indicados"} value={String(isMissions ? row.missions : row.indicated)} /><MiniStat label={isMissions ? "Pendentes" : "Conversão"} value={isMissions ? String(row.pending) : `${row.conversionRate.toFixed(1)}%`} />{!isMissions && <MiniStat label="Equipe" value={String(row.people)} />}</div>
+            <p className="mt-4 text-4xl font-black tabular-nums">{isMissions ? `${row.adjustedMissionRate.toFixed(1)}` : row.confirmed}</p><p className="text-xs text-muted-foreground">{isMissions ? "índice ajustado" : "votos confirmados"}</p>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs"><MiniStat label={isMissions ? "Taxa real" : "Indicados"} value={isMissions ? `${row.missionRate.toFixed(1)}%` : String(row.indicated)} /><MiniStat label={isMissions ? "Concluídas" : "Conversão"} value={isMissions ? String(row.done) : `${row.conversionRate.toFixed(1)}%`} /><MiniStat label={isMissions ? "Atribuídas" : "Equipe"} value={String(isMissions ? row.missions : row.people)} /></div>
           </CardContent>
         </Card>
       ))}</div>}
       <Card><CardHeader className="pb-2"><CardTitle className="text-base">Classificação completa</CardTitle><CardDescription>Sem nota composta e sem porcentagens</CardDescription></CardHeader>
-        <CardContent className="p-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-14">#</TableHead><TableHead>Coordenação</TableHead>{isMissions ? <><TableHead>Concluídas</TableHead><TableHead>Atribuídas</TableHead><TableHead>Pendentes</TableHead></> : <><TableHead>Votos confirmados</TableHead><TableHead>Indicados</TableHead><TableHead>Conversão</TableHead></>}<TableHead>Pessoas na equipe</TableHead></TableRow></TableHeader>
-          <TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell className="text-lg font-black">{row.position}º</TableCell><TableCell><p className="font-semibold">{row.name}</p><p className="text-xs text-muted-foreground">{row.area}</p></TableCell>{isMissions ? <><TableCell className="font-bold text-emerald-700">{row.done}</TableCell><TableCell>{row.missions}</TableCell><TableCell>{row.pending}</TableCell></> : <><TableCell className="font-bold text-emerald-700">{row.confirmed}</TableCell><TableCell>{row.indicated}</TableCell><TableCell>{row.conversionRate.toFixed(1)}%</TableCell></>}<TableCell>{row.people}</TableCell></TableRow>)}</TableBody>
+        <CardContent className="p-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead className="w-14">#</TableHead><TableHead>Coordenação</TableHead>{isMissions ? <><TableHead>Índice ajustado</TableHead><TableHead>Taxa real</TableHead><TableHead>Concluídas</TableHead><TableHead>Atribuídas</TableHead><TableHead>Pendentes</TableHead><TableHead>Situação</TableHead></> : <><TableHead>Votos confirmados</TableHead><TableHead>Indicados</TableHead><TableHead>Conversão</TableHead></>}<TableHead>Pessoas na equipe</TableHead></TableRow></TableHeader>
+          <TableBody>{rows.map((row) => <TableRow key={row.id} className={isMissions && !row.missionRankingEligible ? "opacity-70" : ""}><TableCell className="text-lg font-black">{row.position}º</TableCell><TableCell><p className="font-semibold">{row.name}</p><p className="text-xs text-muted-foreground">{row.area}</p></TableCell>{isMissions ? <><TableCell className="font-bold text-indigo-700">{row.adjustedMissionRate.toFixed(1)}</TableCell><TableCell>{row.missionRate.toFixed(1)}%</TableCell><TableCell className="font-bold text-emerald-700">{row.done}</TableCell><TableCell>{row.missions}</TableCell><TableCell>{row.pending}</TableCell><TableCell><Badge variant="outline">{row.missionRankingEligible ? "Classificado" : "Em apuração"}</Badge></TableCell></> : <><TableCell className="font-bold text-emerald-700">{row.confirmed}</TableCell><TableCell>{row.indicated}</TableCell><TableCell>{row.conversionRate.toFixed(1)}%</TableCell></>}<TableCell>{row.people}</TableCell></TableRow>)}</TableBody>
         </Table></div>{!rows.length && <p className="py-12 text-center text-sm text-muted-foreground">Nenhuma coordenação encontrada nesses filtros.</p>}</CardContent></Card>
     </div>
   );

@@ -371,13 +371,12 @@ export async function exportElectionSeparatedRankingPdf(args: {
 
   autoTable(doc, {
     startY: 184,
-    head: [["#", "Coordenação", "Região", "Equipe", isMissions ? "Concluídas" : "Votos confirmados", isMissions ? "Atribuídas" : "Indicados", isMissions ? "Pendentes" : "Conversão"]],
-    body: args.rows.map((row) => [
-      `${row.position}º`, row.name, row.area, row.people,
-      isMissions ? row.done : row.confirmed,
-      isMissions ? row.missions : row.indicated,
-      isMissions ? row.pending : `${row.conversionRate.toFixed(1)}%`,
-    ]),
+    head: [isMissions
+      ? ["#", "Coordenação", "Região", "Equipe", "Índice ajustado", "Taxa real", "Concluídas", "Atribuídas", "Pendentes", "Situação"]
+      : ["#", "Coordenação", "Região", "Equipe", "Votos confirmados", "Indicados", "Conversão"]],
+    body: args.rows.map((row) => isMissions
+      ? [`${row.position}º`, row.name, row.area, row.people, row.adjustedMissionRate.toFixed(1), `${row.missionRate.toFixed(1)}%`, row.done, row.missions, row.pending, row.missionRankingEligible ? "Classificado" : "Em apuração"]
+      : [`${row.position}º`, row.name, row.area, row.people, row.confirmed, row.indicated, `${row.conversionRate.toFixed(1)}%`]),
     theme: "striped",
     margin: { left: margin, right: margin, bottom: 28 },
     styles: { fontSize: 8, cellPadding: 5, valign: "middle" },
