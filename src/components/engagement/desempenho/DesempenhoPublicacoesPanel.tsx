@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, CalendarDays, ContactRound, FileDown, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
+import { BarChart3, CalendarDays, Check, ChevronsUpDown, ContactRound, FileDown, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
 import { fetchAudiences } from "@/lib/mission-audiences";
 import {
   fetchEquipeDesempenhoPeriodo, fetchPubKpisPeriodo, fetchPublicacoesAuditPeriodo,
@@ -20,6 +20,9 @@ import EquipeRankingPanel from "./EquipeRankingPanel";
 import MatrizCumprimentoPanel from "./MatrizCumprimentoPanel";
 import ResumoEquipesPeriodoPanel, { type TeamPeriodSummary } from "./ResumoEquipesPeriodoPanel";
 import MissionAccessManagement from "@/components/engagement/MissionAccessManagement";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 const localIsoDate = (date: Date) => {
   const year = date.getFullYear();
@@ -42,6 +45,7 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
   const [dataInicio, setDataInicio] = useState(() => daysAgoIso(6));
   const [audienceId, setAudienceId] = useState<string>("padrao");
   const [rootId, setRootId] = useState<string>("todos");
+  const [rootPickerOpen, setRootPickerOpen] = useState(false);
   const [missionId, setMissionId] = useState<string>("todas");
   const aud = audienceId === "padrao" ? null : audienceId;
   const filters = {
@@ -209,17 +213,33 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Equipe responsável</Label>
-            <Select value={rootId} onValueChange={setRootId}>
-              <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todas as equipes</SelectItem>
-                {(teamRoots.data ?? []).map((r) => (
-                  <SelectItem key={r.root_id} value={r.root_id}>
-                    {r.is_avulso ? "Líder avulso" : "Coordenador"} · {r.nome} ({r.pessoas})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={rootPickerOpen} onOpenChange={setRootPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={rootPickerOpen} className="w-[240px] justify-between px-3 font-normal">
+                  <span className="truncate">{rootId === "todos" ? "Todas as equipes" : (() => { const r = (teamRoots.data ?? []).find(item => item.root_id === rootId); return r ? `${r.is_avulso ? "Líder avulso" : "Coordenador"} · ${r.nome} (${r.pessoas})` : "Todas as equipes"; })()}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[320px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Digite o nome da pessoa..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhuma equipe encontrada.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem value="todas as equipes" onSelect={() => { setRootId("todos"); setRootPickerOpen(false); }}>
+                        <Check className={cn("h-4 w-4", rootId === "todos" ? "opacity-100" : "opacity-0")} /> Todas as equipes
+                      </CommandItem>
+                      {(teamRoots.data ?? []).map((r) => (
+                        <CommandItem key={r.root_id} value={`${r.nome} ${r.is_avulso ? "lider avulso" : "coordenador"}`} onSelect={() => { setRootId(r.root_id); setRootPickerOpen(false); }}>
+                          <Check className={cn("h-4 w-4", rootId === r.root_id ? "opacity-100" : "opacity-0")} />
+                          <span className="truncate">{r.is_avulso ? "Líder avulso" : "Coordenador"} · {r.nome} ({r.pessoas})</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Missão</Label>
