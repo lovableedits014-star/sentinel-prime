@@ -580,6 +580,38 @@ function RankingBoard({ kind, rows, exporting, onExport }: {
           </Button>
         </CardContent>
       </Card>
+      {isMissions && (
+        <Card className="border-sky-200 bg-sky-50/60 dark:bg-sky-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Como este ranking é calculado?</CardTitle>
+            <CardDescription>
+              O objetivo é comparar a qualidade do cumprimento sem favorecer equipes apenas por serem maiores.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border bg-background p-3">
+              <strong>1. Taxa real</strong>
+              <p className="mt-1 text-xs text-muted-foreground">Missões concluídas ÷ missões atribuídas. Exemplo: 8 de 10 = 80%.</p>
+            </div>
+            <div className="rounded-lg border bg-background p-3">
+              <strong>2. Índice ajustado</strong>
+              <p className="mt-1 text-xs text-muted-foreground">Combina a taxa da equipe com a média geral. O ajuste diminui distorções entre equipes pequenas e grandes.</p>
+            </div>
+            <div className="rounded-lg border bg-background p-3">
+              <strong>3. Peso de confiança</strong>
+              <p className="mt-1 text-xs text-muted-foreground">São usadas 20 obrigações como referência. Quanto mais missões a equipe possui, mais o índice se aproxima da taxa real.</p>
+            </div>
+            <div className="rounded-lg border bg-background p-3">
+              <strong>4. Entrada no pódio</strong>
+              <p className="mt-1 text-xs text-muted-foreground">Com menos de 5 obrigações, a equipe fica “Em apuração” e não disputa o pódio até possuir dados suficientes.</p>
+            </div>
+            <div className="rounded-lg border bg-background p-3 md:col-span-2 xl:col-span-4">
+              <strong>Ordem e desempate:</strong>
+              <span className="ml-1 text-muted-foreground">maior índice ajustado, maior taxa real, menos pendências, mais missões concluídas e, por último, ordem alfabética. O tamanho da equipe não soma pontos.</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {!!podiumRows.length && <div className="grid gap-3 md:grid-cols-3">{podiumRows.map((row, index) => (
         <Card key={row.id} className={index === 0 ? "border-amber-300 bg-gradient-to-b from-amber-50 to-background shadow-md" : "bg-card"}>
           <CardContent className="p-5">

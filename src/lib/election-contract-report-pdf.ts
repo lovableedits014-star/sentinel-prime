@@ -229,6 +229,20 @@ export async function exportElectionRankingPdf(args: {
   doc.setTextColor(199, 210, 254);
   doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, margin, 77);
 
+  if (isMissions) {
+    doc.setFillColor(239, 246, 255);
+    doc.roundedRect(margin, 174, width - margin * 2, 48, 6, 6, "F");
+    doc.setTextColor(30, 64, 175);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("COMO É CALCULADO", margin + 10, 190);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(51, 65, 85);
+    doc.setFontSize(8);
+    doc.text("O índice ajustado combina a taxa real da equipe com a média geral, usando peso de confiança de 20 obrigações. Equipes com menos de 5 obrigações ficam em apuração e fora do pódio.", margin + 10, 204, { maxWidth: width - margin * 2 - 20 });
+    doc.text("Desempate: índice ajustado, taxa real, menos pendências, mais concluídas e ordem alfabética. O tamanho da equipe não soma pontos.", margin + 10, 215, { maxWidth: width - margin * 2 - 20 });
+  }
+
   const summary = [
     ["Líder do ranking", args.rows[0].name],
     ["Média geral", `${average}/100`],
@@ -251,7 +265,7 @@ export async function exportElectionRankingPdf(args: {
   });
 
   autoTable(doc, {
-    startY: 184,
+    startY: isMissions ? 234 : 184,
     head: [
       [
         "#",
