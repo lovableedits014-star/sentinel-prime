@@ -203,6 +203,8 @@ interface Pessoa {
   confirmado_em?: string | null;
   participou_reuniao?: boolean;
   reuniao_em?: string | null;
+  missao_facebook_ativo?: boolean;
+  missao_instagram_ativo?: boolean;
   is_voluntario?: boolean;
   arquivado_em?: string | null;
   arquivado_por?: string | null;
@@ -305,6 +307,8 @@ export default function Eleicao() {
     rateio_parceiro: 0 as number,
     status_contratacao: "pendente" as "pendente" | "em_negociacao" | "confirmado",
     participou_reuniao: false,
+    missao_facebook_ativo: true,
+    missao_instagram_ativo: true,
   });
 
   useEffect(() => { if (clientId) load(); }, [clientId]);
@@ -353,6 +357,8 @@ export default function Eleicao() {
       rateio_parceiro: 0,
       status_contratacao: "pendente" as "pendente" | "em_negociacao" | "confirmado",
       participou_reuniao: false,
+      missao_facebook_ativo: true,
+      missao_instagram_ativo: true,
       ...presets,
     });
     setDialogOpen(true);
@@ -397,11 +403,16 @@ export default function Eleicao() {
       rateio_parceiro: p.rateio_parceiro ?? 0,
       status_contratacao: p.status_contratacao || "pendente",
       participou_reuniao: !!p.participou_reuniao,
+      missao_facebook_ativo: p.missao_facebook_ativo !== false,
+      missao_instagram_ativo: p.missao_instagram_ativo !== false,
     });
     setDialogOpen(true);
   }
 
   async function save() {
+    if (!form.missao_facebook_ativo && !form.missao_instagram_ativo) {
+      toast.error("Selecione pelo menos uma rede para as missões"); return;
+    }
     if (!form.nome.trim() || !form.telefone.trim() || !form.bairro.trim()) {
       toast.error("Nome, telefone e bairro são obrigatórios"); return;
     }
@@ -468,6 +479,8 @@ export default function Eleicao() {
       confirmado_em: statusContratacao === "confirmado" ? (editing?.confirmado_em || new Date().toISOString()) : null,
       participou_reuniao: form.participou_reuniao,
       reuniao_em: form.participou_reuniao && !editing?.participou_reuniao ? new Date().toISOString() : (editing?.reuniao_em || null),
+      missao_facebook_ativo: form.missao_facebook_ativo,
+      missao_instagram_ativo: form.missao_instagram_ativo,
     };
 
     // Dobradinha:
@@ -1736,6 +1749,35 @@ export default function Eleicao() {
               <Label>Telefone *</Label>
               <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" />
             </div>
+            {(form.tipo === "coordenador" || form.tipo === "lider") && (
+              <div className="space-y-2 rounded-md border border-blue-500/25 bg-blue-500/5 p-3">
+                <div>
+                  <Label>Redes exigidas nas missões</Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    Desmarque a rede que esta pessoa não possui. No portal aparecerão somente as redes selecionadas.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background p-2 text-sm">
+                    <Checkbox
+                      checked={form.missao_facebook_ativo}
+                      onCheckedChange={(checked) => setForm(f => ({ ...f, missao_facebook_ativo: !!checked }))}
+                    />
+                    Facebook
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background p-2 text-sm">
+                    <Checkbox
+                      checked={form.missao_instagram_ativo}
+                      onCheckedChange={(checked) => setForm(f => ({ ...f, missao_instagram_ativo: !!checked }))}
+                    />
+                    Instagram
+                  </label>
+                </div>
+                {!form.missao_facebook_ativo && !form.missao_instagram_ativo && (
+                  <p className="text-xs font-medium text-destructive">Selecione pelo menos uma rede.</p>
+                )}
+              </div>
+            )}
             {editing && (
               <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
                 <Label htmlFor="edit-valor-contratacao" className="flex items-center gap-1.5">

@@ -299,9 +299,11 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
 
             <TabsContent value="matriz">
               <MatrizCumprimentoPanel
+                clientId={clientId}
                 pessoas={equipe.data ?? []}
                 publicacoes={publicacoes.data ?? []}
                 periodoLabel={periodoLabel}
+                onChanged={recarregar}
               />
             </TabsContent>
 
