@@ -54,4 +54,11 @@ describe("buildElectionRanking", () => {
     ], "votes");
     expect(result.map((item) => item.name)).toEqual(["Ana", "Zeca"]);
   });
+
+  it("calcula a conversao como votos confirmados divididos por indicados", () => {
+    const [result] = buildElectionRanking([
+      row({ total_indicados: 20, votos_confirmados: 5, devolutivas_negativas: 100 }),
+    ], "votes");
+    expect(result.conversionRate).toBe(25);
+  });
 });

@@ -89,7 +89,7 @@ export function buildElectionRanking(
       const missionRate = team.missions ? (100 * team.done) / team.missions : 0;
       const listRate = team.indicationGoal ? (100 * team.indicated) / team.indicationGoal : 0;
       const validReturns = team.confirmed + team.negative;
-      const conversionRate = validReturns ? (100 * team.confirmed) / validReturns : 0;
+      const conversionRate = team.indicated ? (100 * team.confirmed) / team.indicated : 0;
       return {
         ...team,
         pending: Math.max(team.missions - team.done, 0),

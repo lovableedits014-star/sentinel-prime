@@ -371,12 +371,12 @@ export async function exportElectionSeparatedRankingPdf(args: {
 
   autoTable(doc, {
     startY: 184,
-    head: [["#", "Coordenação", "Região", "Equipe", isMissions ? "Concluídas" : "Votos confirmados", isMissions ? "Atribuídas" : "Indicados", isMissions ? "Pendentes" : "Observação"]],
+    head: [["#", "Coordenação", "Região", "Equipe", isMissions ? "Concluídas" : "Votos confirmados", isMissions ? "Atribuídas" : "Indicados", isMissions ? "Pendentes" : "Conversão"]],
     body: args.rows.map((row) => [
       `${row.position}º`, row.name, row.area, row.people,
       isMissions ? row.done : row.confirmed,
       isMissions ? row.missions : row.indicated,
-      isMissions ? row.pending : "Indicados não alteram a posição",
+      isMissions ? row.pending : `${row.conversionRate.toFixed(1)}%`,
     ]),
     theme: "striped",
     margin: { left: margin, right: margin, bottom: 28 },
