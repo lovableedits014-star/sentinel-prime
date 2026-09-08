@@ -19,12 +19,12 @@ export const ACCESS_PROFILES: Record<AccessProfile, { label: string; description
   gestor_campanha: {
     label: 'Gestor de Campanha',
     description: 'Apoiadores, Presenças, Territorial',
-    allowedPaths: ['/dashboard', '/supporters', '/checkins', '/territorial', '/pessoas', '/campanha', '/calendario-politico'],
+    allowedPaths: ['/dashboard', '/supporters', '/checkins', '/territorial', '/pessoas', '/campanha', '/calendario-politico', '/agenda'],
   },
   operacional: {
     label: 'Operacional',
     description: 'Presenças/Disparos e Territorial',
-    allowedPaths: ['/dashboard', '/checkins', '/territorial', '/calendario-politico'],
+    allowedPaths: ['/dashboard', '/checkins', '/territorial', '/calendario-politico', '/agenda'],
   },
 };
 
@@ -43,6 +43,7 @@ export const ALL_APP_TABS: AppTab[] = [
   { section: 'Mobilização', label: 'Funcionários', path: '/funcionarios' },
   { section: 'Mobilização', label: 'Controle de Presença', path: '/presenca' },
   { section: 'Mobilização', label: 'Calendário Político', path: '/calendario-politico' },
+  { section: 'Mobilização', label: 'Agenda', path: '/agenda' },
   { section: 'Mobilização', label: 'Telemarketing', path: '/telemarketing-admin' },
   // Operacional
   { section: 'Operacional', label: 'Central WhatsApp', path: '/whatsapp' },

@@ -73,6 +73,8 @@ const GaleriaEvento = lazy(() => import("./pages/GaleriaEvento"));
 const MissaoPublica = lazy(() => import("./pages/MissaoPublica"));
 const ReuniaoPublica = lazy(() => import("./pages/ReuniaoPublica"));
 const TrafegoPago = lazy(() => import("./pages/TrafegoPago"));
+const Agenda = lazy(() => import("./pages/Agenda"));
+const AgendaPublica = lazy(() => import("./pages/AgendaPublica"));
 
 // Wrappers de redirect para preservar links antigos
 const RedirectToCadastro = ({ extraQuery = "" }: { extraQuery?: string }) => {
@@ -142,6 +144,7 @@ const RoutesWithBoundary = () => {
             <Route path="/g/:clientSlug/:gallerySlug" element={<GaleriaEvento />} />
             <Route path="/missao/:missionId" element={<MissaoPublica />} />
             <Route path="/reuniao/:token" element={<ReuniaoPublica />} />
+            <Route path="/agenda/:clientSlug" element={<AgendaPublica />} />
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/comments" element={<Comments />} />
@@ -164,6 +167,7 @@ const RoutesWithBoundary = () => {
               <Route path="/contratados/relatorios" element={<ContratadosRelatorios />} />
               <Route path="/inteligencia-eleitoral" element={<InteligenciaEleitoral />} />
               <Route path="/calendario-politico" element={<CalendarioPolitico />} />
+              <Route path="/agenda" element={<Agenda />} />
               <Route path="/midia" element={<Midia />} />
               <Route path="/trafego-pago" element={<TrafegoPago />} />
               <Route path="/settings" element={<Settings />} />

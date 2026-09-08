@@ -84,6 +84,7 @@ const MENU_SECTIONS: MenuSection[] = [
       { icon: Users, label: "Funcionários", path: "/funcionarios" },
       { icon: CalendarCheck, label: "Controle de Presença", path: "/presenca" },
       { icon: CalendarDays, label: "Calendário Político", path: "/calendario-politico" },
+      { icon: CalendarCheck, label: "Agenda", path: "/agenda" },
       { icon: Headphones, label: "Telemarketing", path: "/telemarketing-admin" },
     ],
   },
