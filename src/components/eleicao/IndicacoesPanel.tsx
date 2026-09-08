@@ -1236,6 +1236,9 @@ function QuickAddIndicadoInline({
   const [transferTo, setTransferTo] = useState("");
   const [removing, setRemoving] = useState<any | null>(null);
   const [actionSaving, setActionSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTransferOpen, setBulkTransferOpen] = useState(false);
+  const [bulkTransferTo, setBulkTransferTo] = useState("");
 
   async function loadIndicados() {
     setLoadingList(true);
@@ -1247,7 +1250,11 @@ function QuickAddIndicadoInline({
       .order("created_at", { ascending: false });
     setLoadingList(false);
     if (error) toast.error("Não foi possível carregar os indicados.");
-    setIndicados((data as any[]) || []);
+    const next = (data as any[]) || [];
+    setIndicados(next);
+    setSelectedIds(
+      (current) => new Set([...current].filter((id) => next.some((item) => item.id === id))),
+    );
   }
   useEffect(() => {
     void loadIndicados();
@@ -1315,6 +1322,27 @@ function QuickAddIndicadoInline({
     if (error || !(data as any)?.ok) return toast.error("Não foi possível excluir o contato.");
     toast.success("Contato excluído e meta atualizada.");
     setRemoving(null);
+    await loadIndicados();
+    await onSaved();
+  }
+  async function doBulkTransfer() {
+    const ids = [...selectedIds];
+    if (!ids.length || !bulkTransferTo)
+      return toast.error("Selecione os indicados e o novo responsável.");
+    setActionSaving(true);
+    const { data, error } = await supabase.rpc("eleicao_transferir_indicados_lote" as any, {
+      _client_id: clientId,
+      _ids: ids,
+      _novo_indicador_id: bulkTransferTo,
+    });
+    setActionSaving(false);
+    if (error || !(data as any)?.ok)
+      return toast.error("Não foi possível transferir os indicados selecionados.");
+    const total = Number((data as any)?.transferidos || ids.length);
+    toast.success(`${total} indicado(s) transferido(s) e metas atualizadas.`);
+    setSelectedIds(new Set());
+    setBulkTransferOpen(false);
+    setBulkTransferTo("");
     await loadIndicados();
     await onSaved();
   }
@@ -1415,6 +1443,38 @@ function QuickAddIndicadoInline({
               exclua.
             </p>
           </div>
+          {indicados.length > 0 && (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+                <Checkbox
+                  checked={
+                    selectedIds.size === indicados.length
+                      ? true
+                      : selectedIds.size > 0
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={(checked) =>
+                    setSelectedIds(checked ? new Set(indicados.map((item) => item.id)) : new Set())
+                  }
+                />
+                Selecionar todos
+              </label>
+              <Button
+                type="button"
+                size="sm"
+                className="h-8"
+                disabled={selectedIds.size === 0}
+                onClick={() => {
+                  setBulkTransferTo("");
+                  setBulkTransferOpen(true);
+                }}
+              >
+                <ArrowRightLeft className="mr-1 h-3.5 w-3.5" />
+                Transferir selecionados ({selectedIds.size})
+              </Button>
+            </div>
+          )}
         </div>
         {loadingList ? (
           <Loader2 className="mx-auto my-3 h-4 w-4 animate-spin" />
@@ -1426,6 +1486,18 @@ function QuickAddIndicadoInline({
           <div className="max-h-64 space-y-1 overflow-y-auto">
             {indicados.map((item) => (
               <div key={item.id} className="flex flex-wrap items-center gap-2 rounded border p-2">
+                <Checkbox
+                  checked={selectedIds.has(item.id)}
+                  aria-label={`Selecionar ${item.nome}`}
+                  onCheckedChange={(checked) =>
+                    setSelectedIds((current) => {
+                      const next = new Set(current);
+                      if (checked) next.add(item.id);
+                      else next.delete(item.id);
+                      return next;
+                    })
+                  }
+                />
                 <div className="min-w-[180px] flex-1">
                   <p className="text-xs font-medium">{item.nome}</p>
                   <p className="text-[10px] text-muted-foreground">
@@ -1558,6 +1630,55 @@ function QuickAddIndicadoInline({
             <Button onClick={doTransfer} disabled={actionSaving || !transferTo}>
               {actionSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar
               transferência
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={bulkTransferOpen}
+        onOpenChange={(v) => !v && !actionSaving && setBulkTransferOpen(false)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transferir {selectedIds.size} indicado(s)</DialogTitle>
+            <DialogDescription>
+              Todos os selecionados deixarão de contar para {nomePessoa} e passarão a contar na meta
+              da pessoa escolhida. A operação é feita de uma só vez.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Novo responsável pelas indicações</Label>
+            <Select value={bulkTransferTo} onValueChange={setBulkTransferTo}>
+              <SelectTrigger>
+                <SelectValue placeholder="Escolha para quem transferir" />
+              </SelectTrigger>
+              <SelectContent>
+                {indicadores
+                  .filter((p) => p.id !== indicadorId)
+                  .sort((a, b) => a.nome.localeCompare(b.nome))
+                  .map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome} · {tipoLabel[p.tipo]}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="rounded-md bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            Confira o novo responsável antes de confirmar. As metas dos dois responsáveis serão
+            atualizadas automaticamente.
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={actionSaving}
+              onClick={() => setBulkTransferOpen(false)}
+            >
+              Voltar
+            </Button>
+            <Button disabled={actionSaving || !bulkTransferTo} onClick={doBulkTransfer}>
+              {actionSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar transferência em massa
             </Button>
           </DialogFooter>
         </DialogContent>

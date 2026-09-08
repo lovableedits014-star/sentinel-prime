@@ -15,7 +15,7 @@ BEGIN
     WHERE client_id=_client_id AND id=ANY(_ids) AND indicador_id<>_novo_indicador_id GROUP BY token_id
   LOOP
     IF v_old.token_id IS NOT NULL THEN UPDATE public.eleicao_indicacao_tokens
-      SET total_indicacoes=greatest(total_indicacoes-v_old.qtd,0) WHERE id=v_old.token_id; END IF;
+      SET total_indicacoes=greatest(total_indicacoes-v_old.qtd::integer,0) WHERE id=v_old.token_id; END IF;
   END LOOP;
   UPDATE public.eleicao_indicados SET indicador_id=_novo_indicador_id,
     indicador_tipo=(SELECT tipo FROM public.eleicao_pessoas WHERE id=_novo_indicador_id),token_id=v_new_token
