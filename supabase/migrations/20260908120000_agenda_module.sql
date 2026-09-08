@@ -118,7 +118,7 @@ CREATE OR REPLACE FUNCTION public.agenda_publica(_slug text, _inicio timestamptz
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_client public.clients; v_cfg public.agenda_configuracoes; v_events jsonb;
 BEGIN
-  SELECT * INTO v_client FROM public.clients WHERE public_slug=_slug LIMIT 1;
+  SELECT * INTO v_client FROM public.clients WHERE public_slug=_slug OR id::text=_slug LIMIT 1;
   IF v_client.id IS NULL THEN RETURN jsonb_build_object('ok',false,'motivo','nao_encontrada'); END IF;
   SELECT * INTO v_cfg FROM public.agenda_configuracoes WHERE client_id=v_client.id;
   IF v_cfg.id IS NULL OR NOT v_cfg.public_enabled THEN RETURN jsonb_build_object('ok',false,'motivo','indisponivel'); END IF;
@@ -145,7 +145,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_client_id uuid; v_tel text; v_id uuid; v_protocolo text;
 BEGIN
   SELECT c.id INTO v_client_id FROM public.clients c JOIN public.agenda_configuracoes a ON a.client_id=c.id
-    WHERE c.public_slug=_slug AND a.public_enabled=true;
+    WHERE (c.public_slug=_slug OR c.id::text=_slug) AND a.public_enabled=true;
   IF v_client_id IS NULL THEN RETURN jsonb_build_object('ok',false,'motivo','indisponivel'); END IF;
   v_tel:=regexp_replace(coalesce(_telefone,''),'\D','','g');
   IF length(trim(coalesce(_nome,'')))<3 THEN RETURN jsonb_build_object('ok',false,'motivo','nome_invalido'); END IF;
