@@ -1,5 +1,22 @@
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Phone, ExternalLink, Copy, Power, Trash2, FlaskConical, ShieldAlert, ListChecks, Users, UserCog, UserPlus, RotateCw, RefreshCcw, Pencil } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Phone,
+  ExternalLink,
+  Copy,
+  Power,
+  Trash2,
+  FlaskConical,
+  ShieldAlert,
+  ListChecks,
+  Users,
+  UserCog,
+  UserPlus,
+  RotateCw,
+  RefreshCcw,
+  Pencil,
+} from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,10 +42,17 @@ const ORIGEM_LABEL: Record<string, string> = {
   indicados_contratados: "Indicados de contratados",
 };
 
-
-interface OpCount { operador_id: string | null; operador_nome: string; pendentes: number; ligados: number }
-interface FilaOperadorResumo { operador_id: string; nome: string; marcado: boolean }
-
+interface OpCount {
+  operador_id: string | null;
+  operador_nome: string;
+  pendentes: number;
+  ligados: number;
+}
+interface FilaOperadorResumo {
+  operador_id: string;
+  nome: string;
+  marcado: boolean;
+}
 
 interface FilaResumo {
   campanha_id: string;
@@ -48,50 +72,120 @@ export default function TelemarketingAdminFilas() {
   const [loading, setLoading] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [countsMap, setCountsMap] = useState<Record<string, OpCount[]>>({});
-  const [atribDialog, setAtribDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
-  const [addDialog, setAddDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
+  const [atribDialog, setAtribDialog] = useState<{
+    open: boolean;
+    campanhaId: string;
+    nome: string;
+  }>({ open: false, campanhaId: "", nome: "" });
+  const [addDialog, setAddDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({
+    open: false,
+    campanhaId: "",
+    nome: "",
+  });
   const [operadores, setOperadores] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
-  const [fonteMap, setFonteMap] = useState<Record<string, { fonte: string | null; filtro: any }>>({});
+  const [fonteMap, setFonteMap] = useState<Record<string, { fonte: string | null; filtro: any }>>(
+    {},
+  );
   const [repopulando, setRepopulando] = useState<string | null>(null);
   const [resetando, setResetando] = useState<string | null>(null);
-  const [renameDialog, setRenameDialog] = useState<{ open: boolean; campanhaId: string; nome: string; descricao: string | null }>({ open: false, campanhaId: "", nome: "", descricao: null });
-  const [opsDialog, setOpsDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({ open: false, campanhaId: "", nome: "" });
+  const [retrabalhandoInvalidos, setRetrabalhandoInvalidos] = useState<string | null>(null);
+  const [renameDialog, setRenameDialog] = useState<{
+    open: boolean;
+    campanhaId: string;
+    nome: string;
+    descricao: string | null;
+  }>({ open: false, campanhaId: "", nome: "", descricao: null });
+  const [opsDialog, setOpsDialog] = useState<{ open: boolean; campanhaId: string; nome: string }>({
+    open: false,
+    campanhaId: "",
+    nome: "",
+  });
   const [filaOpsMap, setFilaOpsMap] = useState<Record<string, FilaOperadorResumo[]>>({});
 
   const resetarFila = async (f: FilaResumo) => {
     if (!clientId) return;
-    if (!confirm(`Resetar a fila "${f.nome}"? Os contatos que não atenderam ou pediram retorno voltam agora para a fila, sem esperar as 6h.`)) return;
+    if (
+      !confirm(
+        `Resetar a fila "${f.nome}"? Os contatos que não atenderam ou pediram retorno voltam agora para a fila, sem esperar as 6h.`,
+      )
+    )
+      return;
     setResetando(f.campanha_id);
     const { data, error } = await supabase.rpc("tele_resetar_fila" as any, {
-      _client_id: clientId, _campanha_id: f.campanha_id,
+      _client_id: clientId,
+      _campanha_id: f.campanha_id,
     });
     setResetando(null);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     const n = Number((data as any)?.reabertos || 0);
     toast[n > 0 ? "success" : "info"](
-      n > 0 ? `${n} contato(s) devolvido(s) para a fila` : "Nenhum contato aguardando retorno nesta fila"
+      n > 0
+        ? `${n} contato(s) devolvido(s) para a fila`
+        : "Nenhum contato aguardando retorno nesta fila",
     );
     load();
   };
 
-
+  const retrabalharInvalidos = async (f: FilaResumo) => {
+    if (!clientId) return;
+    if (
+      !confirm(
+        `Voltar para a fila "${f.nome}" todos os números classificados como inválidos? Eles poderão ser ligados novamente e o histórico anterior será mantido.`,
+      )
+    )
+      return;
+    setRetrabalhandoInvalidos(f.campanha_id);
+    const { data, error } = await supabase.rpc("tele_retrabalhar_invalidos_fila" as any, {
+      _client_id: clientId,
+      _campanha_id: f.campanha_id,
+    });
+    setRetrabalhandoInvalidos(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const n = Number((data as any)?.reabertos || 0);
+    toast[n > 0 ? "success" : "info"](
+      n > 0
+        ? `${n} número(s) inválido(s) voltaram para a fila`
+        : "Esta fila não possui números inválidos",
+    );
+    load();
+  };
 
   const load = async () => {
     if (!clientId) return;
     setLoading(true);
-    const { data, error } = await supabase.rpc("tele_fila_summary" as any, { _client_id: clientId });
-    if (error) { setLoading(false); toast.error(error.message); return; }
-    const list = ((data as any[]) || []).map(r => ({
-      campanha_id: r.campanha_id, nome: r.nome, descricao: r.descricao, ativo: r.ativo,
-      created_at: r.created_at, total: Number(r.total || 0), ligados: Number(r.ligados || 0),
-      pendentes: Number(r.pendentes || 0), confirmados: Number(r.confirmados || 0),
+    const { data, error } = await supabase.rpc("tele_fila_summary" as any, {
+      _client_id: clientId,
+    });
+    if (error) {
+      setLoading(false);
+      toast.error(error.message);
+      return;
+    }
+    const list = ((data as any[]) || []).map((r) => ({
+      campanha_id: r.campanha_id,
+      nome: r.nome,
+      descricao: r.descricao,
+      ativo: r.ativo,
+      created_at: r.created_at,
+      total: Number(r.total || 0),
+      ligados: Number(r.ligados || 0),
+      pendentes: Number(r.pendentes || 0),
+      confirmados: Number(r.confirmados || 0),
     }));
     setFilas(list);
     // Origem/filtros registrados em cada fila
-    const { data: camps } = await supabase.from("telemarketing_campanhas" as any)
-      .select("id, filtros").eq("client_id", clientId);
+    const { data: camps } = await supabase
+      .from("telemarketing_campanhas" as any)
+      .select("id, filtros")
+      .eq("client_id", clientId);
     const fmap: Record<string, { fonte: string | null; filtro: any }> = {};
-    ((camps as any[]) || []).forEach(c => {
+    ((camps as any[]) || []).forEach((c) => {
       const f = (c.filtros || {}) as any;
       fmap[c.id] = { fonte: f.fonte || null, filtro: f.ultimo_filtro || {} };
     });
@@ -99,19 +193,31 @@ export default function TelemarketingAdminFilas() {
     // Carrega contagem por operador em cada fila
     const map: Record<string, OpCount[]> = {};
     const opsMap: Record<string, FilaOperadorResumo[]> = {};
-    await Promise.all(list.map(async (f) => {
-      const [{ data: rows }, { data: filaOps }] = await Promise.all([
-        supabase.rpc("tele_operador_counts_por_campanha" as any, { _client_id: clientId, _campanha_id: f.campanha_id }),
-        supabase.rpc("tele_fila_operadores" as any, { _client_id: clientId, _campanha_id: f.campanha_id }),
-      ]);
-      map[f.campanha_id] = ((rows as any[]) || []).map(x => ({
-        operador_id: x.operador_id, operador_nome: x.operador_nome,
-        pendentes: Number(x.pendentes || 0), ligados: Number(x.ligados || 0),
-      }));
-      opsMap[f.campanha_id] = ((filaOps as any[]) || []).map(x => ({
-        operador_id: x.operador_id, nome: x.nome, marcado: Boolean(x.marcado),
-      }));
-    }));
+    await Promise.all(
+      list.map(async (f) => {
+        const [{ data: rows }, { data: filaOps }] = await Promise.all([
+          supabase.rpc("tele_operador_counts_por_campanha" as any, {
+            _client_id: clientId,
+            _campanha_id: f.campanha_id,
+          }),
+          supabase.rpc("tele_fila_operadores" as any, {
+            _client_id: clientId,
+            _campanha_id: f.campanha_id,
+          }),
+        ]);
+        map[f.campanha_id] = ((rows as any[]) || []).map((x) => ({
+          operador_id: x.operador_id,
+          operador_nome: x.operador_nome,
+          pendentes: Number(x.pendentes || 0),
+          ligados: Number(x.ligados || 0),
+        }));
+        opsMap[f.campanha_id] = ((filaOps as any[]) || []).map((x) => ({
+          operador_id: x.operador_id,
+          nome: x.nome,
+          marcado: Boolean(x.marcado),
+        }));
+      }),
+    );
     setCountsMap(map);
     setFilaOpsMap(opsMap);
     setLoading(false);
@@ -129,32 +235,48 @@ export default function TelemarketingAdminFilas() {
       _csv_rows: [],
     });
     setRepopulando(null);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     const total = Number((data as any)?.total || 0);
     toast[total > 0 ? "success" : "info"](
-      total > 0 ? `${total} novo(s) contato(s) adicionado(s)` : "Nenhum contato novo encontrado com o mesmo filtro"
+      total > 0
+        ? `${total} novo(s) contato(s) adicionado(s)`
+        : "Nenhum contato novo encontrado com o mesmo filtro",
     );
     load();
   };
 
-
   const loadOperadores = async () => {
     if (!clientId) return;
-    const { data } = await supabase.from("telemarketing_operadores")
-      .select("id, nome, ativo").eq("client_id", clientId).order("nome");
-    setOperadores(((data as any[]) || []).map(o => ({ id: o.id, nome: o.nome, ativo: !!o.ativo })));
+    const { data } = await supabase
+      .from("telemarketing_operadores")
+      .select("id, nome, ativo")
+      .eq("client_id", clientId)
+      .order("nome");
+    setOperadores(
+      ((data as any[]) || []).map((o) => ({ id: o.id, nome: o.nome, ativo: !!o.ativo })),
+    );
   };
 
-  useEffect(() => { load(); loadOperadores(); /* eslint-disable-next-line */ }, [clientId]);
-
+  useEffect(() => {
+    load();
+    loadOperadores(); /* eslint-disable-next-line */
+  }, [clientId]);
 
   const linkOperador = (campanhaId: string) =>
     `${window.location.origin}/telemarketing/${clientId}?campanha=${campanhaId}`;
 
   const abrirComoTeste = async (campanhaId: string) => {
     if (!clientId) return;
-    const { data, error } = await supabase.rpc("tele_ensure_test_operador" as any, { _client_id: clientId });
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.rpc("tele_ensure_test_operador" as any, {
+      _client_id: clientId,
+    });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     const creds = data as { nome: string; senha: string };
     const url = `${linkOperador(campanhaId)}&nome=${encodeURIComponent(creds.nome)}&senha=${encodeURIComponent(creds.senha)}&auto=1`;
     window.open(url, "_blank", "noopener,noreferrer");
@@ -166,14 +288,26 @@ export default function TelemarketingAdminFilas() {
   };
 
   const toggleAtivo = async (f: FilaResumo) => {
-    await supabase.from("telemarketing_campanhas" as any).update({ ativo: !f.ativo }).eq("id", f.campanha_id);
+    await supabase
+      .from("telemarketing_campanhas" as any)
+      .update({ ativo: !f.ativo })
+      .eq("id", f.campanha_id);
     load();
   };
 
   const remover = async (f: FilaResumo) => {
-    if (!confirm(`Remover a fila "${f.nome}"? Os contatos ficam, mas perdem o vínculo com esta fila.`)) return;
-    const { error } = await supabase.from("telemarketing_campanhas" as any).delete().eq("id", f.campanha_id);
-    if (error) { toast.error(error.message); return; }
+    if (
+      !confirm(`Remover a fila "${f.nome}"? Os contatos ficam, mas perdem o vínculo com esta fila.`)
+    )
+      return;
+    const { error } = await supabase
+      .from("telemarketing_campanhas" as any)
+      .delete()
+      .eq("id", f.campanha_id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("Fila removida");
     load();
   };
@@ -184,9 +318,14 @@ export default function TelemarketingAdminFilas() {
 
       <div className="mb-6 flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><ListChecks className="w-6 h-6" /> Filas de ligação</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <ListChecks className="w-6 h-6" /> Filas de ligação
+          </h1>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            Cada fila é uma lista de contatos que o operador vai chamar. Crie uma fila, escolha de onde vêm os nomes (CSV, estrutura, indicados…) e compartilhe o link com o operador. O botão <strong>Testar fila</strong> abre o portal já logado para você validar em segundos.
+            Cada fila é uma lista de contatos que o operador vai chamar. Crie uma fila, escolha de
+            onde vêm os nomes (CSV, estrutura, indicados…) e compartilhe o link com o operador. O
+            botão <strong>Testar fila</strong> abre o portal já logado para você validar em
+            segundos.
           </p>
         </div>
         <Button onClick={() => setWizardOpen(true)} size="lg" disabled={!clientId}>
@@ -195,12 +334,16 @@ export default function TelemarketingAdminFilas() {
       </div>
 
       {ctxLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Carregando contexto…</div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" /> Carregando contexto…
+        </div>
       )}
       {!ctxLoading && needsClientSelection && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-4 flex items-start gap-3">
           <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-900 dark:text-amber-200">Selecione um cliente para gerenciar filas.</p>
+          <p className="text-sm text-amber-900 dark:text-amber-200">
+            Selecione um cliente para gerenciar filas.
+          </p>
         </div>
       )}
 
@@ -215,15 +358,20 @@ export default function TelemarketingAdminFilas() {
               <CardContent className="py-12 text-center space-y-2">
                 <Phone className="w-10 h-10 mx-auto opacity-30" />
                 <p className="text-sm text-muted-foreground">Nenhuma fila criada ainda.</p>
-                <Button onClick={() => setWizardOpen(true)}><Plus className="w-4 h-4 mr-1" /> Criar primeira fila</Button>
+                <Button onClick={() => setWizardOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1" /> Criar primeira fila
+                </Button>
               </CardContent>
             </Card>
           )}
           <div className="grid md:grid-cols-2 gap-3">
-            {filas.map(f => {
+            {filas.map((f) => {
               const pct = f.total > 0 ? Math.round((f.ligados / f.total) * 100) : 0;
               const opsMarcados = (filaOpsMap[f.campanha_id] || []).filter((op) => op.marcado);
-              const nomesOps = opsMarcados.slice(0, 2).map((op) => op.nome).join(", ");
+              const nomesOps = opsMarcados
+                .slice(0, 2)
+                .map((op) => op.nome)
+                .join(", ");
               return (
                 <Card key={f.campanha_id} className={f.ativo ? "" : "opacity-60"}>
                   <CardContent className="p-4 space-y-3">
@@ -231,19 +379,30 @@ export default function TelemarketingAdminFilas() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold truncate">{f.nome}</h3>
-                          <Badge variant={f.ativo ? "default" : "secondary"} className="text-[10px]">
+                          <Badge
+                            variant={f.ativo ? "default" : "secondary"}
+                            className="text-[10px]"
+                          >
                             {f.ativo ? "Ativa" : "Pausada"}
                           </Badge>
                           {fonteMap[f.campanha_id]?.fonte && (
                             <Badge variant="outline" className="text-[10px]">
-                              {ORIGEM_LABEL[fonteMap[f.campanha_id].fonte as string] || fonteMap[f.campanha_id].fonte}
-                              {fonteMap[f.campanha_id]?.filtro?.cidade ? ` · ${fonteMap[f.campanha_id].filtro.cidade}` : ""}
+                              {ORIGEM_LABEL[fonteMap[f.campanha_id].fonte as string] ||
+                                fonteMap[f.campanha_id].fonte}
+                              {fonteMap[f.campanha_id]?.filtro?.cidade
+                                ? ` · ${fonteMap[f.campanha_id].filtro.cidade}`
+                                : ""}
                             </Badge>
                           )}
                         </div>
 
-                        {f.descricao && <p className="text-xs text-muted-foreground truncate">{f.descricao}</p>}
-                        <Badge variant={opsMarcados.length ? "outline" : "destructive"} className="mt-1 text-[10px]">
+                        {f.descricao && (
+                          <p className="text-xs text-muted-foreground truncate">{f.descricao}</p>
+                        )}
+                        <Badge
+                          variant={opsMarcados.length ? "outline" : "destructive"}
+                          className="mt-1 text-[10px]"
+                        >
                           {opsMarcados.length
                             ? `${nomesOps}${opsMarcados.length > 2 ? ` +${opsMarcados.length - 2}` : ""}`
                             : "Sem operador — ninguém liga"}
@@ -253,15 +412,32 @@ export default function TelemarketingAdminFilas() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setRenameDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome, descricao: f.descricao })}
+                          onClick={() =>
+                            setRenameDialog({
+                              open: true,
+                              campanhaId: f.campanha_id,
+                              nome: f.nome,
+                              descricao: f.descricao,
+                            })
+                          }
                           title="Renomear fila"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => toggleAtivo(f)} title={f.ativo ? "Pausar" : "Ativar"}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => toggleAtivo(f)}
+                          title={f.ativo ? "Pausar" : "Ativar"}
+                        >
                           <Power className="w-3.5 h-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => remover(f)} title="Remover">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => remover(f)}
+                          title="Remover"
+                        >
                           <Trash2 className="w-3.5 h-3.5 text-destructive" />
                         </Button>
                       </div>
@@ -269,7 +445,9 @@ export default function TelemarketingAdminFilas() {
 
                     <div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                        <span>{f.ligados} de {f.total} ligados · {f.confirmados} confirmados</span>
+                        <span>
+                          {f.ligados} de {f.total} ligados · {f.confirmados} confirmados
+                        </span>
                         <span>{pct}%</span>
                       </div>
                       <Progress value={pct} className="h-1.5" />
@@ -277,8 +455,11 @@ export default function TelemarketingAdminFilas() {
 
                     {(countsMap[f.campanha_id]?.length ?? 0) > 0 && (
                       <div className="flex flex-wrap gap-1 text-[10px]">
-                        {countsMap[f.campanha_id].map(oc => (
-                          <span key={oc.operador_id || "livre"} className="border rounded px-1.5 py-0.5 bg-muted/40">
+                        {countsMap[f.campanha_id].map((oc) => (
+                          <span
+                            key={oc.operador_id || "livre"}
+                            className="border rounded px-1.5 py-0.5 bg-muted/40"
+                          >
                             <Users className="w-2.5 h-2.5 inline-block mr-0.5 -mt-0.5" />
                             <strong>{oc.operador_nome}</strong>: {oc.pendentes} pend
                             {oc.ligados > 0 && ` · ${oc.ligados} ok`}
@@ -288,34 +469,61 @@ export default function TelemarketingAdminFilas() {
                     )}
 
                     <div className="flex gap-2 flex-wrap pt-1">
-                      <Button size="sm" variant="default" onClick={() => abrirComoTeste(f.campanha_id)}>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => abrirComoTeste(f.campanha_id)}
+                      >
                         <FlaskConical className="w-3.5 h-3.5 mr-1" /> Testar fila
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setAddDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setAddDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })
+                        }
+                      >
                         <UserPlus className="w-3.5 h-3.5 mr-1" /> Adicionar contatos
                       </Button>
                       <TeleHelp text={TELE_HELP.adicionarContatos} className="self-center" />
-                      {fonteMap[f.campanha_id]?.fonte && fonteMap[f.campanha_id].fonte !== "csv" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={repopulando === f.campanha_id}
-                          onClick={() => repopular(f)}
-                          title="Buscar novos contatos com o mesmo filtro usado antes"
-                        >
-                          {repopulando === f.campanha_id
-                            ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                            : <RotateCw className="w-3.5 h-3.5 mr-1" />} Buscar novos
-                        </Button>
-                      )}
-                      {fonteMap[f.campanha_id]?.fonte && fonteMap[f.campanha_id].fonte !== "csv" && (
-                        <TeleHelp text={TELE_HELP.buscarNovos} className="self-center" />
-                      )}
-                      <Button size="sm" variant="outline" onClick={() => setAtribDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
+                      {fonteMap[f.campanha_id]?.fonte &&
+                        fonteMap[f.campanha_id].fonte !== "csv" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={repopulando === f.campanha_id}
+                            onClick={() => repopular(f)}
+                            title="Buscar novos contatos com o mesmo filtro usado antes"
+                          >
+                            {repopulando === f.campanha_id ? (
+                              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                            ) : (
+                              <RotateCw className="w-3.5 h-3.5 mr-1" />
+                            )}{" "}
+                            Buscar novos
+                          </Button>
+                        )}
+                      {fonteMap[f.campanha_id]?.fonte &&
+                        fonteMap[f.campanha_id].fonte !== "csv" && (
+                          <TeleHelp text={TELE_HELP.buscarNovos} className="self-center" />
+                        )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setAtribDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })
+                        }
+                      >
                         <UserCog className="w-3.5 h-3.5 mr-1" /> Gerenciar designações
                       </Button>
                       <TeleHelp text={TELE_HELP.gerenciarDesignacoes} className="self-center" />
-                      <Button size="sm" variant="outline" onClick={() => setOpsDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setOpsDialog({ open: true, campanhaId: f.campanha_id, nome: f.nome })
+                        }
+                      >
                         <Users className="w-3.5 h-3.5 mr-1" /> Operadores da fila
                       </Button>
 
@@ -326,19 +534,43 @@ export default function TelemarketingAdminFilas() {
                         onClick={() => resetarFila(f)}
                         title="Devolve agora à fila quem não atendeu ou reagendou, sem esperar as 6h"
                       >
-                        {resetando === f.campanha_id
-                          ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                          : <RefreshCcw className="w-3.5 h-3.5 mr-1" />} Resetar fila
+                        {resetando === f.campanha_id ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <RefreshCcw className="w-3.5 h-3.5 mr-1" />
+                        )}{" "}
+                        Resetar fila
                       </Button>
                       <TeleHelp
                         text="Traz de volta imediatamente para a fila os contatos marcados como 'não atendeu' ou 'reagendou'. Normalmente eles voltam sozinhos após 6h; use este botão para adiantar. Quem já foi concluído não é afetado."
                         className="self-center"
                       />
 
-
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={retrabalhandoInvalidos === f.campanha_id}
+                        onClick={() => retrabalharInvalidos(f)}
+                        title="Devolve à fila os telefones classificados como inválidos"
+                      >
+                        {retrabalhandoInvalidos === f.campanha_id ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <RotateCw className="w-3.5 h-3.5 mr-1" />
+                        )}{" "}
+                        Retrabalhar inválidos
+                      </Button>
+                      <TeleHelp
+                        text="Volta para esta fila todos os números marcados como inválidos, permitindo uma nova tentativa. As tentativas e o histórico anterior continuam registrados."
+                        className="self-center"
+                      />
 
                       <Button size="sm" variant="outline" asChild>
-                        <a href={linkOperador(f.campanha_id)} target="_blank" rel="noopener noreferrer">
+                        <a
+                          href={linkOperador(f.campanha_id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           <ExternalLink className="w-3.5 h-3.5 mr-1" /> Abrir
                         </a>
                       </Button>
@@ -346,7 +578,6 @@ export default function TelemarketingAdminFilas() {
                         <Copy className="w-3.5 h-3.5 mr-1" /> Copiar link
                       </Button>
                     </div>
-
                   </CardContent>
                 </Card>
               );
@@ -367,7 +598,7 @@ export default function TelemarketingAdminFilas() {
       {clientId && atribDialog.open && (
         <AtribuicoesDialog
           open={atribDialog.open}
-          onOpenChange={(o) => setAtribDialog(s => ({ ...s, open: o }))}
+          onOpenChange={(o) => setAtribDialog((s) => ({ ...s, open: o }))}
           clientId={clientId}
           campanhaId={atribDialog.campanhaId}
           campanhaNome={atribDialog.nome}
@@ -379,7 +610,7 @@ export default function TelemarketingAdminFilas() {
       {clientId && addDialog.open && (
         <AdicionarContatosDialog
           open={addDialog.open}
-          onOpenChange={(o) => setAddDialog(s => ({ ...s, open: o }))}
+          onOpenChange={(o) => setAddDialog((s) => ({ ...s, open: o }))}
           clientId={clientId}
           campanhaId={addDialog.campanhaId}
           campanhaNome={addDialog.nome}
@@ -393,7 +624,7 @@ export default function TelemarketingAdminFilas() {
       {clientId && renameDialog.open && (
         <RenomearFilaDialog
           open={renameDialog.open}
-          onOpenChange={(o) => setRenameDialog(s => ({ ...s, open: o }))}
+          onOpenChange={(o) => setRenameDialog((s) => ({ ...s, open: o }))}
           clientId={clientId}
           campanhaId={renameDialog.campanhaId}
           nomeAtual={renameDialog.nome}
@@ -413,6 +644,4 @@ export default function TelemarketingAdminFilas() {
       )}
     </div>
   );
-
 }
-
