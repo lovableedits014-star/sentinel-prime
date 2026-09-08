@@ -49,6 +49,8 @@ import {
   FileSpreadsheet,
   FileText,
   AlertTriangle,
+  Pencil,
+  ArrowRightLeft,
 } from "lucide-react";
 import CobrancaAutoConfig from "./CobrancaAutoConfig";
 import IndicarPaginaConfig from "./IndicarPaginaConfig";
@@ -872,6 +874,9 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
                         <QuickAddIndicadoInline
                           token={r.token}
                           nomePessoa={r.nome}
+                          clientId={clientId}
+                          indicadorId={r.indicador_id}
+                          indicadores={rows.map((item) => ({ id: item.indicador_id, nome: item.nome, tipo: item.tipo }))}
                           onSaved={async () => {
                             await load();
                           }}
@@ -1202,16 +1207,63 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 function QuickAddIndicadoInline({
   token,
   nomePessoa,
+  clientId,
+  indicadorId,
+  indicadores,
   onSaved,
 }: {
   token: string;
   nomePessoa: string;
+  clientId: string;
+  indicadorId: string;
+  indicadores: { id: string; nome: string; tipo: Tipo }[];
   onSaved: () => void | Promise<void>;
 }) {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [bairro, setBairro] = useState("");
   const [saving, setSaving] = useState(false);
+  const [indicados, setIndicados] = useState<any[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ nome: "", telefone: "", bairro: "", cidade: "" });
+  const [transfer, setTransfer] = useState<any | null>(null);
+  const [transferTo, setTransferTo] = useState("");
+  const [removing, setRemoving] = useState<any | null>(null);
+  const [actionSaving, setActionSaving] = useState(false);
+
+  async function loadIndicados() {
+    setLoadingList(true);
+    const { data, error } = await supabase.from("eleicao_indicados")
+      .select("id,nome,telefone,bairro,cidade,status_telemarketing,total_tentativas")
+      .eq("client_id", clientId).eq("indicador_id", indicadorId).order("created_at", { ascending: false });
+    setLoadingList(false);
+    if (error) toast.error("Não foi possível carregar os indicados.");
+    setIndicados((data as any[]) || []);
+  }
+  useEffect(() => { void loadIndicados(); }, [clientId, indicadorId]);
+
+  function startEdit(item: any) {
+    setEditing(item); setEditForm({ nome: item.nome || "", telefone: fmtTelBR(item.telefone), bairro: item.bairro || "", cidade: item.cidade || "" });
+  }
+  async function saveEdit() {
+    if (!editing) return; const digits = editForm.telefone.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+    if (editForm.nome.trim().length < 2 || ![10, 11].includes(digits.length)) return toast.error("Informe nome e telefone válido com DDD.");
+    setActionSaving(true); const { data, error } = await supabase.rpc("eleicao_editar_indicado" as any, { _client_id: clientId, _id: editing.id, _nome: editForm.nome, _telefone: digits, _bairro: editForm.bairro || null, _cidade: editForm.cidade || null }); setActionSaving(false);
+    if (error || !(data as any)?.ok) return toast.error((data as any)?.motivo === "telefone_duplicado" ? "Esse telefone já pertence a outro indicado." : "Não foi possível salvar a alteração.");
+    toast.success("Cadastro atualizado e contato devolvido à fila de ligação."); setEditing(null); await loadIndicados(); await onSaved();
+  }
+  async function doTransfer() {
+    if (!transfer || !transferTo) return toast.error("Escolha a pessoa que receberá a indicação.");
+    setActionSaving(true); const { data, error } = await supabase.rpc("eleicao_transferir_indicado" as any, { _client_id: clientId, _id: transfer.id, _novo_indicador_id: transferTo }); setActionSaving(false);
+    if (error || !(data as any)?.ok) return toast.error("Não foi possível transferir a indicação.");
+    toast.success("Indicado transferido e metas atualizadas."); setTransfer(null); setTransferTo(""); await loadIndicados(); await onSaved();
+  }
+  async function doRemove() {
+    if (!removing) return; setActionSaving(true); const { data, error } = await supabase.rpc("eleicao_excluir_indicado" as any, { _client_id: clientId, _id: removing.id }); setActionSaving(false);
+    if (error || !(data as any)?.ok) return toast.error("Não foi possível excluir o contato.");
+    toast.success("Contato excluído e meta atualizada."); setRemoving(null); await loadIndicados(); await onSaved();
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1256,10 +1308,11 @@ function QuickAddIndicadoInline({
     setTelefone("");
     setBairro("");
     await onSaved();
+    await loadIndicados();
   }
 
   return (
-    <form onSubmit={submit} className="mt-2 rounded-md border bg-muted/30 p-2.5 space-y-2">
+    <div className="mt-2 space-y-2"><form onSubmit={submit} className="rounded-md border bg-muted/30 p-2.5 space-y-2">
       <div className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
         <UserPlus className="w-3.5 h-3.5" />
         Cadastrar voto voluntário em nome de{" "}
@@ -1298,5 +1351,13 @@ function QuickAddIndicadoInline({
         </Button>
       </div>
     </form>
+      <div className="rounded-md border bg-background p-2.5">
+        <div className="mb-2 flex items-center justify-between"><div><p className="text-xs font-semibold">Indicados cadastrados ({indicados.length})</p><p className="text-[10px] text-muted-foreground">Edite telefone ou dados para devolver o contato à fila, transfira para outra pessoa ou exclua.</p></div></div>
+        {loadingList ? <Loader2 className="mx-auto my-3 h-4 w-4 animate-spin" /> : indicados.length === 0 ? <p className="py-2 text-center text-xs text-muted-foreground">Nenhum indicado cadastrado.</p> : <div className="max-h-64 space-y-1 overflow-y-auto">{indicados.map((item) => <div key={item.id} className="flex flex-wrap items-center gap-2 rounded border p-2"><div className="min-w-[180px] flex-1"><p className="text-xs font-medium">{item.nome}</p><p className="text-[10px] text-muted-foreground">{fmtTelBR(item.telefone)}{item.bairro ? ` · ${item.bairro}` : ""} · {item.status_telemarketing || "pendente"}</p></div><Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => startEdit(item)}><Pencil className="mr-1 h-3 w-3" />Editar</Button><Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setTransfer(item); setTransferTo(""); }}><ArrowRightLeft className="mr-1 h-3 w-3" />Transferir</Button><Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={() => setRemoving(item)}><Trash2 className="mr-1 h-3 w-3" />Excluir</Button></div>)}</div>}
+      </div>
+      <Dialog open={!!editing} onOpenChange={(v) => !v && !actionSaving && setEditing(null)}><DialogContent><DialogHeader><DialogTitle>Editar indicado</DialogTitle><DialogDescription>Ao salvar, o contato voltará automaticamente para a fila de ligação. Tentativas e resultado anteriores serão reiniciados, mas o histórico de ligações continuará disponível.</DialogDescription></DialogHeader><div className="grid gap-3 sm:grid-cols-2"><div className="sm:col-span-2"><Label>Nome completo</Label><Input value={editForm.nome} onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} /></div><div><Label>Telefone com DDD</Label><Input inputMode="tel" value={editForm.telefone} onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })} /></div><div><Label>Bairro</Label><Input value={editForm.bairro} onChange={(e) => setEditForm({ ...editForm, bairro: e.target.value })} /></div><div className="sm:col-span-2"><Label>Cidade</Label><Input value={editForm.cidade} onChange={(e) => setEditForm({ ...editForm, cidade: e.target.value })} /></div></div><DialogFooter><Button variant="outline" onClick={() => setEditing(null)} disabled={actionSaving}>Voltar</Button><Button onClick={saveEdit} disabled={actionSaving}>{actionSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Salvar e voltar para a fila</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={!!transfer} onOpenChange={(v) => !v && !actionSaving && setTransfer(null)}><DialogContent><DialogHeader><DialogTitle>Transferir indicado</DialogTitle><DialogDescription>{transfer?.nome} deixará de contar para {nomePessoa} e passará a contar na meta da pessoa escolhida.</DialogDescription></DialogHeader><div><Label>Transferir para</Label><Select value={transferTo} onValueChange={setTransferTo}><SelectTrigger><SelectValue placeholder="Escolha o novo responsável" /></SelectTrigger><SelectContent>{indicadores.filter((p) => p.id !== indicadorId).sort((a,b) => a.nome.localeCompare(b.nome)).map((p) => <SelectItem key={p.id} value={p.id}>{p.nome} · {tipoLabel[p.tipo]}</SelectItem>)}</SelectContent></Select></div><DialogFooter><Button variant="outline" onClick={() => setTransfer(null)} disabled={actionSaving}>Voltar</Button><Button onClick={doTransfer} disabled={actionSaving || !transferTo}>{actionSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar transferência</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={!!removing} onOpenChange={(v) => !v && !actionSaving && setRemoving(null)}><DialogContent><DialogHeader><DialogTitle>Excluir contato indicado?</DialogTitle><DialogDescription>Esta ação remove {removing?.nome} da lista e reduz a meta contabilizada de {nomePessoa}. Não poderá ser desfeita.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setRemoving(null)} disabled={actionSaving}>Voltar</Button><Button variant="destructive" onClick={doRemove} disabled={actionSaving}>{actionSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Excluir definitivamente</Button></DialogFooter></DialogContent></Dialog>
+    </div>
   );
 }
