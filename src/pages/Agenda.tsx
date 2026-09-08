@@ -94,7 +94,7 @@ export default function Agenda(){
       ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=color;ctx.fillRect(0,0,1080,28);
       let headerX=72;
       if(client?.logo_url){try{const logo=new window.Image();logo.crossOrigin="anonymous";await new Promise<void>((resolve,reject)=>{logo.onload=()=>resolve();logo.onerror=()=>reject();logo.src=client.logo_url});ctx.drawImage(logo,72,70,110,110);headerX=210}catch{/* A imagem continua válida mesmo se o servidor da logo bloquear CORS. */}}
-      ctx.fillStyle="#0f172a";ctx.font="600 30px Arial";ctx.fillText(client?.name||"Candidato",headerX,105);ctx.font="800 52px Arial";ctx.fillText("ROTEIRO DO DIA",headerX,170);
+      ctx.fillStyle="#0f172a";ctx.font="800 52px Arial";ctx.fillText("ROTEIRO DO DIA",headerX,145);
       ctx.strokeStyle="#cbd5e1";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(72,220);ctx.lineTo(1008,220);ctx.stroke();
       ctx.font="600 38px Arial";ctx.fillStyle="#0f172a";ctx.fillText(pretty(day),72,285);
       let y=365;
