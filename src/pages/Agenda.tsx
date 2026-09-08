@@ -10,125 +10,1133 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, CircleHelp, Clock, Copy, Download, ExternalLink, Image, MapPin, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserRoundCheck, X } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  Clock,
+  Copy,
+  Download,
+  ExternalLink,
+  Image,
+  MapPin,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Settings,
+  Trash2,
+  UserRoundCheck,
+  X,
+} from "lucide-react";
 
-type EventRow = { id:string; solicitacao_id:string|null; titulo:string; categoria:string; descricao_publica:string|null; observacoes_internas:string|null; inicio_em:string; fim_em:string; local:string|null; contato_nome:string|null; contato_telefone:string|null; endereco_completo:string|null; visibilidade:string; status:string; mensagem_cancelamento_publica:string|null; exibir_cancelamento_publico:boolean; manter_horario_bloqueado:boolean };
-type RequestRow = { id:string; protocolo:string; nome:string; telefone:string; email:string|null; assunto:string; descricao:string|null; inicio_solicitado_em:string; fim_solicitado_em:string; modalidade:string; local:string|null; quantidade_pessoas:number|null; status:string; created_at:string };
-const blank = { titulo:"", data:"", inicio:"09:00", fim:"10:00", local:"", contato_nome:"", contato_telefone:"", endereco_completo:"", descricao_publica:"", observacoes_internas:"", visibilidade:"resumido", categoria:"compromisso" };
-const pad=(n:number)=>String(n).padStart(2,"0");
-const ymd=(d:Date)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const at=(iso:string)=>new Date(iso).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-const pretty=(date:string)=>new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
-const statusLabel:Record<string,string>={em_analise:"Em análise",aprovada:"Aprovada",recusada:"Recusada",horario_proposto:"Outro horário proposto",cancelada_equipe:"Cancelada pela equipe"};
+type EventRow = {
+  id: string;
+  solicitacao_id: string | null;
+  titulo: string;
+  categoria: string;
+  descricao_publica: string | null;
+  observacoes_internas: string | null;
+  inicio_em: string;
+  fim_em: string;
+  local: string | null;
+  contato_nome: string | null;
+  contato_telefone: string | null;
+  endereco_completo: string | null;
+  visibilidade: string;
+  status: string;
+  mensagem_cancelamento_publica: string | null;
+  exibir_cancelamento_publico: boolean;
+  manter_horario_bloqueado: boolean;
+};
+type RequestRow = {
+  id: string;
+  protocolo: string;
+  nome: string;
+  telefone: string;
+  email: string | null;
+  assunto: string;
+  descricao: string | null;
+  inicio_solicitado_em: string;
+  fim_solicitado_em: string;
+  modalidade: string;
+  local: string | null;
+  quantidade_pessoas: number | null;
+  status: string;
+  created_at: string;
+};
+const blank = {
+  titulo: "",
+  data: "",
+  inicio: "09:00",
+  fim: "10:00",
+  local: "",
+  contato_nome: "",
+  contato_telefone: "",
+  endereco_completo: "",
+  descricao_publica: "",
+  observacoes_internas: "",
+  visibilidade: "publico",
+  categoria: "compromisso",
+};
+const pad = (n: number) => String(n).padStart(2, "0");
+const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const at = (iso: string) =>
+  new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+const pretty = (date: string) =>
+  new Date(`${date}T12:00:00`).toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+const statusLabel: Record<string, string> = {
+  em_analise: "Em análise",
+  aprovada: "Aprovada",
+  recusada: "Recusada",
+  horario_proposto: "Outro horário proposto",
+  cancelada_equipe: "Cancelada pela equipe",
+};
 
-export default function Agenda(){
-  const {clientId,isLoading}=useActiveClientId();
-  const [events,setEvents]=useState<EventRow[]>([]),[requests,setRequests]=useState<RequestRow[]>([]);
-  const [client,setClient]=useState<any>(null),[config,setConfig]=useState<any>(null),[loading,setLoading]=useState(true);
-  const [day,setDay]=useState(ymd(new Date())),[cursor,setCursor]=useState(new Date(new Date().getFullYear(),new Date().getMonth(),1));
-  const [eventOpen,setEventOpen]=useState(false),[form,setForm]=useState({...blank,data:ymd(new Date())}),[editId,setEditId]=useState<string|null>(null);
-  const [requestOpen,setRequestOpen]=useState<RequestRow|null>(null),[cancelEvent,setCancelEvent]=useState<EventRow|null>(null),[deleteEvent,setDeleteEvent]=useState<EventRow|null>(null),[deleting,setDeleting]=useState(false);
-  const [cancelReason,setCancelReason]=useState(""),[cancelPublic,setCancelPublic]=useState(""),[showCancelled,setShowCancelled]=useState(true),[keepBlocked,setKeepBlocked]=useState(false),[generatingImage,setGeneratingImage]=useState(false);
+export default function Agenda() {
+  const { clientId, isLoading } = useActiveClientId();
+  const [events, setEvents] = useState<EventRow[]>([]),
+    [requests, setRequests] = useState<RequestRow[]>([]);
+  const [client, setClient] = useState<any>(null),
+    [config, setConfig] = useState<any>(null),
+    [loading, setLoading] = useState(true);
+  const [day, setDay] = useState(ymd(new Date())),
+    [cursor, setCursor] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [eventOpen, setEventOpen] = useState(false),
+    [form, setForm] = useState({ ...blank, data: ymd(new Date()) }),
+    [editId, setEditId] = useState<string | null>(null);
+  const [requestOpen, setRequestOpen] = useState<RequestRow | null>(null),
+    [cancelEvent, setCancelEvent] = useState<EventRow | null>(null),
+    [deleteEvent, setDeleteEvent] = useState<EventRow | null>(null),
+    [deleting, setDeleting] = useState(false);
+  const [cancelReason, setCancelReason] = useState(""),
+    [cancelPublic, setCancelPublic] = useState(""),
+    [showCancelled, setShowCancelled] = useState(true),
+    [keepBlocked, setKeepBlocked] = useState(false),
+    [generatingImage, setGeneratingImage] = useState(false);
 
-  const load=useCallback(async()=>{
-    if(!clientId)return; setLoading(true);
-    let {data:cfg}=await supabase.from("agenda_configuracoes" as any).select("*").eq("client_id",clientId).maybeSingle();
-    if(!cfg){ const {data:newCfg,error}=await supabase.from("agenda_configuracoes" as any).insert({client_id:clientId}).select().single(); if(error) toast.error("Não foi possível preparar a Agenda: "+error.message); cfg=newCfg; }
-    const start=new Date(cursor.getFullYear(),cursor.getMonth()-1,1).toISOString(), end=new Date(cursor.getFullYear(),cursor.getMonth()+2,1).toISOString();
-    const [ev,rq,cl]=await Promise.all([
-      supabase.from("agenda_eventos" as any).select("*").eq("client_id",clientId).gte("inicio_em",start).lt("inicio_em",end).order("inicio_em"),
-      supabase.from("agenda_solicitacoes" as any).select("*").eq("client_id",clientId).order("created_at",{ascending:false}),
-      supabase.from("clients").select("name,logo_url,public_slug,public_base_url").eq("id",clientId).single(),
+  const load = useCallback(async () => {
+    if (!clientId) return;
+    setLoading(true);
+    let { data: cfg } = await supabase
+      .from("agenda_configuracoes" as any)
+      .select("*")
+      .eq("client_id", clientId)
+      .maybeSingle();
+    if (!cfg) {
+      const { data: newCfg, error } = await supabase
+        .from("agenda_configuracoes" as any)
+        .insert({ client_id: clientId })
+        .select()
+        .single();
+      if (error) toast.error("Não foi possível preparar a Agenda: " + error.message);
+      cfg = newCfg;
+    }
+    const start = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1).toISOString(),
+      end = new Date(cursor.getFullYear(), cursor.getMonth() + 2, 1).toISOString();
+    const [ev, rq, cl] = await Promise.all([
+      supabase
+        .from("agenda_eventos" as any)
+        .select("*")
+        .eq("client_id", clientId)
+        .gte("inicio_em", start)
+        .lt("inicio_em", end)
+        .order("inicio_em"),
+      supabase
+        .from("agenda_solicitacoes" as any)
+        .select("*")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("clients")
+        .select("name,logo_url,public_slug,public_base_url")
+        .eq("id", clientId)
+        .single(),
     ]);
-    setConfig(cfg); setEvents((ev.data as any)||[]); setRequests((rq.data as any)||[]); setClient(cl.data); setLoading(false);
-  },[clientId,cursor]);
-  useEffect(()=>{load()},[load]);
-  useEffect(()=>{if(!clientId)return; const ch=supabase.channel(`agenda-${clientId}`).on("postgres_changes",{event:"*",schema:"public",table:"agenda_solicitacoes",filter:`client_id=eq.${clientId}`},()=>load()).subscribe(); return()=>{supabase.removeChannel(ch)}},[clientId,load]);
+    setConfig(cfg);
+    setEvents((ev.data as any) || []);
+    setRequests((rq.data as any) || []);
+    setClient(cl.data);
+    setLoading(false);
+  }, [clientId, cursor]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  useEffect(() => {
+    if (!clientId) return;
+    const ch = supabase
+      .channel(`agenda-${clientId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "agenda_solicitacoes",
+          filter: `client_id=eq.${clientId}`,
+        },
+        () => load(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [clientId, load]);
 
-  const selected=useMemo(()=>events.filter(e=>ymd(new Date(e.inicio_em))===day).sort((a,b)=>a.inicio_em.localeCompare(b.inicio_em)),[events,day]);
-  const pending=requests.filter(r=>r.status==="em_analise");
-  const first=new Date(cursor.getFullYear(),cursor.getMonth(),1), offset=(first.getDay()+6)%7, count=new Date(cursor.getFullYear(),cursor.getMonth()+1,0).getDate();
-  const cells=Array.from({length:42},(_,i)=>{const n=i-offset+1;return n>0&&n<=count?new Date(cursor.getFullYear(),cursor.getMonth(),n):null});
+  const selected = useMemo(
+    () =>
+      events
+        .filter((e) => ymd(new Date(e.inicio_em)) === day)
+        .sort((a, b) => a.inicio_em.localeCompare(b.inicio_em)),
+    [events, day],
+  );
+  const pending = requests.filter((r) => r.status === "em_analise");
+  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1),
+    offset = (first.getDay() + 6) % 7,
+    count = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+  const cells = Array.from({ length: 42 }, (_, i) => {
+    const n = i - offset + 1;
+    return n > 0 && n <= count ? new Date(cursor.getFullYear(), cursor.getMonth(), n) : null;
+  });
   // Clientes antigos podem não ter public_slug. O ID também é aceito pelas RPCs
   // públicas e garante que todo cliente tenha um link compartilhável imediatamente.
-  const publicKey=client?.public_slug||clientId;
-  const publicUrl=publicKey?`${resolvePublicBaseUrl(client).url}/agenda/${publicKey}`:"";
+  const publicKey = client?.public_slug || clientId;
+  const publicUrl = publicKey ? `${resolvePublicBaseUrl(client).url}/agenda/${publicKey}` : "";
 
-  function openNew(){setEditId(null);setForm({...blank,data:day});setEventOpen(true)}
-  function openEdit(e:EventRow){const s=new Date(e.inicio_em),f=new Date(e.fim_em);setEditId(e.id);setForm({titulo:e.titulo,data:ymd(s),inicio:`${pad(s.getHours())}:${pad(s.getMinutes())}`,fim:`${pad(f.getHours())}:${pad(f.getMinutes())}`,local:e.local||"",contato_nome:e.contato_nome||"",contato_telefone:e.contato_telefone||"",endereco_completo:e.endereco_completo||e.local||"",descricao_publica:e.descricao_publica||"",observacoes_internas:e.observacoes_internas||"",visibilidade:e.visibilidade,categoria:e.categoria});setEventOpen(true)}
-  async function saveEvent(){if(!clientId||form.titulo.trim().length<3)return toast.error("Informe um título fácil de identificar.");const inicio=new Date(`${form.data}T${form.inicio}:00`),fim=new Date(`${form.data}T${form.fim}:00`);if(fim<=inicio)return toast.error("O horário final deve ser depois do inicial.");
-    const conflict=events.some(e=>e.id!==editId&&(e.status!=="cancelado"||e.manter_horario_bloqueado)&&new Date(e.inicio_em)<fim&&new Date(e.fim_em)>inicio);if(conflict&&!confirm("Já existe outro compromisso ou bloqueio nesse horário. Deseja salvar mesmo assim?"))return;
-    const payload={client_id:clientId,titulo:form.titulo.trim(),categoria:form.categoria,descricao_publica:form.descricao_publica||null,observacoes_internas:form.observacoes_internas||null,inicio_em:inicio.toISOString(),fim_em:fim.toISOString(),local:form.local||null,contato_nome:form.contato_nome||null,contato_telefone:normalizeBRPhone(form.contato_telefone)||null,endereco_completo:form.endereco_completo||form.local||null,visibilidade:form.visibilidade,status:"confirmado"};
-    const q=editId?supabase.from("agenda_eventos" as any).update(payload).eq("id",editId):supabase.from("agenda_eventos" as any).insert(payload);const {error}=await q;if(error)return toast.error(error.message);toast.success(editId?"Compromisso atualizado.":"Compromisso adicionado à agenda.");setEventOpen(false);setDay(form.data);load();}
-  async function decide(r:RequestRow,status:"aprovada"|"recusada"){
-    if(!clientId)return;if(status==="aprovada"){const {data:event,error}=await supabase.from("agenda_eventos" as any).insert({client_id:clientId,solicitacao_id:r.id,titulo:r.assunto,inicio_em:r.inicio_solicitado_em,fim_em:r.fim_solicitado_em,local:r.local,endereco_completo:r.local,contato_nome:r.nome,contato_telefone:r.telefone,descricao_publica:r.descricao,observacoes_internas:r.descricao,visibilidade:"resumido",status:"confirmado"}).select("id").single();if(error)return toast.error(error.message);await supabase.from("agenda_historico" as any).insert({client_id:clientId,evento_id:(event as any).id,solicitacao_id:r.id,acao:"solicitacao_aprovada"});}
-    const {error}=await supabase.from("agenda_solicitacoes" as any).update({status,analisada_em:new Date().toISOString()}).eq("id",r.id);if(error)return toast.error(error.message);toast.success(status==="aprovada"?"Aprovada e adicionada à agenda.":"Solicitação recusada.");setRequestOpen(null);load();}
-  async function cancel(){if(!cancelEvent||cancelReason.trim().length<3)return toast.error("Explique o motivo interno do cancelamento.");const {error}=await supabase.from("agenda_eventos" as any).update({status:"cancelado",cancelado_em:new Date().toISOString(),motivo_cancelamento_interno:cancelReason,mensagem_cancelamento_publica:cancelPublic||null,exibir_cancelamento_publico:showCancelled,manter_horario_bloqueado:keepBlocked}).eq("id",cancelEvent.id);if(error)return toast.error(error.message);if(cancelEvent.solicitacao_id)await supabase.from("agenda_solicitacoes" as any).update({status:"cancelada_equipe",motivo_decisao:cancelReason,mensagem_resposta:cancelPublic||null}).eq("id",cancelEvent.solicitacao_id);toast.success("Evento cancelado. O histórico foi preservado.");setCancelEvent(null);setCancelReason("");load();}
-  async function restore(e:EventRow){const conflict=events.some(x=>x.id!==e.id&&x.status!=="cancelado"&&new Date(x.inicio_em)<new Date(e.fim_em)&&new Date(x.fim_em)>new Date(e.inicio_em));if(conflict)return toast.error("Não é possível restaurar: esse horário agora possui outro compromisso.");await supabase.from("agenda_eventos" as any).update({status:"confirmado",cancelado_em:null,motivo_cancelamento_interno:null}).eq("id",e.id);toast.success("Evento restaurado.");load()}
-  async function removeEvent(){
-    if(!deleteEvent||!clientId)return;
-    setDeleting(true);
-    const linkedRequest=deleteEvent.solicitacao_id;
-    const {error}=await supabase.from("agenda_eventos" as any).delete().eq("id",deleteEvent.id).eq("client_id",clientId);
-    if(error){setDeleting(false);return toast.error("Não foi possível excluir: "+error.message)}
-    if(linkedRequest){
-      await supabase.from("agenda_solicitacoes" as any).update({status:"cancelada_equipe",motivo_decisao:"Compromisso excluído da agenda"}).eq("id",linkedRequest);
-      await supabase.from("agenda_historico" as any).insert({client_id:clientId,solicitacao_id:linkedRequest,acao:"evento_excluido",detalhes:{titulo:deleteEvent.titulo,inicio_em:deleteEvent.inicio_em}});
-    }
-    setDeleting(false);setDeleteEvent(null);toast.success("Compromisso excluído definitivamente da agenda.");load();
+  function openNew() {
+    setEditId(null);
+    setForm({ ...blank, data: day });
+    setEventOpen(true);
   }
-  async function downloadImage(){
+  function openEdit(e: EventRow) {
+    const s = new Date(e.inicio_em),
+      f = new Date(e.fim_em);
+    setEditId(e.id);
+    setForm({
+      titulo: e.titulo,
+      data: ymd(s),
+      inicio: `${pad(s.getHours())}:${pad(s.getMinutes())}`,
+      fim: `${pad(f.getHours())}:${pad(f.getMinutes())}`,
+      local: e.local || "",
+      contato_nome: e.contato_nome || "",
+      contato_telefone: e.contato_telefone || "",
+      endereco_completo: e.endereco_completo || e.local || "",
+      descricao_publica: e.descricao_publica || "",
+      observacoes_internas: e.observacoes_internas || "",
+      visibilidade: e.visibilidade,
+      categoria: e.categoria,
+    });
+    setEventOpen(true);
+  }
+  async function saveEvent() {
+    if (!clientId || form.titulo.trim().length < 3)
+      return toast.error("Informe um título fácil de identificar.");
+    const inicio = new Date(`${form.data}T${form.inicio}:00`),
+      fim = new Date(`${form.data}T${form.fim}:00`);
+    if (fim <= inicio) return toast.error("O horário final deve ser depois do inicial.");
+    const conflict = events.some(
+      (e) =>
+        e.id !== editId &&
+        (e.status !== "cancelado" || e.manter_horario_bloqueado) &&
+        new Date(e.inicio_em) < fim &&
+        new Date(e.fim_em) > inicio,
+    );
+    if (
+      conflict &&
+      !confirm("Já existe outro compromisso ou bloqueio nesse horário. Deseja salvar mesmo assim?")
+    )
+      return;
+    const payload = {
+      client_id: clientId,
+      titulo: form.titulo.trim(),
+      categoria: form.categoria,
+      descricao_publica: form.descricao_publica || null,
+      observacoes_internas: form.observacoes_internas || null,
+      inicio_em: inicio.toISOString(),
+      fim_em: fim.toISOString(),
+      local: form.local || null,
+      contato_nome: form.contato_nome || null,
+      contato_telefone: normalizeBRPhone(form.contato_telefone) || null,
+      endereco_completo: form.endereco_completo || form.local || null,
+      visibilidade: "publico",
+      status: "confirmado",
+    };
+    const q = editId
+      ? supabase
+          .from("agenda_eventos" as any)
+          .update(payload)
+          .eq("id", editId)
+      : supabase.from("agenda_eventos" as any).insert(payload);
+    const { error } = await q;
+    if (error) return toast.error(error.message);
+    toast.success(editId ? "Compromisso atualizado." : "Compromisso adicionado à agenda.");
+    setEventOpen(false);
+    setDay(form.data);
+    load();
+  }
+  async function decide(r: RequestRow, status: "aprovada" | "recusada") {
+    if (!clientId) return;
+    if (status === "aprovada") {
+      const { data: event, error } = await supabase
+        .from("agenda_eventos" as any)
+        .insert({
+          client_id: clientId,
+          solicitacao_id: r.id,
+          titulo: r.assunto,
+          inicio_em: r.inicio_solicitado_em,
+          fim_em: r.fim_solicitado_em,
+          local: r.local,
+          endereco_completo: r.local,
+          contato_nome: r.nome,
+          contato_telefone: r.telefone,
+          descricao_publica: r.descricao,
+          observacoes_internas: r.descricao,
+          visibilidade: "publico",
+          status: "confirmado",
+        })
+        .select("id")
+        .single();
+      if (error) return toast.error(error.message);
+      await supabase
+        .from("agenda_historico" as any)
+        .insert({
+          client_id: clientId,
+          evento_id: (event as any).id,
+          solicitacao_id: r.id,
+          acao: "solicitacao_aprovada",
+        });
+    }
+    const { error } = await supabase
+      .from("agenda_solicitacoes" as any)
+      .update({ status, analisada_em: new Date().toISOString() })
+      .eq("id", r.id);
+    if (error) return toast.error(error.message);
+    toast.success(
+      status === "aprovada" ? "Aprovada e adicionada à agenda." : "Solicitação recusada.",
+    );
+    setRequestOpen(null);
+    load();
+  }
+  async function cancel() {
+    if (!cancelEvent || cancelReason.trim().length < 3)
+      return toast.error("Explique o motivo interno do cancelamento.");
+    const { error } = await supabase
+      .from("agenda_eventos" as any)
+      .update({
+        status: "cancelado",
+        cancelado_em: new Date().toISOString(),
+        motivo_cancelamento_interno: cancelReason,
+        mensagem_cancelamento_publica: cancelPublic || null,
+        exibir_cancelamento_publico: showCancelled,
+        manter_horario_bloqueado: keepBlocked,
+      })
+      .eq("id", cancelEvent.id);
+    if (error) return toast.error(error.message);
+    if (cancelEvent.solicitacao_id)
+      await supabase
+        .from("agenda_solicitacoes" as any)
+        .update({
+          status: "cancelada_equipe",
+          motivo_decisao: cancelReason,
+          mensagem_resposta: cancelPublic || null,
+        })
+        .eq("id", cancelEvent.solicitacao_id);
+    toast.success("Evento cancelado. O histórico foi preservado.");
+    setCancelEvent(null);
+    setCancelReason("");
+    load();
+  }
+  async function restore(e: EventRow) {
+    const conflict = events.some(
+      (x) =>
+        x.id !== e.id &&
+        x.status !== "cancelado" &&
+        new Date(x.inicio_em) < new Date(e.fim_em) &&
+        new Date(x.fim_em) > new Date(e.inicio_em),
+    );
+    if (conflict)
+      return toast.error("Não é possível restaurar: esse horário agora possui outro compromisso.");
+    await supabase
+      .from("agenda_eventos" as any)
+      .update({ status: "confirmado", cancelado_em: null, motivo_cancelamento_interno: null })
+      .eq("id", e.id);
+    toast.success("Evento restaurado.");
+    load();
+  }
+  async function removeEvent() {
+    if (!deleteEvent || !clientId) return;
+    setDeleting(true);
+    const linkedRequest = deleteEvent.solicitacao_id;
+    const { error } = await supabase
+      .from("agenda_eventos" as any)
+      .delete()
+      .eq("id", deleteEvent.id)
+      .eq("client_id", clientId);
+    if (error) {
+      setDeleting(false);
+      return toast.error("Não foi possível excluir: " + error.message);
+    }
+    if (linkedRequest) {
+      await supabase
+        .from("agenda_solicitacoes" as any)
+        .update({ status: "cancelada_equipe", motivo_decisao: "Compromisso excluído da agenda" })
+        .eq("id", linkedRequest);
+      await supabase
+        .from("agenda_historico" as any)
+        .insert({
+          client_id: clientId,
+          solicitacao_id: linkedRequest,
+          acao: "evento_excluido",
+          detalhes: { titulo: deleteEvent.titulo, inicio_em: deleteEvent.inicio_em },
+        });
+    }
+    setDeleting(false);
+    setDeleteEvent(null);
+    toast.success("Compromisso excluído definitivamente da agenda.");
+    load();
+  }
+  async function downloadImage() {
     setGeneratingImage(true);
-    try{
+    try {
       // Esta é uma folha operacional privada para o motorista, portanto inclui
       // também dados que nunca aparecem na página pública.
-      const printable=selected.filter(e=>e.status!=="rascunho");
-      const canvas=document.createElement("canvas"); canvas.width=1080; canvas.height=Math.max(1920,430+printable.length*260);
-      const ctx=canvas.getContext("2d"); if(!ctx)throw new Error("Canvas indisponível");
-      const color=config?.cor_primaria||"#2563eb";
-      const line=(text:string,x:number,y:number,maxWidth:number,lineHeight:number,maxLines=2)=>{const words=text.split(/\s+/);let current="",used=0;for(const word of words){const test=current?`${current} ${word}`:word;if(ctx.measureText(test).width>maxWidth&&current){ctx.fillText(current,x,y+used*lineHeight);used++;current=word;if(used>=maxLines)return used*lineHeight}else current=test}if(current&&used<maxLines){ctx.fillText(current,x,y+used*lineHeight);used++}return used*lineHeight};
-      ctx.fillStyle="#ffffff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle=color;ctx.fillRect(0,0,1080,28);
-      let headerX=72;
-      if(client?.logo_url){try{const logo=new window.Image();logo.crossOrigin="anonymous";await new Promise<void>((resolve,reject)=>{logo.onload=()=>resolve();logo.onerror=()=>reject();logo.src=client.logo_url});ctx.drawImage(logo,72,70,110,110);headerX=210}catch{/* A imagem continua válida mesmo se o servidor da logo bloquear CORS. */}}
-      ctx.fillStyle="#0f172a";ctx.font="800 52px Arial";ctx.fillText("ROTEIRO DO DIA",headerX,145);
-      ctx.strokeStyle="#cbd5e1";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(72,220);ctx.lineTo(1008,220);ctx.stroke();
-      ctx.font="600 38px Arial";ctx.fillStyle="#0f172a";ctx.fillText(pretty(day),72,285);
-      let y=365;
-      if(!printable.length){ctx.font="30px Arial";ctx.fillStyle="#64748b";ctx.fillText("Nenhum compromisso cadastrado para este dia.",72,y)}
-      for(const e of printable){
-        const linked=requests.find(r=>r.id===e.solicitacao_id);const contact=e.contato_nome||linked?.nome||"Não informado";const phone=e.contato_telefone||linked?.telefone||"Não informado";const address=e.endereco_completo||e.local||linked?.local||"Endereço não informado";
-        ctx.fillStyle=e.status==="cancelado"?"#fff1f2":"#f8fafc";ctx.fillRect(62,y-45,956,225);ctx.fillStyle=e.status==="cancelado"?"#ef4444":color;ctx.fillRect(62,y-45,9,225);
-        ctx.fillStyle="#0f172a";ctx.font="700 30px Arial";line(`${at(e.inicio_em)}–${at(e.fim_em)}  ·  ${e.titulo}`,92,y,885,36,2);
-        ctx.font="25px Arial";ctx.fillStyle="#334155";ctx.fillText(`CONTATO: ${contact}`,92,y+75);ctx.fillText(`TELEFONE: ${fmtPhoneBR(normalizeBRPhone(phone))||phone}`,92,y+112);
-        ctx.font="24px Arial";ctx.fillStyle="#475569";line(`ENDEREÇO: ${address}`,92,y+150,885,30,2);
-        if(e.status==="cancelado"){ctx.font="700 22px Arial";ctx.fillStyle="#dc2626";ctx.fillText("EVENTO CANCELADO",790,y+112)}
-        y+=260;
+      const printable = selected.filter((e) => e.status !== "rascunho");
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080;
+      canvas.height = Math.max(1920, 430 + printable.length * 260);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas indisponível");
+      const color = config?.cor_primaria || "#2563eb";
+      const line = (
+        text: string,
+        x: number,
+        y: number,
+        maxWidth: number,
+        lineHeight: number,
+        maxLines = 2,
+      ) => {
+        const words = text.split(/\s+/);
+        let current = "",
+          used = 0;
+        for (const word of words) {
+          const test = current ? `${current} ${word}` : word;
+          if (ctx.measureText(test).width > maxWidth && current) {
+            ctx.fillText(current, x, y + used * lineHeight);
+            used++;
+            current = word;
+            if (used >= maxLines) return used * lineHeight;
+          } else current = test;
+        }
+        if (current && used < maxLines) {
+          ctx.fillText(current, x, y + used * lineHeight);
+          used++;
+        }
+        return used * lineHeight;
+      };
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, 1080, 28);
+      let headerX = 72;
+      if (client?.logo_url) {
+        try {
+          const logo = new window.Image();
+          logo.crossOrigin = "anonymous";
+          await new Promise<void>((resolve, reject) => {
+            logo.onload = () => resolve();
+            logo.onerror = () => reject();
+            logo.src = client.logo_url;
+          });
+          ctx.drawImage(logo, 72, 70, 110, 110);
+          headerX = 210;
+        } catch {
+          /* A imagem continua válida mesmo se o servidor da logo bloquear CORS. */
+        }
       }
-      const footer=canvas.height-120;ctx.strokeStyle="#cbd5e1";ctx.beginPath();ctx.moveTo(72,footer-42);ctx.lineTo(1008,footer-42);ctx.stroke();ctx.font="22px Arial";ctx.fillStyle="#64748b";ctx.fillText("USO INTERNO · Contém dados pessoais. Compartilhe somente com a equipe autorizada.",72,footer);ctx.font="20px Arial";ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`,72,footer+38);
-      const blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,"image/png"));if(!blob)throw new Error("Falha ao montar o PNG");const url=URL.createObjectURL(blob);const a=document.createElement("a");a.download=`agenda-${client?.public_slug||clientId||"candidato"}-${day}.png`;a.href=url;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast.success("Imagem baixada. Agora você pode enviá-la pelo WhatsApp.");
-    }catch(error){console.error("Erro ao gerar imagem da agenda",error);toast.error("Não foi possível gerar a imagem. Tente novamente ou atualize a página.")}finally{setGeneratingImage(false)}
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "800 52px Arial";
+      ctx.fillText("ROTEIRO DO DIA", headerX, 145);
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(72, 220);
+      ctx.lineTo(1008, 220);
+      ctx.stroke();
+      ctx.font = "600 38px Arial";
+      ctx.fillStyle = "#0f172a";
+      ctx.fillText(pretty(day), 72, 285);
+      let y = 365;
+      if (!printable.length) {
+        ctx.font = "30px Arial";
+        ctx.fillStyle = "#64748b";
+        ctx.fillText("Nenhum compromisso cadastrado para este dia.", 72, y);
+      }
+      for (const e of printable) {
+        const linked = requests.find((r) => r.id === e.solicitacao_id);
+        const contact = e.contato_nome || linked?.nome || "Não informado";
+        const phone = e.contato_telefone || linked?.telefone || "Não informado";
+        const address = e.endereco_completo || e.local || linked?.local || "Endereço não informado";
+        ctx.fillStyle = e.status === "cancelado" ? "#fff1f2" : "#f8fafc";
+        ctx.fillRect(62, y - 45, 956, 225);
+        ctx.fillStyle = e.status === "cancelado" ? "#ef4444" : color;
+        ctx.fillRect(62, y - 45, 9, 225);
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "700 30px Arial";
+        line(`${at(e.inicio_em)}–${at(e.fim_em)}  ·  ${e.titulo}`, 92, y, 885, 36, 2);
+        ctx.font = "25px Arial";
+        ctx.fillStyle = "#334155";
+        ctx.fillText(`CONTATO: ${contact}`, 92, y + 75);
+        ctx.fillText(`TELEFONE: ${fmtPhoneBR(normalizeBRPhone(phone)) || phone}`, 92, y + 112);
+        ctx.font = "24px Arial";
+        ctx.fillStyle = "#475569";
+        line(`ENDEREÇO: ${address}`, 92, y + 150, 885, 30, 2);
+        if (e.status === "cancelado") {
+          ctx.font = "700 22px Arial";
+          ctx.fillStyle = "#dc2626";
+          ctx.fillText("EVENTO CANCELADO", 790, y + 112);
+        }
+        y += 260;
+      }
+      const footer = canvas.height - 120;
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.beginPath();
+      ctx.moveTo(72, footer - 42);
+      ctx.lineTo(1008, footer - 42);
+      ctx.stroke();
+      ctx.font = "22px Arial";
+      ctx.fillStyle = "#64748b";
+      ctx.fillText(
+        "USO INTERNO · Contém dados pessoais. Compartilhe somente com a equipe autorizada.",
+        72,
+        footer,
+      );
+      ctx.font = "20px Arial";
+      ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 72, footer + 38);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("Falha ao montar o PNG");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.download = `agenda-${client?.public_slug || clientId || "candidato"}-${day}.png`;
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success("Imagem baixada. Agora você pode enviá-la pelo WhatsApp.");
+    } catch (error) {
+      console.error("Erro ao gerar imagem da agenda", error);
+      toast.error("Não foi possível gerar a imagem. Tente novamente ou atualize a página.");
+    } finally {
+      setGeneratingImage(false);
+    }
   }
-  async function saveConfig(){const {error}=await supabase.from("agenda_configuracoes" as any).update({public_enabled:config.public_enabled,titulo_publico:config.titulo_publico,descricao_publica:config.descricao_publica,cor_primaria:config.cor_primaria}).eq("client_id",clientId);if(error)toast.error(error.message);else toast.success("Configurações salvas.")}
-  if(isLoading||loading)return <div className="p-8 text-muted-foreground">Carregando Agenda…</div>;
-  return <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-2xl font-bold flex items-center gap-2"><CalendarDays className="text-primary"/> Agenda</h1><p className="text-sm text-muted-foreground">Organize os compromissos do candidato e analise pedidos enviados pelo público.</p></div><div className="flex gap-2 flex-wrap"><Button variant="outline" disabled={!publicUrl} onClick={()=>{navigator.clipboard.writeText(publicUrl);toast.success("Link público copiado!")}}><Copy className="w-4 h-4 mr-2"/>Copiar link público</Button><Button variant="outline" disabled={!publicUrl} onClick={()=>window.open(publicUrl,"_blank")}><ExternalLink className="w-4 h-4 mr-2"/>Ver página pública</Button><Button onClick={openNew}><Plus className="w-4 h-4 mr-2"/>Novo compromisso</Button></div></div>
-    <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20"><CardContent className="pt-4 flex gap-3"><CircleHelp className="w-5 h-5 text-blue-600 shrink-0"/><div className="text-sm"><b>Como funciona?</b> Cadastre compromissos na aba Agenda. Pedidos feitos pelo link público aparecem em Solicitações; eles só entram na agenda depois que você aprovar. Para divulgar um dia no WhatsApp, selecione a data e use “Baixar imagem”.</div></CardContent></Card>
-    {pending.length>0&&<button onClick={()=>document.getElementById("agenda-tabs")?.scrollIntoView()} className="w-full text-left rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-4 animate-pulse motion-reduce:animate-none"><b>🔔 {pending.length} solicitação(ões) aguardando análise</b><p className="text-sm">Abra a aba Solicitações para aprovar ou recusar.</p></button>}
-    <Tabs defaultValue={pending.length?"solicitacoes":"agenda"} id="agenda-tabs"><TabsList className="grid w-full md:w-[520px] grid-cols-3"><TabsTrigger value="agenda">Agenda</TabsTrigger><TabsTrigger value="solicitacoes">Solicitações {pending.length>0&&<Badge className="ml-2">{pending.length}</Badge>}</TabsTrigger><TabsTrigger value="config"><Settings className="w-4 h-4 mr-1"/>Configurações</TabsTrigger></TabsList>
-      <TabsContent value="agenda" className="space-y-4"><div className="grid lg:grid-cols-[1fr_380px] gap-4"><Card><CardHeader className="pb-3"><div className="flex justify-between items-center"><Button variant="ghost" size="icon" onClick={()=>setCursor(new Date(cursor.getFullYear(),cursor.getMonth()-1,1))}><ChevronLeft/></Button><CardTitle className="capitalize">{cursor.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}</CardTitle><Button variant="ghost" size="icon" onClick={()=>setCursor(new Date(cursor.getFullYear(),cursor.getMonth()+1,1))}><ChevronRight/></Button></div></CardHeader><CardContent><div className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground mb-2">{["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"].map(x=><span key={x}>{x}</span>)}</div><div className="grid grid-cols-7 gap-1">{cells.map((d,i)=>d?<button key={i} onClick={()=>setDay(ymd(d))} className={`min-h-16 rounded-lg border p-1 text-left hover:border-primary ${day===ymd(d)?"border-primary bg-primary/5":""}`}><span className="text-xs">{d.getDate()}</span><div className="flex gap-0.5 mt-1 flex-wrap">{events.filter(e=>ymd(new Date(e.inicio_em))===ymd(d)).slice(0,4).map(e=><i key={e.id} className={`w-2 h-2 rounded-full ${e.status==="cancelado"?"bg-red-400":"bg-blue-500"}`}/>)}</div></button>:<div key={i}/>)}</div></CardContent></Card>
-        <div className="space-y-3"><Card><CardHeader><CardTitle className="text-lg capitalize">{pretty(day)}</CardTitle><CardDescription>{selected.length?`${selected.length} item(ns) neste dia.`:"Nenhum compromisso. Você pode adicionar um agora."}</CardDescription></CardHeader><CardContent className="space-y-2">{selected.map(e=><div key={e.id} className={`border rounded-lg p-3 ${e.status==="cancelado"?"opacity-65 bg-red-50 dark:bg-red-950/20":""}`}><div className="flex justify-between gap-2"><div><b className={e.status==="cancelado"?"line-through":""}>{e.titulo}</b><p className="text-sm text-muted-foreground"><Clock className="inline w-3 h-3"/> {at(e.inicio_em)}–{at(e.fim_em)} {e.local&&<> · <MapPin className="inline w-3 h-3"/> {e.local}</>}</p>{e.contato_nome&&<p className="text-xs text-muted-foreground mt-1">Contato: {e.contato_nome}{e.contato_telefone?` · ${fmtPhoneBR(e.contato_telefone)}`:""}</p>}<Badge variant="outline" className="mt-1">{e.status==="cancelado"?"Cancelado":e.visibilidade}</Badge></div></div><div className="flex gap-2 mt-3 flex-wrap">{e.status!=="cancelado"?<><Button size="sm" variant="outline" onClick={()=>openEdit(e)}>Editar</Button><Button size="sm" variant="destructive" onClick={()=>setCancelEvent(e)}>Cancelar</Button></>:<Button size="sm" variant="outline" onClick={()=>restore(e)}><RotateCcw className="w-3 h-3 mr-1"/>Restaurar</Button>}<Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={()=>setDeleteEvent(e)}><Trash2 className="w-3 h-3 mr-1"/>Excluir</Button></div></div>)}<Button variant="outline" className="w-full" onClick={openNew}><Plus className="w-4 h-4 mr-2"/>Adicionar neste dia</Button></CardContent></Card><div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs"><b>Roteiro privado do motorista:</b> a imagem contém nome, telefone e endereço dos contatos. Envie somente para pessoas autorizadas da equipe.</div><Button className="w-full" variant="secondary" onClick={downloadImage} disabled={generatingImage}>{generatingImage?<RefreshCw className="w-4 h-4 mr-2 animate-spin"/>:<Download className="w-4 h-4 mr-2"/>}{generatingImage?"Gerando roteiro…":"Baixar roteiro do motorista"}</Button></div></div>
-      </TabsContent>
-      <TabsContent value="solicitacoes"><Card><CardHeader><CardTitle>Pedidos recebidos</CardTitle><CardDescription>Um pedido não confirma o horário. Confira os dados e escolha Aprovar ou Recusar.</CardDescription></CardHeader><CardContent className="space-y-3">{requests.length===0&&<div className="py-10 text-center text-muted-foreground"><UserRoundCheck className="mx-auto mb-2"/>Nenhuma solicitação recebida.</div>}{requests.map(r=><button key={r.id} onClick={()=>setRequestOpen(r)} className={`w-full text-left border rounded-xl p-4 hover:border-primary ${r.status==="em_analise"?"border-amber-400 bg-amber-50/50 dark:bg-amber-950/20":""}`}><div className="flex justify-between gap-2 flex-wrap"><div><b>{r.nome}</b><p className="font-medium">{r.assunto}</p><p className="text-sm text-muted-foreground">{new Date(r.inicio_solicitado_em).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})} · {r.local||r.modalidade}</p></div><Badge variant={r.status==="em_analise"?"default":"outline"}>{statusLabel[r.status]||r.status}</Badge></div></button>)}</CardContent></Card></TabsContent>
-      <TabsContent value="config"><Card><CardHeader><CardTitle>Página pública</CardTitle><CardDescription>Estas informações aparecem para qualquer pessoa que receber o link.</CardDescription></CardHeader><CardContent className="space-y-4 max-w-xl"><div className="flex items-center justify-between border rounded-lg p-3"><div><Label>Agenda pública ativa</Label><p className="text-xs text-muted-foreground">Desative para esconder temporariamente a página.</p></div><Switch checked={!!config?.public_enabled} onCheckedChange={v=>setConfig({...config,public_enabled:v})}/></div><div><Label>Link público</Label><div className="flex gap-2"><Input readOnly value={publicUrl}/><Button variant="outline" onClick={()=>{navigator.clipboard.writeText(publicUrl);toast.success("Link público copiado!")}}><Copy className="w-4 h-4"/></Button></div><p className="text-xs text-muted-foreground mt-1">Qualquer pessoa que receber este link poderá abrir a agenda, sem login.</p></div><div><Label>Título</Label><Input value={config?.titulo_publico||""} onChange={e=>setConfig({...config,titulo_publico:e.target.value})}/></div><div><Label>Texto de apresentação</Label><Textarea value={config?.descricao_publica||""} onChange={e=>setConfig({...config,descricao_publica:e.target.value})}/></div><div><Label>Cor principal</Label><Input type="color" className="w-24" value={config?.cor_primaria||"#2563eb"} onChange={e=>setConfig({...config,cor_primaria:e.target.value})}/></div><Button onClick={saveConfig}>Salvar configurações</Button></CardContent></Card></TabsContent>
-    </Tabs>
+  async function saveConfig() {
+    const { error } = await supabase
+      .from("agenda_configuracoes" as any)
+      .update({
+        public_enabled: config.public_enabled,
+        titulo_publico: config.titulo_publico,
+        descricao_publica: config.descricao_publica,
+        cor_primaria: config.cor_primaria,
+      })
+      .eq("client_id", clientId);
+    if (error) toast.error(error.message);
+    else toast.success("Configurações salvas.");
+  }
+  if (isLoading || loading)
+    return <div className="p-8 text-muted-foreground">Carregando Agenda…</div>;
+  return (
+    <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <CalendarDays className="text-primary" /> Agenda
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Organize os compromissos do candidato e analise pedidos enviados pelo público.
+          </p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            disabled={!publicUrl}
+            onClick={() => {
+              navigator.clipboard.writeText(publicUrl);
+              toast.success("Link público copiado!");
+            }}
+          >
+            <Copy className="w-4 h-4 mr-2" />
+            Copiar link público
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!publicUrl}
+            onClick={() => window.open(publicUrl, "_blank")}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Ver página pública
+          </Button>
+          <Button onClick={openNew}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo compromisso
+          </Button>
+        </div>
+      </div>
+      <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
+        <CardContent className="pt-4 flex gap-3">
+          <CircleHelp className="w-5 h-5 text-blue-600 shrink-0" />
+          <div className="text-sm">
+            <b>Como funciona?</b> Cadastre compromissos na aba Agenda. Pedidos feitos pelo link
+            público aparecem em Solicitações; eles só entram na agenda depois que você aprovar. Para
+            divulgar um dia no WhatsApp, selecione a data e use “Baixar imagem”.
+          </div>
+        </CardContent>
+      </Card>
+      {pending.length > 0 && (
+        <button
+          onClick={() => document.getElementById("agenda-tabs")?.scrollIntoView()}
+          className="w-full text-left rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-4 animate-pulse motion-reduce:animate-none"
+        >
+          <b>🔔 {pending.length} solicitação(ões) aguardando análise</b>
+          <p className="text-sm">Abra a aba Solicitações para aprovar ou recusar.</p>
+        </button>
+      )}
+      <Tabs defaultValue={pending.length ? "solicitacoes" : "agenda"} id="agenda-tabs">
+        <TabsList className="grid w-full md:w-[520px] grid-cols-3">
+          <TabsTrigger value="agenda">Agenda</TabsTrigger>
+          <TabsTrigger value="solicitacoes">
+            Solicitações {pending.length > 0 && <Badge className="ml-2">{pending.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="config">
+            <Settings className="w-4 h-4 mr-1" />
+            Configurações
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="agenda" className="space-y-4">
+          <div className="grid lg:grid-cols-[1fr_380px] gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))
+                    }
+                  >
+                    <ChevronLeft />
+                  </Button>
+                  <CardTitle className="capitalize">
+                    {cursor.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))
+                    }
+                  >
+                    <ChevronRight />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground mb-2">
+                  {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((x) => (
+                    <span key={x}>{x}</span>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {cells.map((d, i) =>
+                    d ? (
+                      <button
+                        key={i}
+                        onClick={() => setDay(ymd(d))}
+                        className={`min-h-16 rounded-lg border p-1 text-left hover:border-primary ${day === ymd(d) ? "border-primary bg-primary/5" : ""}`}
+                      >
+                        <span className="text-xs">{d.getDate()}</span>
+                        <div className="flex gap-0.5 mt-1 flex-wrap">
+                          {events
+                            .filter((e) => ymd(new Date(e.inicio_em)) === ymd(d))
+                            .slice(0, 4)
+                            .map((e) => (
+                              <i
+                                key={e.id}
+                                className={`w-2 h-2 rounded-full ${e.status === "cancelado" ? "bg-red-400" : "bg-blue-500"}`}
+                              />
+                            ))}
+                        </div>
+                      </button>
+                    ) : (
+                      <div key={i} />
+                    ),
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            <div className="space-y-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg capitalize">{pretty(day)}</CardTitle>
+                  <CardDescription>
+                    {selected.length
+                      ? `${selected.length} item(ns) neste dia.`
+                      : "Nenhum compromisso. Você pode adicionar um agora."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {selected.map((e) => (
+                    <div
+                      key={e.id}
+                      className={`border rounded-lg p-3 ${e.status === "cancelado" ? "opacity-65 bg-red-50 dark:bg-red-950/20" : ""}`}
+                    >
+                      <div className="flex justify-between gap-2">
+                        <div>
+                          <b className={e.status === "cancelado" ? "line-through" : ""}>
+                            {e.titulo}
+                          </b>
+                          <p className="text-sm text-muted-foreground">
+                            <Clock className="inline w-3 h-3" /> {at(e.inicio_em)}–{at(e.fim_em)}{" "}
+                            {e.local && (
+                              <>
+                                {" "}
+                                · <MapPin className="inline w-3 h-3" /> {e.local}
+                              </>
+                            )}
+                          </p>
+                          {e.contato_nome && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Contato: {e.contato_nome}
+                              {e.contato_telefone ? ` · ${fmtPhoneBR(e.contato_telefone)}` : ""}
+                            </p>
+                          )}
+                          <Badge variant="outline" className="mt-1">
+                            {e.status === "cancelado" ? "Cancelado" : e.visibilidade}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3 flex-wrap">
+                        {e.status !== "cancelado" ? (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => openEdit(e)}>
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setCancelEvent(e)}
+                            >
+                              Cancelar
+                            </Button>
+                          </>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => restore(e)}>
+                            <RotateCcw className="w-3 h-3 mr-1" />
+                            Restaurar
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteEvent(e)}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Excluir
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button variant="outline" className="w-full" onClick={openNew}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar neste dia
+                  </Button>
+                </CardContent>
+              </Card>
+              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs">
+                <b>Roteiro privado do motorista:</b> a imagem contém nome, telefone e endereço dos
+                contatos. Envie somente para pessoas autorizadas da equipe.
+              </div>
+              <Button
+                className="w-full"
+                variant="secondary"
+                onClick={downloadImage}
+                disabled={generatingImage}
+              >
+                {generatingImage ? (
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                {generatingImage ? "Gerando roteiro…" : "Baixar roteiro do motorista"}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+        <TabsContent value="solicitacoes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pedidos recebidos</CardTitle>
+              <CardDescription>
+                Um pedido não confirma o horário. Confira os dados e escolha Aprovar ou Recusar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {requests.length === 0 && (
+                <div className="py-10 text-center text-muted-foreground">
+                  <UserRoundCheck className="mx-auto mb-2" />
+                  Nenhuma solicitação recebida.
+                </div>
+              )}
+              {requests.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setRequestOpen(r)}
+                  className={`w-full text-left border rounded-xl p-4 hover:border-primary ${r.status === "em_analise" ? "border-amber-400 bg-amber-50/50 dark:bg-amber-950/20" : ""}`}
+                >
+                  <div className="flex justify-between gap-2 flex-wrap">
+                    <div>
+                      <b>{r.nome}</b>
+                      <p className="font-medium">{r.assunto}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(r.inicio_solicitado_em).toLocaleString("pt-BR", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}{" "}
+                        · {r.local || r.modalidade}
+                      </p>
+                    </div>
+                    <Badge variant={r.status === "em_analise" ? "default" : "outline"}>
+                      {statusLabel[r.status] || r.status}
+                    </Badge>
+                  </div>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="config">
+          <Card>
+            <CardHeader>
+              <CardTitle>Página pública</CardTitle>
+              <CardDescription>
+                Estas informações aparecem para qualquer pessoa que receber o link.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 max-w-xl">
+              <div className="flex items-center justify-between border rounded-lg p-3">
+                <div>
+                  <Label>Agenda pública ativa</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Desative para esconder temporariamente a página.
+                  </p>
+                </div>
+                <Switch
+                  checked={!!config?.public_enabled}
+                  onCheckedChange={(v) => setConfig({ ...config, public_enabled: v })}
+                />
+              </div>
+              <div>
+                <Label>Link público</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={publicUrl} />
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(publicUrl);
+                      toast.success("Link público copiado!");
+                    }}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Qualquer pessoa que receber este link poderá abrir a agenda, sem login.
+                </p>
+              </div>
+              <div>
+                <Label>Título</Label>
+                <Input
+                  value={config?.titulo_publico || ""}
+                  onChange={(e) => setConfig({ ...config, titulo_publico: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Texto de apresentação</Label>
+                <Textarea
+                  value={config?.descricao_publica || ""}
+                  onChange={(e) => setConfig({ ...config, descricao_publica: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Cor principal</Label>
+                <Input
+                  type="color"
+                  className="w-24"
+                  value={config?.cor_primaria || "#2563eb"}
+                  onChange={(e) => setConfig({ ...config, cor_primaria: e.target.value })}
+                />
+              </div>
+              <Button onClick={saveConfig}>Salvar configurações</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-    <Dialog open={eventOpen} onOpenChange={setEventOpen}><DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto"><DialogHeader><DialogTitle>{editId?"Editar compromisso":"Novo compromisso"}</DialogTitle><DialogDescription>Preencha o essencial. Os dados do contato e as observações internas aparecem apenas para a equipe e no roteiro do motorista.</DialogDescription></DialogHeader><div className="grid sm:grid-cols-2 gap-4"><div className="sm:col-span-2"><Label>Título *</Label><Input value={form.titulo} onChange={e=>setForm({...form,titulo:e.target.value})} placeholder="Ex.: Visita à associação de moradores"/></div><div><Label>Data *</Label><Input type="date" value={form.data} onChange={e=>setForm({...form,data:e.target.value})}/></div><div className="grid grid-cols-2 gap-2"><div><Label>Começa</Label><Input type="time" value={form.inicio} onChange={e=>setForm({...form,inicio:e.target.value})}/></div><div><Label>Termina</Label><Input type="time" value={form.fim} onChange={e=>setForm({...form,fim:e.target.value})}/></div></div><div><Label>Nome do contato/solicitante</Label><Input value={form.contato_nome} onChange={e=>setForm({...form,contato_nome:e.target.value})} placeholder="Quem receberá o candidato"/></div><div><Label>Telefone do contato</Label><Input inputMode="tel" value={form.contato_telefone} onChange={e=>setForm({...form,contato_telefone:e.target.value})} onBlur={()=>setForm({...form,contato_telefone:fmtPhoneBR(normalizeBRPhone(form.contato_telefone))})} placeholder="(65) 99999-9999"/></div><div className="sm:col-span-2"><Label>Endereço completo para o motorista</Label><Input value={form.endereco_completo} onChange={e=>setForm({...form,endereco_completo:e.target.value})} placeholder="Rua, número, bairro, cidade e ponto de referência"/></div><div><Label>Local exibido ao público</Label><Input value={form.local} onChange={e=>setForm({...form,local:e.target.value})} placeholder="Ex.: Bairro Centro"/></div><div><Label>O que o público pode ver?</Label><Select value={form.visibilidade} onValueChange={v=>setForm({...form,visibilidade:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="publico">Título e local</SelectItem><SelectItem value="resumido">Somente “Compromisso agendado”</SelectItem><SelectItem value="privado">Não mostrar</SelectItem></SelectContent></Select></div><div className="sm:col-span-2"><Label>Descrição pública</Label><Textarea value={form.descricao_publica} onChange={e=>setForm({...form,descricao_publica:e.target.value})}/></div><div className="sm:col-span-2"><Label>Observações internas</Label><Textarea value={form.observacoes_internas} onChange={e=>setForm({...form,observacoes_internas:e.target.value})} placeholder="Ponto de referência, orientação de chegada ou outra informação para a equipe"/></div></div><DialogFooter><Button variant="outline" onClick={()=>setEventOpen(false)}>Voltar</Button><Button onClick={saveEvent}>Salvar compromisso</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={!!requestOpen} onOpenChange={v=>!v&&setRequestOpen(null)}><DialogContent><DialogHeader><DialogTitle>Analisar solicitação</DialogTitle><DialogDescription>Leia os dados antes de tomar uma decisão. Aprovar cria o compromisso automaticamente.</DialogDescription></DialogHeader>{requestOpen&&<div className="space-y-3 text-sm"><div className="rounded-lg bg-muted p-3"><b>{requestOpen.assunto}</b><p>{requestOpen.nome} · {requestOpen.telefone}</p><p>{new Date(requestOpen.inicio_solicitado_em).toLocaleString("pt-BR")} até {at(requestOpen.fim_solicitado_em)}</p><p>{requestOpen.local||requestOpen.modalidade}</p>{requestOpen.descricao&&<p className="mt-2 whitespace-pre-wrap">{requestOpen.descricao}</p>}<p className="text-xs mt-2">Protocolo: {requestOpen.protocolo}</p></div></div>}<DialogFooter>{requestOpen?.status==="em_analise"&&<><Button variant="destructive" onClick={()=>decide(requestOpen,"recusada")}><X className="w-4 h-4 mr-1"/>Recusar</Button><Button onClick={()=>decide(requestOpen,"aprovada")}><Check className="w-4 h-4 mr-1"/>Aprovar e adicionar</Button></>}</DialogFooter></DialogContent></Dialog>
-    <Dialog open={!!cancelEvent} onOpenChange={v=>!v&&setCancelEvent(null)}><DialogContent><DialogHeader><DialogTitle>Cancelar evento?</DialogTitle><DialogDescription>O evento não será apagado. A equipe poderá consultar o histórico ou restaurá-lo depois.</DialogDescription></DialogHeader><div className="space-y-4"><div><Label>Motivo interno *</Label><Textarea value={cancelReason} onChange={e=>setCancelReason(e.target.value)} placeholder="Ex.: candidato precisará viajar"/></div><div><Label>Mensagem para o público (opcional)</Label><Input value={cancelPublic} onChange={e=>setCancelPublic(e.target.value)} placeholder="Ex.: Evento adiado; nova data em breve"/></div><label className="flex items-center justify-between border rounded-lg p-3"><span><b className="text-sm">Mostrar como cancelado</b><small className="block text-muted-foreground">Útil quando a agenda já foi divulgada.</small></span><Switch checked={showCancelled} onCheckedChange={setShowCancelled}/></label><label className="flex items-center justify-between border rounded-lg p-3"><span><b className="text-sm">Manter horário bloqueado</b><small className="block text-muted-foreground">Impede usar esse horário para outro compromisso.</small></span><Switch checked={keepBlocked} onCheckedChange={setKeepBlocked}/></label></div><DialogFooter><Button variant="outline" onClick={()=>setCancelEvent(null)}>Voltar</Button><Button variant="destructive" onClick={cancel}>Confirmar cancelamento</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={!!deleteEvent} onOpenChange={v=>!v&&!deleting&&setDeleteEvent(null)}><DialogContent><DialogHeader><DialogTitle>Excluir compromisso definitivamente?</DialogTitle><DialogDescription>Use Cancelar se quiser manter o compromisso no histórico e poder restaurá-lo. Excluir remove este item da agenda e não poderá ser desfeito.</DialogDescription></DialogHeader>{deleteEvent&&<div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm"><b>{deleteEvent.titulo}</b><p>{new Date(deleteEvent.inicio_em).toLocaleString("pt-BR")} até {at(deleteEvent.fim_em)}</p>{deleteEvent.local&&<p>{deleteEvent.local}</p>}</div>}<DialogFooter><Button variant="outline" disabled={deleting} onClick={()=>setDeleteEvent(null)}>Voltar</Button><Button variant="destructive" disabled={deleting} onClick={removeEvent}>{deleting?<RefreshCw className="w-4 h-4 mr-2 animate-spin"/>:<Trash2 className="w-4 h-4 mr-2"/>}{deleting?"Excluindo…":"Excluir definitivamente"}</Button></DialogFooter></DialogContent></Dialog>
-  </div>
+      <Dialog open={eventOpen} onOpenChange={setEventOpen}>
+        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editId ? "Editar compromisso" : "Novo compromisso"}</DialogTitle>
+            <DialogDescription>
+              Preencha o essencial. Os dados do contato e as observações internas aparecem apenas
+              para a equipe e no roteiro do motorista.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <Label>Título *</Label>
+              <Input
+                value={form.titulo}
+                onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+                placeholder="Ex.: Visita à associação de moradores"
+              />
+            </div>
+            <div>
+              <Label>Data *</Label>
+              <Input
+                type="date"
+                value={form.data}
+                onChange={(e) => setForm({ ...form, data: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Começa</Label>
+                <Input
+                  type="time"
+                  value={form.inicio}
+                  onChange={(e) => setForm({ ...form, inicio: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Termina</Label>
+                <Input
+                  type="time"
+                  value={form.fim}
+                  onChange={(e) => setForm({ ...form, fim: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Nome do contato/solicitante</Label>
+              <Input
+                value={form.contato_nome}
+                onChange={(e) => setForm({ ...form, contato_nome: e.target.value })}
+                placeholder="Quem receberá o candidato"
+              />
+            </div>
+            <div>
+              <Label>Telefone do contato</Label>
+              <Input
+                inputMode="tel"
+                value={form.contato_telefone}
+                onChange={(e) => setForm({ ...form, contato_telefone: e.target.value })}
+                onBlur={() =>
+                  setForm({
+                    ...form,
+                    contato_telefone: fmtPhoneBR(normalizeBRPhone(form.contato_telefone)),
+                  })
+                }
+                placeholder="(65) 99999-9999"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Endereço completo para o motorista</Label>
+              <Input
+                value={form.endereco_completo}
+                onChange={(e) => setForm({ ...form, endereco_completo: e.target.value })}
+                placeholder="Rua, número, bairro, cidade e ponto de referência"
+              />
+            </div>
+            <div>
+              <Label>Local exibido ao público</Label>
+              <Input
+                value={form.local}
+                onChange={(e) => setForm({ ...form, local: e.target.value })}
+                placeholder="Ex.: Bairro Centro"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Descrição pública</Label>
+              <Textarea
+                value={form.descricao_publica}
+                onChange={(e) => setForm({ ...form, descricao_publica: e.target.value })}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Observações internas</Label>
+              <Textarea
+                value={form.observacoes_internas}
+                onChange={(e) => setForm({ ...form, observacoes_internas: e.target.value })}
+                placeholder="Ponto de referência, orientação de chegada ou outra informação para a equipe"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEventOpen(false)}>
+              Voltar
+            </Button>
+            <Button onClick={saveEvent}>Salvar compromisso</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!requestOpen} onOpenChange={(v) => !v && setRequestOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Analisar solicitação</DialogTitle>
+            <DialogDescription>
+              Leia os dados antes de tomar uma decisão. Aprovar cria o compromisso automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          {requestOpen && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg bg-muted p-3">
+                <b>{requestOpen.assunto}</b>
+                <p>
+                  {requestOpen.nome} · {requestOpen.telefone}
+                </p>
+                <p>
+                  {new Date(requestOpen.inicio_solicitado_em).toLocaleString("pt-BR")} até{" "}
+                  {at(requestOpen.fim_solicitado_em)}
+                </p>
+                <p>{requestOpen.local || requestOpen.modalidade}</p>
+                {requestOpen.descricao && (
+                  <p className="mt-2 whitespace-pre-wrap">{requestOpen.descricao}</p>
+                )}
+                <p className="text-xs mt-2">Protocolo: {requestOpen.protocolo}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            {requestOpen?.status === "em_analise" && (
+              <>
+                <Button variant="destructive" onClick={() => decide(requestOpen, "recusada")}>
+                  <X className="w-4 h-4 mr-1" />
+                  Recusar
+                </Button>
+                <Button onClick={() => decide(requestOpen, "aprovada")}>
+                  <Check className="w-4 h-4 mr-1" />
+                  Aprovar e adicionar
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!cancelEvent} onOpenChange={(v) => !v && setCancelEvent(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar evento?</DialogTitle>
+            <DialogDescription>
+              O evento não será apagado. A equipe poderá consultar o histórico ou restaurá-lo
+              depois.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Motivo interno *</Label>
+              <Textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Ex.: candidato precisará viajar"
+              />
+            </div>
+            <div>
+              <Label>Mensagem para o público (opcional)</Label>
+              <Input
+                value={cancelPublic}
+                onChange={(e) => setCancelPublic(e.target.value)}
+                placeholder="Ex.: Evento adiado; nova data em breve"
+              />
+            </div>
+            <label className="flex items-center justify-between border rounded-lg p-3">
+              <span>
+                <b className="text-sm">Mostrar como cancelado</b>
+                <small className="block text-muted-foreground">
+                  Útil quando a agenda já foi divulgada.
+                </small>
+              </span>
+              <Switch checked={showCancelled} onCheckedChange={setShowCancelled} />
+            </label>
+            <label className="flex items-center justify-between border rounded-lg p-3">
+              <span>
+                <b className="text-sm">Manter horário bloqueado</b>
+                <small className="block text-muted-foreground">
+                  Impede usar esse horário para outro compromisso.
+                </small>
+              </span>
+              <Switch checked={keepBlocked} onCheckedChange={setKeepBlocked} />
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelEvent(null)}>
+              Voltar
+            </Button>
+            <Button variant="destructive" onClick={cancel}>
+              Confirmar cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!deleteEvent} onOpenChange={(v) => !v && !deleting && setDeleteEvent(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir compromisso definitivamente?</DialogTitle>
+            <DialogDescription>
+              Use Cancelar se quiser manter o compromisso no histórico e poder restaurá-lo. Excluir
+              remove este item da agenda e não poderá ser desfeito.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteEvent && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm">
+              <b>{deleteEvent.titulo}</b>
+              <p>
+                {new Date(deleteEvent.inicio_em).toLocaleString("pt-BR")} até{" "}
+                {at(deleteEvent.fim_em)}
+              </p>
+              {deleteEvent.local && <p>{deleteEvent.local}</p>}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" disabled={deleting} onClick={() => setDeleteEvent(null)}>
+              Voltar
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={removeEvent}>
+              {deleting ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              {deleting ? "Excluindo…" : "Excluir definitivamente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
