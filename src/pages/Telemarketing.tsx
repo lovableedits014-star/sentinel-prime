@@ -296,6 +296,32 @@ export default function Telemarketing() {
       return;
     }
 
+    // Uma nova aba/aparelho usa outro session_id. Libera reservas deixadas
+    // pela sessao anterior antes de listar e sortear o proximo contato.
+    const { data: sessionRepair, error: sessionRepairError } = await supabase.rpc(
+      "tele_reconcile_operator_session" as any,
+      {
+        _client_id: clientId!,
+        _nome: operadorNome.trim(),
+        _senha: operadorSenha.trim(),
+        _session_id: sessionIdRef.current,
+      },
+    );
+    if (sessionRepairError) {
+      // Compatibilidade durante deploy: a fila continua abrindo mesmo se o
+      // PostgREST ainda nao recarregou a nova funcao.
+      console.warn("Falha ao reconciliar sessao do operador", sessionRepairError.message);
+    }
+    const releasedPreviousSessions = Number(
+      (sessionRepair as { reservas_sessoes_anteriores_liberadas?: number } | null)
+        ?.reservas_sessoes_anteriores_liberadas || 0,
+    );
+    if (releasedPreviousSessions > 0) {
+      toast.info(
+        `${releasedPreviousSessions} contato(s) da sessão anterior foram devolvidos automaticamente à fila.`,
+      );
+    }
+
     // Fetch contacts via secure RPC (operator-authenticated). When opened from
     // the admin "Filas" page, ?campanha=ID restricts the list to that fila.
     let usedCampanhaId = selectedCampanhaId;
