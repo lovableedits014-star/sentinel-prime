@@ -45,6 +45,7 @@ import DistribuicaoContatosTab from "@/components/eleicao/DistribuicaoContatosTa
 import { FunnelManagement } from "@/components/eleicao/FunnelManagement";
 import { getEleicaoSituacao, isEleicaoContratado, isEleicaoSemContrato, isEleicaoVoluntario } from "@/lib/eleicao-situacao";
 import ContratadosCumprimentoReport from "@/components/eleicao/ContratadosCumprimentoReport";
+import { gerarFormularioCabosPdf, type LiderFormularioCabos } from "@/lib/eleicao-cabos-formulario-pdf";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -232,6 +233,8 @@ type EleicaoActions = {
   onTogglePermissao: (p: Pessoa, field: "pode_cadastrar_lider" | "pode_cadastrar_cabo") => void;
   onResendLiderFlow: (p: Pessoa) => void;
   onArchive: (p: Pessoa) => void;
+  onFormularioCabos: (p: Pessoa) => void;
+  onNovoCabo: (p: Pessoa) => void;
 };
 const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
 
@@ -444,6 +447,18 @@ export default function Eleicao() {
     }
     if (form.tipo === "coordenador" && !editing && form.send_access && (!form.email.trim() || form.password.length < 6)) {
       toast.error("Para enviar acesso, informe e-mail e senha com no mínimo 6 caracteres"); return;
+    }
+    if (form.tipo === "cabo" && form.parent_id) {
+      const parent = pessoas.find(p => p.id === form.parent_id);
+      if (parent?.tipo === "lider") {
+        const totalCabosAtivos = pessoas.filter(p =>
+          p.tipo === "cabo" && p.parent_id === parent.id && !p.arquivado_em && p.id !== editing?.id
+        ).length;
+        if (totalCabosAtivos >= 4) {
+          toast.error("Este líder já possui o limite de 4 cabos eleitorais ativos.");
+          return;
+        }
+      }
     }
     const rua = form.rua.trim();
     const numero = form.numero.trim();
@@ -1275,8 +1290,59 @@ export default function Eleicao() {
     return Array.from(set).sort().map(v => ({ value: v, label: byValue[v] || v }));
   }, [pessoas, escopo, REGIOES]);
 
+  const formularioData = (lider: Pessoa): LiderFormularioCabos => {
+    const coordenador = lider.parent_id ? pessoas.find(p => p.id === lider.parent_id && p.tipo === "coordenador") : null;
+    return {
+      id: lider.id,
+      nome: lider.nome,
+      telefone: lider.telefone,
+      regiao: lider.regiao ? (REGIOES.find(r => r.value === lider.regiao)?.label || lider.regiao) : null,
+      cidade: lider.cidade,
+      coordenador_nome: coordenador?.nome || null,
+    };
+  };
+
+  const baixarFormularioCabos = async (pessoa: Pessoa) => {
+    const lideres = pessoa.tipo === "coordenador"
+      ? pessoas.filter(p => p.tipo === "lider" && p.parent_id === pessoa.id && !p.arquivado_em)
+      : pessoa.tipo === "lider" && !pessoa.arquivado_em ? [pessoa] : [];
+    if (!lideres.length) return toast.error("Nenhum líder ativo encontrado para gerar o formulário.");
+    try {
+      await gerarFormularioCabosPdf(
+        lideres.map(formularioData),
+        pessoa.tipo === "coordenador" ? `Formularios de Cabos - ${pessoa.nome}` : undefined,
+      );
+      toast.success(lideres.length === 1 ? "Formulário dos cabos gerado." : `${lideres.length} formulários gerados.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao gerar formulários.");
+    }
+  };
+
+  const baixarTodosFormulariosCabos = async () => {
+    const lideres = pessoas.filter(p => p.tipo === "lider" && !p.arquivado_em && p.escopo === escopo);
+    if (!lideres.length) return toast.error("Nenhum líder ativo neste escopo.");
+    try {
+      await gerarFormularioCabosPdf(lideres.map(formularioData), `Formularios de Cabos - ${escopo}`);
+      toast.success(`${lideres.length} formulários gerados em um PDF.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao gerar formulários.");
+    }
+  };
+
+  const abrirNovoCabo = (lider: Pessoa) => {
+    const total = pessoas.filter(p => p.tipo === "cabo" && p.parent_id === lider.id && !p.arquivado_em).length;
+    if (total >= 4) return toast.error("Este líder já possui o limite de 4 cabos eleitorais ativos.");
+    openNew({
+      tipo: "cabo",
+      parent_id: lider.id,
+      escopo: lider.escopo,
+      regiao: (lider.regiao || "centro") as Regiao,
+      cidade: lider.cidade || (lider.escopo === "campo_grande" ? "Campo Grande" : ""),
+    });
+  };
+
   return (
-    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow, onArchive: toggleArchive }}>
+    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow, onArchive: toggleArchive, onFormularioCabos: baixarFormularioCabos, onNovoCabo: abrirNovoCabo }}>
     <EleicaoSearchContext.Provider value={searchCtxValue}>
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
 
@@ -1289,6 +1355,9 @@ export default function Eleicao() {
           {clientId && <EleicaoContractTemplates clientId={clientId} />}
           {view === "cadastros" && (
             <>
+              <Button variant="outline" onClick={baixarTodosFormulariosCabos}>
+                <Printer className="w-4 h-4 mr-2" />Formulários dos cabos
+              </Button>
               <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
                 <FileDown className="w-4 h-4 mr-2" />Exportar
               </Button>
@@ -2415,7 +2484,8 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
         onSend={onSend}
         sendingId={sendingId}
         indent={1}
-        teamCount={hasCabos ? cabos.length : undefined}
+        teamCount={cabos.length}
+        teamLimit={4}
         matchInTeam={matchesNaEquipe}
         expanded={open}
         onToggle={hasCabos ? () => setOpen(o => !o) : undefined}
@@ -2495,7 +2565,7 @@ function FavoritoToggle({ pessoa }: { pessoa: Pessoa }) {
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, expanded, onToggle, bulkAction, matchInTeam }: {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, teamLimit, expanded, onToggle, bulkAction, matchInTeam }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
@@ -2504,6 +2574,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   sendingId?: string | null;
   indent?: number;
   teamCount?: number;
+  teamLimit?: number;
   expanded?: boolean;
   onToggle?: () => void;
   bulkAction?: { label: string; onClick: () => void };
@@ -2513,6 +2584,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   const onTogglePermissao = actions?.onTogglePermissao;
   const onResendLiderFlow = actions?.onResendLiderFlow;
   const onArchive = actions?.onArchive;
+  const onFormularioCabos = actions?.onFormularioCabos;
+  const onNovoCabo = actions?.onNovoCabo;
   const { searchActive, matchedIds, nameById, tipoById } = React.useContext(EleicaoSearchContext);
   const isMatch = searchActive && matchedIds.has(p.id);
   const parentName = p.parent_id ? nameById.get(p.parent_id) : null;
@@ -2633,8 +2706,8 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
       </div>
 
       {teamCount !== undefined && (
-        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0 gap-0.5">
-          <Users className="w-2.5 h-2.5" />{teamCount}
+        <Badge variant={teamLimit && teamCount >= teamLimit ? "destructive" : "secondary"} className="text-[10px] h-5 px-1.5 shrink-0 gap-0.5">
+          <Users className="w-2.5 h-2.5" />{teamCount}{teamLimit ? `/${teamLimit}` : ""}
         </Badge>
       )}
       {matchInTeam !== undefined && matchInTeam > 0 && (
@@ -2673,6 +2746,27 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           <DropdownMenuSeparator />
           <EnviarFluxoMenu pessoa={p as any} />
           <DropdownMenuSeparator />
+          {p.tipo === "lider" && onFormularioCabos && (
+            <>
+              <DropdownMenuItem onClick={() => onFormularioCabos(p)}>
+                <Printer className="w-3.5 h-3.5 mr-2" />Baixar formulário dos cabos
+              </DropdownMenuItem>
+              {onNovoCabo && (
+                <DropdownMenuItem onClick={() => onNovoCabo(p)}>
+                  <Plus className="w-3.5 h-3.5 mr-2" />Cadastrar cabo eleitoral
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+            </>
+          )}
+          {p.tipo === "coordenador" && onFormularioCabos && (
+            <>
+              <DropdownMenuItem onClick={() => onFormularioCabos(p)}>
+                <Printer className="w-3.5 h-3.5 mr-2" />Formulários dos líderes
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           {([
             { modo: "ambos" as const, label: "Baixar contrato + distrato (.zip)" },
             { modo: "contrato" as const, label: "Baixar somente contrato (.docx)" },

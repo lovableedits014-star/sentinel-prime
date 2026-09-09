@@ -182,22 +182,35 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
     if (!phone) return toast.error("Coordenador sem WhatsApp cadastrado.");
     const missionLink = `${window.location.origin}/missao/${data?.mission?.id}`;
     const names = (items: string[]) => items.length ? items.map((name) => `- ${name}`).join("\n") : "- Ninguém";
-    const pending = n(team.abriu_sem_concluir) + n(team.nao_abriu);
+    const coordinatorLabel = `${team.coordenador_nome} (coordenador)`;
+    const concludedNames = [...team.concluidos_nomes];
+    const openedNames = [...team.abriu_nomes];
+    const notOpenedNames = [...team.nao_abriu_nomes];
+    if (team.coordenador_status === "cumpriu") concludedNames.push(coordinatorLabel);
+    else if (team.coordenador_status === "abriu") openedNames.push(coordinatorLabel);
+    else notOpenedNames.push(coordinatorLabel);
+
+    const totalPeople = n(team.total_lideres) + 1;
+    const concluded = n(team.concluidos) + (team.coordenador_status === "cumpriu" ? 1 : 0);
+    const opened = n(team.abriu_sem_concluir) + (team.coordenador_status === "abriu" ? 1 : 0);
+    const notOpened = n(team.nao_abriu) + (team.coordenador_status === "nao_abriu" ? 1 : 0);
+    const pending = opened + notOpened;
+    const adherence = totalPeople > 0 ? (concluded / totalPeople) * 100 : 0;
     const text = [
       `Olá, ${team.coordenador_nome.split(" ")[0]}!`, "",
       "Acompanhamento da sua equipe na missão:",
       `*${data?.mission?.title || "Missão da campanha"}*`, "",
       "*Resumo da equipe*",
-      `- Contratados da equipe: ${team.total_lideres}`,
-      `- Concluíram: ${team.concluidos}`,
-      `- Abriram e não concluíram: ${team.abriu_sem_concluir}`,
-      `- Ainda não abriram: ${team.nao_abriu}`,
-      `- Adesão: ${n(team.taxa).toFixed(1)}%`, "",
-      `*Concluíram (${team.concluidos})*`, names(team.concluidos_nomes), "",
-      `*Abriram, mas ainda não concluíram (${team.abriu_sem_concluir})*`, names(team.abriu_nomes), "",
-      `*Ainda não abriram (${team.nao_abriu})*`, names(team.nao_abriu_nomes), "",
+      `- Pessoas da equipe (incluindo coordenador): ${totalPeople}`,
+      `- Concluíram: ${concluded}`,
+      `- Abriram e não concluíram: ${opened}`,
+      `- Ainda não abriram: ${notOpened}`,
+      `- Adesão: ${adherence.toFixed(1)}%`, "",
+      `*Concluíram (${concluded})*`, names(concludedNames), "",
+      `*Abriram, mas ainda não concluíram (${opened})*`, names(openedNames), "",
+      `*Ainda não abriram (${notOpened})*`, names(notOpenedNames), "",
       pending > 0
-        ? `Temos ${pending} contratado(s) pendente(s). Por favor, encaminhe o link abaixo e acompanhe a conclusão de cada um:`
+        ? `Temos ${pending} pessoa(s) pendente(s), incluindo o coordenador quando aplicável. Por favor, encaminhe o link abaixo e acompanhe a conclusão de cada um:`
         : "Parabéns! Toda a sua equipe concluiu esta missão.",
       missionLink,
     ].join("\n");
