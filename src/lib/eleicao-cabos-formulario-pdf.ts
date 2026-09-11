@@ -30,10 +30,10 @@ export async function gerarFormularioCabosPdf(lideres: LiderFormularioCabos[], n
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
-    doc.text("FORMULARIO DE CADASTRO DE CABOS ELEITORAIS", margin, 31);
+    doc.text("FORMULARIO DE CADASTRO", margin, 31);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text("Preenchimento manual - limite de 4 cabos eleitorais por lider", margin, 51);
+    doc.text("Preenchimento manual - limite de 4 pessoas por lideres", margin, 51);
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
