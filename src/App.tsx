@@ -72,6 +72,7 @@ const GaleriaPublica = lazy(() => import("./pages/GaleriaPublica"));
 const GaleriaEvento = lazy(() => import("./pages/GaleriaEvento"));
 const MissaoPublica = lazy(() => import("./pages/MissaoPublica"));
 const ReuniaoPublica = lazy(() => import("./pages/ReuniaoPublica"));
+const TimeDigitalCadastro = lazy(() => import("./pages/TimeDigitalCadastro"));
 const TrafegoPago = lazy(() => import("./pages/TrafegoPago"));
 const Agenda = lazy(() => import("./pages/Agenda"));
 const AgendaPublica = lazy(() => import("./pages/AgendaPublica"));
@@ -144,6 +145,7 @@ const RoutesWithBoundary = () => {
             <Route path="/g/:clientSlug/:gallerySlug" element={<GaleriaEvento />} />
             <Route path="/missao/:missionId" element={<MissaoPublica />} />
             <Route path="/reuniao/:token" element={<ReuniaoPublica />} />
+            <Route path="/time-digital/:token" element={<TimeDigitalCadastro />} />
             <Route path="/agenda/:clientSlug" element={<AgendaPublica />} />
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
