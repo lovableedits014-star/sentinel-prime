@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Copy, Link2, Loader2, Power, UserRoundPlus, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { resolvePublicBaseUrl } from "@/lib/public-base-url";
-import { fmtPhoneBR } from "@/lib/phone-utils";
+import { fmtPhoneBR, isValidBRPhone, normalizeBRPhone } from "@/lib/phone-utils";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,8 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
   const [nome, setNome] = useState("");
   const [leaderId, setLeaderId] = useState("");
   const [coordinatorId, setCoordinatorId] = useState("");
+  const [coordinatorName, setCoordinatorName] = useState("");
+  const [coordinatorPhone, setCoordinatorPhone] = useState("");
   const [selectedGroup, setSelectedGroup] = useState<string>("all");
 
   const { data: client } = useQuery({
@@ -108,13 +110,20 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
 
   const createGroup = useMutation({
     mutationFn: async () => {
+      const isNewCoordinator = coordinatorId === "__novo__";
+      if (isNewCoordinator && coordinatorName.trim().length < 3)
+        throw new Error("Informe o nome do novo coordenador.");
+      if (isNewCoordinator && !isValidBRPhone(coordinatorPhone))
+        throw new Error("Informe um WhatsApp válido para o novo coordenador.");
       if (nome.trim().length < 2 || !leaderId || !coordinatorId)
         throw new Error("Informe grupo, líder e coordenador.");
       const { error } = await (supabase as any).from("engagement_digital_groups").insert({
         client_id: clientId,
         nome: nome.trim(),
         leader_person_id: leaderId,
-        coordinator_person_id: coordinatorId,
+        coordinator_person_id: isNewCoordinator ? null : coordinatorId,
+        coordinator_name: isNewCoordinator ? coordinatorName.trim() : null,
+        coordinator_phone: isNewCoordinator ? normalizeBRPhone(coordinatorPhone) : null,
       });
       if (error) throw error;
     },
@@ -122,6 +131,8 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
       setNome("");
       setLeaderId("");
       setCoordinatorId("");
+      setCoordinatorName("");
+      setCoordinatorPhone("");
       qc.invalidateQueries({ queryKey: ["digital-groups", clientId] });
       toast.success("Grupo criado e link gerado.");
     },
@@ -163,7 +174,7 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
             definidos aqui.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-end">
+        <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 md:items-end">
           <div className="space-y-1.5">
             <Label>Nome do grupo</Label>
             <Input
@@ -194,6 +205,7 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__novo__">+ Cadastrar novo coordenador</SelectItem>
                 {coordinators.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.nome}
@@ -202,6 +214,33 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
               </SelectContent>
             </Select>
           </div>
+          {coordinatorId === "__novo__" && (
+            <>
+              <div className="space-y-1.5">
+                <Label>Nome do novo coordenador</Label>
+                <Input
+                  value={coordinatorName}
+                  onChange={(e) => setCoordinatorName(e.target.value)}
+                  placeholder="Nome completo"
+                  maxLength={100}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>WhatsApp do coordenador</Label>
+                <Input
+                  value={coordinatorPhone}
+                  onChange={(e) => setCoordinatorPhone(e.target.value)}
+                  onBlur={(e) => setCoordinatorPhone(fmtPhoneBR(normalizeBRPhone(e.target.value)))}
+                  placeholder="(67) 99999-9999"
+                  inputMode="tel"
+                />
+              </div>
+              <p className="self-center text-xs text-muted-foreground lg:col-span-2">
+                Este coordenador existirÃ¡ somente no Time Digital. Nenhum contrato ou cadastro
+                eleitoral serÃ¡ criado.
+              </p>
+            </>
+          )}
           <Button onClick={() => createGroup.mutate()} disabled={createGroup.isPending}>
             {createGroup.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
