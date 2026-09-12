@@ -26,7 +26,6 @@ type GroupRow = {
   ativo: boolean;
   invite_token: string;
   leader_person_id: string;
-  lider: string;
   coordinator_person_id: string;
   coordenador: string;
   membros: number;
@@ -51,7 +50,6 @@ type MemberRow = {
 export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
   const qc = useQueryClient();
   const [nome, setNome] = useState("");
-  const [leaderId, setLeaderId] = useState("");
   const [coordinatorId, setCoordinatorId] = useState("");
   const [coordinatorName, setCoordinatorName] = useState("");
   const [coordinatorPhone, setCoordinatorPhone] = useState("");
@@ -83,7 +81,6 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
       return data || [];
     },
   });
-  const leaders = people.filter((p) => p.tipo === "lider" || p.tipo === "coordenador");
   const coordinators = people.filter((p) => p.tipo === "coordenador");
 
   const { data: groups = [], isLoading } = useQuery<GroupRow[]>({
@@ -115,12 +112,12 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
         throw new Error("Informe o nome do novo coordenador.");
       if (isNewCoordinator && !isValidBRPhone(coordinatorPhone))
         throw new Error("Informe um WhatsApp válido para o novo coordenador.");
-      if (nome.trim().length < 2 || !leaderId || !coordinatorId)
-        throw new Error("Informe grupo, líder e coordenador.");
+      if (nome.trim().length < 2 || !coordinatorId)
+        throw new Error("Informe o grupo e o coordenador.");
       const { error } = await (supabase as any).from("engagement_digital_groups").insert({
         client_id: clientId,
         nome: nome.trim(),
-        leader_person_id: leaderId,
+        leader_person_id: null,
         coordinator_person_id: isNewCoordinator ? null : coordinatorId,
         coordinator_name: isNewCoordinator ? coordinatorName.trim() : null,
         coordinator_phone: isNewCoordinator ? normalizeBRPhone(coordinatorPhone) : null,
@@ -129,7 +126,6 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
     },
     onSuccess: () => {
       setNome("");
-      setLeaderId("");
       setCoordinatorId("");
       setCoordinatorName("");
       setCoordinatorPhone("");
@@ -167,11 +163,11 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserRoundPlus className="h-5 w-5" />
-            Líderes de grupos
+            Grupos do Time Digital
           </CardTitle>
           <CardDescription>
-            Crie um convite permanente. Quem se cadastrar ficará vinculado ao líder e ao coordenador
-            definidos aqui.
+            Crie um convite permanente. Quem se cadastrar ficará vinculado ao coordenador definido
+            aqui.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 md:items-end">
@@ -182,21 +178,6 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
               onChange={(e) => setNome(e.target.value)}
               placeholder="Ex.: Apoiadores de Aquidauana"
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Líder responsável</Label>
-            <Select value={leaderId} onValueChange={setLeaderId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                {leaders.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="space-y-1.5">
             <Label>Coordenador</Label>
@@ -270,9 +251,7 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <CardTitle className="text-base">{g.grupo}</CardTitle>
-                    <CardDescription>
-                      {g.lider} · Coord. {g.coordenador || "não informado"}
-                    </CardDescription>
+                    <CardDescription>Coord. {g.coordenador || "não informado"}</CardDescription>
                   </div>
                   <Badge variant={g.ativo ? "default" : "secondary"}>
                     {g.ativo ? "Ativo" : "Inativo"}

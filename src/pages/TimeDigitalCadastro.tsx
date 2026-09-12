@@ -15,7 +15,6 @@ type PublicInfo = {
   ok: boolean;
   motivo?: string;
   grupo?: string;
-  lider?: string;
   coordenador?: string | null;
   campanha?: string | null;
   logo_url?: string | null;
@@ -128,10 +127,6 @@ export default function TimeDigitalCadastro() {
             </Badge>
           </CardHeader>
           <CardContent className="space-y-2 text-center text-sm">
-            <div>
-              <span className="text-muted-foreground">Líder responsável:</span>{" "}
-              <strong>{info.lider}</strong>
-            </div>
             {info.coordenador && (
               <div>
                 <span className="text-muted-foreground">Coordenação:</span>{" "}
