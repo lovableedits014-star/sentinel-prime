@@ -78,7 +78,8 @@ export default function ContextoTerritorial() {
 
   const { data: ultimoLog } = useQuery({
     queryKey: ["municipios-sync-log-last"],
-    refetchInterval: 5000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     queryFn: async () => {
       const { data } = await supabase
         .from("municipios_sync_log" as any)

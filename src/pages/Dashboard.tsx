@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { lazy, Suspense, useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,45 +13,49 @@ import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Lege
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CommentItem, type CommentData } from "@/components/CommentItem";
 import { IEDPanel } from "@/components/IEDPanel";
-import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { AlertasWidget } from "@/components/dashboard/AlertasWidget";
 import { AuditPanel } from "@/components/dashboard/AuditPanel";
-import { DataHealthAlerts } from "@/components/dashboard/DataHealthAlerts";
-import { SuggestedActions } from "@/components/dashboard/SuggestedActions";
 import { FeriadosWidget } from "@/components/dashboard/FeriadosWidget";
 import { MetaTokenStatusCard } from "@/components/dashboard/MetaTokenStatusCard";
-import { exportDashboardPdf } from "@/lib/dashboard-pdf-export";
 // sync-throttle removido
+
+const DashboardOverview = lazy(() => import("@/components/dashboard/DashboardOverview").then((m) => ({ default: m.DashboardOverview })));
+const DataHealthAlerts = lazy(() => import("@/components/dashboard/DataHealthAlerts").then((m) => ({ default: m.DataHealthAlerts })));
+const SuggestedActions = lazy(() => import("@/components/dashboard/SuggestedActions").then((m) => ({ default: m.SuggestedActions })));
+
+function DeferredDashboardSection({ children, minHeight = 160 }: { children: ReactNode; minHeight?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || visible) return;
+    if (!("IntersectionObserver" in window)) { setVisible(true); return; }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "300px 0px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [visible]);
+
+  return (
+    <div ref={ref} style={{ minHeight: visible ? undefined : minHeight }}>
+      {visible && <Suspense fallback={<div className="h-32 animate-pulse rounded-lg bg-muted/50" />}>{children}</Suspense>}
+    </div>
+  );
+}
 
 interface DashboardComment {
   id: string;
-  comment_id: string;
-  post_id: string;
-  client_id: string;
   sentiment: string | null;
   status: string | null;
   created_at: string;
   comment_created_time: string | null;
-  author_name: string | null;
-  author_id: string | null;
-  author_profile_picture: string | null;
-  text: string;
   platform: string | null;
-  platform_user_id: string | null;
-  social_profile_id: string | null;
-  author_unavailable: boolean;
-  author_unavailable_reason: string | null;
-  ai_response: string | null;
-  final_response: string | null;
-  post_message: string | null;
-  post_permalink_url: string | null;
-  post_full_picture: string | null;
-  post_media_type: string | null;
-  parent_comment_id: string | null;
-  is_page_owner: boolean;
-  is_hidden: boolean;
 }
 
 interface TimelineData {
@@ -98,7 +102,10 @@ const Dashboard = () => {
 
     if (!cId) return { allComments: [] as DashboardComment[], supportersCount: 0, clientId: "" };
 
-    // Fetch ALL comments (paginated)
+    // O maior periodo disponivel no painel e 365 dias. Evita baixar todo o
+    // historico e campos pesados de texto/imagem que esta tela nao utiliza.
+    const oldestVisibleDate = new Date();
+    oldestVisibleDate.setDate(oldestVisibleDate.getDate() - 365);
     const PAGE_SIZE = 1000;
     let allData: DashboardComment[] = [];
     let page = 0;
@@ -109,10 +116,11 @@ const Dashboard = () => {
       const to = from + PAGE_SIZE - 1;
       const { data } = await supabase
         .from("comments")
-        .select("id, comment_id, post_id, client_id, sentiment, status, created_at, comment_created_time, author_name, author_id, author_profile_picture, text, platform, platform_user_id, social_profile_id, author_unavailable, author_unavailable_reason, ai_response, final_response, post_message, post_permalink_url, post_full_picture, post_media_type, parent_comment_id, is_page_owner, is_hidden")
+        .select("id, sentiment, status, created_at, comment_created_time, platform")
         .eq("client_id", cId)
         .not("text", "eq", "__post_stub__")
         .eq("is_page_owner", false)
+        .gte("created_at", oldestVisibleDate.toISOString())
         .order("comment_created_time", { ascending: false })
         .range(from, to);
 
@@ -331,6 +339,9 @@ const Dashboard = () => {
     if (exportingPdf) return;
     setExportingPdf(true);
     try {
+      // PDF e captura de tela sao bibliotecas grandes; carregue apenas quando
+      // o usuario realmente pedir a exportacao.
+      const { exportDashboardPdf } = await import("@/lib/dashboard-pdf-export");
       // Buscar nome do cliente e IED mais recente
       let clientName: string | undefined;
       let iedData: {
@@ -659,10 +670,10 @@ const Dashboard = () => {
       {clientId && <IEDPanel clientId={clientId} />}
 
       {/* Data Health Alerts — quedas bruscas e ausência de dados */}
-      {clientId && <DataHealthAlerts clientId={clientId} />}
+      {clientId && <DeferredDashboardSection><DataHealthAlerts clientId={clientId} /></DeferredDashboardSection>}
 
       {/* Suggested Actions — próximos passos com links diretos */}
-      {clientId && <SuggestedActions clientId={clientId} />}
+      {clientId && <DeferredDashboardSection><SuggestedActions clientId={clientId} /></DeferredDashboardSection>}
 
       {/* Audit Panel — transparência das métricas */}
       {clientId && <AuditPanel clientId={clientId} periodDays={periodDays} />}
@@ -674,7 +685,7 @@ const Dashboard = () => {
       <FeriadosWidget />
 
       {/* Unified Overview */}
-      {clientId && <DashboardOverview clientId={clientId} />}
+      {clientId && <DeferredDashboardSection minHeight={240}><DashboardOverview clientId={clientId} /></DeferredDashboardSection>}
 
       {/* Charts */}
       <div id="dashboard-charts-grid" className="grid gap-4 md:grid-cols-2">

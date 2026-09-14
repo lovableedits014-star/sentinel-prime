@@ -52,6 +52,8 @@ type ActivitySummary = {
 const db = supabase as any;
 const todayCuiaba = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Cuiaba", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const n = (value: unknown) => Number(value ?? 0);
+const OPERATIONS_REFRESH_MS = 60_000;
+const OPERATIONS_STALE_MS = 30_000;
 
 function MetricCard({ label, value, Icon, help }: { label: string; value: string | number; Icon: typeof Activity; help: string }) {
   return <Card title={help}><CardContent className="flex min-h-24 items-start gap-3 p-4"><Icon className="mt-1 h-5 w-5 shrink-0 text-primary"/><div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{label}<Info className="h-3 w-3"/></p><p className="text-2xl font-bold">{value}</p><p className="mt-1 text-[10px] leading-snug text-muted-foreground">{help}</p></div></CardContent></Card>;
@@ -81,7 +83,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_command_center", { p_client_id: clientId, p_mission_id: missionId || null, p_dia: todayCuiaba(), p_root_id: null });
       if (error) throw new Error(error.message);
       return data as Center;
-    }, enabled: !!clientId && (!!missionId || missions.isSuccess), refetchInterval: 20_000, staleTime: 5_000,
+    }, enabled: !!clientId && (!!missionId || missions.isSuccess), refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false, staleTime: OPERATIONS_STALE_MS,
   });
 
   const activity = useQuery({
@@ -92,7 +94,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       });
       if (error) throw new Error(error.message);
       return data as ActivitySummary;
-    }, enabled: !!clientId && !!missionId, refetchInterval: 20_000, staleTime: 5_000,
+    }, enabled: !!clientId && !!missionId, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false, staleTime: OPERATIONS_STALE_MS,
   });
 
   const coordinatorTeams = useQuery({
@@ -101,12 +103,12 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_coordinator_mission_charge", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return (data ?? []) as CoordinatorTeam[];
-    }, enabled: !!clientId && !!missionId, staleTime: 5_000, refetchInterval: 20_000,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false,
   });
   const standaloneContracts = useQuery({
     queryKey: ["engagement-mission-standalone-contracts",clientId,missionId],
     queryFn: async()=>{const {data,error}=await db.rpc("engagement_mission_standalone_contracts",{p_client_id:clientId,p_mission_id:missionId});if(error)throw new Error(error.message);return (data??[]) as StandaloneContract[]},
-    enabled:!!clientId&&!!missionId,staleTime:5_000,refetchInterval:20_000,
+    enabled:!!clientId&&!!missionId,staleTime:OPERATIONS_STALE_MS,refetchInterval:OPERATIONS_REFRESH_MS,refetchIntervalInBackground:false,
   });
   const assignmentAudit = useQuery({
     queryKey: ["engagement-mission-assignment-audit", clientId, missionId],
@@ -114,7 +116,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_assignment_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as AssignmentAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: 5_000, refetchInterval: 20_000,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false,
   });
   const completionAudit = useQuery({
     queryKey: ["engagement-mission-completion-audit", clientId, missionId],
@@ -122,7 +124,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_completion_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as CompletionAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: 5_000, refetchInterval: 20_000,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false,
   });
   const trackingAudit = useQuery({
     queryKey: ["engagement-mission-tracking-audit", clientId, missionId],
@@ -130,7 +132,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_tracking_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as TrackingAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: 5_000, refetchInterval: 20_000,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false,
   });
 
   useEffect(() => {

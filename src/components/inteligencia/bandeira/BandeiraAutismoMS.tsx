@@ -35,7 +35,8 @@ export default function BandeiraAutismoMS() {
 
   const { data: lastLog } = useQuery({
     queryKey: ["tea-ms-log-last"],
-    refetchInterval: 5000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     queryFn: async () => {
       const { data } = await supabase
         .from("tea_sync_log" as any)
