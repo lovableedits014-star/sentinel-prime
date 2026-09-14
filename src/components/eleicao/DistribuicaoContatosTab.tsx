@@ -48,6 +48,16 @@ interface ContratadoExportRow extends ContatoExport {
   bairro: string | null;
 }
 
+interface CaboRegiaoRow {
+  escopo: string;
+  regiao_key: string;
+  regiao_label: string;
+  total_elegivel: number;
+  total_ja_exportado: number;
+  total_novos: number;
+  ultima_exportacao_em: string | null;
+}
+
 const fmtDateTime = (s?: string | null) => s ? new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 const onlyDigits = (s: string) => (s || "").replace(/\D/g, "");
 const waLinkText = (phone: string, text: string) => {
@@ -69,6 +79,8 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const [busca, setBusca] = useState("");
   const [open, setOpen] = useState<RegiaoRow | null>(null);
   const [openContratados, setOpenContratados] = useState(false);
+  const [cabosRegioes, setCabosRegioes] = useState<CaboRegiaoRow[]>([]);
+  const [openCabos, setOpenCabos] = useState<CaboRegiaoRow | null>(null);
 
   // dialogs auxiliares
   const [openConfigInterior, setOpenConfigInterior] = useState(false);
@@ -107,17 +119,19 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
 
   const carregar = async () => {
     setLoading(true);
-    const [{ data: regs }, { data: hist }, { data: tpl }, { data: cidadesSem }] = await Promise.all([
+    const [{ data: regs }, { data: hist }, { data: tpl }, { data: cidadesSem }, { data: cabosRegs }] = await Promise.all([
       supabase.rpc("eleicao_listar_regioes_distribuicao", { _client_id: clientId }),
       supabase.from("eleicao_contato_lotes")
         .select("id, coordenador_id, regiao_label, canal, total_contatos, apenas_novos, created_at, vcf_url")
         .eq("client_id", clientId).order("created_at", { ascending: false }).limit(30),
       supabase.from("eleicao_distribuicao_template").select("mensagem_template").eq("client_id", clientId).maybeSingle(),
       supabase.rpc("eleicao_listar_cidades_interior_sem_principal", { _client_id: clientId }),
+      (supabase as any).rpc("eleicao_cabos_export_regioes", { _client_id: clientId }),
     ]);
     setRegioes((regs as any) || []);
     setHistorico((hist as any) || []);
     setCidadesSemPrincipal(((cidadesSem as any) || []).length);
+    setCabosRegioes((cabosRegs as any) || []);
     if (tpl) {
       setTemplate(tpl.mensagem_template || "");
     } else {
@@ -163,6 +177,7 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
         <TabsList>
           <TabsTrigger value="regioes">Regiões</TabsTrigger>
           <TabsTrigger value="contratados">Contratados</TabsTrigger>
+          <TabsTrigger value="cabos">Cabos eleitorais</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
           <TabsTrigger value="template">Mensagem padrão</TabsTrigger>
         </TabsList>
@@ -266,6 +281,33 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
           </Card>
         </TabsContent>
 
+        <TabsContent value="cabos" className="mt-3 space-y-3">
+          <Card className="p-4 bg-muted/30 text-sm text-muted-foreground">
+            Cabos com contrato ativo, separados por região. Cada download fica registrado para destacar os novos cadastros dos próximos dias.
+          </Card>
+          {cabosRegioes.length === 0 ? (
+            <Card className="p-8 text-center text-sm text-muted-foreground">Nenhum cabo eleitoral contratado com telefone válido.</Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {cabosRegioes.map((r) => (
+                <Card key={`${r.escopo}-${r.regiao_key}`} className={`p-4 ${Number(r.total_novos) > 0 ? "border-emerald-400" : ""}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2"><MapPin className="h-4 w-4"/><strong>{r.regiao_label}</strong></div>
+                      <p className="mt-1 text-xs text-muted-foreground">Último download: {fmtDateTime(r.ultima_exportacao_em)}</p>
+                    </div>
+                    {Number(r.total_novos) > 0 ? <Badge className="bg-emerald-500">+{r.total_novos} novos</Badge> : <Badge variant="secondary">Em dia</Badge>}
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                    <Stat label="Total" value={r.total_elegivel}/><Stat label="Já baixados" value={r.total_ja_exportado}/><Stat label="Novos" value={r.total_novos} highlight={Number(r.total_novos)>0}/>
+                  </div>
+                  <div className="mt-3 flex justify-end"><Button size="sm" onClick={() => setOpenCabos(r)}><Download className="mr-2 h-4 w-4"/>Baixar contatos</Button></div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
         {/* ===================== HISTÓRICO ===================== */}
         <TabsContent value="historico" className="mt-3">
           {historico.length === 0 ? (
@@ -329,6 +371,9 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
 
       {openContratados && (
         <ExportarContratadosDialog clientId={clientId} onClose={() => setOpenContratados(false)} />
+      )}
+      {openCabos && (
+        <ExportarCabosRegiaoDialog clientId={clientId} regiao={openCabos} onClose={() => setOpenCabos(null)} onExported={() => { setOpenCabos(null); carregar(); }} />
       )}
 
       <ConfigurarPrincipaisInteriorDialog
@@ -879,6 +924,96 @@ function EnviarPacoteDialog(props: {
           whatsappTexto={mensagemFinal}
         />
       )}
+    </Dialog>
+  );
+}
+
+function ExportarCabosRegiaoDialog({ clientId, regiao, onClose, onExported }: {
+  clientId: string;
+  regiao: CaboRegiaoRow;
+  onClose: () => void;
+  onExported: () => void;
+}) {
+  const [apenasNovos, setApenasNovos] = useState(Number(regiao.total_novos) > 0);
+  const [contatos, setContatos] = useState<ContatoExport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const tag = normalizeTag(`CAB${regiao.regiao_label}`).slice(0, 8);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    Promise.resolve((supabase as any).rpc("eleicao_cabos_export_lista", {
+      _client_id: clientId,
+      _escopo: regiao.escopo,
+      _regiao_key: regiao.regiao_key,
+      _apenas_novos: apenasNovos,
+    })).then(({ data, error }: any) => {
+      if (!active) return;
+      if (error) {
+        toast.error("Não foi possível carregar os cabos", { description: error.message });
+        setContatos([]);
+      } else {
+        setContatos((data || []).map((p: any) => ({ pessoa_id: p.pessoa_id, nome: p.nome, telefone: p.telefone, tipo: "cabo", bairro: p.bairro })));
+      }
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [clientId, regiao.escopo, regiao.regiao_key, apenasNovos]);
+
+  const registrar = async () => {
+    const { data: lote, error } = await (supabase as any).from("eleicao_cabo_export_lotes").insert({
+      client_id: clientId, escopo: regiao.escopo, regiao_key: regiao.regiao_key,
+      regiao_label: regiao.regiao_label, total_contatos: contatos.length, apenas_novos: apenasNovos,
+    }).select("id").single();
+    if (error || !lote) throw new Error(error?.message || "Não foi possível registrar o download");
+    if (contatos.length) {
+      const itens = contatos.map((c) => ({ client_id: clientId, lote_id: lote.id, pessoa_id: c.pessoa_id, escopo: regiao.escopo, regiao_key: regiao.regiao_key }));
+      const { error: itensError } = await (supabase as any).from("eleicao_cabo_export_itens")
+        .upsert(itens, { onConflict: "client_id,escopo,regiao_key,pessoa_id", ignoreDuplicates: true });
+      if (itensError) throw new Error(itensError.message);
+    }
+  };
+
+  const baixar = async (formato: "vcf" | "csv") => {
+    if (!contatos.length) return;
+    setDownloading(true);
+    try {
+      if (formato === "vcf") {
+        const conteudo = gerarVcardLote({ contatos, tagPrefixo: tag, regiaoLabel: regiao.regiao_label });
+        await saveBlob(new Blob([conteudo], { type: "text/vcard;charset=utf-8" }), `cabos_${slugify(regiao.regiao_label)}.vcf`, { title: `Cabos - ${regiao.regiao_label}` });
+      } else {
+        const conteudo = gerarCsvGoogleContacts({ contatos, tagPrefixo: tag, regiaoLabel: regiao.regiao_label });
+        await saveBlob(new Blob(["\ufeff" + conteudo], { type: "text/csv;charset=utf-8" }), `cabos_${slugify(regiao.regiao_label)}.csv`, { title: `Cabos - ${regiao.regiao_label}` });
+      }
+      await registrar();
+      toast.success(`${contatos.length} contato(s) de cabos baixados e registrados.`);
+      onExported();
+    } catch (error) {
+      toast.error("Falha ao baixar os contatos", { description: error instanceof Error ? error.message : "Erro inesperado" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader><DialogTitle>Cabos eleitorais — {regiao.regiao_label}</DialogTitle><DialogDescription>Escolha entre apenas os novos cadastros ou a lista completa da região.</DialogDescription></DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div><Label>Baixar somente os novos</Label><p className="text-xs text-muted-foreground">{regiao.total_novos} novos de {regiao.total_elegivel} no total</p></div>
+            <Switch checked={apenasNovos} onCheckedChange={setApenasNovos}/>
+          </div>
+          <div className="max-h-56 overflow-y-auto rounded-lg border bg-muted/20 p-3 text-sm">
+            {loading ? <Loader2 className="mx-auto h-5 w-5 animate-spin"/> : contatos.length ? contatos.map(c => <div key={c.pessoa_id} className="py-1">• {c.nome} — {c.telefone}</div>) : <p className="text-muted-foreground">Nenhum contato novo para baixar.</p>}
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => baixar("csv")} disabled={loading || downloading || !contatos.length}><FileText className="mr-2 h-4 w-4"/>CSV Google</Button>
+          <Button onClick={() => baixar("vcf")} disabled={loading || downloading || !contatos.length}>{downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}Baixar .vcf</Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }

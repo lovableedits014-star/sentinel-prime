@@ -454,11 +454,11 @@ export default function Eleicao() {
     if (form.tipo === "coordenador" && !editing && form.send_access && (!form.email.trim() || form.password.length < 6)) {
       toast.error("Para enviar acesso, informe e-mail e senha com no mínimo 6 caracteres"); return;
     }
-    if (form.tipo === "cabo" && form.parent_id) {
+    if (form.tipo === "cabo" && form.parent_id && parseValorContratacao(form.valor_contratacao) > 0) {
       const parent = pessoas.find(p => p.id === form.parent_id);
       if (parent?.tipo === "lider") {
         const totalCabosAtivos = pessoas.filter(p =>
-          p.tipo === "cabo" && p.parent_id === parent.id && !p.arquivado_em && p.id !== editing?.id
+          p.tipo === "cabo" && p.parent_id === parent.id && isEleicaoContratado(p) && p.id !== editing?.id
         ).length;
         if (totalCabosAtivos >= 4) {
           toast.error("Este líder já possui o limite de 4 cabos eleitorais ativos.");
@@ -1354,7 +1354,7 @@ export default function Eleicao() {
   };
 
   const abrirNovoCabo = (lider: Pessoa) => {
-    const total = pessoas.filter(p => p.tipo === "cabo" && p.parent_id === lider.id && !p.arquivado_em).length;
+    const total = pessoas.filter(p => p.tipo === "cabo" && p.parent_id === lider.id && isEleicaoContratado(p)).length;
     if (total >= 4) return toast.error("Este líder já possui o limite de 4 cabos eleitorais ativos.");
     openNew({
       tipo: "cabo",
@@ -1362,8 +1362,8 @@ export default function Eleicao() {
       escopo: lider.escopo,
       regiao: (lider.regiao || "centro") as Regiao,
       cidade: lider.cidade || (lider.escopo === "campo_grande" ? "Campo Grande" : ""),
-      rua: lider.rua || "",
-      numero: lider.numero || "",
+      rua: "",
+      numero: "",
       bairro: lider.bairro || "",
     });
   };
@@ -1725,6 +1725,14 @@ export default function Eleicao() {
             <div>
               <Label>Telefone *</Label>
               <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" inputMode="tel" />
+            </div>
+            <div>
+              <Label>Endereço <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+              <Input
+                value={form.rua}
+                onChange={e => setForm(f => ({ ...f, rua: e.target.value }))}
+                placeholder="Rua, número ou complemento"
+              />
             </div>
             <div>
               <Label>CPF <span className="font-normal text-muted-foreground">(opcional)</span></Label>
@@ -2541,6 +2549,7 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
   onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null;
 }) {
   const cabos = all.filter(p => p.tipo === "cabo" && p.parent_id === lider.id);
+  const cabosContratados = cabos.filter(isEleicaoContratado);
   const hasCabos = cabos.length > 0;
   const { searchActive, matchedIds } = React.useContext(EleicaoSearchContext);
   const matchesNaEquipe = useMemo(
@@ -2562,7 +2571,7 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
         onSend={onSend}
         sendingId={sendingId}
         indent={1}
-        teamCount={cabos.length}
+        teamCount={cabosContratados.length}
         teamLimit={4}
         matchInTeam={matchesNaEquipe}
         expanded={open}
