@@ -13,25 +13,26 @@ export default function FotoPublica() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [candidateName, setCandidateName] = useState<string>("Campanha");
   const [materialCount, setMaterialCount] = useState<number>(0);
-  const [partnerName, setPartnerName] = useState<string | null>(null);
   const [invalidPartner, setInvalidPartner] = useState(false);
   const materialsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!clientId) return;
     (async () => {
-      const [{ data: ident }, { data: client }, { count }] = await Promise.all([
+      const [{ data: ident }, { data: client }, materialsResult] = await Promise.all([
         supabase.from("candidate_identity").select("logo_url").eq("client_id", clientId).maybeSingle(),
         supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
-        supabase
-          .from("campaign_materials")
-          .select("id", { count: "exact", head: true })
-          .eq("client_id", clientId)
-          .eq("status", "published"),
+        partnerToken
+          ? Promise.resolve({ count: 0 })
+          : supabase
+              .from("campaign_materials")
+              .select("id", { count: "exact", head: true })
+              .eq("client_id", clientId)
+              .eq("status", "published"),
       ]);
       if (ident?.logo_url) setLogoUrl(ident.logo_url);
       if (client?.name) setCandidateName(client.name);
-      setMaterialCount(count ?? 0);
+      setMaterialCount(materialsResult.count ?? 0);
       if (partnerToken) {
         const { data: partner } = await supabase.rpc("campaign_frame_partner_public_info" as any, {
           _client_id: clientId,
@@ -39,7 +40,6 @@ export default function FotoPublica() {
         });
         const info = partner as any;
         setInvalidPartner(!info?.ok);
-        setPartnerName(info?.ok ? info.nome : null);
       }
     })();
   }, [clientId, partnerToken]);
@@ -60,7 +60,7 @@ export default function FotoPublica() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
-      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
+      {!partnerToken && <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
           {logoUrl ? (
             <img src={logoUrl} alt={candidateName} className="w-10 h-10 object-contain" />
@@ -70,8 +70,8 @@ export default function FotoPublica() {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground">{partnerName ? "Foto da dobradinha" : "Foto oficial da campanha"}</p>
-            <h1 className="text-base font-semibold truncate">{partnerName || candidateName}</h1>
+            <p className="text-xs text-muted-foreground">Foto oficial da campanha</p>
+            <h1 className="text-base font-semibold truncate">{candidateName}</h1>
           </div>
           {materialCount > 0 && (
             <Button
@@ -86,7 +86,7 @@ export default function FotoPublica() {
             </Button>
           )}
         </div>
-      </header>
+      </header>}
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
         <div className="text-center space-y-1">
@@ -102,7 +102,7 @@ export default function FotoPublica() {
           hideWithoutActiveFrame={!!partnerToken}
         />
 
-        {materialCount > 0 && (
+        {!partnerToken && materialCount > 0 && (
           <MateriaisDestaque
             clientId={clientId}
             clientName={candidateName}
@@ -111,7 +111,7 @@ export default function FotoPublica() {
           />
         )}
 
-        {materialCount > 0 && (
+        {!partnerToken && materialCount > 0 && (
           <button
             type="button"
             onClick={scrollToMaterials}
@@ -132,7 +132,7 @@ export default function FotoPublica() {
           </button>
         )}
 
-        <div ref={materialsRef} className="scroll-mt-20 space-y-3 pt-2">
+        {!partnerToken && <div ref={materialsRef} className="scroll-mt-20 space-y-3 pt-2">
           <div className="flex items-center gap-2 border-b pb-2">
             <Download className="w-5 h-5 text-primary" />
             <h2 className="text-xl font-bold">Materiais para baixar e compartilhar</h2>
@@ -141,7 +141,7 @@ export default function FotoPublica() {
             Clique em "Baixar" e depois compartilhe nos seus grupos. Toque no botão verde para enviar direto no WhatsApp.
           </p>
           <PublicMaterialsTab clientId={clientId} clientName={candidateName} />
-        </div>
+        </div>}
       </main>
 
       <footer className="py-6 text-center text-xs text-muted-foreground">
