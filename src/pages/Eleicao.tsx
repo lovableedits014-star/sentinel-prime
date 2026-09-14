@@ -43,7 +43,7 @@ import DobradinhasManagerPanel from "@/components/eleicao/DobradinhasManagerPane
 import DobradinhaPropagarDialog from "@/components/eleicao/DobradinhaPropagarDialog";
 import DistribuicaoContatosTab from "@/components/eleicao/DistribuicaoContatosTab";
 import { FunnelManagement } from "@/components/eleicao/FunnelManagement";
-import { getEleicaoSituacao, isEleicaoContratado, isEleicaoSemContrato, isEleicaoVoluntario } from "@/lib/eleicao-situacao";
+import { getEleicaoSituacao, isEleicaoContratado, isEleicaoContratadoRemunerado, isEleicaoSemContrato, isEleicaoVoluntario, isEleicaoVoluntarioContratado } from "@/lib/eleicao-situacao";
 import ContratadosCumprimentoReport from "@/components/eleicao/ContratadosCumprimentoReport";
 import { gerarFormularioCabosPdf, type LiderFormularioCabos } from "@/lib/eleicao-cabos-formulario-pdf";
 import { gerarReciboDocumentacaoPdf } from "@/lib/eleicao-recibo-documentacao-pdf";
@@ -829,12 +829,13 @@ export default function Eleicao() {
 
   const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao" | "relatorio_contratados">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
-  const [statusFilter, setStatusFilter] = useState<"todos" | "contratados" | "sem_contrato" | "sem_acesso" | "avulsos" | "voluntarios" | "arquivados" | "reuniao">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "contratados" | "voluntarios_contratados" | "sem_contrato" | "sem_acesso" | "avulsos" | "voluntarios" | "arquivados" | "reuniao">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
   const [sortBy, setSortBy] = useState<"nome" | "valor" | "tipo">("nome");
 
   const matchesStatus = (p: Pessoa) => {
-    if (statusFilter === "contratados") return isEleicaoContratado(p);
+    if (statusFilter === "contratados") return isEleicaoContratadoRemunerado(p);
+    if (statusFilter === "voluntarios_contratados") return isEleicaoVoluntarioContratado(p);
     if (statusFilter === "sem_contrato") return isEleicaoSemContrato(p);
     if (statusFilter === "sem_acesso") return p.tipo === "coordenador" && !p.user_id;
     if (statusFilter === "avulsos") return p.tipo === "lider" && !p.parent_id && !p.is_voluntario;
@@ -956,7 +957,8 @@ export default function Eleicao() {
       lider: remunerados.filter(p => p.tipo === "lider").length,
       cabo: remunerados.filter(p => p.tipo === "cabo").length,
       voluntarios: f.filter(isVol).length,
-      contratados: f.filter(isEleicaoContratado).length,
+      contratados: f.filter(isEleicaoContratadoRemunerado).length,
+      voluntariosContratados: f.filter(isEleicaoVoluntarioContratado).length,
       semContrato: f.filter(isEleicaoSemContrato).length,
       arquivados: pessoas.filter(p => p.escopo === escopo && !!p.arquivado_em).length,
       total: f.length,
@@ -1480,9 +1482,10 @@ export default function Eleicao() {
         </TabsList>
 
         {/* KPIs com cards visuais */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 mb-4">
           <KpiCard label="Total" value={stats.total} icon={Users} tone="neutral" />
           <KpiCard label="Contratados" value={stats.contratados} icon={UserCheck} tone="blue" />
+          <KpiCard label="Voluntários contratados" value={stats.voluntariosContratados} icon={Heart} tone="green" />
           <KpiCard label="Sem contrato" value={stats.semContrato} icon={AlertCircle} tone="amber" />
           <KpiCard label="Voluntários" value={stats.voluntarios} icon={Heart} tone="emerald" />
           <KpiCard label="Arquivados" value={stats.arquivados} icon={Trash2} tone="neutral" />
@@ -1516,6 +1519,7 @@ export default function Eleicao() {
               <SelectContent>
                 <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="contratados">✅ Contratados</SelectItem>
+                <SelectItem value="voluntarios_contratados">💚 Voluntários contratados</SelectItem>
                 <SelectItem value="sem_contrato">⚠ Sem contrato</SelectItem>
                   <SelectItem value="sem_acesso">🔒 Coord. sem acesso</SelectItem>
                   <SelectItem value="avulsos">⚡ Líderes avulsos</SelectItem>
@@ -2686,6 +2690,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   const wa = waLink(p.telefone);
   const semValor = !p.valor_contratacao || p.valor_contratacao === 0;
   const situacao = getEleicaoSituacao(p);
+  const voluntarioContratado = isEleicaoVoluntarioContratado(p);
   const tipoBg: Record<Tipo, string> = {
     coordenador: "bg-red-500 text-white",
     lider: "bg-blue-500 text-white",
@@ -2737,11 +2742,12 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           {/* Badge de pré-selecionado removida conforme plano */}
           {p.participou_reuniao && <Badge variant="outline" className="h-5 bg-blue-500/10 text-blue-600 border-blue-500/20 text-[9px] gap-1 px-1"><Users className="w-2.5 h-2.5" /> Reunião</Badge>}
           <Badge variant="outline" className={cn("h-4 px-1 text-[9px] shrink-0",
-            situacao === "contratado" && "border-blue-500/30 text-blue-700 bg-blue-500/10",
+            situacao === "contratado" && !voluntarioContratado && "border-blue-500/30 text-blue-700 bg-blue-500/10",
+            voluntarioContratado && "border-green-500/30 text-green-700 bg-green-500/10",
             situacao === "sem_contrato" && "border-amber-500/30 text-amber-700 bg-amber-500/10",
             situacao === "voluntario" && "border-emerald-500/30 text-emerald-700 bg-emerald-500/10",
             situacao === "arquivado" && "border-slate-500/30 text-slate-600 bg-slate-500/10",
-          )}>{situacao === "sem_contrato" ? "Sem contrato" : situacao === "voluntario" ? "Voluntário" : situacao === "arquivado" ? "Arquivado" : "Contratado"}</Badge>
+          )}>{situacao === "sem_contrato" ? "Sem contrato" : situacao === "voluntario" ? "Voluntário" : situacao === "arquivado" ? "Arquivado" : voluntarioContratado ? "Voluntário contratado" : "Contratado"}</Badge>
           {p.tipo === "coordenador" && p.escopo === "campo_grande" && p.regiao && (
             <FavoritoToggle pessoa={p} />
           )}

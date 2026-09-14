@@ -14,6 +14,12 @@ export function getEleicaoSituacao(pessoa: EleicaoPessoaSituacao): EleicaoSituac
 
 export const isEleicaoAtivo = (pessoa: EleicaoPessoaSituacao) => !pessoa.arquivado_em;
 export const isEleicaoContratado = (pessoa: EleicaoPessoaSituacao) => getEleicaoSituacao(pessoa) === "contratado";
+// Classificacoes exclusivamente visuais. Um valor simbolico abaixo de R$ 1,00
+// continua sendo um contrato ativo para preservar vinculos e permissoes.
+export const isEleicaoVoluntarioContratado = (pessoa: EleicaoPessoaSituacao) =>
+  isEleicaoContratado(pessoa) && Number(pessoa.valor_contratacao || 0) < 1;
+export const isEleicaoContratadoRemunerado = (pessoa: EleicaoPessoaSituacao) =>
+  isEleicaoContratado(pessoa) && Number(pessoa.valor_contratacao || 0) >= 1;
 export const isEleicaoSemContrato = (pessoa: EleicaoPessoaSituacao) => getEleicaoSituacao(pessoa) === "sem_contrato";
 export const isEleicaoVoluntario = (pessoa: EleicaoPessoaSituacao) => getEleicaoSituacao(pessoa) === "voluntario";
 
