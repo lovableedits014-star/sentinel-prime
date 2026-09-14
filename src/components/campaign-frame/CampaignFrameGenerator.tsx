@@ -102,7 +102,7 @@ export default function CampaignFrameGenerator({
   } else if (variant === "showcase") {
     Trigger = (
       <Card className="cursor-pointer hover:shadow-lg transition-all overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10">
-        <CardContent className="p-5 space-y-4">
+        <CardContent className="p-3 sm:p-5 space-y-3 sm:space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
             <div>
@@ -110,7 +110,7 @@ export default function CampaignFrameGenerator({
               <p className="text-xs text-muted-foreground">Mostre seu apoio com uma moldura oficial</p>
             </div>
           </div>
-          <div className="relative mx-auto w-48 h-48 sm:w-56 sm:h-56 rounded-full overflow-hidden bg-muted shadow-md ring-4 ring-background">
+          <div className="relative mx-auto aspect-square w-full max-w-[420px] overflow-hidden rounded-xl bg-muted shadow-md ring-2 ring-background sm:ring-4">
             {showcaseFrame ? (
               <canvas
                 ref={showcaseCanvasRef}
@@ -158,10 +158,10 @@ export default function CampaignFrameGenerator({
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); }}>
       <DialogTrigger asChild>{Trigger}</DialogTrigger>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="left-0 top-0 h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none p-3 pb-24 sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[90vh] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg sm:p-6 sm:pb-6">
+        <DialogHeader className="pr-8 text-left">
           <DialogTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Gerar foto de campanha</DialogTitle>
-          <DialogDescription>Suba sua foto, ajuste o enquadramento e baixe pronta para usar no WhatsApp e redes sociais.</DialogDescription>
+          <DialogDescription>São só 3 passos: envie, ajuste e baixe.</DialogDescription>
         </DialogHeader>
         <FrameEditor
           clientId={clientId}

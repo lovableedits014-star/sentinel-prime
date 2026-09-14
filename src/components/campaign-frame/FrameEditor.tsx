@@ -253,10 +253,19 @@ export default function FrameEditor({
           )}
 
           <TabsContent value="individual" className="mt-4">
+            <div className="mb-3 md:hidden">
+              <Label className="mb-2 block text-sm font-semibold">1. Escolha sua foto</Label>
+              <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+              <Button size="lg" variant={photoFile ? "outline" : "default"} className="h-12 w-full gap-2 text-base" onClick={() => fileInputRef.current?.click()}>
+                {photoFile ? <Camera className="h-5 w-5" /> : <Upload className="h-5 w-5" />}
+                {photoFile ? "Trocar foto" : "Escolher foto do celular"}
+              </Button>
+            </div>
             <div className="grid md:grid-cols-2 gap-6">
               {/* Preview canvas */}
               <div className="space-y-3">
-                <div className="aspect-square w-full bg-muted rounded-lg overflow-hidden border touch-none select-none">
+                <Label className="block text-sm font-semibold md:hidden">2. Ajuste sua foto na moldura</Label>
+                <div className="aspect-square w-full bg-muted rounded-xl overflow-hidden border touch-none select-none shadow-sm">
                   <canvas
                     ref={canvasRef}
                     width={CANVAS_SIZE}
@@ -270,16 +279,19 @@ export default function FrameEditor({
                 </div>
                 {photoFile && (
                   <div>
-                    <Label className="text-xs">Zoom</Label>
+                    <div className="mb-2 flex items-center justify-between">
+                      <Label className="text-sm font-medium">Tamanho da foto</Label>
+                      <span className="text-xs text-muted-foreground">Deslize para ajustar</span>
+                    </div>
                     <Slider value={[zoom]} min={0.5} max={3} step={0.05} onValueChange={(v) => setZoom(v[0])} />
-                    <p className="text-[11px] text-muted-foreground mt-1">Arraste a imagem para reposicionar</p>
+                    <p className="mt-2 rounded-md bg-primary/5 p-2 text-center text-xs font-medium text-primary">Use o dedo para arrastar e centralizar seu rosto</p>
                   </div>
                 )}
               </div>
 
               {/* Controls */}
               <div className="space-y-4">
-                <div>
+                <div className="hidden md:block">
                   <Label className="text-xs mb-2 block">Sua foto</Label>
                   <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
                   <Button variant="outline" className="w-full gap-2" onClick={() => fileInputRef.current?.click()}>
@@ -289,9 +301,10 @@ export default function FrameEditor({
                 </div>
 
                 <div className="flex flex-col gap-2 pt-2">
-                  <Button onClick={handleGenerate} disabled={!photoFile || generating} className="gap-2">
+                  <Label className="text-sm font-semibold md:hidden">3. Finalize sua foto</Label>
+                  <Button size="lg" onClick={handleGenerate} disabled={!photoFile || generating} className="h-12 gap-2 text-base shadow-md">
                     {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                    Gerar imagem final
+                    Criar minha foto pronta
                   </Button>
                   {resultUrl && (
                     <>
@@ -309,7 +322,7 @@ export default function FrameEditor({
                         variant="default"
                         onClick={handleDownload}
                         disabled={downloading}
-                        className="gap-2 bg-primary"
+                        className="h-12 gap-2 bg-primary text-base"
                       >
                         {downloading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -318,7 +331,7 @@ export default function FrameEditor({
                         )}
                         Baixar JPG (1080x1080)
                       </Button>
-                      <Button variant="outline" onClick={handleShare} disabled={sharing} className="gap-2">
+                      <Button variant="outline" onClick={handleShare} disabled={sharing} className="h-12 gap-2 text-base">
                         {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
                         Compartilhar foto
                       </Button>

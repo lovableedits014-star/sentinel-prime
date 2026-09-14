@@ -88,9 +88,9 @@ export default function FotoPublica() {
         </div>
       </header>}
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      <main className={`${partnerToken ? "max-w-xl px-2 py-3 sm:px-4" : "max-w-3xl px-4 py-6"} mx-auto space-y-4 sm:space-y-6`}>
         <div className="text-center space-y-1">
-          <h2 className="text-2xl font-bold">Gere sua foto de perfil</h2>
+          <h2 className="text-xl font-bold sm:text-2xl">Gere sua foto de perfil</h2>
           <p className="text-sm text-muted-foreground">
             Envie sua foto e baixe a versão com a moldura oficial para usar no WhatsApp e redes sociais.
           </p>
@@ -144,7 +144,7 @@ export default function FotoPublica() {
         </div>}
       </main>
 
-      <footer className="py-6 text-center text-xs text-muted-foreground">
+      <footer className="py-4 text-center text-xs text-muted-foreground">
         Compartilhe este link com amigos e apoiadores.
       </footer>
     </div>
