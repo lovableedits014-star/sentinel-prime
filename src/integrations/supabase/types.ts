@@ -887,6 +887,7 @@ export type Database = {
           nome_parlamentar: string | null
           observacoes: string | null
           partido: string | null
+          public_token: string
           uf: string | null
           updated_at: string
           url_camara_municipal: string | null
@@ -908,6 +909,7 @@ export type Database = {
           nome_parlamentar?: string | null
           observacoes?: string | null
           partido?: string | null
+          public_token?: string
           uf?: string | null
           updated_at?: string
           url_camara_municipal?: string | null
@@ -929,6 +931,7 @@ export type Database = {
           nome_parlamentar?: string | null
           observacoes?: string | null
           partido?: string | null
+          public_token?: string
           uf?: string | null
           updated_at?: string
           url_camara_municipal?: string | null
@@ -1061,6 +1064,7 @@ export type Database = {
           is_active: boolean
           kind: string
           nome: string
+          parceiro_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1073,6 +1077,7 @@ export type Database = {
           is_active?: boolean
           kind?: string
           nome: string
+          parceiro_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1085,6 +1090,7 @@ export type Database = {
           is_active?: boolean
           kind?: string
           nome?: string
+          parceiro_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -11583,7 +11589,7 @@ export type Database = {
         Returns: string
       }
       get_active_campaign_frames: {
-        Args: { _client_id: string }
+        Args: { _client_id: string; _parceiro_token?: string | null }
         Returns: {
           composition: Json
           display_order: number

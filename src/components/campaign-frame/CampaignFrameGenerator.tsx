@@ -21,6 +21,7 @@ interface Props {
   variant?: "card" | "button" | "showcase";
   individualOnly?: boolean;
   hideWithoutActiveFrame?: boolean;
+  partnerToken?: string;
 }
 
 const CANVAS_SIZE = 1080;
@@ -43,6 +44,7 @@ export default function CampaignFrameGenerator({
   variant = "card",
   individualOnly = false,
   hideWithoutActiveFrame = false,
+  partnerToken,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [showcaseFrame, setShowcaseFrame] = useState<Frame | null>(null);
@@ -54,13 +56,13 @@ export default function CampaignFrameGenerator({
   useEffect(() => {
     if (variant !== "showcase" || !clientId) return;
     (async () => {
-      const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
+      const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId, _parceiro_token: partnerToken ?? null } as any);
       const list = ((data ?? []) as any as Frame[]);
       const first = list[0] ?? (hideWithoutActiveFrame ? null : DEFAULT_FRAME);
       setShowcaseFrame(first);
       setShowcaseLoaded(true);
     })();
-  }, [variant, clientId, hideWithoutActiveFrame]);
+  }, [variant, clientId, hideWithoutActiveFrame, partnerToken]);
 
   // Render empty showcase preview (no user photo)
   useEffect(() => {
@@ -165,6 +167,7 @@ export default function CampaignFrameGenerator({
           clientId={clientId}
           individualOnly={individualOnly}
           requireActiveFrame={hideWithoutActiveFrame}
+          partnerToken={partnerToken}
         />
       </DialogContent>
     </Dialog>

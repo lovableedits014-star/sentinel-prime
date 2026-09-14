@@ -38,6 +38,7 @@ interface Props {
   frameId?: string;
   initialName?: string;
   initialComposition?: FrameComposition;
+  parceiroId?: string | null;
   onSaved?: () => void;
 }
 
@@ -50,6 +51,7 @@ export default function FrameCompositionEditor({
   frameId,
   initialName,
   initialComposition,
+  parceiroId,
   onSaved,
 }: Props) {
   const [name, setName] = useState(initialName ?? "Nova moldura");
@@ -277,6 +279,7 @@ export default function FrameCompositionEditor({
         composition: comp,
         kind: "composition",
         is_active: true,
+        parceiro_id: parceiroId ?? null,
       };
       if (thumbUrl) payload.image_url = thumbUrl;
 

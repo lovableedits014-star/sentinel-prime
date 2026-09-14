@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Image as ImageIcon, Loader2, Trash2, Sparkles, Plus, Pencil } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Image as ImageIcon, Loader2, Trash2, Sparkles, Plus, Pencil, Copy, Link } from "lucide-react";
 import { toast } from "sonner";
 import FrameCompositionEditor from "@/components/campaign-frame/FrameCompositionEditor";
 import { DEFAULT_COMPOSITION, FrameComposition } from "@/components/campaign-frame/types";
@@ -15,7 +16,10 @@ interface Frame {
   is_active: boolean;
   display_order: number;
   composition: FrameComposition | null;
+  parceiro_id: string | null;
 }
+
+interface Partner { id: string; nome: string; public_token: string; ativo: boolean; }
 
 interface Props { clientId: string; }
 
@@ -24,15 +28,17 @@ export default function CampaignFramesCard({ clientId }: Props) {
   const [loading, setLoading] = useState(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingFrame, setEditingFrame] = useState<Frame | null>(null);
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [scope, setScope] = useState("official");
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("campaign_frames")
-      .select("id, nome, image_url, is_active, display_order, composition")
-      .eq("client_id", clientId)
-      .order("display_order", { ascending: true });
+    const [{ data }, { data: partnerData }] = await Promise.all([
+      supabase.from("campaign_frames").select("id, nome, image_url, is_active, display_order, composition, parceiro_id").eq("client_id", clientId).order("display_order", { ascending: true }),
+      supabase.from("eleicao_candidatos_parceiros").select("id, nome, public_token, ativo").eq("client_id", clientId).eq("ativo", true).order("ordem"),
+    ]);
     setFrames((data ?? []) as any as Frame[]);
+    setPartners((partnerData ?? []) as any as Partner[]);
     setLoading(false);
   };
 
@@ -57,6 +63,13 @@ export default function CampaignFramesCard({ clientId }: Props) {
 
   const openNew = () => { setEditingFrame(null); setEditorOpen(true); };
   const openEdit = (f: Frame) => { setEditingFrame(f); setEditorOpen(true); };
+  const selectedPartner = partners.find((p) => p.id === scope);
+  const visibleFrames = frames.filter((f) => scope === "official" ? !f.parceiro_id : f.parceiro_id === scope);
+  const publicLink = selectedPartner ? `${window.location.origin}/foto/${clientId}/dobradinha/${selectedPartner.public_token}` : `${window.location.origin}/foto/${clientId}`;
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(publicLink);
+    toast.success(`Link ${selectedPartner ? `de ${selectedPartner.nome}` : "oficial"} copiado`);
+  };
 
   return (
     <Card>
@@ -72,9 +85,30 @@ export default function CampaignFramesCard({ clientId }: Props) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+            <div className="flex-1 space-y-1">
+              <label className="text-xs font-medium">Conjunto de molduras</label>
+              <Select value={scope} onValueChange={setScope}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="official">Campanha oficial (atual)</SelectItem>
+                  {partners.map((p) => <SelectItem key={p.id} value={p.id}>Dobradinha · {p.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" onClick={copyLink} className="gap-2"><Copy className="w-4 h-4" /> Copiar link exclusivo</Button>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+            <Link className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{publicLink}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {selectedPartner ? `Somente as molduras de ${selectedPartner.nome} aparecem neste link.` : "Este é o link oficial já existente; ele continua mostrando apenas as molduras oficiais."}
+          </p>
+        </div>
         {loading ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin" /></div>
-        ) : frames.length === 0 ? (
+        ) : visibleFrames.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Nenhuma moldura cadastrada</p>
@@ -82,7 +116,7 @@ export default function CampaignFramesCard({ clientId }: Props) {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {frames.map((f) => (
+            {visibleFrames.map((f) => (
               <div key={f.id} className="border rounded-lg overflow-hidden bg-card">
                 <div className="aspect-square bg-[conic-gradient(at_50%_50%,#f1f5f9_25%,#e2e8f0_25%_50%,#f1f5f9_50%_75%,#e2e8f0_75%)] bg-[length:20px_20px]">
                   {f.image_url ? (
@@ -120,6 +154,7 @@ export default function CampaignFramesCard({ clientId }: Props) {
           frameId={editingFrame?.id}
           initialName={editingFrame?.nome}
           initialComposition={editingFrame?.composition ?? DEFAULT_COMPOSITION}
+          parceiroId={editingFrame?.parceiro_id ?? (scope === "official" ? null : scope)}
           onSaved={load}
         />
       </CardContent>

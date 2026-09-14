@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Download, ArrowDown, Gift } from "lucide-react";
 
 export default function FotoPublica() {
-  const { clientId } = useParams<{ clientId: string }>();
+  const { clientId, partnerToken } = useParams<{ clientId: string; partnerToken?: string }>();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [candidateName, setCandidateName] = useState<string>("Campanha");
   const [materialCount, setMaterialCount] = useState<number>(0);
+  const [partnerName, setPartnerName] = useState<string | null>(null);
+  const [invalidPartner, setInvalidPartner] = useState(false);
   const materialsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,10 +32,19 @@ export default function FotoPublica() {
       if (ident?.logo_url) setLogoUrl(ident.logo_url);
       if (client?.name) setCandidateName(client.name);
       setMaterialCount(count ?? 0);
+      if (partnerToken) {
+        const { data: partner } = await supabase.rpc("campaign_frame_partner_public_info" as any, {
+          _client_id: clientId,
+          _token: partnerToken,
+        });
+        const info = partner as any;
+        setInvalidPartner(!info?.ok);
+        setPartnerName(info?.ok ? info.nome : null);
+      }
     })();
-  }, [clientId]);
+  }, [clientId, partnerToken]);
 
-  if (!clientId) {
+  if (!clientId || invalidPartner) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <Card className="p-6 max-w-md text-center">
@@ -59,8 +70,8 @@ export default function FotoPublica() {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground">Foto oficial da campanha</p>
-            <h1 className="text-base font-semibold truncate">{candidateName}</h1>
+            <p className="text-xs text-muted-foreground">{partnerName ? "Foto da dobradinha" : "Foto oficial da campanha"}</p>
+            <h1 className="text-base font-semibold truncate">{partnerName || candidateName}</h1>
           </div>
           {materialCount > 0 && (
             <Button
@@ -84,7 +95,12 @@ export default function FotoPublica() {
             Envie sua foto e baixe a versão com a moldura oficial para usar no WhatsApp e redes sociais.
           </p>
         </div>
-        <CampaignFrameGenerator clientId={clientId} variant="showcase" />
+        <CampaignFrameGenerator
+          clientId={clientId}
+          variant="showcase"
+          partnerToken={partnerToken}
+          hideWithoutActiveFrame={!!partnerToken}
+        />
 
         {materialCount > 0 && (
           <MateriaisDestaque

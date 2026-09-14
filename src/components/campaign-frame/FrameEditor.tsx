@@ -22,6 +22,7 @@ export interface FrameEditorProps {
   defaultTab?: "individual" | "lote";
   individualOnly?: boolean;
   requireActiveFrame?: boolean;
+  partnerToken?: string;
 }
 
 const CANVAS_SIZE = 1080;
@@ -43,6 +44,7 @@ export default function FrameEditor({
   defaultTab = "individual",
   individualOnly = false,
   requireActiveFrame = false,
+  partnerToken,
 }: FrameEditorProps) {
   const [frames, setFrames] = useState<Frame[]>([]);
   const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
@@ -66,14 +68,14 @@ export default function FrameEditor({
   useEffect(() => {
     if (!clientId) return;
     (async () => {
-      const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId });
+      const { data } = await supabase.rpc("get_active_campaign_frames", { _client_id: clientId, _parceiro_token: partnerToken ?? null } as any);
       const list = ((data ?? []) as any as Frame[]);
       const effective = list.length > 0 ? list : (requireActiveFrame ? [] : [DEFAULT_FRAME]);
       setFrames(effective);
       if (!selectedFrame) setSelectedFrame(effective[0]);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, requireActiveFrame]);
+  }, [clientId, requireActiveFrame, partnerToken]);
 
   const getComposition = (f: Frame | null): FrameComposition => {
     if (!f) return DEFAULT_COMPOSITION;
