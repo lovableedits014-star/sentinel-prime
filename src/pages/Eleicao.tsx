@@ -418,8 +418,12 @@ export default function Eleicao() {
     if (!form.missao_facebook_ativo && !form.missao_instagram_ativo) {
       toast.error("Selecione pelo menos uma rede para as missões"); return;
     }
-    if (!form.nome.trim() || !form.telefone.trim() || !form.bairro.trim()) {
-      toast.error("Nome, telefone e bairro são obrigatórios"); return;
+    const cadastroCaboRapido = !editing && form.tipo === "cabo" && !!form.parent_id;
+    if (!form.nome.trim() || !form.telefone.trim() || (!cadastroCaboRapido && !form.bairro.trim())) {
+      toast.error(cadastroCaboRapido ? "Nome e telefone são obrigatórios" : "Nome, telefone e bairro são obrigatórios"); return;
+    }
+    if (cadastroCaboRapido && parseValorContratacao(form.valor_contratacao) <= 0) {
+      toast.error("Informe o valor do pagamento do cabo eleitoral"); return;
     }
 
     const telLimpo = onlyDigits(form.telefone);
@@ -1358,8 +1362,15 @@ export default function Eleicao() {
       escopo: lider.escopo,
       regiao: (lider.regiao || "centro") as Regiao,
       cidade: lider.cidade || (lider.escopo === "campo_grande" ? "Campo Grande" : ""),
+      rua: lider.rua || "",
+      numero: lider.numero || "",
+      bairro: lider.bairro || "",
     });
   };
+
+  const caboRapidoLider = !editing && form.tipo === "cabo" && form.parent_id
+    ? pessoas.find((p) => p.id === form.parent_id && p.tipo === "lider")
+    : null;
 
   return (
     <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow, onArchive: toggleArchive, onFormularioCabos: baixarFormularioCabos, onReciboDocumentacao: baixarReciboDocumentacao, onNovoCabo: abrirNovoCabo }}>
@@ -1696,8 +1707,54 @@ export default function Eleicao() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] p-0 gap-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle>{editing ? "Editar cadastro" : "Novo cadastro"}</DialogTitle>
+            <DialogTitle>{editing ? "Editar cadastro" : caboRapidoLider ? "Cadastrar cabo eleitoral" : "Novo cadastro"}</DialogTitle>
           </DialogHeader>
+          {caboRapidoLider ? (
+          <div className="space-y-4 px-6 py-3 overflow-y-auto flex-1 min-h-0">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">Líder responsável</p>
+              <p className="font-semibold">{caboRapidoLider.nome}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                O vínculo e a localização serão herdados automaticamente deste líder.
+              </p>
+            </div>
+            <div>
+              <Label>Nome *</Label>
+              <Input autoFocus value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Telefone *</Label>
+              <Input value={form.telefone} onChange={e => setForm(f => ({ ...f, telefone: e.target.value }))} placeholder="(67) 99999-0000" inputMode="tel" />
+            </div>
+            <div>
+              <Label>CPF <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+              <Input
+                value={formatCPF(form.cpf)}
+                onChange={e => setForm(f => ({ ...f, cpf: onlyDigits(e.target.value).slice(0, 11) }))}
+                placeholder="000.000.000-00"
+                inputMode="numeric"
+                maxLength={14}
+              />
+            </div>
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+              <Label htmlFor="cabo-valor-pagamento" className="flex items-center gap-1.5">
+                <DollarSign className="h-4 w-4 text-emerald-600" />Valor do pagamento único *
+              </Label>
+              <div className="relative mt-1.5">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                <Input
+                  id="cabo-valor-pagamento"
+                  className="pl-10"
+                  value={form.valor_contratacao}
+                  onChange={e => setForm(f => ({ ...f, valor_contratacao: e.target.value.replace(/[^\d,.]/g, "") }))}
+                  placeholder="0,00"
+                  inputMode="decimal"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">Pagamento único contabilizado nos custos da campanha.</p>
+            </div>
+          </div>
+          ) : (
           <div className="space-y-3 px-6 py-2 overflow-y-auto flex-1 min-h-0">
             {/* Bloco de tipo e escopo */}
             <div className="grid grid-cols-2 gap-3">
@@ -2138,6 +2195,7 @@ export default function Eleicao() {
             </div>
 
           </div>
+          )}
           <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={save}>{editing ? "Salvar" : "Cadastrar"}</Button>
