@@ -46,6 +46,7 @@ import { FunnelManagement } from "@/components/eleicao/FunnelManagement";
 import { getEleicaoSituacao, isEleicaoContratado, isEleicaoSemContrato, isEleicaoVoluntario } from "@/lib/eleicao-situacao";
 import ContratadosCumprimentoReport from "@/components/eleicao/ContratadosCumprimentoReport";
 import { gerarFormularioCabosPdf, type LiderFormularioCabos } from "@/lib/eleicao-cabos-formulario-pdf";
+import { gerarReciboDocumentacaoPdf } from "@/lib/eleicao-recibo-documentacao-pdf";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -234,6 +235,7 @@ type EleicaoActions = {
   onResendLiderFlow: (p: Pessoa) => void;
   onArchive: (p: Pessoa) => void;
   onFormularioCabos: (p: Pessoa) => void;
+  onReciboDocumentacao: (p: Pessoa) => void;
   onNovoCabo: (p: Pessoa) => void;
 };
 const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
@@ -1329,6 +1331,24 @@ export default function Eleicao() {
     }
   };
 
+  const baixarReciboDocumentacao = async (coordenador: Pessoa) => {
+    if (!isEleicaoContratado(coordenador)) {
+      return toast.error("Este coordenador não possui contrato ativo.");
+    }
+    const lideresContratados = pessoas
+      .filter((p) => p.tipo === "lider" && p.parent_id === coordenador.id && isEleicaoContratado(p))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    if (!lideresContratados.length) {
+      return toast.error("Nenhum líder com contrato ativo vinculado a este coordenador.");
+    }
+    try {
+      await gerarReciboDocumentacaoPdf(coordenador, lideresContratados);
+      toast.success(`Recibo gerado com ${lideresContratados.length} líder(es).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao gerar o recibo de documentação.");
+    }
+  };
+
   const abrirNovoCabo = (lider: Pessoa) => {
     const total = pessoas.filter(p => p.tipo === "cabo" && p.parent_id === lider.id && !p.arquivado_em).length;
     if (total >= 4) return toast.error("Este líder já possui o limite de 4 cabos eleitorais ativos.");
@@ -1342,7 +1362,7 @@ export default function Eleicao() {
   };
 
   return (
-    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow, onArchive: toggleArchive, onFormularioCabos: baixarFormularioCabos, onNovoCabo: abrirNovoCabo }}>
+    <EleicaoActionsContext.Provider value={{ onTogglePermissao: togglePermissaoCadastro, onResendLiderFlow: openResendLiderFlow, onArchive: toggleArchive, onFormularioCabos: baixarFormularioCabos, onReciboDocumentacao: baixarReciboDocumentacao, onNovoCabo: abrirNovoCabo }}>
     <EleicaoSearchContext.Provider value={searchCtxValue}>
     <div className="container mx-auto p-4 md:p-6 max-w-7xl">
 
@@ -2585,6 +2605,7 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   const onResendLiderFlow = actions?.onResendLiderFlow;
   const onArchive = actions?.onArchive;
   const onFormularioCabos = actions?.onFormularioCabos;
+  const onReciboDocumentacao = actions?.onReciboDocumentacao;
   const onNovoCabo = actions?.onNovoCabo;
   const { searchActive, matchedIds, nameById, tipoById } = React.useContext(EleicaoSearchContext);
   const isMatch = searchActive && matchedIds.has(p.id);
@@ -2764,6 +2785,11 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
               <DropdownMenuItem onClick={() => onFormularioCabos(p)}>
                 <Printer className="w-3.5 h-3.5 mr-2" />Formulários dos líderes
               </DropdownMenuItem>
+              {onReciboDocumentacao && (
+                <DropdownMenuItem onClick={() => onReciboDocumentacao(p)}>
+                  <FileText className="w-3.5 h-3.5 mr-2" />Formulário Recibo de Documentação
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
             </>
           )}
