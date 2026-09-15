@@ -48,6 +48,7 @@ interface Cfg {
 }
 
 type GroupOption = { group_jid: string; name: string | null };
+type LatestMission = { id: string; title: string | null; publicado_em: string | null; created_at: string };
 
 export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
   const [loading, setLoading] = useState(true);
@@ -80,6 +81,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
   });
   const [grupos, setGrupos] = useState<GroupOption[]>([]);
   const [copiandoLink, setCopiandoLink] = useState(false);
+  const [latestMission, setLatestMission] = useState<LatestMission | null>(null);
 
   async function load() {
     setLoading(true);
@@ -131,6 +133,16 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       }
       setGrupos(uniq);
     }
+    const { data: missionRow } = await supabase
+      .from("portal_missions" as any)
+      .select("id,title,publicado_em,created_at")
+      .eq("client_id", clientId)
+      .eq("is_active", true)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setLatestMission((missionRow ?? null) as LatestMission | null);
     setLoading(false);
   }
 
@@ -246,6 +258,15 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
           <div className="space-y-1 sm:col-span-2"><Label>Mensagem pronta para os dois números</Label><Textarea rows={3} value={cfg.onboarding_mensagem} onChange={e => setCfg(c => ({ ...c, onboarding_mensagem: e.target.value }))} /></div>
         </div>
         <div className="space-y-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <div className="rounded-md border bg-background/80 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Missão automática exibida no link</p>
+            {latestMission ? (
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <div className="min-w-0"><p className="truncate text-sm font-medium">{latestMission.title || "Missão sem título"}</p><p className="text-[11px] text-muted-foreground">Atualiza automaticamente quando uma missão mais recente for criada/publicada.</p></div>
+                <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => window.open(`${window.location.origin}/missao/${latestMission.id}`, "_blank", "noopener,noreferrer")}>Abrir</Button>
+              </div>
+            ) : <p className="mt-1 text-xs text-muted-foreground">Nenhuma missão ativa cadastrada.</p>}
+          </div>
           <div>
             <Label className="text-sm font-semibold">Link geral de acesso dos cabos</Label>
             <p className="text-xs text-muted-foreground">É um único link para todos. Copie e envie manualmente quantas vezes quiser.</p>

@@ -3,9 +3,11 @@ import { useParams } from "react-router-dom";
 import {
   CheckCircle2,
   ContactRound,
+  ExternalLink,
   Loader2,
   LockKeyhole,
   MessageCircle,
+  Target,
   UsersRound,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +17,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 
 type Grupo = { chave: string; nome: string; link: string };
+type LatestMission = {
+  id: string;
+  titulo: string | null;
+  plataforma: string | null;
+  publicado_em: string;
+};
 type Jornada = {
   ok: boolean;
   error?: string;
@@ -60,6 +68,7 @@ export default function CaboOnboarding() {
     return created;
   });
   const [data, setData] = useState<Jornada | null>(null);
+  const [latestMission, setLatestMission] = useState<LatestMission | null>(null);
   const [loading, setLoading] = useState(true);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [sent, setSent] = useState<Set<string>>(new Set());
@@ -73,6 +82,11 @@ export default function CaboOnboarding() {
       setLoading(false);
       if (error) return toast.error(error.message);
       setData(result as Jornada);
+      const { data: missionResult } = await (supabase as any).rpc(
+        "eleicao_cabo_onboarding_latest_mission",
+        { p_token: token },
+      );
+      setLatestMission((missionResult?.mission ?? null) as LatestMission | null);
     })();
   }, [token, visitorKey]);
 
@@ -182,6 +196,32 @@ export default function CaboOnboarding() {
             Conclua os três passos abaixo. Leva menos de dois minutos.
           </p>
         </header>
+
+        {latestMission && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Target className="h-5 w-5 text-primary" /> Missão mais recente
+              </CardTitle>
+              <CardDescription>{latestMission.titulo || "Missão da campanha"}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                className="w-full gap-2"
+                size="lg"
+                onClick={() =>
+                  window.open(
+                    `${window.location.origin}/missao/${latestMission.id}`,
+                    "_blank",
+                    "noopener,noreferrer",
+                  )
+                }
+              >
+                <ExternalLink className="h-5 w-5" /> Abrir missão de hoje
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
