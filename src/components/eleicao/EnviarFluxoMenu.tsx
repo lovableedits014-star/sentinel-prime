@@ -7,10 +7,21 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Send, MessageCircle, Crown, User, Building2, Loader2, AlertCircle } from "lucide-react";
+import {
+  Send,
+  MessageCircle,
+  Crown,
+  User,
+  Building2,
+  Loader2,
+  AlertCircle,
+  Copy,
+  Link as LinkIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   resolverFluxoCadastro,
+  criarLinkOnboardingCabo,
   type FluxoPessoa,
   type FluxoResolvido,
   type FluxoDestino,
@@ -52,59 +63,92 @@ export default function EnviarFluxoMenu({ pessoa }: Props) {
     window.open(d.waUrl, "_blank", "noopener,noreferrer");
   }
 
+  async function copyOnboardingLink() {
+    setLoading(true);
+    try {
+      const link = await criarLinkOnboardingCabo(pessoa.client_id, pessoa.id);
+      await navigator.clipboard.writeText(link);
+      toast.success("Link externo copiado", {
+        description: "Agora é só colar e enviar manualmente para o cabo.",
+      });
+    } catch (e: any) {
+      toast.error(e?.message || "Não foi possível gerar o link");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger
-        onClick={(e) => {
-          e.stopPropagation();
-          void ensureResolved();
-        }}
-        onPointerEnter={() => { void ensureResolved(); }}
-      >
-        <Send className="w-3.5 h-3.5 mr-2" />
-        Enviar fluxo pelo MEU WhatsApp
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="w-72" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-          Manda do seu próprio WhatsApp
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-
-        {loading && !resolved ? (
-          <DropdownMenuItem disabled>
+    <>
+      {pessoa.tipo === "cabo" && (
+        <DropdownMenuItem onClick={() => void copyOnboardingLink()} disabled={loading}>
+          {loading ? (
             <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-            Carregando mensagens…
-          </DropdownMenuItem>
-        ) : (
-          <>
-            <DestinoItem
-              icon={Crown}
-              titulo="Para o Coordenador"
-              destino={resolved?.coordenador}
-              onClick={(d) => openDestino(d, "o coordenador")}
-            />
-            <DestinoItem
-              icon={User}
-              titulo="Para o Cadastrado"
-              destino={resolved?.cadastrado}
-              onClick={(d) => openDestino(d, "o cadastrado")}
-            />
-            <DestinoItem
-              icon={Building2}
-              titulo="Para a Secretaria"
-              destino={resolved?.secretaria}
-              onClick={(d) => openDestino(d, "a secretaria")}
-            />
-          </>
-        )}
+          ) : (
+            <LinkIcon className="w-3.5 h-3.5 mr-2" />
+          )}
+          <div className="flex flex-col items-start">
+            <span>Copiar link de boas-vindas</span>
+            <span className="text-[10px] text-muted-foreground">Para enviar manualmente</span>
+          </div>
+          <Copy className="w-3 h-3 ml-auto text-muted-foreground" />
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger
+          onClick={(e) => {
+            e.stopPropagation();
+            void ensureResolved();
+          }}
+          onPointerEnter={() => {
+            void ensureResolved();
+          }}
+        >
+          <Send className="w-3.5 h-3.5 mr-2" />
+          Enviar fluxo pelo MEU WhatsApp
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent className="w-72" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            Manda do seu próprio WhatsApp
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
 
-        <DropdownMenuSeparator />
-        <div className="px-2 py-1.5 text-[10px] text-muted-foreground leading-snug">
-          Abre o WhatsApp Web/celular numa nova aba com a mensagem já pronta.
-          Não depende da instância da campanha.
-        </div>
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
+          {loading && !resolved ? (
+            <DropdownMenuItem disabled>
+              <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+              Carregando mensagens…
+            </DropdownMenuItem>
+          ) : (
+            <>
+              <DestinoItem
+                icon={Crown}
+                titulo="Para o Coordenador"
+                destino={resolved?.coordenador}
+                onClick={(d) => openDestino(d, "o coordenador")}
+              />
+              <DestinoItem
+                icon={User}
+                titulo="Para o Cadastrado"
+                destino={resolved?.cadastrado}
+                onClick={(d) => openDestino(d, "o cadastrado")}
+              />
+              <DestinoItem
+                icon={Building2}
+                titulo="Para a Secretaria"
+                destino={resolved?.secretaria}
+                onClick={(d) => openDestino(d, "a secretaria")}
+              />
+            </>
+          )}
+
+          <DropdownMenuSeparator />
+          <div className="px-2 py-1.5 text-[10px] text-muted-foreground leading-snug">
+            Abre o WhatsApp Web/celular numa nova aba com a mensagem já pronta. Não depende da
+            instância da campanha.
+          </div>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+    </>
   );
 }
 

@@ -48,6 +48,16 @@ export interface FluxoResolvido {
   secretaria: FluxoDestino;
 }
 
+export async function criarLinkOnboardingCabo(clientId: string, pessoaId: string): Promise<string> {
+  const { data, error } = await (supabase as any).rpc("eleicao_cabo_onboarding_create", {
+    p_client_id: clientId,
+    p_pessoa_id: pessoaId,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Não foi possível gerar o link de boas-vindas");
+  return `${window.location.origin}/boas-vindas/cabo/${data}`;
+}
+
 // ─── Helpers de telefone (espelham a edge) ──────────────────────────────────
 function onlyDigits(s: string | null | undefined) {
   return String(s ?? "").replace(/\D/g, "");
@@ -75,8 +85,14 @@ function applyTemplate(tpl: string, vars: Record<string, string>) {
 }
 
 const REGIAO_LABELS_FALLBACK: Record<string, string> = {
-  centro: "Centro", segredo: "Segredo", prosa: "Prosa", bandeira: "Bandeira",
-  anhanduizinho: "Anhanduizinho", lagoa: "Lagoa", imbirussu: "Imbirussu", moreninha: "Moreninha",
+  centro: "Centro",
+  segredo: "Segredo",
+  prosa: "Prosa",
+  bandeira: "Bandeira",
+  anhanduizinho: "Anhanduizinho",
+  lagoa: "Lagoa",
+  imbirussu: "Imbirussu",
+  moreninha: "Moreninha",
 };
 
 // Defaults idênticos ao da edge `eleicao-notify-novo-lider`.
@@ -97,9 +113,13 @@ function buildWaUrl(rawPhone: string | null | undefined, message: string): strin
 
 function destinoDesabilitado(nome: string, motivo: string): FluxoDestino {
   return {
-    disabled: true, motivo, nome,
-    telefone: null, telefoneFmt: null,
-    mensagem: "", waUrl: null,
+    disabled: true,
+    motivo,
+    nome,
+    telefone: null,
+    telefoneFmt: null,
+    mensagem: "",
+    waUrl: null,
   };
 }
 
@@ -132,7 +152,10 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
         .maybeSingle();
       const pr = parentRow as any;
       if (!pr) break;
-      if (pr.regiao) { regiaoValue = pr.regiao; break; }
+      if (pr.regiao) {
+        regiaoValue = pr.regiao;
+        break;
+      }
       currentParentId = pr.parent_id || null;
     }
   }
@@ -164,12 +187,10 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
   // Cabos recebem uma jornada individual: salvam os dois contatos, enviam o
   // "olá", escolhem apenas um grupo e geram a foto oficial.
   if (p.tipo === "cabo") {
-    const { data: onboardingToken, error: onboardingError } = await (supabase as any).rpc(
-      "eleicao_cabo_onboarding_create",
-      { p_client_id: p.client_id, p_pessoa_id: p.id },
-    );
-    if (!onboardingError && onboardingToken) {
-      linkGrupo = `${window.location.origin}/boas-vindas/cabo/${onboardingToken}`;
+    try {
+      linkGrupo = await criarLinkOnboardingCabo(p.client_id, p.id);
+    } catch {
+      /* mantém o grupo legado */
     }
   }
 
@@ -178,7 +199,11 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
     nome: p.nome,
     regiao: regiaoLabel,
     telefone: fmtPhone(p.telefone || ""),
-    rua: p.rua || (p.endereco && p.endereco.trim().toLowerCase() !== (p.bairro || "").trim().toLowerCase() ? p.endereco : "—"),
+    rua:
+      p.rua ||
+      (p.endereco && p.endereco.trim().toLowerCase() !== (p.bairro || "").trim().toLowerCase()
+        ? p.endereco
+        : "—"),
     numero: p.numero || "s/n",
     bairro: p.bairro || "—",
     link_grupo: linkGrupo || "(grupo não configurado)",
@@ -187,7 +212,10 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
   // 6. Mensagens prontas
   const msgInterno = applyTemplate(cfg.template_coordenador || DEFAULT_TEMPLATE_COORDENADOR, vars);
   const msgLider = applyTemplate(cfg.template_lider || DEFAULT_TEMPLATE_LIDER, vars);
-  const msgCoordBV = applyTemplate(cfg.template_coordenador_boas_vindas || DEFAULT_TEMPLATE_COORD_BV, vars);
+  const msgCoordBV = applyTemplate(
+    cfg.template_coordenador_boas_vindas || DEFAULT_TEMPLATE_COORD_BV,
+    vars,
+  );
   const msgCaboBV = applyTemplate(cfg.template_cabo_boas_vindas || DEFAULT_TEMPLATE_CABO_BV, vars);
 
   // 7. Destinatário "Cadastrado" — varia conforme o tipo
@@ -195,10 +223,7 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
   if (!p.telefone) {
     cadastrado = destinoDesabilitado(p.nome, "Pessoa sem telefone cadastrado");
   } else {
-    const mensagem =
-      p.tipo === "lider" ? msgLider
-        : p.tipo === "cabo" ? msgCaboBV
-          : msgCoordBV; // coordenador
+    const mensagem = p.tipo === "lider" ? msgLider : p.tipo === "cabo" ? msgCaboBV : msgCoordBV; // coordenador
     cadastrado = {
       disabled: false,
       nome: p.nome,
@@ -228,7 +253,7 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
         .eq("id", p.parent_id)
         .maybeSingle();
       const pr = parent as any;
-      
+
       if (pr?.tipo === "coordenador" && pr.telefone) {
         coordPhone = pr.telefone;
         coordNome = pr.nome;
