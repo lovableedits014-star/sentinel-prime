@@ -1,7 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs/tabelas entram nos tipos gerados apos aplicar a migracao. */
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Copy, Link2, Loader2, Power, UserRoundPlus, Users } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Copy,
+  Link2,
+  Loader2,
+  Power,
+  Search,
+  UserRoundPlus,
+  Users,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { resolvePublicBaseUrl } from "@/lib/public-base-url";
 import { fmtPhoneBR, isValidBRPhone, normalizeBRPhone } from "@/lib/phone-utils";
@@ -53,7 +63,9 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
   const [coordinatorId, setCoordinatorId] = useState("");
   const [coordinatorName, setCoordinatorName] = useState("");
   const [coordinatorPhone, setCoordinatorPhone] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const [groupStatus, setGroupStatus] = useState<"active" | "inactive" | "all">("active");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const { data: client } = useQuery({
     queryKey: ["digital-groups-client", clientId],
@@ -94,16 +106,65 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
     },
   });
   const { data: members = [] } = useQuery<MemberRow[]>({
-    queryKey: ["digital-group-members", clientId, selectedGroup],
+    queryKey: ["digital-group-members", clientId],
     queryFn: async () => {
       const { data, error } = await (supabase as any).rpc("digital_group_members_list", {
         p_client_id: clientId,
-        p_group_id: selectedGroup === "all" ? null : selectedGroup,
+        p_group_id: null,
       });
       if (error) throw error;
       return data || [];
     },
   });
+
+  const membersByGroup = useMemo(() => {
+    const result = new Map<string, MemberRow[]>();
+    members.forEach((member) => {
+      const rows = result.get(member.group_id) || [];
+      rows.push(member);
+      result.set(member.group_id, rows);
+    });
+    return result;
+  }, [members]);
+
+  const normalizedSearch = search.trim().toLocaleLowerCase("pt-BR");
+  const visibleGroups = useMemo(
+    () =>
+      groups.filter((group) => {
+        if (groupStatus === "active" && !group.ativo) return false;
+        if (groupStatus === "inactive" && group.ativo) return false;
+        if (!normalizedSearch) return true;
+        const groupMatches = `${group.grupo} ${group.coordenador || ""}`
+          .toLocaleLowerCase("pt-BR")
+          .includes(normalizedSearch);
+        const memberMatches = (membersByGroup.get(group.group_id) || []).some((member) =>
+          `${member.nome} ${member.telefone || ""}`
+            .toLocaleLowerCase("pt-BR")
+            .includes(normalizedSearch),
+        );
+        return groupMatches || memberMatches;
+      }),
+    [groups, groupStatus, normalizedSearch, membersByGroup],
+  );
+
+  const totals = useMemo(
+    () => ({
+      activeGroups: groups.filter((group) => group.ativo).length,
+      members: groups.reduce((sum, group) => sum + Number(group.membros || 0), 0),
+      activeMembers: groups.reduce((sum, group) => sum + Number(group.membros_ativos_30d || 0), 0),
+      completed: groups.reduce((sum, group) => sum + Number(group.missoes_concluidas || 0), 0),
+    }),
+    [groups],
+  );
+
+  function toggleExpanded(groupId: string) {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
 
   const createGroup = useMutation({
     mutationFn: async () => {
@@ -233,140 +294,174 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
         </CardContent>
       </Card>
 
-      {isLoading ? (
-        <div className="py-10 text-center">
-          <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-        </div>
-      ) : groups.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Nenhum grupo do Time Digital criado.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {groups.map((g) => (
-            <Card key={g.group_id} className={!g.ativo ? "opacity-65" : ""}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-base">{g.grupo}</CardTitle>
-                    <CardDescription>Coord. {g.coordenador || "não informado"}</CardDescription>
-                  </div>
-                  <Badge variant={g.ativo ? "default" : "secondary"}>
-                    {g.ativo ? "Ativo" : "Inativo"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                  <Metric label="Pessoas" value={g.membros} />
-                  <Metric label="Ativos 30d" value={g.membros_ativos_30d} />
-                  <Metric label="Acessos" value={g.missoes_acessadas} />
-                  <Metric label="Concluídas" value={g.missoes_concluidas} />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copyInvite(g)}
-                    disabled={!g.ativo}
-                  >
-                    <Copy className="mr-1.5 h-3.5 w-3.5" />
-                    Copiar convite
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSelectedGroup(g.group_id);
-                      document
-                        .getElementById("digital-members")
-                        ?.scrollIntoView({ behavior: "smooth" });
-                    }}
-                  >
-                    <Users className="mr-1.5 h-3.5 w-3.5" />
-                    Ver pessoas
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => toggleGroup.mutate(g)}>
-                    <Power className="mr-1.5 h-3.5 w-3.5" />
-                    {g.ativo ? "Desativar" : "Ativar"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="Equipes ativas" value={totals.activeGroups} />
+        <Metric label="Pessoas" value={totals.members} />
+        <Metric label="Ativos nos últimos 30 dias" value={totals.activeMembers} />
+        <Metric label="Missões concluídas" value={totals.completed} />
+      </section>
 
-      <Card id="digital-members">
+      <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">Pessoas captadas</CardTitle>
-              <CardDescription>
-                Participantes externos reconhecidos pelo telefone nas missões atuais.
-              </CardDescription>
+          <CardTitle className="text-base">Gestão das equipes digitais</CardTitle>
+          <CardDescription>
+            Consulte cada coordenador e sua equipe no mesmo lugar. Abra uma equipe para acompanhar
+            as pessoas, acessos, conclusões e última atividade.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <div className="relative min-w-[240px] flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar equipe, coordenador, pessoa ou WhatsApp"
+              />
             </div>
-            <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-              <SelectTrigger className="w-[240px]">
+            <Select
+              value={groupStatus}
+              onValueChange={(value) => setGroupStatus(value as typeof groupStatus)}
+            >
+              <SelectTrigger className="w-[190px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os grupos</SelectItem>
-                {groups.map((g) => (
-                  <SelectItem key={g.group_id} value={g.group_id}>
-                    {g.grupo}
-                  </SelectItem>
-                ))}
+                <SelectItem value="active">Equipes ativas</SelectItem>
+                <SelectItem value="inactive">Equipes inativas</SelectItem>
+                <SelectItem value="all">Todas as equipes</SelectItem>
               </SelectContent>
             </Select>
+            <Badge variant="secondary" className="h-9 px-3">
+              {visibleGroups.length} equipe(s)
+            </Badge>
           </div>
-        </CardHeader>
-        <CardContent>
-          {members.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhuma pessoa cadastrada neste grupo.
+
+          {isLoading ? (
+            <div className="py-10 text-center">
+              <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+            </div>
+          ) : groups.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Nenhum grupo do Time Digital criado.
+            </p>
+          ) : visibleGroups.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Nenhuma equipe corresponde aos filtros.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-xs">
-                  <tr>
-                    <th className="p-2 text-left">Pessoa</th>
-                    <th className="p-2 text-left">Grupo</th>
-                    <th className="p-2 text-left">WhatsApp</th>
-                    <th className="p-2 text-right">Acessou</th>
-                    <th className="p-2 text-right">Concluiu</th>
-                    <th className="p-2 text-left">Última atividade</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((m) => (
-                    <tr key={m.member_id} className="border-t">
-                      <td className="p-2 font-medium">{m.nome}</td>
-                      <td className="p-2">{m.grupo}</td>
-                      <td className="p-2 text-muted-foreground">{fmtPhoneBR(m.telefone)}</td>
-                      <td className="p-2 text-right">{m.missoes_acessadas}</td>
-                      <td className="p-2 text-right">
-                        {m.missoes_concluidas > 0 ? (
-                          <span className="inline-flex items-center gap-1">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                            {m.missoes_concluidas}
-                          </span>
+            <div className="divide-y overflow-hidden rounded-lg border">
+              {visibleGroups.map((group) => {
+                const groupMembers = membersByGroup.get(group.group_id) || [];
+                const visibleMembers = !normalizedSearch
+                  ? groupMembers
+                  : groupMembers.filter((member) =>
+                      `${member.nome} ${member.telefone || ""}`
+                        .toLocaleLowerCase("pt-BR")
+                        .includes(normalizedSearch),
+                    );
+                const expanded = expandedGroups.has(group.group_id) || Boolean(normalizedSearch);
+                return (
+                  <div
+                    key={group.group_id}
+                    className={!group.ativo ? "bg-muted/20 opacity-70" : ""}
+                  >
+                    <div className="flex flex-wrap items-center gap-3 p-3">
+                      <button
+                        type="button"
+                        className="flex min-w-[240px] flex-1 items-center gap-2 text-left"
+                        onClick={() => toggleExpanded(group.group_id)}
+                      >
+                        <ChevronRight
+                          className={`h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+                        />
+                        <div>
+                          <p className="font-semibold">{group.grupo}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Coord. {group.coordenador || "não informado"}
+                          </p>
+                        </div>
+                      </button>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <Badge variant={group.ativo ? "default" : "secondary"}>
+                          {group.ativo ? "Ativa" : "Inativa"}
+                        </Badge>
+                        <Badge variant="outline">
+                          <Users className="mr-1 h-3 w-3" />
+                          {group.membros} pessoas
+                        </Badge>
+                        <Badge variant="outline">{group.membros_ativos_30d} ativos 30d</Badge>
+                        <Badge variant="outline">{group.missoes_acessadas} acessos</Badge>
+                        <Badge variant="outline" className="text-emerald-700">
+                          {group.missoes_concluidas} concluídas
+                        </Badge>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copyInvite(group)}
+                          disabled={!group.ativo}
+                        >
+                          <Copy className="mr-1 h-3.5 w-3.5" />
+                          Convite
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => toggleGroup.mutate(group)}>
+                          <Power className="mr-1 h-3.5 w-3.5" />
+                          {group.ativo ? "Desativar" : "Ativar"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {expanded && (
+                      <div className="border-t bg-muted/10 px-3 pb-3">
+                        {groupMembers.length === 0 ? (
+                          <p className="py-5 text-center text-sm text-muted-foreground">
+                            Nenhuma pessoa cadastrada nesta equipe.
+                          </p>
+                        ) : visibleMembers.length === 0 ? (
+                          <p className="py-5 text-center text-sm text-muted-foreground">
+                            A equipe corresponde à busca, mas nenhum membro individual corresponde.
+                          </p>
                         ) : (
-                          "—"
+                          <div className="divide-y">
+                            {visibleMembers.map((member) => (
+                              <div
+                                key={member.member_id}
+                                className="grid gap-2 py-3 text-sm md:grid-cols-[1fr_160px_120px_190px] md:items-center"
+                              >
+                                <div>
+                                  <p className="font-medium">{member.nome}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {fmtPhoneBR(member.telefone)}
+                                  </p>
+                                </div>
+                                <p className="text-xs">{member.missoes_acessadas} acesso(s)</p>
+                                <p className="text-xs">
+                                  {member.missoes_concluidas > 0 ? (
+                                    <span className="inline-flex items-center gap-1 text-emerald-700">
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      {member.missoes_concluidas} concluída(s)
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">Nenhuma conclusão</span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {member.ultimo_acesso
+                                    ? `Última atividade: ${new Date(member.ultimo_acesso).toLocaleString("pt-BR")}`
+                                    : "Ainda não acessou"}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
                         )}
-                      </td>
-                      <td className="p-2 text-xs text-muted-foreground">
-                        {m.ultimo_acesso
-                          ? new Date(m.ultimo_acesso).toLocaleString("pt-BR")
-                          : "Ainda não acessou"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -377,9 +472,11 @@ export default function DigitalGroupsTab({ clientId }: { clientId: string }) {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md bg-muted/50 p-2">
-      <div className="text-lg font-semibold">{value || 0}</div>
-      <div className="text-muted-foreground">{label}</div>
-    </div>
+    <Card>
+      <CardContent className="p-4">
+        <div className="text-2xl font-bold">{value || 0}</div>
+        <div className="text-xs text-muted-foreground">{label}</div>
+      </CardContent>
+    </Card>
   );
 }
