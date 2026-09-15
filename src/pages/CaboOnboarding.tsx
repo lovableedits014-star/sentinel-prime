@@ -12,9 +12,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
+import IosContactsShareDialog from "@/components/eleicao/IosContactsShareDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
+import {
+  gerarCsvGoogleContacts,
+  gerarVcardLote,
+  type ContatoExport,
+} from "@/lib/eleicao-distribuicao-contatos";
+import { isIOS } from "@/lib/mobile-download";
 
 type Grupo = { chave: string; nome: string; link: string };
 type LatestMission = {
@@ -48,15 +55,6 @@ const waUrl = (phone: string | null, message: string) => {
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
 };
 
-const vcard = (name: string, phone: string) =>
-  [
-    "BEGIN:VCARD",
-    "VERSION:3.0",
-    `FN:${name}`,
-    `TEL;TYPE=CELL:${phone.replace(/\D/g, "")}`,
-    "END:VCARD",
-  ].join("\r\n");
-
 export default function CaboOnboarding() {
   const { token = "" } = useParams();
   const [visitorKey] = useState(() => {
@@ -72,6 +70,7 @@ export default function CaboOnboarding() {
   const [loading, setLoading] = useState(true);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [sent, setSent] = useState<Set<string>>(new Set());
+  const [iosContacts, setIosContacts] = useState<{ vcfBlob: Blob; csvBlob: Blob } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -104,10 +103,30 @@ export default function CaboOnboarding() {
   const saveContacts = () => {
     const valid = contacts.filter((contact) => contact.phone);
     if (!valid.length) return toast.error("Os contatos oficiais ainda não foram configurados.");
-    const blob = new Blob(
-      [valid.map((contact) => vcard(contact.name, contact.phone!)).join("\r\n")],
-      { type: "text/vcard;charset=utf-8" },
-    );
+    const exportContacts: ContatoExport[] = valid.map((contact) => ({
+      pessoa_id: contact.key,
+      nome: contact.name,
+      telefone: contact.phone!,
+      tipo: "Contato oficial",
+    }));
+    const vcfContent = gerarVcardLote({
+      contatos: exportContacts,
+      tagPrefixo: "",
+      regiaoLabel: data?.campanha_nome || "Campanha",
+    });
+    const blob = new Blob([vcfContent], { type: "text/vcard;charset=utf-8" });
+    if (isIOS()) {
+      const csv = gerarCsvGoogleContacts({
+        contatos: exportContacts,
+        tagPrefixo: "",
+        regiaoLabel: data?.campanha_nome || "Campanha",
+      });
+      setIosContacts({
+        vcfBlob: blob,
+        csvBlob: new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }),
+      });
+      return;
+    }
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -330,6 +349,17 @@ export default function CaboOnboarding() {
 
         <CampaignFrameGenerator clientId={data.client_id} variant="showcase" individualOnly />
       </div>
+      {iosContacts && (
+        <IosContactsShareDialog
+          open
+          onOpenChange={(open) => !open && setIosContacts(null)}
+          vcfBlob={iosContacts.vcfBlob}
+          vcfFilename="contatos-oficiais.vcf"
+          totalContatos={2}
+          csvBlob={iosContacts.csvBlob}
+          csvFilename="contatos-oficiais-iphone.csv"
+        />
+      )}
     </main>
   );
 }
