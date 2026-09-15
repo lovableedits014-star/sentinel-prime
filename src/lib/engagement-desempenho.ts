@@ -44,8 +44,12 @@ export type DetalheItem = {
 };
 
 export type PublicacaoAudit = {
-  mission_id: string; publico_congelado: number; registros_ativos: number;
-  pessoas_unicas: number; dispensados: number; duplicados: number;
+  mission_id: string;
+  publico_congelado: number;
+  registros_ativos: number;
+  pessoas_unicas: number;
+  dispensados: number;
+  duplicados: number;
 };
 
 export type PessoaDesempenho = {
@@ -109,11 +113,15 @@ export type DesempenhoFilters = {
 export type EngagementDatePeriod = { inicio: string; fim: string };
 
 export async function fetchTeamRoots(clientId: string): Promise<TeamRoot[]> {
-  return unwrap<TeamRoot>(await db.rpc("engagement_team_roots_contacts", { p_client_id: clientId }));
+  return unwrap<TeamRoot>(
+    await db.rpc("engagement_team_roots_contacts", { p_client_id: clientId }),
+  );
 }
 
 export async function fetchTeamHierarchy(clientId: string): Promise<TeamHierarchyMember[]> {
-  return unwrap<TeamHierarchyMember>(await db.rpc("engagement_report_team_hierarchy", { p_client_id: clientId }));
+  return unwrap<TeamHierarchyMember>(
+    await db.rpc("engagement_report_team_hierarchy", { p_client_id: clientId }),
+  );
 }
 
 function unwrap<T>(res: { data: unknown; error: { message: string } | null }): T[] {
@@ -121,9 +129,20 @@ function unwrap<T>(res: { data: unknown; error: { message: string } | null }): T
   return (res.data ?? []) as T[];
 }
 
-export async function fetchPubKpis(clientId: string, dias: number, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PubKpis | null> {
+export async function fetchPubKpis(
+  clientId: string,
+  dias: number,
+  audienceId: string | null,
+  filters: DesempenhoFilters = {},
+): Promise<PubKpis | null> {
   const rows = unwrap<PubKpis>(
-    await db.rpc("engagement_pub_kpis_v2", { p_client_id: clientId, p_dias: dias, p_audience_id: audienceId, p_root_id: filters.rootId ?? null, p_mission_id: filters.missionId ?? null }),
+    await db.rpc("engagement_pub_kpis_v2", {
+      p_client_id: clientId,
+      p_dias: dias,
+      p_audience_id: audienceId,
+      p_root_id: filters.rootId ?? null,
+      p_mission_id: filters.missionId ?? null,
+    }),
   );
   return rows[0] ?? null;
 }
@@ -146,12 +165,20 @@ export async function fetchPublicacoesDesempenho(
 }
 
 export async function fetchPublicacoesAudit(
-  clientId: string, dias: number, audienceId: string | null, filters: DesempenhoFilters = {},
+  clientId: string,
+  dias: number,
+  audienceId: string | null,
+  filters: DesempenhoFilters = {},
 ): Promise<PublicacaoAudit[]> {
-  return unwrap<PublicacaoAudit>(await db.rpc("engagement_publicacoes_audit", {
-    p_client_id: clientId, p_dias: dias, p_audience_id: audienceId,
-    p_root_id: filters.rootId ?? null, p_mission_id: filters.missionId ?? null,
-  }));
+  return unwrap<PublicacaoAudit>(
+    await db.rpc("engagement_publicacoes_audit", {
+      p_client_id: clientId,
+      p_dias: dias,
+      p_audience_id: audienceId,
+      p_root_id: filters.rootId ?? null,
+      p_mission_id: filters.missionId ?? null,
+    }),
+  );
 }
 
 export async function fetchEquipeDesempenho(
@@ -169,10 +196,18 @@ export async function fetchEquipeDesempenho(
       p_mission_id: filters.missionId ?? null,
     }),
   );
-  return rows.map((r) => ({ ...r, detalhe: Array.isArray(r.detalhe) ? r.detalhe : [] })) as PessoaDesempenho[];
+  return rows.map((r) => ({
+    ...r,
+    detalhe: Array.isArray(r.detalhe) ? r.detalhe : [],
+  })) as PessoaDesempenho[];
 }
 
-const periodArgs = (clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters) => ({
+const periodArgs = (
+  clientId: string,
+  period: EngagementDatePeriod,
+  audienceId: string | null,
+  filters: DesempenhoFilters,
+) => ({
   p_client_id: clientId,
   p_data_inicio: period.inicio,
   p_data_fim: period.fim,
@@ -181,22 +216,86 @@ const periodArgs = (clientId: string, period: EngagementDatePeriod, audienceId: 
   p_mission_id: filters.missionId ?? null,
 });
 
-export async function fetchPubKpisPeriodo(clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PubKpis | null> {
-  const rows = unwrap<PubKpis>(await db.rpc("engagement_pub_kpis_periodo_v2", periodArgs(clientId, period, audienceId, filters)));
+export async function fetchPubKpisPeriodo(
+  clientId: string,
+  period: EngagementDatePeriod,
+  audienceId: string | null,
+  filters: DesempenhoFilters = {},
+): Promise<PubKpis | null> {
+  const rows = unwrap<PubKpis>(
+    await db.rpc(
+      "engagement_pub_kpis_periodo_v2",
+      periodArgs(clientId, period, audienceId, filters),
+    ),
+  );
   return rows[0] ?? null;
 }
 
-export async function fetchPublicacoesDesempenhoPeriodo(clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PublicacaoDesempenho[]> {
-  return unwrap<PublicacaoDesempenho>(await db.rpc("engagement_publicacoes_desempenho_periodo_v2", periodArgs(clientId, period, audienceId, filters)));
+export async function fetchPublicacoesDesempenhoPeriodo(
+  clientId: string,
+  period: EngagementDatePeriod,
+  audienceId: string | null,
+  filters: DesempenhoFilters = {},
+): Promise<PublicacaoDesempenho[]> {
+  return unwrap<PublicacaoDesempenho>(
+    await db.rpc(
+      "engagement_publicacoes_desempenho_periodo_v2",
+      periodArgs(clientId, period, audienceId, filters),
+    ),
+  );
 }
 
-export async function fetchPublicacoesAuditPeriodo(clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PublicacaoAudit[]> {
-  return unwrap<PublicacaoAudit>(await db.rpc("engagement_publicacoes_audit_periodo", periodArgs(clientId, period, audienceId, filters)));
+export async function fetchPublicacoesAuditPeriodo(
+  clientId: string,
+  period: EngagementDatePeriod,
+  audienceId: string | null,
+  filters: DesempenhoFilters = {},
+): Promise<PublicacaoAudit[]> {
+  return unwrap<PublicacaoAudit>(
+    await db.rpc(
+      "engagement_publicacoes_audit_periodo",
+      periodArgs(clientId, period, audienceId, filters),
+    ),
+  );
 }
 
-export async function fetchEquipeDesempenhoPeriodo(clientId: string, period: EngagementDatePeriod, audienceId: string | null, filters: DesempenhoFilters = {}): Promise<PessoaDesempenho[]> {
-  const rows = unwrap<any>(await db.rpc("engagement_equipe_desempenho_periodo_v2", periodArgs(clientId, period, audienceId, filters)));
-  return rows.map((r) => ({ ...r, detalhe: Array.isArray(r.detalhe) ? r.detalhe : [] })) as PessoaDesempenho[];
+export async function fetchEquipeDesempenhoPeriodo(
+  clientId: string,
+  period: EngagementDatePeriod,
+  audienceId: string | null,
+  filters: DesempenhoFilters = {},
+): Promise<PessoaDesempenho[]> {
+  const rows = unwrap<any>(
+    await db.rpc(
+      "engagement_equipe_desempenho_periodo_v2",
+      periodArgs(clientId, period, audienceId, filters),
+    ),
+  );
+  return rows.map((r) => ({
+    ...r,
+    detalhe: Array.isArray(r.detalhe) ? r.detalhe : [],
+  })) as PessoaDesempenho[];
+}
+
+export async function fetchDigitalMatrixPeriodo(
+  clientId: string,
+  period: EngagementDatePeriod,
+  audienceId: string | null,
+  missionId?: string | null,
+): Promise<PessoaDesempenho[]> {
+  const rows = unwrap<any>(
+    await db.rpc("engagement_digital_matrix_periodo", {
+      p_client_id: clientId,
+      p_data_inicio: period.inicio,
+      p_data_fim: period.fim,
+      p_audience_id: audienceId,
+      p_mission_id: missionId ?? null,
+    }),
+  );
+  return rows.map((row) => ({
+    ...row,
+    detalhe: Array.isArray(row.detalhe) ? row.detalhe : [],
+  })) as PessoaDesempenho[];
 }
 
 export async function fetchFaltantes(
@@ -224,10 +323,19 @@ export const FAIXA_DESEMPENHO: Record<
   PessoaDesempenho["faixa"],
   { label: string; className: string }
 > = {
-  excelente: { label: "Cumprindo bem", className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
+  excelente: {
+    label: "Cumprindo bem",
+    className: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",
+  },
   atencao: { label: "Precisa melhorar", className: "bg-sky-500/15 text-sky-600 border-sky-500/30" },
-  baixo: { label: "Poucas confirmações", className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
-  critico: { label: "Nenhuma confirmação", className: "bg-destructive/15 text-destructive border-destructive/30" },
+  baixo: {
+    label: "Poucas confirmações",
+    className: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+  },
+  critico: {
+    label: "Nenhuma confirmação",
+    className: "bg-destructive/15 text-destructive border-destructive/30",
+  },
 };
 
 export const STATUS_PUB_LABEL: Record<string, string> = {
@@ -236,13 +344,18 @@ export const STATUS_PUB_LABEL: Record<string, string> = {
   nao_abriu: "Não abriu",
 };
 
-export const fmtPct = (n: number | null | undefined) => `${Number(n ?? 0).toFixed(1).replace(".0", "")}%`;
+export const fmtPct = (n: number | null | undefined) =>
+  `${Number(n ?? 0)
+    .toFixed(1)
+    .replace(".0", "")}%`;
 
 export const fmtDataHora = (s?: string | null) =>
   s ? new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 export const fmtData = (s?: string | null) =>
-  s ? new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
+  s
+    ? new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })
+    : "—";
 
 export const fmtTelefone = (s?: string | null) => {
   const d = (s || "").replace(/\D/g, "");

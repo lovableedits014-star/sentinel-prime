@@ -6,12 +6,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, CalendarDays, Check, ChevronsUpDown, ContactRound, FileDown, Gauge, Grid3x3, Megaphone, RefreshCw, TrendingUp } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  BarChart3,
+  CalendarDays,
+  Check,
+  ChevronsUpDown,
+  ContactRound,
+  FileDown,
+  Gauge,
+  Grid3x3,
+  Megaphone,
+  RefreshCw,
+  TrendingUp,
+} from "lucide-react";
 import { fetchAudiences } from "@/lib/mission-audiences";
 import {
-  fetchEquipeDesempenhoPeriodo, fetchPubKpisPeriodo, fetchPublicacoesAuditPeriodo,
-  fetchPublicacoesDesempenhoPeriodo, fetchTeamHierarchy, fetchTeamRoots,
+  fetchDigitalMatrixPeriodo,
+  fetchEquipeDesempenhoPeriodo,
+  fetchPubKpisPeriodo,
+  fetchPublicacoesAuditPeriodo,
+  fetchPublicacoesDesempenhoPeriodo,
+  fetchTeamHierarchy,
+  fetchTeamRoots,
 } from "@/lib/engagement-desempenho";
 import MonitorKpisHeader from "./MonitorKpisHeader";
 import MonitorCharts from "./MonitorCharts";
@@ -21,7 +44,14 @@ import MatrizCumprimentoPanel from "./MatrizCumprimentoPanel";
 import ResumoEquipesPeriodoPanel, { type TeamPeriodSummary } from "./ResumoEquipesPeriodoPanel";
 import MissionAccessManagement from "@/components/engagement/MissionAccessManagement";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
 const localIsoDate = (date: Date) => {
@@ -37,7 +67,7 @@ const daysAgoIso = (days: number) => {
   return localIsoDate(date);
 };
 
-const dateLabel = (iso: string) => iso ? iso.split("-").reverse().join("-") : "—";
+const dateLabel = (iso: string) => (iso ? iso.split("-").reverse().join("-") : "—");
 
 export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: string }) {
   const today = localIsoDate(new Date());
@@ -110,49 +140,96 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
     enabled: !!clientId && periodValid,
   });
 
+  const equipeDigital = useQuery({
+    queryKey: ["eng-digital-matrix", clientId, dataInicio, dataFim, aud, missionId],
+    queryFn: () => fetchDigitalMatrixPeriodo(clientId, period, aud, filters.missionId),
+    enabled: !!clientId && periodValid,
+  });
+
   const resumoEquipes = useQuery({
-    queryKey: ["eng-resumo-equipes-periodo", clientId, dataInicio, dataFim, aud, missionId, teamRoots.data, teamHierarchy.data],
-    queryFn: async () => Promise.all((teamRoots.data ?? []).map(async (root): Promise<TeamPeriodSummary> => {
-      const equipeDaRaiz = await fetchEquipeDesempenhoPeriodo(clientId, period, aud, {
-        rootId: root.root_id,
-        missionId: filters.missionId,
-      });
-      // Líder avulso é mensurado individualmente; coordenador consolida a equipe inteira.
-      const membros = root.is_avulso
-        ? equipeDaRaiz.filter((person) => person.pessoa_id === root.root_id)
-        : equipeDaRaiz;
-      const atribuicoes = membros.reduce((sum, person) => sum + person.publicacoes, 0);
-      const cumpridas = membros.reduce((sum, person) => sum + person.cumpridas, 0);
-      const abriu = membros.reduce((sum, person) => sum + person.abriu_sem_confirmar, 0);
-      const faltas = membros.reduce((sum, person) => sum + person.faltas, 0);
-      const desempenho = new Map(equipeDaRaiz.map((person) => [person.pessoa_id, person]));
-      const estrutura = (teamHierarchy.data ?? []).filter((person) => person.root_id === root.root_id);
-      const asResult = (person: { pessoa_id: string; nome: string; telefone: string | null; tipo: string }) => {
-        const result = desempenho.get(person.pessoa_id);
-        return {
-          pessoa_id: person.pessoa_id, nome: person.nome, telefone: person.telefone,
-          cargo: person.tipo, publicacoes: result?.publicacoes ?? 0,
-          cumpridas: result?.cumpridas ?? 0, abriu_sem_confirmar: result?.abriu_sem_confirmar ?? 0,
-          faltas: result?.faltas ?? 0, pct: result?.pct ?? 0,
-        };
-      };
-      const rootPerson = estrutura.find((person) => person.pessoa_id === root.root_id) ?? root;
-      const responsavel = asResult({ ...rootPerson, pessoa_id: root.root_id, tipo: root.tipo });
-      const lideres = root.is_avulso ? [] : estrutura
-        .filter((person) => person.tipo === "lider")
-        .map(asResult);
-      return { ...root, membros, responsavel, lideres, atribuicoes, cumpridas, abriu, faltas, adesao: atribuicoes ? cumpridas / atribuicoes * 100 : 0 };
-    })),
+    queryKey: [
+      "eng-resumo-equipes-periodo",
+      clientId,
+      dataInicio,
+      dataFim,
+      aud,
+      missionId,
+      teamRoots.data,
+      teamHierarchy.data,
+    ],
+    queryFn: async () =>
+      Promise.all(
+        (teamRoots.data ?? []).map(async (root): Promise<TeamPeriodSummary> => {
+          const equipeDaRaiz = await fetchEquipeDesempenhoPeriodo(clientId, period, aud, {
+            rootId: root.root_id,
+            missionId: filters.missionId,
+          });
+          // Líder avulso é mensurado individualmente; coordenador consolida a equipe inteira.
+          const membros = root.is_avulso
+            ? equipeDaRaiz.filter((person) => person.pessoa_id === root.root_id)
+            : equipeDaRaiz;
+          const atribuicoes = membros.reduce((sum, person) => sum + person.publicacoes, 0);
+          const cumpridas = membros.reduce((sum, person) => sum + person.cumpridas, 0);
+          const abriu = membros.reduce((sum, person) => sum + person.abriu_sem_confirmar, 0);
+          const faltas = membros.reduce((sum, person) => sum + person.faltas, 0);
+          const desempenho = new Map(equipeDaRaiz.map((person) => [person.pessoa_id, person]));
+          const estrutura = (teamHierarchy.data ?? []).filter(
+            (person) => person.root_id === root.root_id,
+          );
+          const asResult = (person: {
+            pessoa_id: string;
+            nome: string;
+            telefone: string | null;
+            tipo: string;
+          }) => {
+            const result = desempenho.get(person.pessoa_id);
+            return {
+              pessoa_id: person.pessoa_id,
+              nome: person.nome,
+              telefone: person.telefone,
+              cargo: person.tipo,
+              publicacoes: result?.publicacoes ?? 0,
+              cumpridas: result?.cumpridas ?? 0,
+              abriu_sem_confirmar: result?.abriu_sem_confirmar ?? 0,
+              faltas: result?.faltas ?? 0,
+              pct: result?.pct ?? 0,
+            };
+          };
+          const rootPerson = estrutura.find((person) => person.pessoa_id === root.root_id) ?? root;
+          const responsavel = asResult({ ...rootPerson, pessoa_id: root.root_id, tipo: root.tipo });
+          const lideres = root.is_avulso
+            ? []
+            : estrutura.filter((person) => person.tipo === "lider").map(asResult);
+          return {
+            ...root,
+            membros,
+            responsavel,
+            lideres,
+            atribuicoes,
+            cumpridas,
+            abriu,
+            faltas,
+            adesao: atribuicoes ? (cumpridas / atribuicoes) * 100 : 0,
+          };
+        }),
+      ),
     enabled: !!clientId && periodValid && teamRoots.isSuccess && teamHierarchy.isSuccess,
   });
 
-  const carregando = kpis.isLoading || publicacoes.isLoading || equipe.isLoading || audit.isLoading;
-  const erro = kpis.error || publicacoes.error || equipe.error || audit.error;
+  const carregando =
+    kpis.isLoading ||
+    publicacoes.isLoading ||
+    equipe.isLoading ||
+    equipeDigital.isLoading ||
+    audit.isLoading;
+  const erro =
+    kpis.error || publicacoes.error || equipe.error || equipeDigital.error || audit.error;
 
   const recarregar = () => {
     kpis.refetch();
     publicacoes.refetch();
     equipe.refetch();
+    equipeDigital.refetch();
     audit.refetch();
     resumoEquipes.refetch();
   };
@@ -165,17 +242,23 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
             <Gauge className="h-4 w-4 text-primary" /> Desempenho da equipe nas publicações
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm">
-            Conta <strong>todas</strong> as publicações do período e reúne as provas de cumprimento em um só lugar:
+            Conta <strong>todas</strong> as publicações do período e reúne as provas de cumprimento
+            em um só lugar:
             <strong> E1</strong> comprovado e validado, <strong>E2</strong> confirmado no portal ou
-            check-in, <strong>E3</strong> evidência anexada. Quem abriu o link e não confirmou aparece separado de quem
-            nunca abriu.
+            check-in, <strong>E3</strong> evidência anexada. Quem abriu o link e não confirmou
+            aparece separado de quem nunca abriu.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3 px-3 sm:px-6">
           <div className="space-y-1">
             <Label className="text-xs">Atalho de período</Label>
-            <Select value="personalizado" onValueChange={(v) => v !== "personalizado" && applyLastDays(Number(v))}>
-              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+            <Select
+              value="personalizado"
+              onValueChange={(v) => v !== "personalizado" && applyLastDays(Number(v))}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="personalizado">Personalizado</SelectItem>
                 <SelectItem value="7">7 dias</SelectItem>
@@ -187,12 +270,22 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Lista de obrigados</Label>
-            <Select value={audienceId} onValueChange={(v) => { setAudienceId(v); setMissionId("todas"); }}>
-              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+            <Select
+              value={audienceId}
+              onValueChange={(v) => {
+                setAudienceId(v);
+                setMissionId("todas");
+              }}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="padrao">Padrão (estrutura + contratos)</SelectItem>
                 {(audiences.data ?? []).map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.nome}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -200,23 +293,50 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
           <div className="space-y-1">
             <Label className="text-xs">Data inicial</Label>
             <Input
-              type="date" value={dataInicio} max={dataFim || today} className="w-[160px]"
-              onChange={(e) => { setDataInicio(e.target.value); setMissionId("todas"); }}
+              type="date"
+              value={dataInicio}
+              max={dataFim || today}
+              className="w-[160px]"
+              onChange={(e) => {
+                setDataInicio(e.target.value);
+                setMissionId("todas");
+              }}
             />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Data final</Label>
             <Input
-              type="date" value={dataFim} min={dataInicio} max={today} className="w-[160px]"
-              onChange={(e) => { setDataFim(e.target.value); setMissionId("todas"); }}
+              type="date"
+              value={dataFim}
+              min={dataInicio}
+              max={today}
+              className="w-[160px]"
+              onChange={(e) => {
+                setDataFim(e.target.value);
+                setMissionId("todas");
+              }}
             />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Equipe responsável</Label>
             <Popover open={rootPickerOpen} onOpenChange={setRootPickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" aria-expanded={rootPickerOpen} className="w-[240px] justify-between px-3 font-normal">
-                  <span className="truncate">{rootId === "todos" ? "Todas as equipes" : (() => { const r = (teamRoots.data ?? []).find(item => item.root_id === rootId); return r ? `${r.is_avulso ? "Líder avulso" : "Coordenador"} · ${r.nome} (${r.pessoas})` : "Todas as equipes"; })()}</span>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={rootPickerOpen}
+                  className="w-[240px] justify-between px-3 font-normal"
+                >
+                  <span className="truncate">
+                    {rootId === "todos"
+                      ? "Todas as equipes"
+                      : (() => {
+                          const r = (teamRoots.data ?? []).find((item) => item.root_id === rootId);
+                          return r
+                            ? `${r.is_avulso ? "Líder avulso" : "Coordenador"} · ${r.nome} (${r.pessoas})`
+                            : "Todas as equipes";
+                        })()}
+                  </span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -226,13 +346,39 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
                   <CommandList>
                     <CommandEmpty>Nenhuma equipe encontrada.</CommandEmpty>
                     <CommandGroup>
-                      <CommandItem value="todas as equipes" onSelect={() => { setRootId("todos"); setRootPickerOpen(false); }}>
-                        <Check className={cn("h-4 w-4", rootId === "todos" ? "opacity-100" : "opacity-0")} /> Todas as equipes
+                      <CommandItem
+                        value="todas as equipes"
+                        onSelect={() => {
+                          setRootId("todos");
+                          setRootPickerOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "h-4 w-4",
+                            rootId === "todos" ? "opacity-100" : "opacity-0",
+                          )}
+                        />{" "}
+                        Todas as equipes
                       </CommandItem>
                       {(teamRoots.data ?? []).map((r) => (
-                        <CommandItem key={r.root_id} value={`${r.nome} ${r.is_avulso ? "lider avulso" : "coordenador"}`} onSelect={() => { setRootId(r.root_id); setRootPickerOpen(false); }}>
-                          <Check className={cn("h-4 w-4", rootId === r.root_id ? "opacity-100" : "opacity-0")} />
-                          <span className="truncate">{r.is_avulso ? "Líder avulso" : "Coordenador"} · {r.nome} ({r.pessoas})</span>
+                        <CommandItem
+                          key={r.root_id}
+                          value={`${r.nome} ${r.is_avulso ? "lider avulso" : "coordenador"}`}
+                          onSelect={() => {
+                            setRootId(r.root_id);
+                            setRootPickerOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "h-4 w-4",
+                              rootId === r.root_id ? "opacity-100" : "opacity-0",
+                            )}
+                          />
+                          <span className="truncate">
+                            {r.is_avulso ? "Líder avulso" : "Coordenador"} · {r.nome} ({r.pessoas})
+                          </span>
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -244,7 +390,9 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
           <div className="space-y-1">
             <Label className="text-xs">Missão</Label>
             <Select value={missionId} onValueChange={setMissionId}>
-              <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[240px]">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todas">Todas as missões do período</SelectItem>
                 {(missionOptions.data ?? []).map((m) => (
@@ -264,7 +412,9 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
         </CardContent>
       </Card>
 
-      {!periodValid && <p className="text-sm text-destructive">Escolha um período válido, sem datas futuras.</p>}
+      {!periodValid && (
+        <p className="text-sm text-destructive">Escolha um período válido, sem datas futuras.</p>
+      )}
 
       {erro && (
         <Card>
@@ -299,6 +449,9 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
               <TabsTrigger value="matriz" className="gap-1.5 text-xs sm:text-sm">
                 <Grid3x3 className="h-4 w-4" /> Matriz
               </TabsTrigger>
+              <TabsTrigger value="matriz-digital" className="gap-1.5 text-xs sm:text-sm">
+                <Grid3x3 className="h-4 w-4" /> Matriz Time Digital
+              </TabsTrigger>
               <TabsTrigger value="participantes" className="gap-1.5 text-xs sm:text-sm">
                 <ContactRound className="h-4 w-4" /> Externos e sem contrato
               </TabsTrigger>
@@ -331,6 +484,17 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
               />
             </TabsContent>
 
+            <TabsContent value="matriz-digital">
+              <MatrizCumprimentoPanel
+                clientId={clientId}
+                pessoas={equipeDigital.data ?? []}
+                publicacoes={publicacoes.data ?? []}
+                periodoLabel={periodoLabel}
+                onChanged={recarregar}
+                modo="digital"
+              />
+            </TabsContent>
+
             <TabsContent value="participantes">
               <MissionAccessManagement clientId={clientId} />
             </TabsContent>
@@ -345,8 +509,8 @@ export default function DesempenhoPublicacoesPanel({ clientId }: { clientId: str
           </Tabs>
 
           <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <BarChart3 className="h-3.5 w-3.5" /> Base: publicações não arquivadas do período, confirmações do portal,
-            check-ins, cliques rastreados nas redes e obrigações/evidências.
+            <BarChart3 className="h-3.5 w-3.5" /> Base: publicações não arquivadas do período,
+            confirmações do portal, check-ins, cliques rastreados nas redes e obrigações/evidências.
           </p>
         </>
       )}

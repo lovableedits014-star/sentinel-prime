@@ -161,6 +161,18 @@ export async function resolverFluxoCadastro(p: FluxoPessoa): Promise<FluxoResolv
     linkGrupo = gruposLinks[regiaoValue] || "";
   }
 
+  // Cabos recebem uma jornada individual: salvam os dois contatos, enviam o
+  // "olá", escolhem apenas um grupo e geram a foto oficial.
+  if (p.tipo === "cabo") {
+    const { data: onboardingToken, error: onboardingError } = await (supabase as any).rpc(
+      "eleicao_cabo_onboarding_create",
+      { p_client_id: p.client_id, p_pessoa_id: p.id },
+    );
+    if (!onboardingError && onboardingToken) {
+      linkGrupo = `${window.location.origin}/boas-vindas/cabo/${onboardingToken}`;
+    }
+  }
+
   // 5. Vars de template (mesmas chaves usadas pela edge)
   const vars: Record<string, string> = {
     nome: p.nome,

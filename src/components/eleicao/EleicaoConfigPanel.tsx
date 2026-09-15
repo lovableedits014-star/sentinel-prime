@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, MessageSquare, Phone, Link as LinkIcon, Plus, X } from "lucide-react";
+import { ContactRound, Loader2, Save, MessageSquare, Phone, Link as LinkIcon, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,6 +39,11 @@ interface Cfg {
   cadastro_lider_ativo: boolean;
   cadastro_cabo_ativo: boolean;
   cadastro_voluntario_ativo: boolean;
+  escritorio_nome: string;
+  escritorio_telefone: string;
+  candidato_nome: string;
+  candidato_telefone: string;
+  onboarding_mensagem: string;
 }
 
 type GroupOption = { group_jid: string; name: string | null };
@@ -66,6 +71,11 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     cadastro_lider_ativo: true,
     cadastro_cabo_ativo: true,
     cadastro_voluntario_ativo: true,
+    escritorio_nome: "Escritório da campanha",
+    escritorio_telefone: "",
+    candidato_nome: "Candidato",
+    candidato_telefone: "",
+    onboarding_mensagem: "Olá, acabo de me cadastrar como cabo eleitoral.",
   });
   const [grupos, setGrupos] = useState<GroupOption[]>([]);
 
@@ -96,6 +106,11 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
         cadastro_lider_ativo: d.cadastro_lider_ativo ?? true,
         cadastro_cabo_ativo: d.cadastro_cabo_ativo ?? true,
         cadastro_voluntario_ativo: d.cadastro_voluntario_ativo ?? true,
+        escritorio_nome: d.escritorio_nome || "Escritório da campanha",
+        escritorio_telefone: d.escritorio_telefone || "",
+        candidato_nome: d.candidato_nome || "Candidato",
+        candidato_telefone: d.candidato_telefone || "",
+        onboarding_mensagem: d.onboarding_mensagem || "Olá, acabo de me cadastrar como cabo eleitoral.",
       });
     }
     // Carrega grupos do WhatsApp disponíveis
@@ -138,6 +153,11 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
       cadastro_lider_ativo: cfg.cadastro_lider_ativo,
       cadastro_cabo_ativo: cfg.cadastro_cabo_ativo,
       cadastro_voluntario_ativo: cfg.cadastro_voluntario_ativo,
+      escritorio_nome: cfg.escritorio_nome.trim() || "Escritório da campanha",
+      escritorio_telefone: cfg.escritorio_telefone.trim() || null,
+      candidato_nome: cfg.candidato_nome.trim() || "Candidato",
+      candidato_telefone: cfg.candidato_telefone.trim() || null,
+      onboarding_mensagem: cfg.onboarding_mensagem.trim() || "Olá, acabo de me cadastrar como cabo eleitoral.",
     };
     const q = cfg.id
       ? supabase.from("eleicao_notif_config" as any).update(payload).eq("id", cfg.id)
@@ -195,6 +215,20 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
   return (
     <div className="space-y-4">
       <ParceirosManager clientId={clientId} />
+
+      <Card className="p-4 space-y-4">
+        <div>
+          <h3 className="font-semibold flex items-center gap-2"><ContactRound className="w-4 h-4" />Jornada de boas-vindas do cabo</h3>
+          <p className="text-xs text-muted-foreground mt-1">Configura os dois contatos e a mensagem exibidos no link individual enviado ao novo cabo. Os grupos usados são os mesmos configurados por região abaixo.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1"><Label>Nome do escritório</Label><Input value={cfg.escritorio_nome} onChange={e => setCfg(c => ({ ...c, escritorio_nome: e.target.value }))} /></div>
+          <div className="space-y-1"><Label>WhatsApp do escritório</Label><Input placeholder="(67) 99999-0000" value={cfg.escritorio_telefone} onChange={e => setCfg(c => ({ ...c, escritorio_telefone: e.target.value }))} /></div>
+          <div className="space-y-1"><Label>Nome do candidato</Label><Input value={cfg.candidato_nome} onChange={e => setCfg(c => ({ ...c, candidato_nome: e.target.value }))} /></div>
+          <div className="space-y-1"><Label>WhatsApp do candidato</Label><Input placeholder="(67) 99999-0000" value={cfg.candidato_telefone} onChange={e => setCfg(c => ({ ...c, candidato_telefone: e.target.value }))} /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Mensagem pronta para os dois números</Label><Textarea rows={3} value={cfg.onboarding_mensagem} onChange={e => setCfg(c => ({ ...c, onboarding_mensagem: e.target.value }))} /></div>
+        </div>
+      </Card>
 
       <Card className="p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
