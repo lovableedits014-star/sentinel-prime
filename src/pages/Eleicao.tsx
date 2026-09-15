@@ -331,14 +331,24 @@ export default function Eleicao() {
     // Usa RPC SECURITY DEFINER para garantir que todo team_member ativo do client
     // veja a árvore completa (coordenadores + líderes + cabos), evitando casos
     // em que a RLS por linha falha por timing de sessão/JWT.
-    const { data, error } = await supabase
-      .rpc("get_eleicao_pessoas_for_client" as any, { _client_id: clientId! });
-    if (error) {
-      toast.error("Erro ao carregar: " + error.message);
-      setLoading(false);
-      return;
+    // O PostgREST limita uma resposta a 1.000 linhas. Como Campo Grande e
+    // Interior são retornados juntos, cadastros antigos podiam ficar fora da
+    // primeira página e, consequentemente, também fora da busca local.
+    const pageSize = 1000;
+    const rows: Pessoa[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .rpc("get_eleicao_pessoas_for_client" as any, { _client_id: clientId! })
+        .range(from, from + pageSize - 1);
+      if (error) {
+        toast.error("Erro ao carregar: " + error.message);
+        setLoading(false);
+        return;
+      }
+      const page = ((data as any) || []) as Pessoa[];
+      rows.push(...page);
+      if (page.length < pageSize) break;
     }
-    const rows = ((data as any) || []) as Pessoa[];
     rows.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     setPessoas(rows);
     setLoading(false);
