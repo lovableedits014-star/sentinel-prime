@@ -48,10 +48,12 @@ export interface FluxoResolvido {
   secretaria: FluxoDestino;
 }
 
-export async function criarLinkOnboardingCabo(clientId: string, pessoaId: string): Promise<string> {
-  const { data, error } = await (supabase as any).rpc("eleicao_cabo_onboarding_create", {
+export async function criarLinkOnboardingCabo(
+  clientId: string,
+  _pessoaId?: string,
+): Promise<string> {
+  const { data, error } = await (supabase as any).rpc("eleicao_cabo_onboarding_public_link", {
     p_client_id: clientId,
-    p_pessoa_id: pessoaId,
   });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Não foi possível gerar o link de boas-vindas");

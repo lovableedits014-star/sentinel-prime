@@ -88,8 +88,8 @@ export default function EnviarFluxoMenu({ pessoa }: Props) {
             <LinkIcon className="w-3.5 h-3.5 mr-2" />
           )}
           <div className="flex flex-col items-start">
-            <span>Copiar link de boas-vindas</span>
-            <span className="text-[10px] text-muted-foreground">Para enviar manualmente</span>
+            <span>Copiar link geral dos cabos</span>
+            <span className="text-[10px] text-muted-foreground">O mesmo link para todos</span>
           </div>
           <Copy className="w-3 h-3 ml-auto text-muted-foreground" />
         </DropdownMenuItem>

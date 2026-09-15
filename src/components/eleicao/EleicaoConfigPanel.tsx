@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ContactRound, Loader2, Save, MessageSquare, Phone, Link as LinkIcon, Plus, X } from "lucide-react";
+import { ContactRound, Copy, Loader2, Save, MessageSquare, Phone, Link as LinkIcon, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ParceirosManager from "@/components/eleicao/ParceirosManager";
+import { criarLinkOnboardingCabo } from "@/lib/eleicao-fluxo-cadastro";
 
 const DEFAULT_TPL_COORD =
   "Foi adicionado novo líder na região: *{regiao}*\n\nNome: {nome}\nTelefone: {telefone}\nRua: {rua}, {numero}\nBairro: {bairro}";
@@ -78,6 +79,7 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     onboarding_mensagem: "Olá, acabo de me cadastrar como cabo eleitoral.",
   });
   const [grupos, setGrupos] = useState<GroupOption[]>([]);
+  const [copiandoLink, setCopiandoLink] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -208,6 +210,21 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
     else toast.success(`${vinculados} região(ões) vinculada(s). Clique em Salvar para confirmar.`);
   }
 
+  async function copiarLinkPublico() {
+    setCopiandoLink(true);
+    try {
+      const link = await criarLinkOnboardingCabo(clientId);
+      await navigator.clipboard.writeText(link);
+      toast.success("Link geral copiado", {
+        description: "Envie este mesmo link para todos os novos cabos.",
+      });
+    } catch (e: any) {
+      toast.error(e?.message || "Não foi possível gerar o link");
+    } finally {
+      setCopiandoLink(false);
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center py-10"><Loader2 className="w-5 h-5 animate-spin" /></div>;
   }
@@ -227,6 +244,15 @@ export default function EleicaoConfigPanel({ clientId }: { clientId: string }) {
           <div className="space-y-1"><Label>Nome do candidato</Label><Input value={cfg.candidato_nome} onChange={e => setCfg(c => ({ ...c, candidato_nome: e.target.value }))} /></div>
           <div className="space-y-1"><Label>WhatsApp do candidato</Label><Input placeholder="(67) 99999-0000" value={cfg.candidato_telefone} onChange={e => setCfg(c => ({ ...c, candidato_telefone: e.target.value }))} /></div>
           <div className="space-y-1 sm:col-span-2"><Label>Mensagem pronta para os dois números</Label><Textarea rows={3} value={cfg.onboarding_mensagem} onChange={e => setCfg(c => ({ ...c, onboarding_mensagem: e.target.value }))} /></div>
+        </div>
+        <div className="space-y-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <div>
+            <Label className="text-sm font-semibold">Link geral de acesso dos cabos</Label>
+            <p className="text-xs text-muted-foreground">É um único link para todos. Copie e envie manualmente quantas vezes quiser.</p>
+          </div>
+          <Button type="button" size="lg" className="w-full gap-2" disabled={copiandoLink} onClick={() => void copiarLinkPublico()}>
+            {copiandoLink ? <Loader2 className="h-5 w-5 animate-spin" /> : <Copy className="h-5 w-5" />} Copiar link geral dos cabos
+          </Button>
         </div>
       </Card>
 

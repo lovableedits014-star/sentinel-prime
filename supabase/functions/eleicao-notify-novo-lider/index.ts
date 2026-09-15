@@ -410,13 +410,8 @@ Deno.serve(async (req) => {
       ? ((cfg.grupos_links && cfg.grupos_links["__interior__"]) || "")
       : ((cfg.grupos_links && regiaoValue) ? (cfg.grupos_links[regiaoValue] || "") : "");
     if (pessoa.tipo === "cabo") {
-      const { data: onboarding } = await admin
-        .from("eleicao_cabo_onboarding_tokens")
-        .upsert({ client_id: pessoa.client_id, pessoa_id: pessoa.id }, { onConflict: "client_id,pessoa_id" })
-        .select("token")
-        .single();
       const appUrl = (Deno.env.get("PUBLIC_APP_URL") || req.headers.get("origin") || "").replace(/\/$/, "");
-      if (onboarding?.token && appUrl) linkGrupo = `${appUrl}/boas-vindas/cabo/${onboarding.token}`;
+      if (cfg.onboarding_public_token && appUrl) linkGrupo = `${appUrl}/boas-vindas/cabo/${cfg.onboarding_public_token}`;
     }
     const vars = {
       nome: pessoa.nome,

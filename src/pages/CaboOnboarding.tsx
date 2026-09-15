@@ -19,7 +19,6 @@ type Jornada = {
   ok: boolean;
   error?: string;
   client_id: string;
-  pessoa_nome: string;
   campanha_nome: string;
   logo_url: string | null;
   escritorio_nome: string;
@@ -52,6 +51,14 @@ const vcard = (name: string, phone: string) =>
 
 export default function CaboOnboarding() {
   const { token = "" } = useParams();
+  const [visitorKey] = useState(() => {
+    const storageKey = `cabo-onboarding:${token}`;
+    const existing = localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const created = crypto.randomUUID();
+    localStorage.setItem(storageKey, created);
+    return created;
+  });
   const [data, setData] = useState<Jornada | null>(null);
   const [loading, setLoading] = useState(true);
   const [choosing, setChoosing] = useState<string | null>(null);
@@ -61,12 +68,13 @@ export default function CaboOnboarding() {
     (async () => {
       const { data: result, error } = await (supabase as any).rpc("eleicao_cabo_onboarding_info", {
         p_token: token,
+        p_visitor_key: visitorKey,
       });
       setLoading(false);
       if (error) return toast.error(error.message);
       setData(result as Jornada);
     })();
-  }, [token]);
+  }, [token, visitorKey]);
 
   const contacts = useMemo(
     () =>
@@ -116,6 +124,7 @@ export default function CaboOnboarding() {
       "eleicao_cabo_onboarding_choose_group",
       {
         p_token: token,
+        p_visitor_key: visitorKey,
         p_grupo_chave: group.chave,
       },
     );
@@ -168,7 +177,7 @@ export default function CaboOnboarding() {
             />
           )}
           <p className="text-sm font-medium text-primary">{data.campanha_nome}</p>
-          <h1 className="text-2xl font-bold">Bem-vindo(a), {data.pessoa_nome.split(" ")[0]}!</h1>
+          <h1 className="text-2xl font-bold">Bem-vindo(a) ao nosso time!</h1>
           <p className="text-sm text-muted-foreground">
             Conclua os três passos abaixo. Leva menos de dois minutos.
           </p>
@@ -279,12 +288,7 @@ export default function CaboOnboarding() {
           </CardContent>
         </Card>
 
-        <CampaignFrameGenerator
-          clientId={data.client_id}
-          variant="showcase"
-          individualOnly
-          hideWithoutActiveFrame
-        />
+        <CampaignFrameGenerator clientId={data.client_id} variant="showcase" individualOnly />
       </div>
     </main>
   );
