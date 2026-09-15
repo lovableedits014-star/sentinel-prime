@@ -2384,6 +2384,14 @@ function RegionBlock({
   const hasContent = pessoas.length > 0;
   const [open, setOpen] = useState(defaultOpen ?? hasContent);
 
+  // `defaultOpen` muda quando o usuário pesquisa ou seleciona uma região.
+  // O valor inicial do useState, porém, não é reaplicado em renders futuros;
+  // assim um resultado existente podia permanecer escondido em uma região
+  // anteriormente recolhida.
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
+
   const valorTotal = pessoas.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
   const semValor = pessoas.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
 
