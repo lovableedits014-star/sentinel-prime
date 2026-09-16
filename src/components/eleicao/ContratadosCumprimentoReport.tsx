@@ -115,6 +115,32 @@ type VoteAudit = {
 const reportDb = supabase as unknown as {
   rpc: (name: string, args: Record<string, unknown>) => Promise<RpcResult>;
 };
+const paginatedReportDb = supabase as unknown as {
+  rpc: (
+    name: string,
+    args: Record<string, unknown>,
+  ) => { range: (from: number, to: number) => Promise<RpcResult> };
+};
+
+const REPORT_PAGE_SIZE = 1000;
+
+async function fetchCompleteComplianceReport(args: Record<string, unknown>) {
+  const allRows: ReportRow[] = [];
+
+  for (let from = 0; ; from += REPORT_PAGE_SIZE) {
+    const { data, error } = await paginatedReportDb
+      .rpc("election_contract_compliance_report", args)
+      .range(from, from + REPORT_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = (data || []) as unknown as ReportRow[];
+    allRows.push(...page);
+    if (page.length < REPORT_PAGE_SIZE) break;
+  }
+
+  return allRows;
+}
 
 const statusLabel: Record<string, string> = {
   cumprindo: "Cumprindo",
@@ -170,8 +196,8 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
     refetchOnWindowFocus: true,
     staleTime: 0,
     queryFn: async () => {
-      const [{ data, error }, configResult, auditResult] = await Promise.all([
-        reportDb.rpc("election_contract_compliance_report", {
+      const [reportRows, configResult, auditResult] = await Promise.all([
+        fetchCompleteComplianceReport({
           p_client_id: clientId,
           p_data_inicio: inicio,
           p_data_fim: fim,
@@ -183,12 +209,11 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           .maybeSingle(),
         reportDb.rpc("telemarketing_vote_return_audit", { p_client_id: clientId }),
       ]);
-      if (error) throw error;
       if (configResult.error) throw configResult.error;
       // A auditoria cobre toda a base de telemarketing e pode ser mais pesada que
       // o relatório. Uma falha nela não deve bloquear o acesso ao relatório principal.
       const config = configResult.data;
-      const people = ((data || []) as ReportRow[]).map((r) => {
+      const people = reportRows.map((r) => {
         const details = Array.isArray(r.indicados_detalhe) ? r.indicados_detalhe : [];
         const currentMeta =
           r.cargo === "coordenador"
