@@ -951,9 +951,12 @@ export default function Eleicao() {
     const semValor = remunerados.filter(p => !p.valor_contratacao || p.valor_contratacao === 0).length;
     const avulsos = remunerados.filter(p => p.tipo === "lider" && !p.parent_id).length;
     return {
-      coord: remunerados.filter(p => p.tipo === "coordenador").length,
-      lider: remunerados.filter(p => p.tipo === "lider").length,
-      cabo: remunerados.filter(p => p.tipo === "cabo").length,
+      coord: f.filter(p => p.tipo === "coordenador").length,
+      lider: f.filter(p => p.tipo === "lider").length,
+      cabo: f.filter(p => p.tipo === "cabo").length,
+      coordContratados: f.filter(p => p.tipo === "coordenador" && isEleicaoContratado(p)).length,
+      liderContratados: f.filter(p => p.tipo === "lider" && isEleicaoContratado(p)).length,
+      caboContratados: f.filter(p => p.tipo === "cabo" && isEleicaoContratado(p)).length,
       voluntarios: f.filter(isVol).length,
       contratados: f.filter(isEleicaoContratadoRemunerado).length,
       voluntariosContratados: f.filter(isEleicaoVoluntarioContratado).length,
@@ -1478,14 +1481,15 @@ export default function Eleicao() {
         </TabsList>
 
         {/* KPIs com cards visuais */}
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 mb-4">
-          <KpiCard label="Total" value={stats.total} icon={Users} tone="neutral" />
-          <KpiCard label="Contratados" value={stats.contratados} icon={UserCheck} tone="blue" />
-          <KpiCard label="Voluntários contratados" value={stats.voluntariosContratados} icon={Heart} tone="green" />
-          <KpiCard label="Sem contrato" value={stats.semContrato} icon={AlertCircle} tone="amber" />
-          <KpiCard label="Voluntários" value={stats.voluntarios} icon={Heart} tone="emerald" />
-          <KpiCard label="Arquivados" value={stats.arquivados} icon={Trash2} tone="neutral" />
-          <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" small />
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 mb-4">
+          <KpiCard label="Total ativo" value={stats.total} icon={Network} tone="neutral" hint={`${stats.arquivados} arquivado(s)`} />
+          <KpiCard label="Total contratado" value={stats.contratados} icon={CheckCircle2} tone="blue" hint={`+ ${stats.voluntariosContratados} contratos simbólicos`} />
+          <KpiCard label="Coordenadores" value={stats.coord} icon={Crown} tone="red" hint={`${stats.coordContratados} com contrato`} />
+          <KpiCard label="Líderes" value={stats.lider} icon={UserCheck} tone="blue" hint={`${stats.liderContratados} com contrato`} />
+          <KpiCard label="Cabos eleitorais" value={stats.cabo} icon={Users} tone="green" hint={`${stats.caboContratados} com contrato`} />
+          <KpiCard label="Sem contrato" value={stats.semContrato} icon={AlertCircle} tone="amber" hint="aguardando definição" />
+          <KpiCard label="Voluntários" value={stats.voluntarios} icon={Heart} tone="emerald" hint="sem remuneração" />
+          <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" hint="contratos remunerados" small />
 
         </div>
 
@@ -2995,9 +2999,9 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
 }
 
 // ─── KPI Card visual ────────────────────────────────────────────
-function KpiCard({ label, value, icon: Icon, tone, small }: {
+function KpiCard({ label, value, icon: Icon, tone, small, hint }: {
   label: string; value: number | string; icon: any;
-  tone: "neutral" | "red" | "blue" | "green" | "emerald" | "amber"; small?: boolean;
+  tone: "neutral" | "red" | "blue" | "green" | "emerald" | "amber"; small?: boolean; hint?: string;
 }) {
   const tones: Record<string, string> = {
     neutral: "from-muted/40 to-muted/10 text-foreground border-border/50",
@@ -3008,11 +3012,12 @@ function KpiCard({ label, value, icon: Icon, tone, small }: {
     amber: "from-amber-500/15 to-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/20",
   };
   return (
-    <div className={cn("relative rounded-xl border bg-gradient-to-br p-3 overflow-hidden", tones[tone])}>
+    <div className={cn("relative min-h-[86px] rounded-xl border bg-gradient-to-br p-3 overflow-hidden", tones[tone])}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-wider opacity-70 font-semibold">{label}</p>
           <p className={cn("font-bold tabular-nums leading-tight mt-0.5 truncate", small ? "text-base" : "text-2xl")}>{value}</p>
+          {hint && <p className="mt-1 text-[9px] leading-tight opacity-65 truncate" title={hint}>{hint}</p>}
         </div>
         <Icon className={cn("opacity-40 shrink-0", small ? "w-4 h-4" : "w-5 h-5")} />
       </div>
