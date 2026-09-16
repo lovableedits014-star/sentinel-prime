@@ -1353,21 +1353,21 @@ export default function Eleicao() {
     }
   };
 
-  const abrirNovoCabo = (lider: Pessoa) => {
+  const abrirNovoCabo = (responsavel: Pessoa) => {
     openNew({
       tipo: "cabo",
-      parent_id: lider.id,
-      escopo: lider.escopo,
-      regiao: (lider.regiao || "centro") as Regiao,
-      cidade: lider.cidade || (lider.escopo === "campo_grande" ? "Campo Grande" : ""),
+      parent_id: responsavel.id,
+      escopo: responsavel.escopo,
+      regiao: (responsavel.regiao || "centro") as Regiao,
+      cidade: responsavel.cidade || (responsavel.escopo === "campo_grande" ? "Campo Grande" : ""),
       rua: "",
       numero: "",
-      bairro: lider.bairro || "",
+      bairro: responsavel.bairro || "",
     });
   };
 
-  const caboRapidoLider = !editing && form.tipo === "cabo" && form.parent_id
-    ? pessoas.find((p) => p.id === form.parent_id && p.tipo === "lider")
+  const caboRapidoResponsavel = !editing && form.tipo === "cabo" && form.parent_id
+    ? pessoas.find((p) => p.id === form.parent_id && (p.tipo === "lider" || p.tipo === "coordenador"))
     : null;
 
   return (
@@ -1707,15 +1707,15 @@ export default function Eleicao() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-xl w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] p-0 gap-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <DialogTitle>{editing ? "Editar cadastro" : caboRapidoLider ? "Cadastrar cabo eleitoral" : "Novo cadastro"}</DialogTitle>
+            <DialogTitle>{editing ? "Editar cadastro" : caboRapidoResponsavel ? "Cadastrar cabo eleitoral" : "Novo cadastro"}</DialogTitle>
           </DialogHeader>
-          {caboRapidoLider ? (
+          {caboRapidoResponsavel ? (
           <div className="space-y-4 px-6 py-3 overflow-y-auto flex-1 min-h-0">
             <div className="rounded-lg border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Líder responsável</p>
-              <p className="font-semibold">{caboRapidoLider.nome}</p>
+              <p className="text-xs text-muted-foreground">{caboRapidoResponsavel.tipo === "coordenador" ? "Coordenador responsável" : "Líder responsável"}</p>
+              <p className="font-semibold">{caboRapidoResponsavel.nome}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                O vínculo e a localização serão herdados automaticamente deste líder.
+                O vínculo e a localização serão herdados automaticamente deste {caboRapidoResponsavel.tipo === "coordenador" ? "coordenador" : "líder"}.
               </p>
             </div>
             <div>
@@ -2436,7 +2436,7 @@ function RegionBlock({
       {open && hasContent && (
         <div className="border-t bg-muted/20">
           {coords.map(c => (
-            <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} interior={interior} />
+            <CoordBlock key={c.id} coord={c} all={pessoas} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} />
           ))}
           {lideresOrfaos.length > 0 && (
             <div className="px-3 py-2 border-t border-dashed bg-amber-500/5">
@@ -2477,9 +2477,9 @@ function RegionBlock({
   );
 }
 
-function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendingId, interior }: {
+function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendingId }: {
   coord: Pessoa; all: Pessoa[]; onEdit: (p: Pessoa) => void; onDelete: (id: string) => void; onCredentials: (p: Pessoa) => void;
-  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null; interior?: boolean;
+  onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void; sendingId: string | null;
 }) {
   const lideres = all.filter(p => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter(p => p.tipo === "cabo" && p.parent_id === coord.id);
@@ -2487,6 +2487,11 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
   const totalEquipe = lideres.length + cabosDir.length + cabosLid.length;
   const hasTeam = totalEquipe > 0;
   const allDoTime = [coord, ...lideres, ...cabosDir, ...cabosLid];
+  const valorCoordenador = Number(coord.valor_contratacao || 0);
+  const valorLideres = lideres.reduce((total, pessoa) => total + Number(pessoa.valor_contratacao || 0), 0);
+  const todosCabos = [...cabosDir, ...cabosLid];
+  const valorCabos = todosCabos.reduce((total, pessoa) => total + Number(pessoa.valor_contratacao || 0), 0);
+  const valorTotalArvore = valorCoordenador + valorLideres + valorCabos;
 
   const { searchActive, matchedIds } = React.useContext(EleicaoSearchContext);
   // Conta matches dentro da equipe (excluindo o próprio coord para destacar "achou alguém aqui dentro").
@@ -2518,6 +2523,14 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
         sendingId={sendingId}
         teamCount={hasTeam ? totalEquipe : undefined}
         matchInTeam={matchesNaEquipe}
+        teamFinancials={{
+          valorCoordenador,
+          lideres: lideres.length,
+          valorLideres,
+          cabos: todosCabos.length,
+          valorCabos,
+          valorTotal: valorTotalArvore,
+        }}
         expanded={expanded}
         onToggle={hasTeam ? () => { setUserToggled(true); setExpanded(e => !e); } : undefined}
         bulkAction={hasTeam ? {
@@ -2545,7 +2558,7 @@ function CoordBlock({ coord, all, onEdit, onDelete, onCredentials, onSend, sendi
               sendingId={sendingId}
             />
           ))}
-          {interior && cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />)}
+          {cabosDir.map(cb => <PessoaRow key={cb.id} p={cb} onEdit={onEdit} onDelete={onDelete} onCredentials={onCredentials} onSend={onSend} sendingId={sendingId} indent={1} />)}
         </div>
       )}
     </div>
@@ -2580,7 +2593,6 @@ function LiderBlock({ lider, all, onEdit, onDelete, onCredentials, onSend, sendi
         sendingId={sendingId}
         indent={1}
         teamCount={cabosContratados.length}
-        teamLimit={4}
         matchInTeam={matchesNaEquipe}
         expanded={open}
         onToggle={hasCabos ? () => setOpen(o => !o) : undefined}
@@ -2660,7 +2672,7 @@ function FavoritoToggle({ pessoa }: { pessoa: Pessoa }) {
   );
 }
 
-function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, teamLimit, expanded, onToggle, bulkAction, matchInTeam }: {
+function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, indent = 0, teamCount, teamLimit, expanded, onToggle, bulkAction, matchInTeam, teamFinancials }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
@@ -2674,6 +2686,14 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
   onToggle?: () => void;
   bulkAction?: { label: string; onClick: () => void };
   matchInTeam?: number;
+  teamFinancials?: {
+    valorCoordenador: number;
+    lideres: number;
+    valorLideres: number;
+    cabos: number;
+    valorCabos: number;
+    valorTotal: number;
+  };
 }) {
   const actions = React.useContext(EleicaoActionsContext);
   const onTogglePermissao = actions?.onTogglePermissao;
@@ -2801,6 +2821,14 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
             ↳ Vinculado a {parentTipo === "coordenador" ? "coordenador" : "líder"} <span className="font-medium text-foreground/80 not-italic">{parentName}</span>
           </div>
         )}
+        {teamFinancials && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-[10.5px] tabular-nums">
+            <span className="text-muted-foreground">Coordenador <strong className="text-foreground">{fmtBRL(teamFinancials.valorCoordenador)}</strong></span>
+            <span className="text-muted-foreground">Líderes ({teamFinancials.lideres}) <strong className="text-blue-700 dark:text-blue-400">{fmtBRL(teamFinancials.valorLideres)}</strong></span>
+            <span className="text-muted-foreground">Cabos ({teamFinancials.cabos}) <strong className="text-green-700 dark:text-green-400">{fmtBRL(teamFinancials.valorCabos)}</strong></span>
+            <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">Total da árvore: {fmtBRL(teamFinancials.valorTotal)}</span>
+          </div>
+        )}
       </div>
 
       {teamCount !== undefined && (
@@ -2859,6 +2887,11 @@ function PessoaRow({ p, onEdit, onDelete, onCredentials, onSend, sendingId, inde
           )}
           {p.tipo === "coordenador" && onFormularioCabos && (
             <>
+              {onNovoCabo && (
+                <DropdownMenuItem onClick={() => onNovoCabo(p)}>
+                  <Plus className="w-3.5 h-3.5 mr-2" />Cadastrar cabo eleitoral
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => onFormularioCabos(p)}>
                 <Printer className="w-3.5 h-3.5 mr-2" />Formulários dos líderes
               </DropdownMenuItem>
