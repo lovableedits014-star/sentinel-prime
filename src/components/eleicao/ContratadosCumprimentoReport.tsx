@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   exportElectionContractReportPdf,
   exportElectionSeparatedRankingPdf,
@@ -141,6 +142,12 @@ const badgeClass = (s: string) =>
 const area = (r: ReportRow) =>
   r.escopo === "interior" ? r.cidade || "Sem cidade" : r.regiao || "Sem região";
 const n = (v: unknown) => Number(v || 0);
+const cargoOptions = [
+  { value: "coordenador", label: "Coordenadores" },
+  { value: "lider", label: "Líderes" },
+  { value: "cabo", label: "Cabos" },
+] as const;
+type ReportCargo = (typeof cargoOptions)[number]["value"];
 
 export default function ContratadosCumprimentoReport({ clientId }: { clientId: string }) {
   const today = format(endOfDay(new Date()), "yyyy-MM-dd");
@@ -150,6 +157,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   const [coordinator, setCoordinator] = useState("all");
   const [region, setRegion] = useState("all");
   const [status, setStatus] = useState("all");
+  const [cargos, setCargos] = useState<ReportCargo[]>(["coordenador", "lider", "cabo"]);
   const [exporting, setExporting] = useState(false);
   const [exportingRanking, setExportingRanking] = useState<ElectionRankingKind | null>(null);
 
@@ -157,7 +165,7 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
     queryKey: ["election-contract-compliance", clientId, inicio, fim],
     enabled: !!clientId && !!inicio && !!fim && fim >= inicio,
     refetchOnMount: "always",
-    refetchInterval: 30000,
+    refetchInterval: 120000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     staleTime: 0,
@@ -177,7 +185,8 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
       ]);
       if (error) throw error;
       if (configResult.error) throw configResult.error;
-      if (auditResult.error) throw auditResult.error;
+      // A auditoria cobre toda a base de telemarketing e pode ser mais pesada que
+      // o relatório. Uma falha nela não deve bloquear o acesso ao relatório principal.
       const config = configResult.data;
       const people = ((data || []) as ReportRow[]).map((r) => {
         const details = Array.isArray(r.indicados_detalhe) ? r.indicados_detalhe : [];
@@ -205,7 +214,9 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
           devolutivas_negativas: details.filter((i) => i.vota_candidato === "nao").length,
         };
       });
-      const voteAudit = (auditResult.data as VoteAudit[] | null)?.[0] || null;
+      const voteAudit = auditResult.error
+        ? null
+        : (auditResult.data as VoteAudit[] | null)?.[0] || null;
       return { people, voteAudit };
     },
   });
@@ -240,14 +251,25 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
               : r.coordenador_id === coordinator)) &&
           (region === "all" || area(r) === region) &&
           (status === "all" || r.faixa === status) &&
+          cargos.includes(r.cargo as ReportCargo) &&
           (!q ||
             [r.nome, r.telefone, r.coordenador_nome, r.responsavel_nome, area(r)].some((v) =>
               (v || "").toLocaleLowerCase("pt-BR").includes(q),
             ))
         );
       }),
-    [rows, search, coordinator, region, status],
+    [rows, search, coordinator, region, status, cargos],
   );
+  const toggleCargo = (cargo: ReportCargo) => {
+    setCargos((current) => {
+      if (!current.includes(cargo)) return [...current, cargo];
+      if (current.length === 1) {
+        toast.info("Mantenha pelo menos um cargo selecionado.");
+        return current;
+      }
+      return current.filter((item) => item !== cargo);
+    });
+  };
   const totals = useMemo(
     () => ({
       people: filtered.length,
@@ -305,12 +327,15 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
   if (query.isError)
     return (
       <Card className="border-destructive/40">
-        <CardContent className="flex gap-2 pt-6 text-destructive">
+        <CardContent className="flex items-start gap-3 pt-6 text-destructive">
           <AlertCircle className="h-5 w-5" />
-          <div>
+          <div className="flex-1">
             <p className="font-medium">Não foi possível carregar o relatório.</p>
             <p className="text-sm">{(query.error as Error).message}</p>
           </div>
+          <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+            Tentar novamente
+          </Button>
         </CardContent>
       </Card>
     );
@@ -419,6 +444,33 @@ export default function ContratadosCumprimentoReport({ clientId }: { clientId: s
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Nome ou telefone"
             />
+          </div>
+          <div className="space-y-1 md:col-span-2 xl:col-span-6">
+            <Label className="text-xs">Incluir no relatório e no PDF</Label>
+            <div className="flex flex-wrap gap-2">
+              {cargoOptions.map((option) => {
+                const selected = cargos.includes(option.value);
+                return (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    size="sm"
+                    variant={selected ? "default" : "outline"}
+                    className="h-8 gap-1.5"
+                    onClick={() => toggleCargo(option.value)}
+                    aria-pressed={selected}
+                  >
+                    <span className={cn(
+                      "flex h-3.5 w-3.5 items-center justify-center rounded-sm border text-[10px]",
+                      selected ? "border-primary-foreground/50" : "border-muted-foreground/40",
+                    )}>
+                      {selected ? "✓" : ""}
+                    </span>
+                    {option.label}
+                  </Button>
+                );
+              })}
+            </div>
           </div>
         </CardContent>
       </Card>
