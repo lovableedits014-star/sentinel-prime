@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Image as ImageIcon, Loader2, Trash2, Sparkles, Plus, Pencil, Copy, Link } from "lucide-react";
 import { toast } from "sonner";
 import FrameCompositionEditor from "@/components/campaign-frame/FrameCompositionEditor";
@@ -17,6 +18,7 @@ interface Frame {
   display_order: number;
   composition: FrameComposition | null;
   parceiro_id: string | null;
+  kind: string;
 }
 
 interface Partner { id: string; nome: string; public_token: string; ativo: boolean; }
@@ -30,11 +32,14 @@ export default function CampaignFramesCard({ clientId }: Props) {
   const [editingFrame, setEditingFrame] = useState<Frame | null>(null);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [scope, setScope] = useState("official");
+  const [cloningFrame, setCloningFrame] = useState<Frame | null>(null);
+  const [cloneTarget, setCloneTarget] = useState("");
+  const [cloning, setCloning] = useState(false);
 
   const load = async () => {
     setLoading(true);
     const [{ data }, { data: partnerData }] = await Promise.all([
-      supabase.from("campaign_frames").select("id, nome, image_url, is_active, display_order, composition, parceiro_id").eq("client_id", clientId).order("display_order", { ascending: true }),
+      supabase.from("campaign_frames").select("id, nome, image_url, is_active, display_order, composition, parceiro_id, kind").eq("client_id", clientId).order("display_order", { ascending: true }),
       supabase.from("eleicao_candidatos_parceiros").select("id, nome, public_token, ativo").eq("client_id", clientId).eq("ativo", true).order("ordem"),
     ]);
     setFrames((data ?? []) as any as Frame[]);
@@ -63,6 +68,40 @@ export default function CampaignFramesCard({ clientId }: Props) {
 
   const openNew = () => { setEditingFrame(null); setEditorOpen(true); };
   const openEdit = (f: Frame) => { setEditingFrame(f); setEditorOpen(true); };
+  const openClone = (f: Frame) => {
+    setCloningFrame(f);
+    setCloneTarget("");
+  };
+  const cloneFrame = async () => {
+    if (!cloningFrame || !cloneTarget) return;
+    const target = partners.find((p) => p.id === cloneTarget);
+    if (!target) return;
+    setCloning(true);
+    try {
+      const nextOrder = frames
+        .filter((f) => f.parceiro_id === cloneTarget)
+        .reduce((max, f) => Math.max(max, f.display_order), -1) + 1;
+      const { error } = await supabase.from("campaign_frames").insert({
+        client_id: clientId,
+        nome: cloningFrame.nome,
+        image_url: cloningFrame.image_url,
+        is_active: cloningFrame.is_active,
+        display_order: nextOrder,
+        composition: cloningFrame.composition as any,
+        parceiro_id: cloneTarget,
+        kind: cloningFrame.kind,
+      });
+      if (error) throw error;
+      toast.success(`Moldura clonada para ${target.nome}`);
+      setCloningFrame(null);
+      setScope(cloneTarget);
+      await load();
+    } catch (error: any) {
+      toast.error("Erro ao clonar moldura", { description: error.message });
+    } finally {
+      setCloning(false);
+    }
+  };
   const selectedPartner = partners.find((p) => p.id === scope);
   const visibleFrames = frames.filter((f) => scope === "official" ? !f.parceiro_id : f.parceiro_id === scope);
   const publicLink = selectedPartner ? `${window.location.origin}/foto/${clientId}/dobradinha/${selectedPartner.public_token}` : `${window.location.origin}/foto/${clientId}`;
@@ -133,6 +172,9 @@ export default function CampaignFramesCard({ clientId }: Props) {
                       <span className="text-[10px] text-muted-foreground">{f.is_active ? "Ativa" : "Inativa"}</span>
                     </div>
                     <div className="flex">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openClone(f)} title="Clonar para outra dobradinha">
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(f)} title="Editar">
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -157,6 +199,35 @@ export default function CampaignFramesCard({ clientId }: Props) {
           parceiroId={editingFrame?.parceiro_id ?? (scope === "official" ? null : scope)}
           onSaved={load}
         />
+
+        <Dialog open={!!cloningFrame} onOpenChange={(open) => { if (!open && !cloning) setCloningFrame(null); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Clonar moldura</DialogTitle>
+              <DialogDescription>
+                Copie somente a moldura “{cloningFrame?.nome}” para outra dobradinha. A original permanecerá inalterada.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              <label className="text-sm font-medium">Dobradinha de destino</label>
+              <Select value={cloneTarget} onValueChange={setCloneTarget} disabled={cloning}>
+                <SelectTrigger><SelectValue placeholder="Selecione a dobradinha" /></SelectTrigger>
+                <SelectContent>
+                  {partners
+                    .filter((p) => p.id !== cloningFrame?.parceiro_id)
+                    .map((p) => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCloningFrame(null)} disabled={cloning}>Cancelar</Button>
+              <Button onClick={cloneFrame} disabled={!cloneTarget || cloning} className="gap-2">
+                {cloning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                Clonar moldura
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

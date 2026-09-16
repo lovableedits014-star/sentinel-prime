@@ -33,7 +33,7 @@ export async function gerarFormularioCabosPdf(lideres: LiderFormularioCabos[], n
     doc.text("FORMULARIO DE CADASTRO", margin, 31);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text("Preenchimento manual - limite de 4 pessoas por lideres", margin, 51);
+    doc.text("Preenchimento manual de cabos eleitorais", margin, 51);
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
@@ -47,11 +47,11 @@ export async function gerarFormularioCabosPdf(lideres: LiderFormularioCabos[], n
       startY: 151,
       margin: { left: margin, right: margin },
       head: [["No", "NOME COMPLETO", "TELEFONE", "CPF", "ASSINATURA"]],
-      body: Array.from({ length: 4 }, (_, row) => [String(row + 1), "", "", "", ""]),
+      body: Array.from({ length: 8 }, (_, row) => [String(row + 1), "", "", "", ""]),
       theme: "grid",
       styles: { font: "helvetica", fontSize: 10, lineColor: [71, 85, 105], lineWidth: 0.8, valign: "middle" },
       headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: "bold", halign: "center", minCellHeight: 30 },
-      bodyStyles: { minCellHeight: 62 },
+      bodyStyles: { minCellHeight: 43 },
       columnStyles: {
         0: { cellWidth: 34, halign: "center" },
         1: { cellWidth: 225 },

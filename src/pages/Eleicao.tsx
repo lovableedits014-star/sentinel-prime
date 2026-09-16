@@ -464,18 +464,6 @@ export default function Eleicao() {
     if (form.tipo === "coordenador" && !editing && form.send_access && (!form.email.trim() || form.password.length < 6)) {
       toast.error("Para enviar acesso, informe e-mail e senha com no mínimo 6 caracteres"); return;
     }
-    if (form.tipo === "cabo" && form.parent_id && parseValorContratacao(form.valor_contratacao) > 0) {
-      const parent = pessoas.find(p => p.id === form.parent_id);
-      if (parent?.tipo === "lider") {
-        const totalCabosAtivos = pessoas.filter(p =>
-          p.tipo === "cabo" && p.parent_id === parent.id && isEleicaoContratado(p) && p.id !== editing?.id
-        ).length;
-        if (totalCabosAtivos >= 4) {
-          toast.error("Este líder já possui o limite de 4 cabos eleitorais ativos.");
-          return;
-        }
-      }
-    }
     const rua = form.rua.trim();
     const numero = form.numero.trim();
     const bairro = form.bairro.trim();
@@ -1366,8 +1354,6 @@ export default function Eleicao() {
   };
 
   const abrirNovoCabo = (lider: Pessoa) => {
-    const total = pessoas.filter(p => p.tipo === "cabo" && p.parent_id === lider.id && isEleicaoContratado(p)).length;
-    if (total >= 4) return toast.error("Este líder já possui o limite de 4 cabos eleitorais ativos.");
     openNew({
       tipo: "cabo",
       parent_id: lider.id,
