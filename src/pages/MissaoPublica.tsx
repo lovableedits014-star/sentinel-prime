@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock, RefreshCw, Copy, CircleHelp } from "lucide-react";
+import { ExternalLink, CheckCircle2, Loader2, UserCog, BadgeCheck, ShieldCheck, AlertTriangle, Lock, RefreshCw, Copy } from "lucide-react";
 import { toWhatsAppBR, fmtPhoneBR } from "@/lib/phone-utils";
 import CampaignFrameGenerator from "@/components/campaign-frame/CampaignFrameGenerator";
 import { normalizeExternalUrl } from "@/lib/external-social-link";
@@ -144,7 +144,6 @@ export default function MissaoPublica() {
 
   const clickedKey = missionId ? `sm_missao_clicks_${missionId}` : "";
   const doneKey = missionId ? `sm_missao_done_${missionId}` : "";
-  const [showLinkHelp, setShowLinkHelp] = useState(false);
 
   // Restaura, no aparelho, o que a pessoa já clicou/confirmou nesta missão.
   useEffect(() => {
@@ -773,30 +772,6 @@ export default function MissaoPublica() {
                       <ClickedMark k={l.id} />
                     </Button>
                   ))}
-                  {requiredLinkKeys.length > 0 && (
-                    <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
-                      <button type="button" className="flex w-full items-center gap-2 text-left text-xs font-semibold text-amber-800 dark:text-amber-300" onClick={() => setShowLinkHelp(v => !v)}>
-                        <CircleHelp className="h-4 w-4 shrink-0" />
-                        A publicação apareceu como “Indisponível”?
-                      </button>
-                      {showLinkHelp && (
-                        <div className="mt-3 space-y-2 border-t border-amber-500/20 pt-3">
-                          <p className="text-xs text-muted-foreground">
-                            Isso pode acontecer por causa da sessão ou do aplicativo do Facebook/Instagram. Copie o link e cole no Safari ou Chrome, já conectado à sua conta.
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {linkFb && <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => copyExternal(linkFb, "click_facebook")}><Copy className="h-3.5 w-3.5" />Copiar Facebook</Button>}
-                            {linkIg && <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => copyExternal(linkIg, "click_instagram")}><Copy className="h-3.5 w-3.5" />Copiar Instagram</Button>}
-                            {linkAv && <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => copyExternal(linkAv, "click_avulso")}><Copy className="h-3.5 w-3.5" />Copiar link</Button>}
-                            {extraLinks.map(l => <Button key={`copy-${l.id}`} type="button" size="sm" variant="outline" className="h-8 max-w-full gap-1.5 text-xs" onClick={() => copyExternal(l.url, "click_link", l.id)}><Copy className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Copiar {l.label}</span></Button>)}
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            Se continuar indisponível também no aplicativo, a publicação pode exigir login, ter restrição de público ou ter sido removida. Avise o responsável pela missão.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {!declared && (
