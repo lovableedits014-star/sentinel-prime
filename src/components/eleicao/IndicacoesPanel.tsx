@@ -105,6 +105,30 @@ type Config = {
   limite_diario_token: number;
 };
 
+const INDICADORES_PAGE_SIZE = 1000;
+
+async function fetchAllIndicadores(clientId: string) {
+  const rows: Row[] = [];
+
+  for (let from = 0; ; from += INDICADORES_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("v_eleicao_indicadores_cobranca")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("total_indicacoes", { ascending: true })
+      .order("indicador_id", { ascending: true })
+      .range(from, from + INDICADORES_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = (data as Row[] | null) || [];
+    rows.push(...page);
+    if (page.length < INDICADORES_PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
 const tipoLabel: Record<Tipo, string> = {
   coordenador: "Coordenador",
   lider: "Líder",
@@ -169,28 +193,30 @@ export default function IndicacoesPanel({ clientId }: { clientId: string }) {
 
   async function load() {
     setLoading(true);
-    const [cob, cfg, cli, hist] = await Promise.all([
-      supabase
-        .from("v_eleicao_indicadores_cobranca")
-        .select("*")
-        .eq("client_id", clientId)
-        .order("total_indicacoes", { ascending: true }),
-      supabase.from("eleicao_indicacao_config").select("*").eq("client_id", clientId).maybeSingle(),
-      supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
-      supabase
-        .from("whatsapp_dispatches")
-        .select("id,titulo,status,total_destinatarios,enviados,falhas,created_at,completed_at")
-        .eq("client_id", clientId)
-        .eq("tipo", "indicadores_cobranca")
-        .order("created_at", { ascending: false })
-        .limit(10),
-    ]);
-    setRows((cob.data as any) || []);
-    if (cfg.data) setConfig(cfg.data as any);
-    setCandidatoNome((cli.data as any)?.name || "");
-    setHistorico((hist.data as any) || []);
-    setLastRefresh(Date.now());
-    setLoading(false);
+    try {
+      const [indicadores, cfg, cli, hist] = await Promise.all([
+        fetchAllIndicadores(clientId),
+        supabase.from("eleicao_indicacao_config").select("*").eq("client_id", clientId).maybeSingle(),
+        supabase.from("clients").select("name").eq("id", clientId).maybeSingle(),
+        supabase
+          .from("whatsapp_dispatches")
+          .select("id,titulo,status,total_destinatarios,enviados,falhas,created_at,completed_at")
+          .eq("client_id", clientId)
+          .eq("tipo", "indicadores_cobranca")
+          .order("created_at", { ascending: false })
+          .limit(10),
+      ]);
+      setRows(indicadores);
+      if (cfg.data) setConfig(cfg.data as any);
+      setCandidatoNome((cli.data as any)?.name || "");
+      setHistorico((hist.data as any) || []);
+      setLastRefresh(Date.now());
+    } catch (error) {
+      console.error("[IndicacoesPanel] Falha ao carregar indicadores", error);
+      toast.error("Não foi possível carregar todos os indicadores.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
