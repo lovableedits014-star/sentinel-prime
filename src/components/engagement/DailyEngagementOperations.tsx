@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Activity, CheckCircle2, Clock3, FileDown, Info, MessageCircle, MousePointerClick, RefreshCw, Search, Users, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,6 @@ type ActivitySummary = {
 const db = supabase as any;
 const todayCuiaba = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Cuiaba", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const n = (value: unknown) => Number(value ?? 0);
-const OPERATIONS_REFRESH_MS = 60_000;
 const OPERATIONS_STALE_MS = 30_000;
 
 function MetricCard({ label, value, Icon, help }: { label: string; value: string | number; Icon: typeof Activity; help: string }) {
@@ -60,7 +59,6 @@ function MetricCard({ label, value, Icon, help }: { label: string; value: string
 }
 
 export default function DailyEngagementOperations({ clientId }: { clientId: string }) {
-  const qc = useQueryClient();
   const [missionId, setMissionId] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("pendentes");
@@ -83,7 +81,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_command_center", { p_client_id: clientId, p_mission_id: missionId || null, p_dia: todayCuiaba(), p_root_id: null });
       if (error) throw new Error(error.message);
       return data as Center;
-    }, enabled: !!clientId && (!!missionId || missions.isSuccess), refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false, staleTime: OPERATIONS_STALE_MS,
+    }, enabled: !!clientId && (!!missionId || missions.isSuccess), staleTime: OPERATIONS_STALE_MS,
   });
 
   const activity = useQuery({
@@ -94,7 +92,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       });
       if (error) throw new Error(error.message);
       return data as ActivitySummary;
-    }, enabled: !!clientId && !!missionId, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false, staleTime: OPERATIONS_STALE_MS,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
   });
 
   const coordinatorTeams = useQuery({
@@ -103,12 +101,12 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_coordinator_mission_charge", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return (data ?? []) as CoordinatorTeam[];
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
   });
   const standaloneContracts = useQuery({
     queryKey: ["engagement-mission-standalone-contracts",clientId,missionId],
     queryFn: async()=>{const {data,error}=await db.rpc("engagement_mission_standalone_contracts",{p_client_id:clientId,p_mission_id:missionId});if(error)throw new Error(error.message);return (data??[]) as StandaloneContract[]},
-    enabled:!!clientId&&!!missionId,staleTime:OPERATIONS_STALE_MS,refetchInterval:OPERATIONS_REFRESH_MS,refetchIntervalInBackground:false,
+    enabled:!!clientId&&!!missionId,staleTime:OPERATIONS_STALE_MS,
   });
   const assignmentAudit = useQuery({
     queryKey: ["engagement-mission-assignment-audit", clientId, missionId],
@@ -116,7 +114,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_assignment_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as AssignmentAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
   });
   const completionAudit = useQuery({
     queryKey: ["engagement-mission-completion-audit", clientId, missionId],
@@ -124,7 +122,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_completion_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as CompletionAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
   });
   const trackingAudit = useQuery({
     queryKey: ["engagement-mission-tracking-audit", clientId, missionId],
@@ -132,27 +130,30 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_tracking_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as TrackingAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS, refetchInterval: OPERATIONS_REFRESH_MS, refetchIntervalInBackground: false,
+    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
   });
 
-  useEffect(() => {
-    const refresh = () => {
-      void qc.invalidateQueries({ queryKey: ["engagement-mission-command-center", clientId] });
-      void qc.invalidateQueries({ queryKey: ["engagement-coordinator-mission-charge", clientId] });
-      void qc.invalidateQueries({ queryKey: ["engagement-mission-completion-audit", clientId] });
-      void qc.invalidateQueries({ queryKey: ["engagement-mission-activity-summary", clientId] });
-      void qc.invalidateQueries({ queryKey: ["engagement-mission-activity-period", clientId] });
-      void qc.invalidateQueries({ queryKey: ["engagement-mission-assignment-audit", clientId] });
-      void qc.invalidateQueries({ queryKey: ["engagement-mission-tracking-audit", clientId] });
-      void qc.invalidateQueries({ queryKey: ["engagement-mission-standalone-contracts", clientId] });
-    };
-    const channel = supabase.channel(`engagement-command-${clientId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "mission_events", filter: `client_id=eq.${clientId}` }, refresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "mission_checkins", filter: `client_id=eq.${clientId}` }, refresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "engagement_obrigacoes", filter: `client_id=eq.${clientId}` }, refresh)
-      .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [clientId, qc]);
+  const operationsFetching = [
+    missions,
+    center,
+    activity,
+    coordinatorTeams,
+    standaloneContracts,
+    assignmentAudit,
+    completionAudit,
+    trackingAudit,
+  ].some((query) => query.isFetching);
+
+  const refreshOperations = () => {
+    void missions.refetch();
+    void center.refetch();
+    void activity.refetch();
+    void coordinatorTeams.refetch();
+    void standaloneContracts.refetch();
+    void assignmentAudit.refetch();
+    void completionAudit.refetch();
+    void trackingAudit.refetch();
+  };
 
   const data = center.data;
   const chargeCertified = completionAudit.isSuccess && completionAudit.data.consistente
@@ -290,7 +291,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
   ] as const;
 
   return <div className="space-y-4">
-    <Card><CardHeader><CardTitle className="text-base">Operação da missão</CardTitle><CardDescription>O funil mede os contratados da Eleição. O movimento de hoje mostra todas as pessoas que usaram o link, separadamente.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-end gap-3"><div className="min-w-[280px] flex-1 space-y-1"><p className="text-xs font-medium">Missão acompanhada</p><Select value={missionId} onValueChange={setMissionId}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{(missions.data??[]).map((m)=><SelectItem key={m.mission_id} value={m.mission_id}>{m.titulo}</SelectItem>)}</SelectContent></Select></div><div className="text-xs text-muted-foreground"><p>Publicada em {published.toLocaleString("pt-BR")}</p><p>No ar há {ageHours<24?`${ageHours}h`:`${Math.floor(ageHours/24)} dias`}</p></div><Button variant="outline" onClick={()=>{center.refetch();activity.refetch();}} disabled={center.isFetching||activity.isFetching}><RefreshCw className={`mr-1 h-4 w-4 ${center.isFetching||activity.isFetching?"animate-spin":""}`}/>Atualizar</Button></CardContent></Card>
+    <Card><CardHeader><CardTitle className="text-base">Operação da missão</CardTitle><CardDescription>O funil mede os contratados da Eleição. Os dados permanecem estáveis até você clicar em Atualizar.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-end gap-3"><div className="min-w-[280px] flex-1 space-y-1"><p className="text-xs font-medium">Missão acompanhada</p><Select value={missionId} onValueChange={setMissionId}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{(missions.data??[]).map((m)=><SelectItem key={m.mission_id} value={m.mission_id}>{m.titulo}</SelectItem>)}</SelectContent></Select></div><div className="text-xs text-muted-foreground"><p>Publicada em {published.toLocaleString("pt-BR")}</p><p>No ar há {ageHours<24?`${ageHours}h`:`${Math.floor(ageHours/24)} dias`}</p></div><Button variant="outline" onClick={refreshOperations} disabled={operationsFetching}><RefreshCw className={`mr-1 h-4 w-4 ${operationsFetching?"animate-spin":""}`}/>Atualizar tudo</Button></CardContent></Card>
     <section><h2 className="mb-1 text-sm font-semibold">Resultado acumulado da missão</h2><p className="mb-2 text-xs text-muted-foreground">Todos os contratados e coordenadores são acompanhados desde o início; outras pessoas vinculadas entram quando se identificam. Concluíram + abriram + nunca abriram fecha o total.</p><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{cumulativeCards.map(([label,value,Icon,help])=><MetricCard key={label} label={label} value={value} Icon={Icon} help={help}/>)}</div></section>
     <Card><CardHeader><div className="flex flex-wrap items-start justify-between gap-2"><div><CardTitle className="text-base">Funil acumulado</CardTitle><CardDescription>Desde {published.toLocaleDateString("pt-BR")} até agora.</CardDescription></div><Badge variant="outline">E1 {c.e1} · E2 {c.e2} · E3 {c.e3}</Badge></div></CardHeader><CardContent className="space-y-3"><Progress value={n(c.taxa)} className="h-3"/><div className="grid gap-2 text-sm sm:grid-cols-3"><p className="rounded border p-2 text-emerald-700"><strong>{c.concluidos}</strong> concluíram</p><p className="rounded border p-2 text-amber-700"><strong>{c.abriu_sem_concluir}</strong> abriram e não concluíram</p><p className="rounded border p-2 text-destructive"><strong>{c.nao_abriu}</strong> nunca abriram</p></div><p className="text-xs text-muted-foreground">Conferência: {n(c.concluidos)+n(c.abriu_sem_concluir)+n(c.nao_abriu)} de {c.obrigados} líderes classificados.</p></CardContent></Card>
     <section><div className="mb-2 flex flex-wrap items-end justify-between gap-2"><div><h2 className="text-sm font-semibold">Atividade da missão</h2><p className="text-xs text-muted-foreground">Cada pessoa conta uma vez por indicador dentro do período escolhido. Reaberturas e cliques repetidos não inflam os totais.</p></div><Select value={activityPeriod} onValueChange={(value)=>setActivityPeriod(value as "hoje"|"todo")}><SelectTrigger className="w-[180px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="hoje">Hoje</SelectItem><SelectItem value="todo">Todo o período</SelectItem></SelectContent></Select></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{todayCards.map(([label,value,Icon,help])=><MetricCard key={label} label={label} value={value} Icon={Icon} help={help}/>)}</div></section>
