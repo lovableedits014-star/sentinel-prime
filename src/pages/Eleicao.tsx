@@ -168,6 +168,7 @@ async function gerarContratosLote(
 
 type Tipo = "coordenador" | "lider" | "cabo";
 type Escopo = "campo_grande" | "interior";
+type EscopoTab = "geral" | Escopo;
 type Regiao = string;
 
 interface Pessoa {
@@ -263,6 +264,7 @@ export default function Eleicao() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [escopo, setEscopo] = useState<Escopo>("campo_grande");
+  const [escopoTab, setEscopoTab] = useState<EscopoTab>("geral");
   const [regiaoFilter, setRegiaoFilter] = useState<Regiao | "all">("all");
   const { regioes: REGIOES } = useRegioesEleicao(clientId || undefined);
   const { parceirosAtivos: PARCEIROS } = useCandidatosParceiros(clientId || undefined);
@@ -864,7 +866,7 @@ export default function Eleicao() {
   const visibleIds = useMemo(() => {
     const visible = new Set<string>();
     const baseFiltered = pessoas.filter(
-      p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p),
+      p => (escopoTab === "geral" || p.escopo === escopo) && matchesSearch(p) && matchesStatus(p) && matchesTipo(p),
     );
     baseFiltered.forEach(p => visible.add(p.id));
     if (search) {
@@ -882,7 +884,7 @@ export default function Eleicao() {
 
       const childrenByParent = new Map<string, Pessoa[]>();
       pessoas.forEach(p => {
-        if (p.escopo !== escopo || !p.parent_id) return;
+        if ((escopoTab !== "geral" && p.escopo !== escopo) || !p.parent_id) return;
         const children = childrenByParent.get(p.parent_id) || [];
         children.push(p);
         childrenByParent.set(p.parent_id, children);
@@ -902,12 +904,12 @@ export default function Eleicao() {
       });
     }
     return visible;
-  }, [pessoas, escopo, search, statusFilter, tipoFilter, pessoaById]);
+  }, [pessoas, escopo, escopoTab, search, statusFilter, tipoFilter, pessoaById]);
 
   // Lista visível no escopo. Mantém o nome original para minimizar mudanças no resto da árvore.
   const escopoList = useMemo(
-    () => pessoas.filter(p => p.escopo === escopo && visibleIds.has(p.id)),
-    [pessoas, escopo, visibleIds],
+    () => pessoas.filter(p => (escopoTab === "geral" || p.escopo === escopo) && visibleIds.has(p.id)),
+    [pessoas, escopo, escopoTab, visibleIds],
   );
 
   // Ids que realmente correspondem à busca (sem contar ancestrais visíveis por contexto).
@@ -915,10 +917,10 @@ export default function Eleicao() {
     if (!search) return new Set<string>();
     return new Set(
       pessoas
-        .filter(p => p.escopo === escopo && matchesSearch(p) && matchesStatus(p) && matchesTipo(p))
+        .filter(p => (escopoTab === "geral" || p.escopo === escopo) && matchesSearch(p) && matchesStatus(p) && matchesTipo(p))
         .map(p => p.id),
     );
-  }, [pessoas, escopo, search, statusFilter, tipoFilter]);
+  }, [pessoas, escopo, escopoTab, search, statusFilter, tipoFilter]);
 
   const searchCtxValue = useMemo<EleicaoSearchCtx>(() => {
     const nameById = new Map<string, string>();
@@ -944,7 +946,8 @@ export default function Eleicao() {
   }, [escopo, escopoList]);
 
   const stats = useMemo(() => {
-    const f = pessoas.filter(p => p.escopo === escopo && !p.arquivado_em);
+    const noEscopo = pessoas.filter(p => escopoTab === "geral" || p.escopo === escopo);
+    const f = noEscopo.filter(p => !p.arquivado_em);
     const isVol = (p: any) => !!p.is_voluntario;
     const remunerados = f.filter(p => !isVol(p));
     const valorTotal = remunerados.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
@@ -961,13 +964,13 @@ export default function Eleicao() {
       contratados: f.filter(isEleicaoContratadoRemunerado).length,
       voluntariosContratados: f.filter(isEleicaoVoluntarioContratado).length,
       semContrato: f.filter(isEleicaoSemContrato).length,
-      arquivados: pessoas.filter(p => p.escopo === escopo && !!p.arquivado_em).length,
+      arquivados: noEscopo.filter(p => !!p.arquivado_em).length,
       total: f.length,
       valorTotal,
       semValor,
       avulsos,
     };
-  }, [pessoas, escopo]);
+  }, [pessoas, escopo, escopoTab]);
 
 
   // potential parents for the form
@@ -1474,22 +1477,28 @@ export default function Eleicao() {
       ) : view === "config" ? (
         clientId ? <EleicaoConfigPanel clientId={clientId} /> : null
       ) : (
-      <Tabs value={escopo} onValueChange={(v) => { setEscopo(v as Escopo); setRegiaoFilter("all"); }}>
-        <TabsList className="grid grid-cols-2 w-full max-w-md mb-4">
+      <Tabs value={escopoTab} onValueChange={(v) => {
+        const next = v as EscopoTab;
+        setEscopoTab(next);
+        if (next !== "geral") setEscopo(next);
+        setRegiaoFilter("all");
+      }}>
+        <TabsList className="grid grid-cols-3 w-full max-w-2xl mb-4">
+          <TabsTrigger value="geral">Coord. Geral</TabsTrigger>
           <TabsTrigger value="campo_grande">Coord. Campo Grande</TabsTrigger>
           <TabsTrigger value="interior">Coord. Interior</TabsTrigger>
         </TabsList>
 
         {/* KPIs com cards visuais */}
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2 mb-4">
-          <KpiCard label="Total ativo" value={stats.total} icon={Network} tone="neutral" hint={`${stats.arquivados} arquivado(s)`} />
+          <KpiCard label="Total ativo" value={stats.total} icon={Network} tone="neutral" hint={`${stats.arquivados} arquivado(s)${escopoTab === "geral" ? " · todos os escopos" : ""}`} />
           <KpiCard label="Total contratado" value={stats.contratados} icon={CheckCircle2} tone="blue" hint={`+ ${stats.voluntariosContratados} contratos simbólicos`} />
           <KpiCard label="Coordenadores" value={stats.coord} icon={Crown} tone="red" hint={`${stats.coordContratados} com contrato`} />
-          <KpiCard label="Líderes" value={stats.lider} icon={UserCheck} tone="blue" hint={`${stats.liderContratados} com contrato`} />
+          <KpiCard label="Líderes" value={stats.lider} icon={UserCheck} tone="blue" hint={`${stats.liderContratados} com contrato${escopoTab === "geral" ? " · Campo Grande + Interior" : ""}`} />
           <KpiCard label="Cabos eleitorais" value={stats.cabo} icon={Users} tone="green" hint={`${stats.caboContratados} com contrato`} />
           <KpiCard label="Sem contrato" value={stats.semContrato} icon={AlertCircle} tone="amber" hint="aguardando definição" />
           <KpiCard label="Voluntários" value={stats.voluntarios} icon={Heart} tone="emerald" hint="sem remuneração" />
-          <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" hint="contratos remunerados" small />
+          <KpiCard label="Investimento" value={fmtBRL(stats.valorTotal)} icon={DollarSign} tone="emerald" hint={`contratos remunerados${escopoTab === "geral" ? " · Campo Grande + Interior" : ""}`} small />
 
         </div>
 
@@ -1562,7 +1571,7 @@ export default function Eleicao() {
         )}
 
         {/* Chips de região (CG) */}
-        {escopo === "campo_grande" && (
+        {escopoTab === "campo_grande" && (
           <div className="flex flex-wrap gap-1.5 mb-4">
             <button
               onClick={() => setRegiaoFilter("all")}
@@ -1627,6 +1636,26 @@ export default function Eleicao() {
             })}
           </div>
         )}
+
+        <TabsContent value="geral" className="space-y-2 mt-0">
+          {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> : (
+            <ListaPlana
+              pessoas={escopoList}
+              sortBy={sortBy}
+              onEdit={openEdit}
+              onDelete={remove}
+              onCredentials={openCred}
+              onSend={sendCredentials}
+              sendingId={sendingId}
+            />
+          )}
+          {!loading && escopoList.length === 0 && (
+            <Card className="py-12 text-center text-muted-foreground border-dashed">
+              <Crown className="w-10 h-10 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Nenhum cadastro encontrado</p>
+            </Card>
+          )}
+        </TabsContent>
 
         <TabsContent value="campo_grande" className="space-y-2 mt-0">
           {loading ? <p className="text-center text-muted-foreground py-8">Carregando…</p> :
