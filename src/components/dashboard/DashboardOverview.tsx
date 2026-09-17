@@ -129,25 +129,24 @@ export function DashboardOverview({ clientId }: DashboardOverviewProps) {
   const { data: topLideres } = useQuery({
     queryKey: ["overview-top-lideres", clientId],
     queryFn: async () => {
-      const { data: lideres } = await supabase
+      const { data: contratados } = await supabase
         .from("contratados")
-        .select("id, nome")
+        .select("id, nome, lider_id, is_lider")
         .eq("client_id", clientId)
-        .eq("is_lider", true)
         .eq("status", "ativo");
 
+      const lideres = (contratados || []).filter((p: any) => p.is_lider);
       if (!lideres || lideres.length === 0) return [];
 
-      const counts = await Promise.all(
-        lideres.map(async (l: any) => {
-          const { count } = await supabase
-            .from("contratados")
-            .select("id", { count: "exact", head: true })
-            .eq("client_id", clientId)
-            .eq("lider_id", l.id);
-          return { nome: l.nome, liderados: count || 0 };
-        })
-      );
+      const lideradosPorLider = new Map<string, number>();
+      for (const pessoa of contratados || []) {
+        if (!pessoa.lider_id) continue;
+        lideradosPorLider.set(pessoa.lider_id, (lideradosPorLider.get(pessoa.lider_id) || 0) + 1);
+      }
+      const counts = lideres.map((l: any) => ({
+        nome: l.nome,
+        liderados: lideradosPorLider.get(l.id) || 0,
+      }));
       return counts
         .filter(c => c.liderados > 0)
         .sort((a, b) => b.liderados - a.liderados)

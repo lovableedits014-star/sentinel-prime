@@ -249,8 +249,9 @@ export function DataHealthAlerts({ clientId }: DataHealthAlertsProps) {
       return alerts;
     },
     enabled: !!clientId,
-    staleTime: 1000 * 60 * 3, // 3 min
-    refetchInterval: 1000 * 60 * 5, // refresca a cada 5 min em background
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const alerts = data || [];

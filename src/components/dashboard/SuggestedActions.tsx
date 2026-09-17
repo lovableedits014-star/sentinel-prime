@@ -56,6 +56,7 @@ export function SuggestedActions({ clientId }: SuggestedActionsProps) {
       const [
         contratadosSemContrato,
         lideresSemEquipe,
+        liderados,
         contratadosAtivos,
         pessoasSemNivel,
         pessoasStale,
@@ -70,6 +71,8 @@ export function SuggestedActions({ clientId }: SuggestedActionsProps) {
           .eq("client_id", clientId).eq("status", "ativo").eq("contrato_aceito", false),
         supabase.from("contratados").select("id, nome").eq("client_id", clientId)
           .eq("is_lider", true).eq("status", "ativo"),
+        supabase.from("contratados").select("lider_id").eq("client_id", clientId)
+          .eq("status", "ativo").not("lider_id", "is", null),
         supabase.from("contratados").select("id", { count: "exact", head: true })
           .eq("client_id", clientId).eq("status", "ativo"),
         supabase.from("pessoas").select("id", { count: "exact", head: true })
@@ -130,15 +133,8 @@ export function SuggestedActions({ clientId }: SuggestedActionsProps) {
       // ─── Líderes sem equipe (alta se contratados existem) ───
       const lideres = lideresSemEquipe.data || [];
       if (lideres.length > 0) {
-        const counts = await Promise.all(
-          lideres.map(async (l: any) => {
-            const { count } = await supabase
-              .from("contratados").select("id", { count: "exact", head: true })
-              .eq("client_id", clientId).eq("lider_id", l.id);
-            return count || 0;
-          })
-        );
-        const semEquipe = counts.filter(c => c === 0).length;
+        const lideresComEquipe = new Set((liderados.data || []).map((p: any) => p.lider_id));
+        const semEquipe = lideres.filter((l: any) => !lideresComEquipe.has(l.id)).length;
         if (semEquipe > 0) {
           cards.push({
             id: "lideres-sem-equipe",

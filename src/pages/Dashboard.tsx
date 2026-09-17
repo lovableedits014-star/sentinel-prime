@@ -102,10 +102,10 @@ const Dashboard = () => {
 
     if (!cId) return { allComments: [] as DashboardComment[], supportersCount: 0, clientId: "" };
 
-    // O maior periodo disponivel no painel e 365 dias. Evita baixar todo o
-    // historico e campos pesados de texto/imagem que esta tela nao utiliza.
+    // Busca somente o periodo selecionado. O painel abria baixando ate 365 dias
+    // mesmo quando o usuario via apenas os ultimos 30, gerando paginas extras.
     const oldestVisibleDate = new Date();
-    oldestVisibleDate.setDate(oldestVisibleDate.getDate() - 365);
+    oldestVisibleDate.setDate(oldestVisibleDate.getDate() - periodDays);
     const PAGE_SIZE = 1000;
     let allData: DashboardComment[] = [];
     let page = 0;
@@ -136,10 +136,10 @@ const Dashboard = () => {
       .eq("client_id", cId);
 
     return { allComments: allData, supportersCount: supCount || 0, clientId: cId };
-  }, []);
+  }, [periodDays]);
 
   const { data: dashData, isLoading: loading } = useQuery({
-    queryKey: ["dashboard-data", authUserId],
+    queryKey: ["dashboard-data", authUserId, periodDays],
     queryFn: fetchDashboardData,
     enabled: !!authUserId,
     staleTime: Infinity, // Never auto-refetch — only manual

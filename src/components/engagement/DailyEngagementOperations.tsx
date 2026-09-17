@@ -52,7 +52,12 @@ type ActivitySummary = {
 const db = supabase as any;
 const todayCuiaba = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Cuiaba", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const n = (value: unknown) => Number(value ?? 0);
-const OPERATIONS_STALE_MS = 30_000;
+const MANUAL_QUERY_OPTIONS = {
+  staleTime: Infinity,
+  retry: false,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+} as const;
 
 function MetricCard({ label, value, Icon, help }: { label: string; value: string | number; Icon: typeof Activity; help: string }) {
   return <Card title={help}><CardContent className="flex min-h-24 items-start gap-3 p-4"><Icon className="mt-1 h-5 w-5 shrink-0 text-primary"/><div className="min-w-0"><p className="flex items-center gap-1 text-xs text-muted-foreground">{label}<Info className="h-3 w-3"/></p><p className="text-2xl font-bold">{value}</p><p className="mt-1 text-[10px] leading-snug text-muted-foreground">{help}</p></div></CardContent></Card>;
@@ -64,6 +69,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
   const [status, setStatus] = useState("pendentes");
   const [activityPeriod, setActivityPeriod] = useState<"hoje" | "todo">("hoje");
   const [busy, setBusy] = useState<string | null>(null);
+  const [auditRequested, setAuditRequested] = useState(false);
 
   const missions = useQuery({
     queryKey: ["engagement-operational-missions", clientId],
@@ -71,7 +77,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_operational_missions", { p_client_id: clientId, p_limit: 50 });
       if (error) throw new Error(error.message);
       return (data ?? []) as MissionOption[];
-    }, enabled: !!clientId,
+    }, enabled: !!clientId, ...MANUAL_QUERY_OPTIONS,
   });
   useEffect(() => { if (!missionId && missions.data?.[0]) setMissionId(missions.data[0].mission_id); }, [missionId, missions.data]);
 
@@ -81,7 +87,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_command_center", { p_client_id: clientId, p_mission_id: missionId || null, p_dia: todayCuiaba(), p_root_id: null });
       if (error) throw new Error(error.message);
       return data as Center;
-    }, enabled: !!clientId && (!!missionId || missions.isSuccess), staleTime: OPERATIONS_STALE_MS,
+    }, enabled: !!clientId && !!missionId, ...MANUAL_QUERY_OPTIONS,
   });
 
   const activity = useQuery({
@@ -92,7 +98,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       });
       if (error) throw new Error(error.message);
       return data as ActivitySummary;
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
+    }, enabled: !!clientId && !!missionId && center.isSuccess, ...MANUAL_QUERY_OPTIONS,
   });
 
   const coordinatorTeams = useQuery({
@@ -101,12 +107,12 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_coordinator_mission_charge", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return (data ?? []) as CoordinatorTeam[];
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
+    }, enabled: !!clientId && !!missionId && center.isSuccess, ...MANUAL_QUERY_OPTIONS,
   });
   const standaloneContracts = useQuery({
     queryKey: ["engagement-mission-standalone-contracts",clientId,missionId],
     queryFn: async()=>{const {data,error}=await db.rpc("engagement_mission_standalone_contracts",{p_client_id:clientId,p_mission_id:missionId});if(error)throw new Error(error.message);return (data??[]) as StandaloneContract[]},
-    enabled:!!clientId&&!!missionId,staleTime:OPERATIONS_STALE_MS,
+    enabled:!!clientId&&!!missionId&&center.isSuccess,...MANUAL_QUERY_OPTIONS,
   });
   const assignmentAudit = useQuery({
     queryKey: ["engagement-mission-assignment-audit", clientId, missionId],
@@ -114,7 +120,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_assignment_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as AssignmentAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
+    }, enabled: !!clientId && !!missionId && center.isSuccess && auditRequested, ...MANUAL_QUERY_OPTIONS,
   });
   const completionAudit = useQuery({
     queryKey: ["engagement-mission-completion-audit", clientId, missionId],
@@ -122,7 +128,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_completion_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as CompletionAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
+    }, enabled: !!clientId && !!missionId && center.isSuccess && auditRequested, ...MANUAL_QUERY_OPTIONS,
   });
   const trackingAudit = useQuery({
     queryKey: ["engagement-mission-tracking-audit", clientId, missionId],
@@ -130,7 +136,7 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
       const { data, error } = await db.rpc("engagement_mission_tracking_audit", { p_client_id: clientId, p_mission_id: missionId });
       if (error) throw new Error(error.message);
       return data as TrackingAudit;
-    }, enabled: !!clientId && !!missionId, staleTime: OPERATIONS_STALE_MS,
+    }, enabled: !!clientId && !!missionId && center.isSuccess && auditRequested, ...MANUAL_QUERY_OPTIONS,
   });
 
   const operationsFetching = [
@@ -150,9 +156,11 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
     void activity.refetch();
     void coordinatorTeams.refetch();
     void standaloneContracts.refetch();
-    void assignmentAudit.refetch();
-    void completionAudit.refetch();
-    void trackingAudit.refetch();
+    if (auditRequested) {
+      void assignmentAudit.refetch();
+      void completionAudit.refetch();
+      void trackingAudit.refetch();
+    }
   };
 
   const data = center.data;
@@ -291,13 +299,13 @@ export default function DailyEngagementOperations({ clientId }: { clientId: stri
   ] as const;
 
   return <div className="space-y-4">
-    <Card><CardHeader><CardTitle className="text-base">Operação da missão</CardTitle><CardDescription>O funil mede os contratados da Eleição. Os dados permanecem estáveis até você clicar em Atualizar.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-end gap-3"><div className="min-w-[280px] flex-1 space-y-1"><p className="text-xs font-medium">Missão acompanhada</p><Select value={missionId} onValueChange={setMissionId}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{(missions.data??[]).map((m)=><SelectItem key={m.mission_id} value={m.mission_id}>{m.titulo}</SelectItem>)}</SelectContent></Select></div><div className="text-xs text-muted-foreground"><p>Publicada em {published.toLocaleString("pt-BR")}</p><p>No ar há {ageHours<24?`${ageHours}h`:`${Math.floor(ageHours/24)} dias`}</p></div><Button variant="outline" onClick={refreshOperations} disabled={operationsFetching}><RefreshCw className={`mr-1 h-4 w-4 ${operationsFetching?"animate-spin":""}`}/>Atualizar tudo</Button></CardContent></Card>
+    <Card><CardHeader><CardTitle className="text-base">Operação da missão</CardTitle><CardDescription>O funil mede os contratados da Eleição. Os dados permanecem estáveis até você clicar em Atualizar.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-end gap-3"><div className="min-w-[280px] flex-1 space-y-1"><p className="text-xs font-medium">Missão acompanhada</p><Select value={missionId} onValueChange={(value)=>{setMissionId(value);setAuditRequested(false);}}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{(missions.data??[]).map((m)=><SelectItem key={m.mission_id} value={m.mission_id}>{m.titulo}</SelectItem>)}</SelectContent></Select></div><div className="text-xs text-muted-foreground"><p>Publicada em {published.toLocaleString("pt-BR")}</p><p>No ar há {ageHours<24?`${ageHours}h`:`${Math.floor(ageHours/24)} dias`}</p></div><Button variant="outline" onClick={refreshOperations} disabled={operationsFetching}><RefreshCw className={`mr-1 h-4 w-4 ${operationsFetching?"animate-spin":""}`}/>Atualizar tudo</Button></CardContent></Card>
     <section><h2 className="mb-1 text-sm font-semibold">Resultado acumulado da missão</h2><p className="mb-2 text-xs text-muted-foreground">Todos os contratados e coordenadores são acompanhados desde o início; outras pessoas vinculadas entram quando se identificam. Concluíram + abriram + nunca abriram fecha o total.</p><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{cumulativeCards.map(([label,value,Icon,help])=><MetricCard key={label} label={label} value={value} Icon={Icon} help={help}/>)}</div></section>
     <Card><CardHeader><div className="flex flex-wrap items-start justify-between gap-2"><div><CardTitle className="text-base">Funil acumulado</CardTitle><CardDescription>Desde {published.toLocaleDateString("pt-BR")} até agora.</CardDescription></div><Badge variant="outline">E1 {c.e1} · E2 {c.e2} · E3 {c.e3}</Badge></div></CardHeader><CardContent className="space-y-3"><Progress value={n(c.taxa)} className="h-3"/><div className="grid gap-2 text-sm sm:grid-cols-3"><p className="rounded border p-2 text-emerald-700"><strong>{c.concluidos}</strong> concluíram</p><p className="rounded border p-2 text-amber-700"><strong>{c.abriu_sem_concluir}</strong> abriram e não concluíram</p><p className="rounded border p-2 text-destructive"><strong>{c.nao_abriu}</strong> nunca abriram</p></div><p className="text-xs text-muted-foreground">Conferência: {n(c.concluidos)+n(c.abriu_sem_concluir)+n(c.nao_abriu)} de {c.obrigados} líderes classificados.</p></CardContent></Card>
     <section><div className="mb-2 flex flex-wrap items-end justify-between gap-2"><div><h2 className="text-sm font-semibold">Atividade da missão</h2><p className="text-xs text-muted-foreground">Cada pessoa conta uma vez por indicador dentro do período escolhido. Reaberturas e cliques repetidos não inflam os totais.</p></div><Select value={activityPeriod} onValueChange={(value)=>setActivityPeriod(value as "hoje"|"todo")}><SelectTrigger className="w-[180px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="hoje">Hoje</SelectItem><SelectItem value="todo">Todo o período</SelectItem></SelectContent></Select></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{todayCards.map(([label,value,Icon,help])=><MetricCard key={label} label={label} value={value} Icon={Icon} help={help}/>)}</div></section>
     {t&&<Card className={t.confirmados_fora_publico>0?"border-amber-500/50":""}><CardContent className="grid gap-3 p-4 text-sm sm:grid-cols-3"><div><p className="text-xs text-muted-foreground">Confirmaram no público obrigatório</p><p className="text-xl font-bold text-emerald-700">{t.confirmados_no_publico}</p></div><div><p className="text-xs text-muted-foreground">Confirmaram fora do público obrigatório</p><p className="text-xl font-bold text-amber-700">{t.confirmados_fora_publico}</p></div><div><p className="text-xs text-muted-foreground">Diagnóstico técnico</p><p className="text-xs">{t.eventos_brutos} eventos brutos foram condensados em {t.acoes_unicas} ações únicas. Esses valores não são curtidas do Instagram.</p></div></CardContent></Card>}
     <Card><CardHeader><CardTitle className="text-base">{activityPeriod==="hoje"?"Pessoas ativas por hora":"Evolução diária da missão"}</CardTitle><CardDescription>{activityPeriod==="hoje"?"Cada barra mostra pessoas únicas com atividade naquela hora.":"Cada barra mostra pessoas únicas que tiveram atividade no dia, desde a publicação da missão."}</CardDescription></CardHeader><CardContent>{activity.isLoading?<Skeleton className="h-36 w-full"/>:activity.isError?<p className="text-sm text-destructive">Métricas detalhadas indisponíveis: {(activity.error as Error).message}</p>:<div className="overflow-x-auto"><div className="flex h-36 min-w-full items-end gap-1" style={{minWidth:activityPeriod==="todo"?`${Math.max(720,timeline.length*34)}px`:undefined}}>{timeline.map((point,index)=><div key={point.chave} className="flex min-w-[22px] flex-1 flex-col items-center justify-end gap-1" title={`${point.rotulo}: ${point.pessoas} pessoas · ${point.pessoas_clicaram} clicaram · ${point.confirmacoes} confirmaram`}><div className="w-full rounded-t bg-primary/70" style={{height:`${Math.max(point.pessoas?6:1,(point.pessoas/maxTimeline)*110)}px`}}/><span className="text-[9px] text-muted-foreground">{activityPeriod==="hoje"?(index%3===0?point.rotulo:""):(timeline.length<=20||index%Math.ceil(timeline.length/15)===0?point.rotulo:"")}</span></div>)}</div></div>}</CardContent></Card>
-    <Card className={chargeCertified&&trackingAudit.data?.obrigacoes_concluidas_pendentes===0?"border-emerald-500/40":"border-amber-500/60"}><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><div><CardTitle className="text-base">Auditoria antes da cobrança</CardTitle><CardDescription>Compara confirmações, identidade reconhecida e o funil exibido. Divergências são atualizadas em tempo real.</CardDescription></div><Badge variant={chargeCertified&&trackingAudit.data?.obrigacoes_concluidas_pendentes===0?"default":"destructive"}>{chargeCertified&&trackingAudit.data?.obrigacoes_concluidas_pendentes===0?"Dados reconciliados":"Revisão necessária"}</Badge></div></CardHeader><CardContent>{completionAudit.isLoading?<Skeleton className="h-20 w-full"/>:completionAudit.isError?<p className="text-sm text-destructive">Auditoria indisponível: {(completionAudit.error as Error).message}</p>:<div className="grid gap-2 text-sm sm:grid-cols-4"><p className="rounded border p-3"><strong className="block text-xl">{completionAudit.data?.confirmacoes_brutas??0}</strong>pessoas que confirmaram</p><p className="rounded border p-3"><strong className="block text-xl">{completionAudit.data?.lideres_confirmados??0}</strong>contratados confirmados</p><p className="rounded border p-3"><strong className="block text-xl">{trackingAudit.data?.obrigacoes_concluidas_pendentes??0}</strong>conclusões ainda divergentes</p><p className="rounded border p-3"><strong className="block text-xl">{trackingAudit.data?.concluidos_sem_vinculo??0}</strong>concluíram sem vínculo</p></div>}{trackingAudit.data&&trackingAudit.data.telefones_duplicados_eleicao>0&&<p className="mt-2 text-xs text-amber-700">Existem {trackingAudit.data.telefones_duplicados_eleicao} telefone(s) duplicado(s) na Eleição; esses cadastros precisam de revisão manual para não atribuir uma conclusão à pessoa errada.</p>}</CardContent></Card>
+    <Card className={auditRequested?(chargeCertified&&trackingAudit.data?.obrigacoes_concluidas_pendentes===0?"border-emerald-500/40":"border-amber-500/60"):undefined}><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><div><CardTitle className="text-base">Auditoria antes da cobrança</CardTitle><CardDescription>A auditoria detalhada só é consultada quando você solicitar, sem bloquear os dados principais.</CardDescription></div>{auditRequested?<Badge variant={chargeCertified&&trackingAudit.data?.obrigacoes_concluidas_pendentes===0?"default":"destructive"}>{chargeCertified&&trackingAudit.data?.obrigacoes_concluidas_pendentes===0?"Dados reconciliados":"Revisão necessária"}</Badge>:<Button variant="outline" size="sm" onClick={()=>setAuditRequested(true)}>Carregar auditoria</Button>}</div></CardHeader>{auditRequested&&<CardContent>{completionAudit.isLoading||trackingAudit.isLoading?<Skeleton className="h-20 w-full"/>:completionAudit.isError||trackingAudit.isError?<p className="text-sm text-destructive">Auditoria indisponível: {((completionAudit.error||trackingAudit.error) as Error)?.message}</p>:<div className="grid gap-2 text-sm sm:grid-cols-4"><p className="rounded border p-3"><strong className="block text-xl">{completionAudit.data?.confirmacoes_brutas??0}</strong>pessoas que confirmaram</p><p className="rounded border p-3"><strong className="block text-xl">{completionAudit.data?.lideres_confirmados??0}</strong>contratados confirmados</p><p className="rounded border p-3"><strong className="block text-xl">{trackingAudit.data?.obrigacoes_concluidas_pendentes??0}</strong>conclusões ainda divergentes</p><p className="rounded border p-3"><strong className="block text-xl">{trackingAudit.data?.concluidos_sem_vinculo??0}</strong>concluíram sem vínculo</p></div>}{trackingAudit.data&&trackingAudit.data.telefones_duplicados_eleicao>0&&<p className="mt-2 text-xs text-amber-700">Existem {trackingAudit.data.telefones_duplicados_eleicao} telefone(s) duplicado(s) na Eleição; esses cadastros precisam de revisão manual para não atribuir uma conclusão à pessoa errada.</p>}</CardContent>}</Card>
     <Card><CardContent className="pt-6"><Tabs defaultValue="coordenadores"><TabsList><TabsTrigger value="coordenadores">Cobrança por coordenador</TabsTrigger><TabsTrigger value="avulsos">Avulsos ({standaloneContracts.data?.length??0})</TabsTrigger></TabsList><TabsContent value="coordenadores" className="space-y-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold">Cobrança por coordenador</h3><p className="text-xs text-muted-foreground">Todos os coordenadores ativos aparecem aqui. Use o resumo para uma visão rápida ou o relatório detalhado para consultar os nomes.</p></div><div className="flex flex-wrap items-center gap-2">{assignmentAudit.data&&<Badge variant={assignmentAudit.data.confere?"outline":"destructive"}>{assignmentAudit.data.em_equipes} em equipes + {assignmentAudit.data.cobranca_individual} individuais = {assignmentAudit.data.contratados_obrigatorios}</Badge>}<Button size="sm" variant="outline" disabled={!coordinatorTeams.data?.length||busy==="pdf:summary"} onClick={exportCoordinatorSummaryPdf}><FileDown className="mr-1 h-4 w-4"/>PDF resumo</Button><Button size="sm" variant="outline" disabled={!coordinatorTeams.data?.length||busy==="pdf:all"} onClick={()=>exportCoordinatorPdf(coordinatorTeams.data??[])}><FileDown className="mr-1 h-4 w-4"/>PDF detalhado</Button></div></div>{coordinatorTeams.isLoading&&<Skeleton className="h-28 w-full"/>}{coordinatorTeams.isError&&<p className="text-sm text-destructive">Não foi possível carregar os coordenadores: {(coordinatorTeams.error as Error).message}</p>}<div className="max-h-[440px] divide-y overflow-auto rounded-lg border">{coordinatorTeams.data?.map((team)=>{const pending=n(team.abriu_sem_concluir)+n(team.nao_abriu);const hasTeam=n(team.total_lideres)>0;return <div key={team.coordenador_id} className="flex flex-wrap items-center gap-3 p-3"><div className="min-w-52 flex-1"><p className="font-semibold">{team.coordenador_nome}</p><p className="text-xs text-muted-foreground">{hasTeam?`${team.total_lideres} contratados · ${team.concluidos} concluíram · ${pending} pendentes`:"Sem contratados vinculados nesta missão"}</p><Progress value={n(team.taxa)} className="mt-2 h-2"/></div><div className="flex flex-wrap gap-2"><Badge variant="outline" className={team.coordenador_status==="cumpriu"?"text-emerald-700":team.coordenador_status==="abriu"?"text-amber-700":"text-destructive"}>Coordenador: {team.coordenador_status==="cumpriu"?"concluiu":team.coordenador_status==="abriu"?"abriu, não concluiu":"não abriu"}</Badge>{hasTeam?<Badge variant="outline" className="text-emerald-700">{n(team.taxa).toFixed(1)}%</Badge>:<Badge variant="outline">Sem equipe</Badge>}<Button size="sm" variant="outline" disabled={!hasTeam||busy===`pdf:${team.coordenador_id}`} onClick={()=>exportCoordinatorPdf([team],team.coordenador_nome)}><FileDown className="mr-1 h-4 w-4"/>PDF</Button><Button size="sm" disabled={!hasTeam||busy===`coordinator:${team.coordenador_id}`||!team.coordenador_telefone} onClick={()=>chargeCoordinator(team)}><MessageCircle className="mr-1 h-4 w-4"/>Cobrar equipe</Button></div></div>})}</div></TabsContent><TabsContent value="avulsos" className="space-y-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-semibold">Contratados avulsos</h3><p className="text-xs text-muted-foreground">Contratados obrigatórios sem coordenador ancestral. Coordenadores não são misturados nesta lista.</p></div><Button size="sm" variant="outline" disabled={!standaloneContracts.data?.length||busy==="pdf:standalone"} onClick={exportStandalonePdf}><FileDown className="mr-1 h-4 w-4"/>PDF dos avulsos</Button></div>{standaloneContracts.isLoading&&<Skeleton className="h-28 w-full"/>}{standaloneContracts.isError&&<p className="text-sm text-destructive">Não foi possível carregar os avulsos: {(standaloneContracts.error as Error).message}</p>}<div className="max-h-[440px] divide-y overflow-auto rounded-lg border">{standaloneContracts.data?.map(person=><div key={person.pessoa_id} className="flex flex-wrap items-center gap-3 p-3"><div className="min-w-52 flex-1"><p className="font-semibold">{person.nome}</p><p className="text-xs text-muted-foreground">{person.telefone||"sem telefone"} · {person.cargo||"sem cargo"} · {person.regiao||person.cidade||"sem região"}</p></div><Badge variant="outline" className={person.status==="cumpriu"?"text-emerald-700":person.status==="abriu"?"text-amber-700":"text-destructive"}>{person.status==="cumpriu"?"Concluiu":person.status==="abriu"?"Abriu, não concluiu":"Não abriu"}</Badge></div>)}{standaloneContracts.isSuccess&&!standaloneContracts.data.length&&<p className="py-10 text-center text-sm text-muted-foreground">Nenhum contratado avulso nesta missão.</p>}</div></TabsContent></Tabs></CardContent></Card>
     <Card><CardHeader><div className="flex flex-wrap items-start justify-between gap-2"><div><CardTitle className="text-base">Contratados da missão</CardTitle><CardDescription>Lista completa para cobrança individual, incluindo coordenadores e contratados avulsos.</CardDescription></div><Badge variant="outline">Atualizado {new Date(data.updated_at).toLocaleTimeString("pt-BR")}</Badge></div></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap gap-2"><div className="relative min-w-[240px] flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"/><Input className="pl-9" value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Nome, telefone, região ou cidade"/></div><Select value={status} onValueChange={setStatus}><SelectTrigger className="w-[210px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="pendentes">Todos os pendentes</SelectItem><SelectItem value="nao_abriu">Nunca abriram</SelectItem><SelectItem value="abriu">Abriram, não concluíram</SelectItem><SelectItem value="cumpriu">Concluíram</SelectItem><SelectItem value="concluiu_hoje">Concluíram hoje</SelectItem><SelectItem value="todos">Todos</SelectItem></SelectContent></Select></div><p className="text-xs text-muted-foreground"><strong>{people.length}</strong> contratados neste filtro.</p><div className="max-h-[520px] divide-y overflow-auto rounded-lg border">{!people.length&&<p className="py-10 text-center text-sm text-muted-foreground">Nenhum contratado neste filtro.</p>}{people.map((p)=><div key={`${p.origem}-${p.pessoa_id}`} className="flex flex-wrap items-center gap-2 p-3"><div className="min-w-52 flex-1"><p className="font-semibold">{p.nome}</p><p className="text-xs text-muted-foreground">{p.telefone||"sem telefone"} · {p.regiao||p.cidade||"sem região"}</p></div>{p.concluiu_hoje&&<Badge className="bg-emerald-600">Concluiu hoje</Badge>}<Badge variant="outline" className={p.status==="cumpriu"?"text-emerald-700":p.status==="abriu"?"text-amber-700":"text-destructive"}>{p.status==="cumpriu"?"Concluiu":p.status==="abriu"?"Abriu, não concluiu":"Não abriu"}</Badge>{p.status!=="cumpriu"&&<Button size="sm" disabled={busy===p.pessoa_id||!p.telefone} onClick={()=>charge(p)}><MessageCircle className="mr-1 h-4 w-4"/>Cobrar</Button>}</div>)}</div></CardContent></Card>
   </div>;
