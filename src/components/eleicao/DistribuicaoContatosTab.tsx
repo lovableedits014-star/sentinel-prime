@@ -81,6 +81,7 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
   const [openContratados, setOpenContratados] = useState(false);
   const [cabosRegioes, setCabosRegioes] = useState<CaboRegiaoRow[]>([]);
   const [openCabos, setOpenCabos] = useState<CaboRegiaoRow | null>(null);
+  const [openTodosCabos, setOpenTodosCabos] = useState(false);
 
   // dialogs auxiliares
   const [openConfigInterior, setOpenConfigInterior] = useState(false);
@@ -282,8 +283,13 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
         </TabsContent>
 
         <TabsContent value="cabos" className="mt-3 space-y-3">
-          <Card className="p-4 bg-muted/30 text-sm text-muted-foreground">
-            Cabos com contrato ativo, separados por região. Cada download fica registrado para destacar os novos cadastros dos próximos dias.
+          <Card className="flex flex-col gap-3 bg-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Cabos com contrato ativo, separados por região. Cada download fica registrado para destacar os novos cadastros dos próximos dias.
+            </p>
+            <Button onClick={() => setOpenTodosCabos(true)} disabled={cabosRegioes.length === 0} className="shrink-0">
+              <Download className="mr-2 h-4 w-4" />Baixar todos
+            </Button>
           </Card>
           {cabosRegioes.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">Nenhum cabo eleitoral contratado com telefone válido.</Card>
@@ -374,6 +380,9 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
       )}
       {openCabos && (
         <ExportarCabosRegiaoDialog clientId={clientId} regiao={openCabos} onClose={() => setOpenCabos(null)} onExported={() => { setOpenCabos(null); carregar(); }} />
+      )}
+      {openTodosCabos && (
+        <ExportarTodosCabosDialog clientId={clientId} regioes={cabosRegioes} onClose={() => setOpenTodosCabos(false)} onExported={() => { setOpenTodosCabos(false); carregar(); }} />
       )}
 
       <ConfigurarPrincipaisInteriorDialog
@@ -924,6 +933,158 @@ function EnviarPacoteDialog(props: {
           whatsappTexto={mensagemFinal}
         />
       )}
+    </Dialog>
+  );
+}
+
+interface CabosGrupoExportacao {
+  regiao: CaboRegiaoRow;
+  contatos: ContatoExport[];
+}
+
+function ExportarTodosCabosDialog({ clientId, regioes, onClose, onExported }: {
+  clientId: string;
+  regioes: CaboRegiaoRow[];
+  onClose: () => void;
+  onExported: () => void;
+}) {
+  const [grupos, setGrupos] = useState<CabosGrupoExportacao[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const [tag, setTag] = useState("CABOS");
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    Promise.all(regioes.map(async (regiao) => {
+      const { data, error } = await (supabase as any).rpc("eleicao_cabos_export_lista", {
+        _client_id: clientId,
+        _escopo: regiao.escopo,
+        _regiao_key: regiao.regiao_key,
+        _apenas_novos: false,
+      });
+      if (error) throw error;
+      return {
+        regiao,
+        contatos: (data || []).map((p: any) => ({
+          pessoa_id: p.pessoa_id,
+          nome: p.nome,
+          telefone: p.telefone,
+          tipo: "cabo",
+          bairro: p.bairro,
+        })),
+      } satisfies CabosGrupoExportacao;
+    })).then((resultado) => {
+      if (!active) return;
+      setGrupos(resultado);
+      setLoading(false);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      toast.error("Não foi possível carregar todos os cabos", {
+        description: error instanceof Error ? error.message : "Erro inesperado",
+      });
+      setGrupos([]);
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [clientId, regioes]);
+
+  const contatos = useMemo(() => {
+    const unicos = new Map<string, ContatoExport>();
+    for (const grupo of grupos) {
+      for (const contato of grupo.contatos) {
+        const telefone = onlyDigits(contato.telefone);
+        const chave = telefone || contato.pessoa_id;
+        if (!unicos.has(chave)) unicos.set(chave, contato);
+      }
+    }
+    return Array.from(unicos.values());
+  }, [grupos]);
+
+  const registrar = async () => {
+    for (const { regiao, contatos: contatosRegiao } of grupos) {
+      if (!contatosRegiao.length) continue;
+      const { data: lote, error } = await (supabase as any).from("eleicao_cabo_export_lotes").insert({
+        client_id: clientId,
+        escopo: regiao.escopo,
+        regiao_key: regiao.regiao_key,
+        regiao_label: regiao.regiao_label,
+        total_contatos: contatosRegiao.length,
+        apenas_novos: false,
+      }).select("id").single();
+      if (error || !lote) throw new Error(error?.message || `Não foi possível registrar ${regiao.regiao_label}`);
+
+      const itens = contatosRegiao.map((contato) => ({
+        client_id: clientId,
+        lote_id: lote.id,
+        pessoa_id: contato.pessoa_id,
+        escopo: regiao.escopo,
+        regiao_key: regiao.regiao_key,
+      }));
+      const { error: itensError } = await (supabase as any).from("eleicao_cabo_export_itens")
+        .upsert(itens, { onConflict: "client_id,escopo,regiao_key,pessoa_id", ignoreDuplicates: true });
+      if (itensError) throw new Error(itensError.message);
+    }
+  };
+
+  const baixar = async (formato: "vcf" | "csv") => {
+    if (!contatos.length || !tag) return;
+    setDownloading(true);
+    try {
+      if (formato === "vcf") {
+        const conteudo = gerarVcardLote({ contatos, tagPrefixo: tag, regiaoLabel: "Todas as regiões" });
+        const totalGerado = contarVcardsNoConteudo(conteudo);
+        if (totalGerado !== contatos.length) throw new Error(`Esperado ${contatos.length}, gerado ${totalGerado}.`);
+        await saveBlob(new Blob([conteudo], { type: "text/vcard;charset=utf-8" }), `cabos_eleitorais_${Date.now()}.vcf`, { title: "Todos os cabos eleitorais" });
+      } else {
+        const conteudo = gerarCsvGoogleContacts({ contatos, tagPrefixo: tag, regiaoLabel: "Todas as regiões" });
+        await saveBlob(new Blob(["\ufeff" + conteudo], { type: "text/csv;charset=utf-8" }), "cabos_eleitorais_google_contacts.csv", { title: "Todos os cabos eleitorais" });
+      }
+      await registrar();
+      toast.success(`${contatos.length} cabo(s) baixados com a TAG ${tag}.`);
+      onExported();
+    } catch (error) {
+      toast.error("Falha ao baixar todos os cabos", { description: error instanceof Error ? error.message : "Erro inesperado" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(value) => { if (!value) onClose(); }}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Baixar todos os cabos eleitorais</DialogTitle>
+          <DialogDescription>Escolha a TAG que será adicionada ao nome de todos os contatos antes de baixar.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label className="flex items-center gap-1"><TagIcon className="h-3 w-3" />TAG dos contatos</Label>
+            <Input value={tag} onChange={(event) => setTag(normalizeTag(event.target.value))} placeholder="Ex: CABOS" maxLength={8} className="max-w-40 font-mono uppercase" autoFocus />
+            <p className="mt-1 text-xs text-muted-foreground">Exemplo na agenda: <strong>{aplicarTag("João da Silva", tag)}</strong></p>
+          </div>
+          <Card className="p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium">Contatos encontrados em {regioes.length} região(ões)</span>
+              <Badge variant="secondary">{loading ? "..." : contatos.length}</Badge>
+            </div>
+            <div className="max-h-64 overflow-y-auto rounded-md border bg-muted/30 p-2 text-xs">
+              {loading ? <Loader2 className="mx-auto my-5 h-5 w-5 animate-spin" /> : contatos.length === 0 ? (
+                <div className="py-5 text-center text-muted-foreground">Nenhum cabo com telefone foi encontrado.</div>
+              ) : (
+                <ul className="space-y-1">
+                  {contatos.slice(0, 100).map((contato) => <li key={contato.pessoa_id} className="truncate">• <strong>{aplicarTag(contato.nome, tag)}</strong> — {contato.telefone}</li>)}
+                  {contatos.length > 100 && <li className="text-muted-foreground">…e mais {contatos.length - 100}</li>}
+                </ul>
+              )}
+            </div>
+          </Card>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => baixar("csv")} disabled={loading || downloading || !contatos.length || !tag}><FileText className="mr-2 h-4 w-4" />CSV Google</Button>
+          <Button onClick={() => baixar("vcf")} disabled={loading || downloading || !contatos.length || !tag}>{downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}{isIOS() ? "Gerar contatos no iPhone" : "Baixar .vcf"}</Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }
