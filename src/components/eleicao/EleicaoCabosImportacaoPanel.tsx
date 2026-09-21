@@ -60,6 +60,21 @@ type ImportLot = {
 };
 
 type Analysis = { lote: ImportLot; itens: ImportItem[] };
+type DuplicatePerson = {
+  id: string;
+  nome: string;
+  tipo: string;
+  telefone: string | null;
+  responsavel_nome: string | null;
+  valor_contratacao: number | null;
+  is_voluntario: boolean | null;
+  contrato_fim: string | null;
+};
+type DuplicateGroup = {
+  tipo: "telefone" | "cpf";
+  chave: string;
+  cadastros: DuplicatePerson[];
+};
 type Parent = {
   id: string;
   nome: string;
@@ -143,6 +158,7 @@ export default function EleicaoCabosImportacaoPanel({
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
   const [history, setHistory] = useState<ImportLot[]>([]);
+  const [databaseDuplicates, setDatabaseDuplicates] = useState<DuplicateGroup[]>([]);
   const [auditItems, setAuditItems] = useState<ImportItem[]>([]);
   const [auditLot, setAuditLot] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -154,7 +170,7 @@ export default function EleicaoCabosImportacaoPanel({
   const [parentId, setParentId] = useState("");
 
   const loadBase = async () => {
-    const [parentResult, lotsResult] = await Promise.all([
+    const [parentResult, lotsResult, duplicatesResult] = await Promise.all([
       db
         .from("eleicao_pessoas")
         .select("id,nome,tipo,escopo,regiao,cidade")
@@ -168,9 +184,12 @@ export default function EleicaoCabosImportacaoPanel({
         .eq("client_id", clientId)
         .order("created_at", { ascending: false })
         .limit(30),
+      db.rpc("eleicao_auditar_duplicidades", { p_client_id: clientId }),
     ]);
     if (!parentResult.error) setParents(parentResult.data || []);
     if (!lotsResult.error) setHistory(lotsResult.data || []);
+    if (!duplicatesResult.error)
+      setDatabaseDuplicates(Array.isArray(duplicatesResult.data) ? duplicatesResult.data : []);
   };
 
   useEffect(() => {
@@ -503,11 +522,66 @@ export default function EleicaoCabosImportacaoPanel({
         </Card>
       )}
 
+      <Card className={databaseDuplicates.length ? "border-destructive/40" : "border-emerald-300"}>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>Duplicidades na base</CardTitle>
+            <Badge variant={databaseDuplicates.length ? "destructive" : "outline"}>
+              {databaseDuplicates.length} conflito(s)
+            </Badge>
+          </div>
+          <CardDescription>
+            Varredura de todos os cadastros ativos do cliente por telefone normalizado e CPF,
+            independentemente do líder ou coordenador responsável.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!databaseDuplicates.length ? (
+            <div className="flex items-center gap-2 text-sm text-emerald-700">
+              <CheckCircle2 className="h-4 w-4" />
+              Nenhuma duplicidade ativa encontrada na base.
+            </div>
+          ) : (
+            <div className="max-h-[420px] space-y-3 overflow-y-auto">
+              {databaseDuplicates.map((group) => (
+                <div key={`${group.tipo}:${group.chave}`} className="rounded-lg border p-3">
+                  <p className="mb-2 text-sm font-semibold">
+                    Mesmo {group.tipo}:{" "}
+                    {group.tipo === "cpf" ? `***${group.chave.slice(-4)}` : group.chave}
+                  </p>
+                  <div className="space-y-2">
+                    {group.cadastros.map((person) => (
+                      <div key={person.id} className="rounded-md bg-muted/40 px-3 py-2 text-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <strong>{person.nome}</strong>
+                          <Badge variant="outline">{person.tipo}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {person.is_voluntario
+                              ? "Voluntário"
+                              : Number(person.valor_contratacao || 0) > 0
+                                ? `Contrato de ${money(person.valor_contratacao)}`
+                                : "Sem contrato"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Responsável: {person.responsavel_nome || "sem responsável"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Histórico</CardTitle>
           <CardDescription>
-            Lotes analisados e confirmados, inclusive os duplicados identificados.
+            Lotes analisados e confirmados. Use “Ver ocorrências” para abrir os duplicados e
+            inválidos encontrados em cada planilha.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
