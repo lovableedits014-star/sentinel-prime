@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Download,
   FileSpreadsheet,
+  Folder,
   Loader2,
   Upload,
 } from "lucide-react";
@@ -31,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { gerarRelatorioDuplicidadesPdf } from "@/lib/eleicao-duplicidades-pdf";
 
 type ImportItem = {
   id: number;
@@ -210,6 +212,26 @@ export default function EleicaoCabosImportacaoPanel({
       ) || [],
     [analysis],
   );
+  const duplicateFolders = useMemo(() => {
+    const folders = new Map<string, DuplicateGroup[]>();
+    for (const group of databaseDuplicates) {
+      const names = new Set(
+        group.cadastros.map(
+          (person) =>
+            person.responsavel_nome ||
+            (person.tipo === "coordenador" || person.tipo === "lider"
+              ? person.nome
+              : "Sem responsável"),
+        ),
+      );
+      for (const folderName of names) {
+        const groups = folders.get(folderName) || [];
+        groups.push(group);
+        folders.set(folderName, groups);
+      }
+    }
+    return Array.from(folders.entries()).sort(([a], [b]) => a.localeCompare(b, "pt-BR"));
+  }, [databaseDuplicates]);
 
   const readFile = async (selected: File) => {
     setBusy(true);
@@ -526,9 +548,21 @@ export default function EleicaoCabosImportacaoPanel({
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>Duplicidades na base</CardTitle>
-            <Badge variant={databaseDuplicates.length ? "destructive" : "outline"}>
-              {databaseDuplicates.length} conflito(s)
-            </Badge>
+            <div className="flex items-center gap-2">
+              {!!databaseDuplicates.length && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void gerarRelatorioDuplicidadesPdf(databaseDuplicates)}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Baixar PDF detalhado
+                </Button>
+              )}
+              <Badge variant={databaseDuplicates.length ? "destructive" : "outline"}>
+                {databaseDuplicates.length} conflito(s)
+              </Badge>
+            </div>
           </div>
           <CardDescription>
             Varredura de todos os cadastros ativos do cliente por telefone normalizado e CPF,
@@ -542,34 +576,53 @@ export default function EleicaoCabosImportacaoPanel({
               Nenhuma duplicidade ativa encontrada na base.
             </div>
           ) : (
-            <div className="max-h-[420px] space-y-3 overflow-y-auto">
-              {databaseDuplicates.map((group) => (
-                <div key={`${group.tipo}:${group.chave}`} className="rounded-lg border p-3">
-                  <p className="mb-2 text-sm font-semibold">
-                    Mesmo {group.tipo}:{" "}
-                    {group.tipo === "cpf" ? `***${group.chave.slice(-4)}` : group.chave}
-                  </p>
-                  <div className="space-y-2">
-                    {group.cadastros.map((person) => (
-                      <div key={person.id} className="rounded-md bg-muted/40 px-3 py-2 text-sm">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <strong>{person.nome}</strong>
-                          <Badge variant="outline">{person.tipo}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {person.is_voluntario
-                              ? "Voluntário"
-                              : Number(person.valor_contratacao || 0) > 0
-                                ? `Contrato de ${money(person.valor_contratacao)}`
-                                : "Sem contrato"}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Responsável: {person.responsavel_nome || "sem responsável"}
+            <div className="space-y-2">
+              {duplicateFolders.map(([folderName, groups]) => (
+                <details key={folderName} className="group rounded-lg border bg-background">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40">
+                    <span className="flex min-w-0 items-center gap-2 font-medium">
+                      <Folder className="h-5 w-5 shrink-0 text-amber-500" />
+                      <span className="truncate">{folderName}</span>
+                    </span>
+                    <Badge variant="secondary">{groups.length} conflito(s)</Badge>
+                  </summary>
+                  <div className="max-h-[420px] space-y-3 overflow-y-auto border-t p-3">
+                    {groups.map((group) => (
+                      <div
+                        key={`${folderName}:${group.tipo}:${group.chave}`}
+                        className="rounded-lg border p-3"
+                      >
+                        <p className="mb-2 text-sm font-semibold">
+                          Mesmo {group.tipo}:{" "}
+                          {group.tipo === "cpf" ? `***${group.chave.slice(-4)}` : group.chave}
                         </p>
+                        <div className="space-y-2">
+                          {group.cadastros.map((person) => (
+                            <div
+                              key={person.id}
+                              className="rounded-md bg-muted/40 px-3 py-2 text-sm"
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <strong>{person.nome}</strong>
+                                <Badge variant="outline">{person.tipo}</Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {person.is_voluntario
+                                    ? "Voluntário"
+                                    : Number(person.valor_contratacao || 0) > 0
+                                      ? `Contrato de ${money(person.valor_contratacao)}`
+                                      : "Sem contrato"}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Responsável: {person.responsavel_nome || "sem responsável"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                </details>
               ))}
             </div>
           )}
