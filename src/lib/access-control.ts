@@ -51,7 +51,6 @@ export const ALL_APP_TABS: AppTab[] = [
   { section: 'Operacional', label: 'Territorial', path: '/territorial' },
   { section: 'Operacional', label: 'Inteligência Eleitoral', path: '/inteligencia-eleitoral' },
   { section: 'Operacional', label: 'Mídia', path: '/midia' },
-  { section: 'Operacional', label: 'Tráfego Pago', path: '/trafego-pago' },
   // Sistema
   { section: 'Sistema', label: 'Configurações', path: '/settings' },
 ];

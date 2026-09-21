@@ -402,7 +402,7 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
               className="shrink-0"
             >
               <Download className="mr-2 h-4 w-4" />
-              Baixar todos
+              Exportar por responsável
             </Button>
           </Card>
           {cabosRegioes.length === 0 ? (
@@ -553,7 +553,6 @@ export default function DistribuicaoContatosTab({ clientId }: { clientId: string
       {openTodosCabos && (
         <ExportarTodosCabosDialog
           clientId={clientId}
-          regioes={cabosRegioes}
           onClose={() => setOpenTodosCabos(false)}
           onExported={() => {
             setOpenTodosCabos(false);
@@ -1338,105 +1337,126 @@ function EnviarPacoteDialog(props: {
   );
 }
 
-interface CabosGrupoExportacao {
-  regiao: CaboRegiaoRow;
-  contatos: ContatoExport[];
+interface ResponsavelExportacao {
+  id: string;
+  nome: string;
+  tipo: "coordenador" | "lider";
+}
+
+interface ContatoHierarquia extends ContatoExport {
+  tipo: "cabo" | "lider";
+  escopo: string;
+  regiao_key: string;
+  regiao_label: string;
 }
 
 function ExportarTodosCabosDialog({
   clientId,
-  regioes,
   onClose,
   onExported,
 }: {
   clientId: string;
-  regioes: CaboRegiaoRow[];
   onClose: () => void;
   onExported: () => void;
 }) {
-  const [grupos, setGrupos] = useState<CabosGrupoExportacao[]>([]);
+  const [responsaveis, setResponsaveis] = useState<ResponsavelExportacao[]>([]);
+  const [responsavelId, setResponsavelId] = useState("todos");
+  const [incluirCabos, setIncluirCabos] = useState(true);
+  const [incluirLideres, setIncluirLideres] = useState(false);
+  const [contatos, setContatos] = useState<ContatoHierarquia[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [tag, setTag] = useState("CABOS");
 
   useEffect(() => {
     let active = true;
+    (supabase as any)
+      .rpc("eleicao_responsaveis_exportacao", { p_client_id: clientId })
+      .then(({ data, error }: any) => {
+        if (!active) return;
+        if (error) {
+          toast.error("Não foi possível carregar os responsáveis", { description: error.message });
+          return;
+        }
+        setResponsaveis(data || []);
+      });
+    return () => {
+      active = false;
+    };
+  }, [clientId]);
+
+  useEffect(() => {
+    let active = true;
+    if (!incluirCabos && !incluirLideres) {
+      setContatos([]);
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
     setLoading(true);
-    Promise.all(
-      regioes.map(async (regiao) => {
-        const { data, error } = await (supabase as any).rpc("eleicao_cabos_export_lista", {
-          _client_id: clientId,
-          _escopo: regiao.escopo,
-          _regiao_key: regiao.regiao_key,
-          _apenas_novos: false,
-        });
-        if (error) throw error;
-        return {
-          regiao,
-          contatos: (data || []).map((p: any) => ({
-            pessoa_id: p.pessoa_id,
-            nome: p.nome,
-            telefone: p.telefone,
-            tipo: "cabo",
-            bairro: p.bairro,
-          })),
-        } satisfies CabosGrupoExportacao;
-      }),
-    )
-      .then((resultado) => {
-        if (!active) return;
-        setGrupos(resultado);
-        setLoading(false);
+    (supabase as any)
+      .rpc("eleicao_contatos_exportar_hierarquia", {
+        p_client_id: clientId,
+        p_responsavel_id: responsavelId === "todos" ? null : responsavelId,
+        p_incluir_cabos: incluirCabos,
+        p_incluir_lideres: incluirLideres,
       })
-      .catch((error: unknown) => {
+      .then(({ data, error }: any) => {
         if (!active) return;
-        toast.error("Não foi possível carregar todos os cabos", {
-          description: error instanceof Error ? error.message : "Erro inesperado",
-        });
-        setGrupos([]);
+        if (error) {
+          toast.error("Não foi possível carregar os contatos", { description: error.message });
+          setContatos([]);
+        } else {
+          setContatos(Array.isArray(data) ? data : []);
+        }
         setLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [clientId, regioes]);
+  }, [clientId, responsavelId, incluirCabos, incluirLideres]);
 
-  const contatos = useMemo(() => {
-    const unicos = new Map<string, ContatoExport>();
-    for (const grupo of grupos) {
-      for (const contato of grupo.contatos) {
-        const telefone = onlyDigits(contato.telefone);
-        const chave = telefone || contato.pessoa_id;
-        if (!unicos.has(chave)) unicos.set(chave, contato);
-      }
-    }
-    return Array.from(unicos.values());
-  }, [grupos]);
+  const responsavelSelecionado = responsaveis.find((item) => item.id === responsavelId);
+  const tiposSelecionados = [incluirCabos ? "cabo" : null, incluirLideres ? "lider" : null].filter(
+    Boolean,
+  ) as string[];
 
   const registrar = async () => {
-    for (const { regiao, contatos: contatosRegiao } of grupos) {
+    const grupos = new Map<string, ContatoHierarquia[]>();
+    for (const contato of contatos) {
+      const chave = `${contato.escopo}:${contato.regiao_key}`;
+      const grupo = grupos.get(chave) || [];
+      grupo.push(contato);
+      grupos.set(chave, grupo);
+    }
+    for (const contatosRegiao of grupos.values()) {
       if (!contatosRegiao.length) continue;
+      const referencia = contatosRegiao[0];
       const { data: lote, error } = await (supabase as any)
         .from("eleicao_cabo_export_lotes")
         .insert({
           client_id: clientId,
-          escopo: regiao.escopo,
-          regiao_key: regiao.regiao_key,
-          regiao_label: regiao.regiao_label,
+          escopo: referencia.escopo,
+          regiao_key: referencia.regiao_key,
+          regiao_label: referencia.regiao_label,
           total_contatos: contatosRegiao.length,
           apenas_novos: false,
+          responsavel_id: responsavelId === "todos" ? null : responsavelId,
+          tipos_exportados: tiposSelecionados,
+          tag,
         })
         .select("id")
         .single();
       if (error || !lote)
-        throw new Error(error?.message || `Não foi possível registrar ${regiao.regiao_label}`);
+        throw new Error(error?.message || `Não foi possível registrar ${referencia.regiao_label}`);
 
       const itens = contatosRegiao.map((contato) => ({
         client_id: clientId,
         lote_id: lote.id,
         pessoa_id: contato.pessoa_id,
-        escopo: regiao.escopo,
-        regiao_key: regiao.regiao_key,
+        escopo: contato.escopo,
+        regiao_key: contato.regiao_key,
       }));
       const { error: itensError } = await (supabase as any)
         .from("eleicao_cabo_export_itens")
@@ -1452,37 +1472,39 @@ function ExportarTodosCabosDialog({
     if (!contatos.length || !tag) return;
     setDownloading(true);
     try {
+      const tituloGrupo = responsavelSelecionado?.nome || "Todos os responsáveis";
+      const nomeArquivo = slugify(responsavelSelecionado?.nome || "todos");
       if (formato === "vcf") {
         const conteudo = gerarVcardLote({
           contatos,
           tagPrefixo: tag,
-          regiaoLabel: "Todas as regiões",
+          regiaoLabel: tituloGrupo,
         });
         const totalGerado = contarVcardsNoConteudo(conteudo);
         if (totalGerado !== contatos.length)
           throw new Error(`Esperado ${contatos.length}, gerado ${totalGerado}.`);
         await saveBlob(
           new Blob([conteudo], { type: "text/vcard;charset=utf-8" }),
-          `cabos_eleitorais_${Date.now()}.vcf`,
-          { title: "Todos os cabos eleitorais" },
+          `contatos_${nomeArquivo}_${Date.now()}.vcf`,
+          { title: `Contatos - ${tituloGrupo}` },
         );
       } else {
         const conteudo = gerarCsvGoogleContacts({
           contatos,
           tagPrefixo: tag,
-          regiaoLabel: "Todas as regiões",
+          regiaoLabel: tituloGrupo,
         });
         await saveBlob(
           new Blob(["\ufeff" + conteudo], { type: "text/csv;charset=utf-8" }),
-          "cabos_eleitorais_google_contacts.csv",
-          { title: "Todos os cabos eleitorais" },
+          `contatos_${nomeArquivo}_google.csv`,
+          { title: `Contatos - ${tituloGrupo}` },
         );
       }
       await registrar();
-      toast.success(`${contatos.length} cabo(s) baixados com a TAG ${tag}.`);
+      toast.success(`${contatos.length} contato(s) baixados com a TAG ${tag}.`);
       onExported();
     } catch (error) {
-      toast.error("Falha ao baixar todos os cabos", {
+      toast.error("Falha ao baixar os contatos", {
         description: error instanceof Error ? error.message : "Erro inesperado",
       });
     } finally {
@@ -1499,12 +1521,49 @@ function ExportarTodosCabosDialog({
     >
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Baixar todos os cabos eleitorais</DialogTitle>
+          <DialogTitle>Exportar contatos por responsável</DialogTitle>
           <DialogDescription>
-            Escolha a TAG que será adicionada ao nome de todos os contatos antes de baixar.
+            Selecione um coordenador ou líder, os tipos de contato e a TAG da agenda.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <div>
+            <Label htmlFor="responsavel-exportacao">Coordenador ou líder</Label>
+            <select
+              id="responsavel-exportacao"
+              value={responsavelId}
+              onChange={(event) => setResponsavelId(event.target.value)}
+              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="todos">Todos os responsáveis</option>
+              {responsaveis.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.nome} · {item.tipo === "coordenador" ? "Coordenador" : "Líder"}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Coordenadores incluem toda a equipe abaixo deles; líderes incluem sua própria equipe.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <Label htmlFor="exportar-cabos">Incluir cabos</Label>
+              <Switch
+                id="exportar-cabos"
+                checked={incluirCabos}
+                onCheckedChange={setIncluirCabos}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <Label htmlFor="exportar-lideres">Incluir líderes</Label>
+              <Switch
+                id="exportar-lideres"
+                checked={incluirLideres}
+                onCheckedChange={setIncluirLideres}
+              />
+            </div>
+          </div>
           <div>
             <Label className="flex items-center gap-1">
               <TagIcon className="h-3 w-3" />
@@ -1524,9 +1583,7 @@ function ExportarTodosCabosDialog({
           </div>
           <Card className="p-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium">
-                Contatos encontrados em {regioes.length} região(ões)
-              </span>
+              <span className="text-sm font-medium">Contatos encontrados</span>
               <Badge variant="secondary">{loading ? "..." : contatos.length}</Badge>
             </div>
             <div className="max-h-64 overflow-y-auto rounded-md border bg-muted/30 p-2 text-xs">
@@ -1534,13 +1591,14 @@ function ExportarTodosCabosDialog({
                 <Loader2 className="mx-auto my-5 h-5 w-5 animate-spin" />
               ) : contatos.length === 0 ? (
                 <div className="py-5 text-center text-muted-foreground">
-                  Nenhum cabo com telefone foi encontrado.
+                  Selecione pelo menos um tipo ou escolha outro responsável.
                 </div>
               ) : (
                 <ul className="space-y-1">
                   {contatos.slice(0, 100).map((contato) => (
                     <li key={contato.pessoa_id} className="truncate">
                       • <strong>{aplicarTag(contato.nome, tag)}</strong> — {contato.telefone}
+                      <span className="ml-1 text-muted-foreground">({contato.tipo})</span>
                     </li>
                   ))}
                   {contatos.length > 100 && (

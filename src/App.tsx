@@ -74,7 +74,6 @@ const MissaoPublica = lazy(() => import("./pages/MissaoPublica"));
 const ReuniaoPublica = lazy(() => import("./pages/ReuniaoPublica"));
 const TimeDigitalCadastro = lazy(() => import("./pages/TimeDigitalCadastro"));
 const CaboOnboarding = lazy(() => import("./pages/CaboOnboarding"));
-const TrafegoPago = lazy(() => import("./pages/TrafegoPago"));
 const Agenda = lazy(() => import("./pages/Agenda"));
 const AgendaPublica = lazy(() => import("./pages/AgendaPublica"));
 
@@ -174,7 +173,6 @@ const RoutesWithBoundary = () => {
               <Route path="/calendario-politico" element={<CalendarioPolitico />} />
               <Route path="/agenda" element={<Agenda />} />
               <Route path="/midia" element={<Midia />} />
-              <Route path="/trafego-pago" element={<TrafegoPago />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/telemarketing-admin" element={<TelemarketingAdmin />} />
               <Route path="/telemarketing-admin/fila" element={<Navigate to="/telemarketing-admin/filas" replace />} />
