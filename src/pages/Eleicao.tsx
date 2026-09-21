@@ -31,7 +31,7 @@ import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog"
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
-import { FileDown, Package, FileText, Printer, CalendarDays } from "lucide-react";
+import { FileDown, Package, FileText, FileSpreadsheet, Printer, CalendarDays } from "lucide-react";
 import { exportEleicaoPdf, exportEleicaoCsv, exportEleicaoPdfRaiz, exportEleicaoCsvRaiz, type ExportPessoa } from "@/lib/eleicao-export-pdf";
 import ExportEleicaoDialog, { type ExportConfig } from "@/components/eleicao/ExportEleicaoDialog";
 import { exportarCsvConfiguravel, exportarPdfConfiguravel, exportarZipPorCoordenador } from "@/lib/eleicao-export-configuravel";
@@ -45,6 +45,7 @@ import DistribuicaoContatosTab from "@/components/eleicao/DistribuicaoContatosTa
 import { FunnelManagement } from "@/components/eleicao/FunnelManagement";
 import { getEleicaoSituacao, isEleicaoContratado, isEleicaoContratadoRemunerado, isEleicaoSemContrato, isEleicaoVoluntario, isEleicaoVoluntarioContratado } from "@/lib/eleicao-situacao";
 import ContratadosCumprimentoReport from "@/components/eleicao/ContratadosCumprimentoReport";
+import EleicaoCabosImportacaoPanel from "@/components/eleicao/EleicaoCabosImportacaoPanel";
 import { gerarFormularioCabosPdf, type LiderFormularioCabos } from "@/lib/eleicao-cabos-formulario-pdf";
 import { gerarReciboDocumentacaoPdf } from "@/lib/eleicao-recibo-documentacao-pdf";
 
@@ -827,7 +828,7 @@ export default function Eleicao() {
     }
   }
 
-  const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao" | "relatorio_contratados">("cadastros");
+  const [view, setView] = useState<"cadastros" | "funnel" | "reunioes" | "pendentes" | "custos" | "config" | "indicacoes" | "dobradinhas" | "distribuicao" | "relatorio_contratados" | "importacao_cabos">("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<"todos" | "contratados" | "voluntarios_contratados" | "sem_contrato" | "sem_acesso" | "avulsos" | "voluntarios" | "arquivados" | "reuniao">("todos");
   const [tipoFilter, setTipoFilter] = useState<"todos" | Tipo>("todos");
@@ -1405,7 +1406,7 @@ export default function Eleicao() {
 
 
       <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-        <TabsList className="grid h-auto grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 w-full max-w-7xl">
+        <TabsList className="grid h-auto grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 w-full max-w-7xl">
           <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
           <TabsTrigger value="funnel" className="gap-1.5">
             <Handshake className="w-3.5 h-3.5" />
@@ -1430,6 +1431,10 @@ export default function Eleicao() {
           <TabsTrigger value="distribuicao" className="gap-1.5">
             <Send className="w-3.5 h-3.5" />
             Distribuição
+          </TabsTrigger>
+          <TabsTrigger value="importacao_cabos" className="gap-1.5">
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Importar cabos
           </TabsTrigger>
           <TabsTrigger value="dobradinhas" className="gap-1.5">
             <Handshake className="w-3.5 h-3.5" />
@@ -1470,6 +1475,8 @@ export default function Eleicao() {
         clientId ? <IndicacoesPanel clientId={clientId} /> : null
       ) : view === "relatorio_contratados" ? (
         clientId ? <ContratadosCumprimentoReport clientId={clientId} /> : null
+      ) : view === "importacao_cabos" ? (
+        clientId ? <EleicaoCabosImportacaoPanel clientId={clientId} onChanged={load} /> : null
       ) : view === "distribuicao" ? (
         clientId ? <DistribuicaoContatosTab clientId={clientId} /> : null
       ) : view === "dobradinhas" ? (
