@@ -79,6 +79,12 @@ type ImportDuplicateDetail = {
 
 type ImportItem = {
   id: number;
+  lote_nome?: string;
+  arquivo_nome?: string;
+  data_tentativa?: string;
+  responsavel_tentativa_id?: string | null;
+  responsavel_tentativa_nome?: string | null;
+  responsavel_tentativa_tipo?: string | null;
   numero_linha: number;
   nome: string | null;
   cpf_normalizado: string | null;
@@ -1074,7 +1080,9 @@ export default function EleicaoCabosImportacaoPanel({
                       }
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      Baixar relatório deste lote
+                      {auditItems[0]?.responsavel_tentativa_nome
+                        ? `Baixar relatório para ${auditItems[0].responsavel_tentativa_nome}`
+                        : "Baixar relatório deste lote"}
                     </Button>
                   )}
                   <Button

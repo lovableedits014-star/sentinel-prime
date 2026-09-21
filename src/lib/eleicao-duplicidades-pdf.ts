@@ -22,6 +22,11 @@ export type DuplicidadeGrupoPdf = {
 };
 
 export type OcorrenciaImportacaoPdf = {
+  lote_nome?: string;
+  arquivo_nome?: string;
+  data_tentativa?: string;
+  responsavel_tentativa_nome?: string | null;
+  responsavel_tentativa_tipo?: string | null;
   numero_linha: number;
   nome: string | null;
   cpf_normalizado: string | null;
@@ -223,74 +228,137 @@ export async function gerarRelatorioOcorrenciasLotePdf(
   const largura = doc.internal.pageSize.getWidth();
   const altura = doc.internal.pageSize.getHeight();
   const margem = 30;
+  const duplicadosAtivos = ocorrencias.filter(
+    (item) => item.classificacao === "duplicado_contrato_ativo" && item.duplicado,
+  );
+  const outrasOcorrencias = ocorrencias.filter(
+    (item) => item.classificacao !== "duplicado_contrato_ativo" || !item.duplicado,
+  );
+  const contexto = ocorrencias[0];
+  const responsavel = contexto?.responsavel_tentativa_nome || "Responsável não identificado";
+  const responsavelTipo = papel(contexto?.responsavel_tentativa_tipo || null);
+  const arquivoOrigem = contexto?.arquivo_nome || nomeLote;
 
-  doc.setFillColor(153, 27, 27);
-  doc.rect(0, 0, largura, 58, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.text("Relatório de ocorrências da importação", margem, 27);
-  doc.setFontSize(10);
-  doc.text(nomeLote, margem, 44);
+  const cabecalho = (titulo: string, subtitulo: string) => {
+    doc.setFillColor(153, 27, 27);
+    doc.rect(0, 0, largura, 58, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.text(titulo, margem, 27);
+    doc.setFontSize(9);
+    doc.text(subtitulo, margem, 44);
+  };
 
+  cabecalho(
+    "Relatório de cabos recusados por contrato ativo",
+    `${responsavel} - ${responsavelTipo} | Lote: ${nomeLote}`,
+  );
   doc.setTextColor(51, 65, 85);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(
-    `${ocorrencias.length} ocorrência(s). Cadastros com contrato ativo incluem a localização e os dados do contrato que impediram a inclusão.`,
+    `Arquivo: ${arquivoOrigem}. Este documento comprova por que cada cabo abaixo não foi cadastrado para ${responsavel}.`,
     margem,
     78,
   );
 
   autoTable(doc, {
     startY: 90,
-    margin: { left: margem, right: margem, bottom: 40 },
-    head: [
-      [
-        "Linha / pessoa importada",
-        "Situação",
-        "Cadastro que causou o bloqueio",
-        "Onde está cadastrado",
-        "Contrato ativo",
-      ],
+    tableWidth: 460,
+    head: [["Resumo", "Quantidade"]],
+    body: [
+      ["Cabos recusados por contrato ativo", String(duplicadosAtivos.length)],
+      ["Outras ocorrências da planilha", String(outrasOcorrencias.length)],
+      ["Responsável da importação", `${responsavel} (${responsavelTipo.toLowerCase()})`],
     ],
-    body: ocorrencias.map((item) => {
-      const duplicado = item.duplicado;
-      const valor = Number(duplicado?.valor_contratacao || 0).toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      });
-      const periodo = duplicado
-        ? `${dataBr(duplicado.contrato_inicio) || "início não informado"} até ${
-            dataBr(duplicado.contrato_fim) || "sem término"
-          }`
-        : "-";
-      return [
-        `Linha ${item.numero_linha + 1}\n${item.nome || "Sem nome"}\n${item.telefone_normalizado || item.cpf_normalizado || "Sem documento"}`,
-        `${item.classificacao.replaceAll("_", " ")}\n${item.motivo || "-"}`,
-        duplicado
-          ? `${duplicado.nome} (${duplicado.tipo})\nTelefone: ${duplicado.telefone || "-"}`
-          : "Sem cadastro externo associado",
-        duplicado?.responsavel_nome
-          ? `${duplicado.responsavel_nome} (${papel(duplicado.responsavel_tipo).toLowerCase()})`
-          : "Sem responsável",
-        duplicado
-          ? `${duplicado.is_voluntario ? "Voluntário" : valor}\n${periodo}`
-          : "Não se aplica",
-      ];
-    }),
     theme: "grid",
-    styles: { fontSize: 7.5, cellPadding: 4, overflow: "linebreak", valign: "top" },
+    styles: { fontSize: 8.5, cellPadding: 4 },
     headStyles: { fillColor: [127, 29, 29] },
-    alternateRowStyles: { fillColor: [254, 242, 242] },
-    columnStyles: {
-      0: { cellWidth: 145 },
-      1: { cellWidth: 140 },
-      2: { cellWidth: 170 },
-      3: { cellWidth: 145 },
-      4: { cellWidth: "auto" },
-    },
+    columnStyles: { 0: { cellWidth: 300 }, 1: { cellWidth: 160 } },
   });
+
+  if (duplicadosAtivos.length) {
+    const finalResumo = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable
+      ?.finalY;
+    autoTable(doc, {
+      startY: (finalResumo || 90) + 16,
+      margin: { left: margem, right: margem, bottom: 40 },
+      head: [
+        [
+          "Cabo recusado",
+          "Solicitado por",
+          "Contrato ativo encontrado",
+          "Onde já está contratado",
+          "Justificativa da recusa",
+        ],
+      ],
+      body: duplicadosAtivos.map((item) => {
+        const duplicado = item.duplicado!;
+        const valor = Number(duplicado.valor_contratacao || 0).toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+        });
+        const destino = duplicado.responsavel_nome
+          ? `${duplicado.responsavel_nome} (${papel(duplicado.responsavel_tipo).toLowerCase()})`
+          : "Sem responsável identificado";
+        return [
+          `${item.nome || "Sem nome"}\nTelefone: ${item.telefone_normalizado || "-"}\nCPF: ${item.cpf_normalizado || "-"}\nLinha ${item.numero_linha + 1}`,
+          `${item.responsavel_tentativa_nome || responsavel}\n${papel(item.responsavel_tentativa_tipo || contexto?.responsavel_tentativa_tipo || null)}`,
+          `${duplicado.nome} (${duplicado.tipo})\nTelefone: ${duplicado.telefone || "-"}\n${valor}\n${dataBr(duplicado.contrato_inicio) || "início não informado"} até ${dataBr(duplicado.contrato_fim) || "sem término"}`,
+          destino,
+          `Não cadastrado para ${item.responsavel_tentativa_nome || responsavel} porque já possui contrato ativo com ${destino}.`,
+        ];
+      }),
+      theme: "grid",
+      styles: { fontSize: 7.2, cellPadding: 4, overflow: "linebreak", valign: "top" },
+      headStyles: { fillColor: [127, 29, 29] },
+      alternateRowStyles: { fillColor: [254, 242, 242] },
+      columnStyles: {
+        0: { cellWidth: 135 },
+        1: { cellWidth: 125 },
+        2: { cellWidth: 175 },
+        3: { cellWidth: 145 },
+        4: { cellWidth: "auto" },
+      },
+    });
+  }
+
+  if (outrasOcorrencias.length) {
+    doc.addPage("a4", "landscape");
+    cabecalho("Anexo - outras ocorrências da planilha", `${arquivoOrigem} | ${nomeLote}`);
+    doc.setTextColor(51, 65, 85);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(
+      "Estes itens são erros de dados, conflitos de identidade ou repetições no próprio arquivo; não representam outro contrato ativo.",
+      margem,
+      78,
+    );
+    autoTable(doc, {
+      startY: 90,
+      margin: { left: margem, right: margem, bottom: 40 },
+      head: [["Linha", "Pessoa", "Contato/documento", "Situação", "Motivo"]],
+      body: outrasOcorrencias.map((item) => [
+        String(item.numero_linha + 1),
+        item.nome || "Sem nome",
+        item.telefone_normalizado || item.cpf_normalizado || "Sem documento",
+        item.classificacao.replaceAll("_", " "),
+        item.motivo || "-",
+      ]),
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak", valign: "top" },
+      headStyles: { fillColor: [71, 85, 105] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 180 },
+        2: { cellWidth: 150 },
+        3: { cellWidth: 150 },
+        4: { cellWidth: "auto" },
+      },
+    });
+  }
 
   const paginas = doc.getNumberOfPages();
   for (let pagina = 1; pagina <= paginas; pagina++) {
@@ -306,7 +374,7 @@ export async function gerarRelatorioOcorrenciasLotePdf(
     );
   }
 
-  const arquivo = nomeLote
+  const arquivo = responsavel
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9]+/g, "-")
