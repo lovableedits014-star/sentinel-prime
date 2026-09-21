@@ -141,28 +141,27 @@ BEGIN
   IF p_data_inicio IS NULL OR (p_data_fim IS NOT NULL AND p_data_fim < p_data_inicio) THEN
     RAISE EXCEPTION 'Periodo de contratacao invalido';
   END IF;
-  IF p_escopo NOT IN ('campo_grande','interior') THEN
-    RAISE EXCEPTION 'Escopo invalido';
-  END IF;
-  IF p_escopo = 'campo_grande' AND p_regiao NOT IN
-    ('centro','segredo','prosa','bandeira','anhanduizinho','lagoa','moreninha','imbirussu') THEN
-    RAISE EXCEPTION 'Regiao invalida';
-  END IF;
-  IF p_escopo = 'interior' AND nullif(btrim(coalesce(p_cidade,'')),'') IS NULL THEN
-    RAISE EXCEPTION 'Informe a cidade';
-  END IF;
   IF jsonb_typeof(p_linhas) <> 'array' OR jsonb_array_length(p_linhas) = 0 THEN
     RAISE EXCEPTION 'A planilha nao possui linhas';
   END IF;
   IF jsonb_array_length(p_linhas) > 10000 THEN
     RAISE EXCEPTION 'Limite de 10000 linhas por importacao';
   END IF;
-  IF p_parent_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM public.eleicao_pessoas p
-    WHERE p.id=p_parent_id AND p.client_id=p_client_id AND p.arquivado_em IS NULL
-      AND p.tipo::text IN ('coordenador','lider')
-  ) THEN
-    RAISE EXCEPTION 'Responsavel padrao invalido';
+  IF p_parent_id IS NULL THEN RAISE EXCEPTION 'Selecione o responsavel'; END IF;
+
+  -- A localizacao do lote sempre vem do lider/coordenador. Os parametros de
+  -- localizacao existem por compatibilidade com a RPC, mas nao sao confiados.
+  SELECT p.escopo::text,p.regiao,p.cidade
+    INTO p_escopo,p_regiao,p_cidade
+  FROM public.eleicao_pessoas p
+  WHERE p.id=p_parent_id AND p.client_id=p_client_id AND p.arquivado_em IS NULL
+    AND p.tipo::text IN ('coordenador','lider');
+  IF NOT FOUND THEN RAISE EXCEPTION 'Responsavel padrao invalido'; END IF;
+  IF p_escopo = 'campo_grande' AND nullif(btrim(coalesce(p_regiao,'')),'') IS NULL THEN
+    RAISE EXCEPTION 'O responsavel selecionado nao possui regiao cadastrada';
+  END IF;
+  IF p_escopo = 'interior' AND nullif(btrim(coalesce(p_cidade,'')),'') IS NULL THEN
+    RAISE EXCEPTION 'O responsavel selecionado nao possui cidade cadastrada';
   END IF;
 
   INSERT INTO public.eleicao_cabo_import_lotes(
@@ -342,6 +341,7 @@ BEGIN
         endereco=coalesce(v_item.endereco,endereco),
         bairro=coalesce(v_item.bairro,bairro),
         parent_id=coalesce(v_lote.parent_id_padrao,parent_id),
+        escopo=v_lote.escopo_padrao,regiao=v_lote.regiao_padrao,cidade=v_lote.cidade_padrao,
         valor_contratacao=v_lote.valor_unitario,is_voluntario=false,
         contrato_inicio=v_lote.data_inicio,contrato_fim=v_lote.data_fim,
         importacao_lote_id=v_lote.id,
@@ -353,7 +353,7 @@ BEGIN
         cpf,valor_contratacao,is_voluntario,created_by,contrato_inicio,contrato_fim,importacao_lote_id
       ) VALUES (
         v_lote.client_id,'cabo',v_lote.escopo_padrao,v_lote.regiao_padrao,
-        coalesce(v_item.cidade,v_lote.cidade_padrao),v_item.nome,
+        v_lote.cidade_padrao,v_item.nome,
         coalesce(v_item.telefone_normalizado,v_item.cpf_normalizado),
         coalesce(v_item.endereco,'Nao informado'),v_item.bairro,v_lote.parent_id_padrao,
         v_item.cpf_normalizado,v_lote.valor_unitario,false,(SELECT auth.uid()),

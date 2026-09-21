@@ -60,7 +60,14 @@ type ImportLot = {
 };
 
 type Analysis = { lote: ImportLot; itens: ImportItem[] };
-type Parent = { id: string; nome: string; tipo: string };
+type Parent = {
+  id: string;
+  nome: string;
+  tipo: string;
+  escopo: "campo_grande" | "interior";
+  regiao: string | null;
+  cidade: string | null;
+};
 type SheetRow = Record<string, unknown>;
 
 // As tabelas/RPCs passam a integrar os tipos gerados depois que a migration for aplicada.
@@ -144,16 +151,13 @@ export default function EleicaoCabosImportacaoPanel({
   const [value, setValue] = useState("");
   const [start, setStart] = useState(format(new Date(), "yyyy-MM-dd"));
   const [end, setEnd] = useState("");
-  const [parentId, setParentId] = useState("none");
-  const [scope, setScope] = useState("campo_grande");
-  const [region, setRegion] = useState("centro");
-  const [city, setCity] = useState("");
+  const [parentId, setParentId] = useState("");
 
   const loadBase = async () => {
     const [parentResult, lotsResult] = await Promise.all([
       db
         .from("eleicao_pessoas")
-        .select("id,nome,tipo")
+        .select("id,nome,tipo,escopo,regiao,cidade")
         .eq("client_id", clientId)
         .is("arquivado_em", null)
         .in("tipo", ["coordenador", "lider"])
@@ -176,6 +180,10 @@ export default function EleicaoCabosImportacaoPanel({
   }, [clientId]);
 
   const totals = analysis?.lote;
+  const selectedParent = useMemo(
+    () => parents.find((parent) => parent.id === parentId) || null,
+    [parentId, parents],
+  );
   const exceptions = useMemo(
     () =>
       analysis?.itens.filter(
@@ -213,7 +221,11 @@ export default function EleicaoCabosImportacaoPanel({
     if (!file || !rows.length) return toast.error("Selecione uma planilha.");
     if (!unitValue || unitValue <= 0)
       return toast.error("Informe um valor por cabo maior que zero.");
-    if (scope === "interior" && !city.trim()) return toast.error("Informe a cidade padrão.");
+    if (!selectedParent) return toast.error("Selecione o líder ou coordenador responsável.");
+    if (selectedParent.escopo === "campo_grande" && !selectedParent.regiao)
+      return toast.error("O responsável selecionado não possui região cadastrada.");
+    if (selectedParent.escopo === "interior" && !selectedParent.cidade)
+      return toast.error("O responsável selecionado não possui cidade cadastrada.");
     setBusy(true);
     try {
       const { data, error } = await db.rpc("eleicao_cabo_import_analisar", {
@@ -223,10 +235,10 @@ export default function EleicaoCabosImportacaoPanel({
         p_valor_unitario: unitValue,
         p_data_inicio: start,
         p_data_fim: end || null,
-        p_parent_id: parentId === "none" ? null : parentId,
-        p_escopo: scope,
-        p_regiao: scope === "campo_grande" ? region : null,
-        p_cidade: scope === "interior" ? city.trim() : null,
+        p_parent_id: selectedParent.id,
+        p_escopo: selectedParent.escopo,
+        p_regiao: selectedParent.escopo === "campo_grande" ? selectedParent.regiao : null,
+        p_cidade: selectedParent.escopo === "interior" ? selectedParent.cidade : null,
         p_linhas: rows,
       });
       if (error) throw error;
@@ -254,6 +266,7 @@ export default function EleicaoCabosImportacaoPanel({
       setRows([]);
       setName("");
       setValue("");
+      setParentId("");
       await loadBase();
       onChanged();
     } catch (error: unknown) {
@@ -266,19 +279,27 @@ export default function EleicaoCabosImportacaoPanel({
   const loadAudit = async (lotId: string) => {
     setBusy(true);
     try {
-      const { data, error } = await db
-        .from("eleicao_cabo_import_itens")
-        .select("*")
-        .eq("lote_id", lotId)
-        .in("classificacao", [
-          "duplicado_contrato_ativo",
-          "duplicado_no_arquivo",
-          "conflito_identidade",
-          "dados_invalidos",
-        ])
-        .order("numero_linha");
-      if (error) throw error;
-      setAuditItems(data || []);
+      const allItems: ImportItem[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await db
+          .from("eleicao_cabo_import_itens")
+          .select("*")
+          .eq("lote_id", lotId)
+          .in("classificacao", [
+            "duplicado_contrato_ativo",
+            "duplicado_no_arquivo",
+            "conflito_identidade",
+            "dados_invalidos",
+          ])
+          .order("numero_linha")
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const page = (data || []) as ImportItem[];
+        allItems.push(...page);
+        if (page.length < pageSize) break;
+      }
+      setAuditItems(allItems);
       setAuditLot(lotId);
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Falha ao abrir a auditoria."));
@@ -346,10 +367,9 @@ export default function EleicaoCabosImportacaoPanel({
               <Label>Responsável padrão</Label>
               <Select value={parentId} onValueChange={setParentId}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione um líder ou coordenador" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sem responsável</SelectItem>
                   {parents.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.nome} · {p.tipo}
@@ -359,48 +379,15 @@ export default function EleicaoCabosImportacaoPanel({
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Escopo</Label>
-              <Select value={scope} onValueChange={setScope}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="campo_grande">Campo Grande</SelectItem>
-                  <SelectItem value="interior">Interior</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Local herdado do responsável</Label>
+              <div className="flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm">
+                {selectedParent
+                  ? selectedParent.escopo === "interior"
+                    ? selectedParent.cidade || "Cidade não cadastrada"
+                    : `Campo Grande · ${selectedParent.regiao || "região não cadastrada"}`
+                  : "Selecione o responsável"}
+              </div>
             </div>
-            {scope === "campo_grande" ? (
-              <div className="space-y-1">
-                <Label>Região padrão</Label>
-                <Select value={region} onValueChange={setRegion}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[
-                      "centro",
-                      "segredo",
-                      "prosa",
-                      "bandeira",
-                      "anhanduizinho",
-                      "lagoa",
-                      "moreninha",
-                      "imbirussu",
-                    ].map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <Label>Cidade padrão</Label>
-                <Input value={city} onChange={(e) => setCity(e.target.value)} />
-              </div>
-            )}
             <div className="space-y-1">
               <Label>Planilha</Label>
               <input
@@ -424,8 +411,8 @@ export default function EleicaoCabosImportacaoPanel({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>
-              Colunas reconhecidas: nome, CPF, telefone/celular/WhatsApp, endereço, bairro, cidade e
-              região.
+              Colunas reconhecidas: nome, CPF, telefone/celular/WhatsApp, endereço e bairro. Escopo,
+              região ou cidade serão herdados automaticamente do responsável.
             </span>
             <Button onClick={analyze} disabled={busy || !rows.length}>
               {busy ? (
@@ -600,50 +587,59 @@ export default function EleicaoCabosImportacaoPanel({
 }
 
 function ItemTable({ items }: { items: ImportItem[] }) {
+  const visibleItems = items.slice(0, 1000);
   return (
-    <div className="max-h-[420px] overflow-auto rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Linha</TableHead>
-            <TableHead>Nome</TableHead>
-            <TableHead>CPF</TableHead>
-            <TableHead>Telefone</TableHead>
-            <TableHead>Situação</TableHead>
-            <TableHead>Motivo</TableHead>
-            <TableHead className="text-right">Valor</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.slice(0, 1000).map((item) => (
-            <TableRow key={item.id}>
-              <TableCell>{item.numero_linha + 1}</TableCell>
-              <TableCell>{item.nome || "—"}</TableCell>
-              <TableCell>
-                {item.cpf_normalizado
-                  ? `***.***.${item.cpf_normalizado.slice(-5, -2)}-${item.cpf_normalizado.slice(-2)}`
-                  : "—"}
-              </TableCell>
-              <TableCell>{item.telefone_normalizado || "—"}</TableCell>
-              <TableCell>
-                <Badge variant={item.classificacao === "confirmado" ? "default" : "outline"}>
-                  {classificationLabel[item.classificacao] || item.classificacao}
-                </Badge>
-              </TableCell>
-              <TableCell className="max-w-xs text-xs">{item.motivo}</TableCell>
-              <TableCell className="text-right">{money(item.valor_aplicado)}</TableCell>
-            </TableRow>
-          ))}
-          {!items.length && (
+    <div className="space-y-2">
+      {items.length > visibleItems.length && (
+        <p className="text-xs text-muted-foreground">
+          Exibindo 1.000 de {items.length.toLocaleString("pt-BR")} registros para manter a tela
+          rápida. Todos foram processados e continuam disponíveis na exportação.
+        </p>
+      )}
+      <div className="max-h-[420px] overflow-auto rounded-md border">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                <AlertTriangle className="mx-auto mb-2 h-5 w-5" />
-                Nenhum registro nesta categoria.
-              </TableCell>
+              <TableHead>Linha</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>CPF</TableHead>
+              <TableHead>Telefone</TableHead>
+              <TableHead>Situação</TableHead>
+              <TableHead>Motivo</TableHead>
+              <TableHead className="text-right">Valor</TableHead>
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {visibleItems.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell>{item.numero_linha + 1}</TableCell>
+                <TableCell>{item.nome || "—"}</TableCell>
+                <TableCell>
+                  {item.cpf_normalizado
+                    ? `***.***.${item.cpf_normalizado.slice(-5, -2)}-${item.cpf_normalizado.slice(-2)}`
+                    : "—"}
+                </TableCell>
+                <TableCell>{item.telefone_normalizado || "—"}</TableCell>
+                <TableCell>
+                  <Badge variant={item.classificacao === "confirmado" ? "default" : "outline"}>
+                    {classificationLabel[item.classificacao] || item.classificacao}
+                  </Badge>
+                </TableCell>
+                <TableCell className="max-w-xs text-xs">{item.motivo}</TableCell>
+                <TableCell className="text-right">{money(item.valor_aplicado)}</TableCell>
+              </TableRow>
+            ))}
+            {!items.length && (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <AlertTriangle className="mx-auto mb-2 h-5 w-5" />
+                  Nenhum registro nesta categoria.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
