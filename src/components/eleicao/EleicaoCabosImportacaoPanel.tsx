@@ -34,8 +34,32 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   gerarRelatorioDuplicidadesPdf,
+  gerarRelatorioCasosRecusadosPdf,
   gerarRelatorioOcorrenciasLotePdf,
 } from "@/lib/eleicao-duplicidades-pdf";
+
+type DuplicateCase = {
+  id: number;
+  data_tentativa: string;
+  lote_id: string;
+  lote_nome: string;
+  arquivo_nome: string;
+  numero_linha: number;
+  nome_tentativa: string | null;
+  cpf_tentativa: string | null;
+  telefone_tentativa: string | null;
+  responsavel_tentativa_nome: string | null;
+  responsavel_tentativa_tipo: string | null;
+  cadastro_existente_nome: string;
+  cadastro_existente_tipo: string;
+  cadastro_existente_telefone: string | null;
+  responsavel_existente_nome: string | null;
+  responsavel_existente_tipo: string | null;
+  valor_contratacao: number;
+  contrato_inicio: string | null;
+  contrato_fim: string | null;
+  motivo: string | null;
+};
 
 type ImportDuplicateDetail = {
   id: string;
@@ -201,6 +225,8 @@ export default function EleicaoCabosImportacaoPanel({
   const [parents, setParents] = useState<Parent[]>([]);
   const [history, setHistory] = useState<ImportLot[]>([]);
   const [databaseDuplicates, setDatabaseDuplicates] = useState<DuplicateGroup[]>([]);
+  const [duplicateCases, setDuplicateCases] = useState<DuplicateCase[]>([]);
+  const [selectedCaseIds, setSelectedCaseIds] = useState<Set<number>>(new Set());
   const [auditItems, setAuditItems] = useState<ImportItem[]>([]);
   const [auditLot, setAuditLot] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -212,7 +238,8 @@ export default function EleicaoCabosImportacaoPanel({
   const [parentId, setParentId] = useState("");
 
   const loadBase = async () => {
-    const [parentResult, lotsResult, duplicatesResult] = await Promise.all([
+    await db.rpc("eleicao_cabo_import_limpar_rascunhos", { p_client_id: clientId });
+    const [parentResult, lotsResult, duplicatesResult, casesResult] = await Promise.all([
       db
         .from("eleicao_pessoas")
         .select("id,nome,tipo,escopo,regiao,cidade")
@@ -225,13 +252,16 @@ export default function EleicaoCabosImportacaoPanel({
         .select("*")
         .eq("client_id", clientId)
         .order("created_at", { ascending: false })
-        .limit(30),
+        .limit(100),
       db.rpc("eleicao_auditar_duplicidades", { p_client_id: clientId }),
+      db.rpc("eleicao_casos_duplicados_ativos", { p_client_id: clientId }),
     ]);
     if (!parentResult.error) setParents(parentResult.data || []);
     if (!lotsResult.error) setHistory(lotsResult.data || []);
     if (!duplicatesResult.error)
       setDatabaseDuplicates(Array.isArray(duplicatesResult.data) ? duplicatesResult.data : []);
+    if (!casesResult.error)
+      setDuplicateCases(Array.isArray(casesResult.data) ? casesResult.data : []);
   };
 
   useEffect(() => {
@@ -274,6 +304,25 @@ export default function EleicaoCabosImportacaoPanel({
       contractsAtRisk.reduce((total, person) => total + Number(person.valor_contratacao || 0), 0),
     [contractsAtRisk],
   );
+  const activeHistory = useMemo(
+    () => history.filter((lot) => lot.status === "confirmado"),
+    [history],
+  );
+  const canceledHistory = useMemo(
+    () => history.filter((lot) => lot.status === "cancelado"),
+    [history],
+  );
+  const selectedCases = useMemo(
+    () => duplicateCases.filter((item) => selectedCaseIds.has(item.id)),
+    [duplicateCases, selectedCaseIds],
+  );
+  const toggleCase = (id: number) =>
+    setSelectedCaseIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const duplicateFolders = useMemo(() => {
     const folders = new Map<string, DuplicateFolder>();
     for (const group of activeContractDuplicates) {
@@ -323,6 +372,20 @@ export default function EleicaoCabosImportacaoPanel({
     }
   };
 
+  const analyzeParams = () => ({
+    p_client_id: clientId,
+    p_nome: name,
+    p_arquivo_nome: file?.name || "planilha.xlsx",
+    p_valor_unitario: Number(value.replace(/\./g, "").replace(",", ".")),
+    p_data_inicio: start,
+    p_data_fim: end || null,
+    p_parent_id: selectedParent?.id || null,
+    p_escopo: selectedParent?.escopo || null,
+    p_regiao: selectedParent?.escopo === "campo_grande" ? selectedParent.regiao : null,
+    p_cidade: selectedParent?.escopo === "interior" ? selectedParent.cidade : null,
+    p_linhas: rows,
+  });
+
   const analyze = async () => {
     const unitValue = Number(value.replace(/\./g, "").replace(",", "."));
     if (!file || !rows.length) return toast.error("Selecione uma planilha.");
@@ -335,23 +398,15 @@ export default function EleicaoCabosImportacaoPanel({
       return toast.error("O responsável selecionado não possui cidade cadastrada.");
     setBusy(true);
     try {
-      const { data, error } = await db.rpc("eleicao_cabo_import_analisar", {
-        p_client_id: clientId,
-        p_nome: name,
-        p_arquivo_nome: file.name,
-        p_valor_unitario: unitValue,
-        p_data_inicio: start,
-        p_data_fim: end || null,
-        p_parent_id: selectedParent.id,
-        p_escopo: selectedParent.escopo,
-        p_regiao: selectedParent.escopo === "campo_grande" ? selectedParent.regiao : null,
-        p_cidade: selectedParent.escopo === "interior" ? selectedParent.cidade : null,
-        p_linhas: rows,
-      });
+      const { data, error } = await db.rpc("eleicao_cabo_import_analisar", analyzeParams());
       if (error) throw error;
-      setAnalysis(data as Analysis);
-      await loadBase();
-      toast.success("Análise concluída. Confira a previsão antes de confirmar.");
+      const preview = data as Analysis;
+      const { error: discardError } = await db.rpc("eleicao_cabo_import_descartar", {
+        p_lote_id: preview.lote.id,
+      });
+      if (discardError) throw discardError;
+      setAnalysis(preview);
+      toast.success("Prévia concluída. Nada foi salvo; confirme para realizar a importação.");
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Falha ao analisar a planilha."));
     } finally {
@@ -362,11 +417,20 @@ export default function EleicaoCabosImportacaoPanel({
   const confirm = async () => {
     if (!analysis) return;
     setBusy(true);
+    let pendingLotId: string | null = null;
     try {
+      const { data: analyzedData, error: analyzeError } = await db.rpc(
+        "eleicao_cabo_import_analisar",
+        analyzeParams(),
+      );
+      if (analyzeError) throw analyzeError;
+      pendingLotId = (analyzedData as Analysis).lote.id;
+
       const { data, error } = await db.rpc("eleicao_cabo_import_confirmar", {
-        p_lote_id: analysis.lote.id,
+        p_lote_id: pendingLotId,
       });
       if (error) throw error;
+      pendingLotId = null;
       toast.success(`${data.confirmados} cabos confirmados — ${money(data.custo_confirmado)}.`);
       setAnalysis(null);
       setFile(null);
@@ -377,6 +441,9 @@ export default function EleicaoCabosImportacaoPanel({
       await loadBase();
       onChanged();
     } catch (error: unknown) {
+      if (pendingLotId) {
+        await db.rpc("eleicao_cabo_import_descartar", { p_lote_id: pendingLotId });
+      }
       toast.error(errorMessage(error, "Falha ao confirmar a importação."));
     } finally {
       setBusy(false);
@@ -394,35 +461,6 @@ export default function EleicaoCabosImportacaoPanel({
       setAuditLot(lotId);
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Falha ao abrir a auditoria."));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const cancelAnalyzedLot = async (lot: ImportLot) => {
-    if (
-      !window.confirm(
-        `Cancelar a análise "${lot.nome}"? Nenhum cadastro será apagado. O lote continuará no histórico como cancelado.`,
-      )
-    )
-      return;
-    setBusy(true);
-    try {
-      const { error } = await db
-        .from("eleicao_cabo_import_lotes")
-        .update({ status: "cancelado" })
-        .eq("id", lot.id)
-        .eq("client_id", clientId)
-        .eq("status", "analisado");
-      if (error) throw error;
-      if (auditLot === lot.id) {
-        setAuditLot(null);
-        setAuditItems([]);
-      }
-      await loadBase();
-      toast.success("Análise repetida cancelada. Nenhum contrato foi alterado.");
-    } catch (error: unknown) {
-      toast.error(errorMessage(error, "Falha ao cancelar o lote."));
     } finally {
       setBusy(false);
     }
@@ -638,18 +676,134 @@ export default function EleicaoCabosImportacaoPanel({
               </TabsContent>
             </Tabs>
             <div className="flex justify-end">
-              <Button onClick={confirm} disabled={busy || !totals.total_elegiveis}>
+              <Button
+                onClick={confirm}
+                disabled={
+                  busy ||
+                  (!totals.total_elegiveis &&
+                    !analysis.itens.some(
+                      (item) => item.classificacao === "duplicado_contrato_ativo",
+                    ))
+                }
+              >
                 {busy ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <CheckCircle2 className="mr-2 h-4 w-4" />
                 )}
-                Confirmar {totals.total_elegiveis} contratações — {money(totals.custo_previsto)}
+                {totals.total_elegiveis
+                  ? `Confirmar ${totals.total_elegiveis} contratações — ${money(totals.custo_previsto)}`
+                  : "Finalizar auditoria sem contratações"}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
+
+      <Card className="border-amber-300">
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Central de duplicados recusados</CardTitle>
+              <CardDescription>
+                Somente tentativas recusadas porque o cabo já possuía contrato ativo.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!duplicateCases.length}
+                onClick={() =>
+                  setSelectedCaseIds(
+                    selectedCaseIds.size === duplicateCases.length
+                      ? new Set()
+                      : new Set(duplicateCases.map((item) => item.id)),
+                  )
+                }
+              >
+                {selectedCaseIds.size === duplicateCases.length
+                  ? "Limpar seleção"
+                  : "Selecionar todos"}
+              </Button>
+              <Button
+                size="sm"
+                disabled={!selectedCases.length}
+                onClick={() => void gerarRelatorioCasosRecusadosPdf(selectedCases)}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Gerar relatório ({selectedCases.length})
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!duplicateCases.length ? (
+            <div className="flex items-center gap-2 text-sm text-emerald-700">
+              <CheckCircle2 className="h-4 w-4" />
+              Nenhuma tentativa recusada por contrato ativo.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {duplicateCases.map((item) => (
+                <div key={item.id} className="flex items-start gap-3 rounded-lg border p-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4"
+                    checked={selectedCaseIds.has(item.id)}
+                    onChange={() => toggleCase(item.id)}
+                    aria-label={`Selecionar caso de ${item.nome_tentativa || "cabo"}`}
+                  />
+                  <details className="min-w-0 flex-1">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-semibold">{item.nome_tentativa || "Sem nome"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Tentativa para {item.responsavel_tentativa_nome || "sem responsável"} •{" "}
+                            {format(new Date(item.data_tentativa), "dd/MM/yyyy HH:mm")}
+                          </p>
+                        </div>
+                        <Badge variant="destructive">Contrato ativo encontrado</Badge>
+                      </div>
+                    </summary>
+                    <div className="mt-3 grid gap-3 border-t pt-3 md:grid-cols-2">
+                      <div className="rounded-md bg-muted/40 p-3 text-sm">
+                        <p className="font-medium">Tentativa recusada</p>
+                        <p>Líder/coordenador: {item.responsavel_tentativa_nome || "—"}</p>
+                        <p>Telefone informado: {item.telefone_tentativa || "—"}</p>
+                        <p>Arquivo: {item.arquivo_nome}</p>
+                        <p>Linha: {item.numero_linha + 1}</p>
+                      </div>
+                      <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm">
+                        <p className="font-medium">Onde já está contratado</p>
+                        <p>{item.cadastro_existente_nome}</p>
+                        <p>
+                          Responsável: {item.responsavel_existente_nome || "sem responsável"}
+                          {item.responsavel_existente_tipo
+                            ? ` (${roleLabel(item.responsavel_existente_tipo).toLowerCase()})`
+                            : ""}
+                        </p>
+                        <p>Contrato: {money(item.valor_contratacao)}</p>
+                        <p>
+                          Período:{" "}
+                          {item.contrato_inicio
+                            ? format(new Date(`${item.contrato_inicio}T12:00:00`), "dd/MM/yyyy")
+                            : "não informado"}
+                          {" até "}
+                          {item.contrato_fim
+                            ? format(new Date(`${item.contrato_fim}T12:00:00`), "dd/MM/yyyy")
+                            : "sem término"}
+                        </p>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card
         className={activeContractDuplicates.length ? "border-destructive/60" : "border-emerald-300"}
@@ -829,7 +983,7 @@ export default function EleicaoCabosImportacaoPanel({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {history.map((lot) => (
+              {activeHistory.map((lot) => (
                 <TableRow key={lot.id}>
                   <TableCell>{format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
                   <TableCell>
@@ -861,22 +1015,11 @@ export default function EleicaoCabosImportacaoPanel({
                       >
                         Ver ocorrências
                       </Button>
-                      {lot.status === "analisado" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          disabled={busy}
-                          onClick={() => void cancelAnalyzedLot(lot)}
-                        >
-                          Cancelar análise
-                        </Button>
-                      )}
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
-              {!history.length && (
+              {!activeHistory.length && (
                 <TableRow>
                   <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     Nenhuma importação realizada.
@@ -885,6 +1028,35 @@ export default function EleicaoCabosImportacaoPanel({
               )}
             </TableBody>
           </Table>
+          {!!canceledHistory.length && (
+            <details className="rounded-lg border border-dashed bg-muted/20">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+                Análises canceladas ({canceledHistory.length}) — sem alteração de cadastros ou
+                custos
+              </summary>
+              <div className="space-y-2 border-t px-4 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Estes arquivos foram apenas analisados e depois cancelados. Não criaram contratos
+                  e não entram na auditoria financeira.
+                </p>
+                {canceledHistory.map((lot) => (
+                  <div
+                    key={lot.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium">{lot.nome}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")} • {lot.arquivo_nome}{" "}
+                        • {lot.total_linhas} linhas
+                      </p>
+                    </div>
+                    <Badge variant="outline">Cancelado — R$ 0,00</Badge>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
           {auditLot && (
             <div>
               <div className="mb-2 flex items-center justify-between">

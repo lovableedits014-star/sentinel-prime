@@ -314,3 +314,96 @@ export async function gerarRelatorioOcorrenciasLotePdf(
     .toLowerCase();
   doc.save(`ocorrencias-${arquivo || "importacao"}-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
+export type CasoRecusadoPdf = {
+  id: number;
+  data_tentativa: string;
+  lote_nome: string;
+  arquivo_nome: string;
+  numero_linha: number;
+  nome_tentativa: string | null;
+  telefone_tentativa: string | null;
+  responsavel_tentativa_nome: string | null;
+  cadastro_existente_nome: string;
+  cadastro_existente_telefone: string | null;
+  responsavel_existente_nome: string | null;
+  responsavel_existente_tipo: string | null;
+  valor_contratacao: number;
+  contrato_inicio: string | null;
+  contrato_fim: string | null;
+  motivo: string | null;
+};
+
+export async function gerarRelatorioCasosRecusadosPdf(casos: CasoRecusadoPdf[]) {
+  const [{ default: jsPDF }, tableModule] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const autoTable = tableModule.default;
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+  const largura = doc.internal.pageSize.getWidth();
+  const altura = doc.internal.pageSize.getHeight();
+  const margem = 30;
+
+  doc.setFillColor(146, 64, 14);
+  doc.rect(0, 0, largura, 58, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text("Relatório de cabos recusados por contrato ativo", margem, 28);
+  doc.setFontSize(9);
+  doc.text(
+    `${casos.length} caso(s) selecionado(s) para apresentação aos responsáveis.`,
+    margem,
+    44,
+  );
+
+  autoTable(doc, {
+    startY: 76,
+    margin: { left: margem, right: margem, bottom: 40 },
+    head: [
+      [
+        "Cabo recusado",
+        "Tentativa de cadastro",
+        "Contrato já existente",
+        "Responsável atual",
+        "Contrato",
+      ],
+    ],
+    body: casos.map((item) => [
+      `${item.nome_tentativa || "Sem nome"}\n${item.telefone_tentativa || "Sem telefone"}`,
+      `${item.responsavel_tentativa_nome || "Sem responsável"}\n${item.lote_nome} - linha ${item.numero_linha + 1}\n${new Date(item.data_tentativa).toLocaleString("pt-BR")}`,
+      `${item.cadastro_existente_nome}\n${item.cadastro_existente_telefone || "Sem telefone"}`,
+      item.responsavel_existente_nome
+        ? `${item.responsavel_existente_nome} (${papel(item.responsavel_existente_tipo).toLowerCase()})`
+        : "Sem responsável",
+      `${Number(item.valor_contratacao || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}\n${dataBr(item.contrato_inicio) || "início não informado"} até ${dataBr(item.contrato_fim) || "sem término"}`,
+    ]),
+    theme: "grid",
+    styles: { fontSize: 7.5, cellPadding: 4, overflow: "linebreak", valign: "top" },
+    headStyles: { fillColor: [180, 83, 9] },
+    alternateRowStyles: { fillColor: [255, 247, 237] },
+    columnStyles: {
+      0: { cellWidth: 145 },
+      1: { cellWidth: 165 },
+      2: { cellWidth: 145 },
+      3: { cellWidth: 145 },
+      4: { cellWidth: "auto" },
+    },
+  });
+
+  const paginas = doc.getNumberOfPages();
+  for (let pagina = 1; pagina <= paginas; pagina++) {
+    doc.setPage(pagina);
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margem, altura - 27, largura - margem, altura - 27);
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(8);
+    doc.text(
+      `Gerado em ${new Date().toLocaleString("pt-BR")} - Página ${pagina} de ${paginas}`,
+      margem,
+      altura - 13,
+    );
+  }
+  doc.save(`casos-duplicados-ativos-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
