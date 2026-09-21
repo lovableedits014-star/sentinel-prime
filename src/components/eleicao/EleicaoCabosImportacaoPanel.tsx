@@ -32,7 +32,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { gerarRelatorioDuplicidadesPdf } from "@/lib/eleicao-duplicidades-pdf";
+import {
+  gerarRelatorioDuplicidadesPdf,
+  gerarRelatorioOcorrenciasLotePdf,
+} from "@/lib/eleicao-duplicidades-pdf";
+
+type ImportDuplicateDetail = {
+  id: string;
+  nome: string;
+  tipo: string;
+  telefone: string | null;
+  cpf: string | null;
+  responsavel_id: string | null;
+  responsavel_nome: string | null;
+  responsavel_tipo: string | null;
+  valor_contratacao: number | null;
+  is_voluntario: boolean | null;
+  contrato_inicio: string | null;
+  contrato_fim: string | null;
+  importacao_lote_id: string | null;
+};
 
 type ImportItem = {
   id: number;
@@ -43,6 +62,8 @@ type ImportItem = {
   classificacao: string;
   motivo: string | null;
   valor_aplicado: number;
+  pessoa_existente_id: string | null;
+  duplicado: ImportDuplicateDetail | null;
 };
 
 type ImportLot = {
@@ -72,7 +93,11 @@ type DuplicatePerson = {
   responsavel_tipo: string | null;
   valor_contratacao: number | null;
   is_voluntario: boolean | null;
+  contrato_inicio: string | null;
   contrato_fim: string | null;
+  importacao_lote_id: string | null;
+  importacao_lote_nome: string | null;
+  contrato_ativo: boolean;
 };
 type DuplicateGroup = {
   tipo: "telefone" | "cpf";
@@ -227,9 +252,31 @@ export default function EleicaoCabosImportacaoPanel({
       ) || [],
     [analysis],
   );
+  const activeContractDuplicates = useMemo(
+    () =>
+      databaseDuplicates
+        .map((group) => ({
+          ...group,
+          cadastros: group.cadastros.filter((person) => person.contrato_ativo),
+        }))
+        .filter((group) => group.cadastros.length > 1),
+    [databaseDuplicates],
+  );
+  const contractsAtRisk = useMemo(() => {
+    const people = new Map<string, DuplicatePerson>();
+    for (const group of activeContractDuplicates) {
+      for (const person of group.cadastros) people.set(person.id, person);
+    }
+    return Array.from(people.values());
+  }, [activeContractDuplicates]);
+  const riskValue = useMemo(
+    () =>
+      contractsAtRisk.reduce((total, person) => total + Number(person.valor_contratacao || 0), 0),
+    [contractsAtRisk],
+  );
   const duplicateFolders = useMemo(() => {
     const folders = new Map<string, DuplicateFolder>();
-    for (const group of databaseDuplicates) {
+    for (const group of activeContractDuplicates) {
       const owners = new Map<string, { name: string; role: string }>();
       for (const person of group.cadastros) {
         const ownerId = duplicateOwnerKey(person);
@@ -250,7 +297,7 @@ export default function EleicaoCabosImportacaoPanel({
       }
     }
     return Array.from(folders.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-  }, [databaseDuplicates]);
+  }, [activeContractDuplicates]);
 
   const readFile = async (selected: File) => {
     setBusy(true);
@@ -339,30 +386,71 @@ export default function EleicaoCabosImportacaoPanel({
   const loadAudit = async (lotId: string) => {
     setBusy(true);
     try {
-      const allItems: ImportItem[] = [];
-      const pageSize = 1000;
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await db
-          .from("eleicao_cabo_import_itens")
-          .select("*")
-          .eq("lote_id", lotId)
-          .in("classificacao", [
-            "duplicado_contrato_ativo",
-            "duplicado_no_arquivo",
-            "conflito_identidade",
-            "dados_invalidos",
-          ])
-          .order("numero_linha")
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-        const page = (data || []) as ImportItem[];
-        allItems.push(...page);
-        if (page.length < pageSize) break;
-      }
-      setAuditItems(allItems);
+      const { data, error } = await db.rpc("eleicao_cabo_import_ocorrencias", {
+        p_lote_id: lotId,
+      });
+      if (error) throw error;
+      setAuditItems(Array.isArray(data) ? (data as ImportItem[]) : []);
       setAuditLot(lotId);
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Falha ao abrir a auditoria."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelAnalyzedLot = async (lot: ImportLot) => {
+    if (
+      !window.confirm(
+        `Cancelar a análise "${lot.nome}"? Nenhum cadastro será apagado. O lote continuará no histórico como cancelado.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const { error } = await db
+        .from("eleicao_cabo_import_lotes")
+        .update({ status: "cancelado" })
+        .eq("id", lot.id)
+        .eq("client_id", clientId)
+        .eq("status", "analisado");
+      if (error) throw error;
+      if (auditLot === lot.id) {
+        setAuditLot(null);
+        setAuditItems([]);
+      }
+      await loadBase();
+      toast.success("Análise repetida cancelada. Nenhum contrato foi alterado.");
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Falha ao cancelar o lote."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resolveActiveDuplicate = async (group: DuplicateGroup, keep: DuplicatePerson) => {
+    const archive = group.cadastros.filter((person) => person.id !== keep.id);
+    if (
+      !window.confirm(
+        `Manter o contrato de ${keep.nome}, vinculado a ${duplicateOwnerLabel(keep)}, e arquivar ${archive.length} cadastro(s) duplicado(s)? A correção fica registrada e é reversível.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const { data, error } = await db.rpc("eleicao_resolver_contratos_duplicados", {
+        p_client_id: clientId,
+        p_manter_id: keep.id,
+        p_arquivar_ids: archive.map((person) => person.id),
+      });
+      if (error) throw error;
+      await loadBase();
+      onChanged();
+      toast.success(
+        `${Number(data?.arquivados || archive.length)} contrato(s) duplicado(s) arquivado(s).`,
+      );
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Falha ao corrigir os contratos duplicados."));
     } finally {
       setBusy(false);
     }
@@ -563,39 +651,58 @@ export default function EleicaoCabosImportacaoPanel({
         </Card>
       )}
 
-      <Card className={databaseDuplicates.length ? "border-destructive/40" : "border-emerald-300"}>
+      <Card
+        className={activeContractDuplicates.length ? "border-destructive/60" : "border-emerald-300"}
+      >
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Duplicidades na base</CardTitle>
+            <CardTitle>Auditoria financeira — contratos ativos duplicados</CardTitle>
             <div className="flex items-center gap-2">
-              {!!databaseDuplicates.length && (
+              {!!activeContractDuplicates.length && (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => void gerarRelatorioDuplicidadesPdf(databaseDuplicates)}
+                  onClick={() => void gerarRelatorioDuplicidadesPdf(activeContractDuplicates)}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  Baixar PDF detalhado
+                  Baixar relatório completo
                 </Button>
               )}
-              <Badge variant={databaseDuplicates.length ? "destructive" : "outline"}>
-                {databaseDuplicates.length} conflito(s)
+              <Badge variant={activeContractDuplicates.length ? "destructive" : "outline"}>
+                {activeContractDuplicates.length} conflito(s) financeiro(s)
               </Badge>
             </div>
           </div>
           <CardDescription>
-            Varredura de todos os cadastros ativos do cliente por telefone normalizado e CPF,
-            independentemente do líder ou coordenador responsável.
+            Varredura de ponta a ponta por telefone e CPF. Mostra somente os casos em que dois ou
+            mais cadastros da mesma pessoa possuem contrato ativo simultaneamente.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!databaseDuplicates.length ? (
+          {!activeContractDuplicates.length ? (
             <div className="flex items-center gap-2 text-sm text-emerald-700">
               <CheckCircle2 className="h-4 w-4" />
-              Nenhuma duplicidade ativa encontrada na base.
+              Nenhum contrato ativo duplicado encontrado. Existem {databaseDuplicates.length}{" "}
+              conflito(s) cadastral(is) sem risco de pagamento duplo.
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border bg-destructive/5 p-3">
+                  <p className="text-xs text-muted-foreground">Conflitos financeiros</p>
+                  <p className="text-xl font-bold text-destructive">
+                    {activeContractDuplicates.length}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-destructive/5 p-3">
+                  <p className="text-xs text-muted-foreground">Contratos sob revisão</p>
+                  <p className="text-xl font-bold text-destructive">{contractsAtRisk.length}</p>
+                </div>
+                <div className="rounded-lg border bg-destructive/5 p-3">
+                  <p className="text-xs text-muted-foreground">Valor total sob risco</p>
+                  <p className="text-xl font-bold text-destructive">{money(riskValue)}</p>
+                </div>
+              </div>
               {duplicateFolders.map((folder) => (
                 <details key={folder.key} className="group rounded-lg border bg-background">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40">
@@ -661,6 +768,31 @@ export default function EleicaoCabosImportacaoPanel({
                               <p className="mt-1 text-xs text-muted-foreground">
                                 Localização do cadastro: {duplicateOwnerLabel(person)}
                               </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Contrato: {money(person.valor_contratacao || 0)}
+                                {person.contrato_inicio
+                                  ? ` • início ${format(new Date(`${person.contrato_inicio}T12:00:00`), "dd/MM/yyyy")}`
+                                  : ""}
+                                {person.contrato_fim
+                                  ? ` • término ${format(new Date(`${person.contrato_fim}T12:00:00`), "dd/MM/yyyy")}`
+                                  : " • sem término"}
+                                {person.importacao_lote_nome
+                                  ? ` • lote ${person.importacao_lote_nome}`
+                                  : " • cadastro manual"}
+                              </p>
+                              {group.cadastros
+                                .filter((other) => other.id !== person.id)
+                                .every((other) => other.tipo === "cabo") && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="mt-2"
+                                  disabled={busy}
+                                  onClick={() => void resolveActiveDuplicate(group, person)}
+                                >
+                                  Manter este contrato e arquivar os duplicados
+                                </Button>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -711,17 +843,36 @@ export default function EleicaoCabosImportacaoPanel({
                   <TableCell>{lot.total_duplicados}</TableCell>
                   <TableCell>{lot.total_invalidos}</TableCell>
                   <TableCell className="text-right">
-                    {money(lot.status === "confirmado" ? lot.custo_confirmado : lot.custo_previsto)}
+                    {money(
+                      lot.status === "confirmado"
+                        ? lot.custo_confirmado
+                        : lot.status === "cancelado"
+                          ? 0
+                          : lot.custo_previsto,
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={!lot.total_duplicados && !lot.total_invalidos}
-                      onClick={() => void loadAudit(lot.id)}
-                    >
-                      Ver ocorrências
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!lot.total_duplicados && !lot.total_invalidos}
+                        onClick={() => void loadAudit(lot.id)}
+                      >
+                        Ver ocorrências
+                      </Button>
+                      {lot.status === "analisado" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          disabled={busy}
+                          onClick={() => void cancelAnalyzedLot(lot)}
+                        >
+                          Cancelar análise
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -738,16 +889,33 @@ export default function EleicaoCabosImportacaoPanel({
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <p className="font-medium">Duplicados e inválidos do lote</p>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setAuditLot(null);
-                    setAuditItems([]);
-                  }}
-                >
-                  Fechar
-                </Button>
+                <div className="flex items-center gap-2">
+                  {!!auditItems.length && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        void gerarRelatorioOcorrenciasLotePdf(
+                          history.find((lot) => lot.id === auditLot)?.nome || "Importação",
+                          auditItems,
+                        )
+                      }
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Baixar relatório deste lote
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setAuditLot(null);
+                      setAuditItems([]);
+                    }}
+                  >
+                    Fechar
+                  </Button>
+                </div>
               </div>
               <ItemTable items={auditItems} />
             </div>
@@ -778,6 +946,7 @@ function ItemTable({ items }: { items: ImportItem[] }) {
               <TableHead>Telefone</TableHead>
               <TableHead>Situação</TableHead>
               <TableHead>Motivo</TableHead>
+              <TableHead>Onde está o contrato ativo</TableHead>
               <TableHead className="text-right">Valor</TableHead>
             </TableRow>
           </TableHeader>
@@ -798,12 +967,41 @@ function ItemTable({ items }: { items: ImportItem[] }) {
                   </Badge>
                 </TableCell>
                 <TableCell className="max-w-xs text-xs">{item.motivo}</TableCell>
+                <TableCell className="min-w-[280px] text-xs">
+                  {item.duplicado ? (
+                    <div className="space-y-1 rounded-md border border-destructive/20 bg-destructive/5 p-2">
+                      <p>
+                        <strong>{item.duplicado.nome}</strong> ({item.duplicado.tipo})
+                      </p>
+                      <p>
+                        Responsável: {item.duplicado.responsavel_nome || "sem responsável"}
+                        {item.duplicado.responsavel_tipo
+                          ? ` (${roleLabel(item.duplicado.responsavel_tipo).toLowerCase()})`
+                          : ""}
+                      </p>
+                      <p>
+                        Contrato: {money(item.duplicado.valor_contratacao || 0)}
+                        {item.duplicado.contrato_inicio
+                          ? ` • início ${format(new Date(`${item.duplicado.contrato_inicio}T12:00:00`), "dd/MM/yyyy")}`
+                          : ""}
+                        {item.duplicado.contrato_fim
+                          ? ` • término ${format(new Date(`${item.duplicado.contrato_fim}T12:00:00`), "dd/MM/yyyy")}`
+                          : " • sem término"}
+                      </p>
+                      <p>Telefone cadastrado: {item.duplicado.telefone || "—"}</p>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      Não se aplica ou duplicado somente dentro da planilha.
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">{money(item.valor_aplicado)}</TableCell>
               </TableRow>
             ))}
             {!items.length && (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                   <AlertTriangle className="mx-auto mb-2 h-5 w-5" />
                   Nenhum registro nesta categoria.
                 </TableCell>

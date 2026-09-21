@@ -8,13 +8,37 @@ export type DuplicidadePessoaPdf = {
   responsavel_tipo: string | null;
   valor_contratacao: number | null;
   is_voluntario: boolean | null;
+  contrato_inicio: string | null;
   contrato_fim: string | null;
+  importacao_lote_id: string | null;
+  importacao_lote_nome: string | null;
+  contrato_ativo: boolean;
 };
 
 export type DuplicidadeGrupoPdf = {
   tipo: "telefone" | "cpf";
   chave: string;
   cadastros: DuplicidadePessoaPdf[];
+};
+
+export type OcorrenciaImportacaoPdf = {
+  numero_linha: number;
+  nome: string | null;
+  cpf_normalizado: string | null;
+  telefone_normalizado: string | null;
+  classificacao: string;
+  motivo: string | null;
+  duplicado: {
+    nome: string;
+    tipo: string;
+    telefone: string | null;
+    responsavel_nome: string | null;
+    responsavel_tipo: string | null;
+    valor_contratacao: number | null;
+    is_voluntario: boolean | null;
+    contrato_inicio: string | null;
+    contrato_fim: string | null;
+  } | null;
 };
 
 const papel = (tipo: string | null) =>
@@ -25,9 +49,13 @@ const contratoDaPessoa = (pessoa: DuplicidadePessoaPdf) => {
   const valor = Number(pessoa.valor_contratacao || 0);
   if (valor <= 0) return "Sem contrato";
   const dinheiro = valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  return pessoa.contrato_fim
-    ? `${dinheiro} - término ${new Date(`${pessoa.contrato_fim}T12:00:00`).toLocaleDateString("pt-BR")}`
-    : `${dinheiro} - ativo sem término`;
+  const inicio = pessoa.contrato_inicio
+    ? new Date(`${pessoa.contrato_inicio}T12:00:00`).toLocaleDateString("pt-BR")
+    : "não informado";
+  const fim = pessoa.contrato_fim
+    ? new Date(`${pessoa.contrato_fim}T12:00:00`).toLocaleDateString("pt-BR")
+    : "sem término";
+  return `${dinheiro} - ${inicio} até ${fim} - ${pessoa.importacao_lote_nome || "cadastro manual"}`;
 };
 
 export async function gerarRelatorioDuplicidadesPdf(grupos: DuplicidadeGrupoPdf[]) {
@@ -40,6 +68,14 @@ export async function gerarRelatorioDuplicidadesPdf(grupos: DuplicidadeGrupoPdf[
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 36;
+  const contratosUnicos = new Map<string, DuplicidadePessoaPdf>();
+  for (const grupo of grupos) {
+    for (const pessoa of grupo.cadastros) contratosUnicos.set(pessoa.id, pessoa);
+  }
+  const valorSobRisco = Array.from(contratosUnicos.values()).reduce(
+    (total, pessoa) => total + Number(pessoa.valor_contratacao || 0),
+    0,
+  );
 
   const pastas = new Map<
     string,
@@ -86,12 +122,12 @@ export async function gerarRelatorioDuplicidadesPdf(grupos: DuplicidadeGrupoPdf[
     }
   };
 
-  desenharCabecalho("Relatório detalhado de duplicidades eleitorais");
+  desenharCabecalho("Relatório de auditoria - contratos ativos duplicados");
   doc.setTextColor(15, 23, 42);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(
-    "Varredura por telefone normalizado e CPF entre todos os cadastros ativos do cliente.",
+    "Varredura financeira por telefone normalizado e CPF, com localização de todos os vínculos ativos.",
     margin,
     78,
   );
@@ -111,12 +147,16 @@ export async function gerarRelatorioDuplicidadesPdf(grupos: DuplicidadeGrupoPdf[
         String(grupos.filter((grupo) => grupo.tipo === "telefone").length),
       ],
       ["Conflitos por CPF", String(grupos.filter((grupo) => grupo.tipo === "cpf").length)],
+      [
+        "Valor total dos contratos sob revisão",
+        valorSobRisco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+      ],
     ],
     theme: "grid",
-    tableWidth: 330,
+    tableWidth: 430,
     styles: { fontSize: 9, cellPadding: 5 },
     headStyles: { fillColor: [51, 65, 85] },
-    columnStyles: { 0: { cellWidth: 230 }, 1: { cellWidth: 100, halign: "right" } },
+    columnStyles: { 0: { cellWidth: 300 }, 1: { cellWidth: 130, halign: "right" } },
   });
 
   const ordenadas = Array.from(pastas.values()).sort((a, b) =>
@@ -165,4 +205,112 @@ export async function gerarRelatorioDuplicidadesPdf(grupos: DuplicidadeGrupoPdf[
 
   adicionarRodape();
   doc.save(`relatorio-duplicidades-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+const dataBr = (value: string | null) =>
+  value ? new Date(`${value}T12:00:00`).toLocaleDateString("pt-BR") : null;
+
+export async function gerarRelatorioOcorrenciasLotePdf(
+  nomeLote: string,
+  ocorrencias: OcorrenciaImportacaoPdf[],
+) {
+  const [{ default: jsPDF }, tableModule] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const autoTable = tableModule.default;
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+  const largura = doc.internal.pageSize.getWidth();
+  const altura = doc.internal.pageSize.getHeight();
+  const margem = 30;
+
+  doc.setFillColor(153, 27, 27);
+  doc.rect(0, 0, largura, 58, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text("Relatório de ocorrências da importação", margem, 27);
+  doc.setFontSize(10);
+  doc.text(nomeLote, margem, 44);
+
+  doc.setTextColor(51, 65, 85);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(
+    `${ocorrencias.length} ocorrência(s). Cadastros com contrato ativo incluem a localização e os dados do contrato que impediram a inclusão.`,
+    margem,
+    78,
+  );
+
+  autoTable(doc, {
+    startY: 90,
+    margin: { left: margem, right: margem, bottom: 40 },
+    head: [
+      [
+        "Linha / pessoa importada",
+        "Situação",
+        "Cadastro que causou o bloqueio",
+        "Onde está cadastrado",
+        "Contrato ativo",
+      ],
+    ],
+    body: ocorrencias.map((item) => {
+      const duplicado = item.duplicado;
+      const valor = Number(duplicado?.valor_contratacao || 0).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      });
+      const periodo = duplicado
+        ? `${dataBr(duplicado.contrato_inicio) || "início não informado"} até ${
+            dataBr(duplicado.contrato_fim) || "sem término"
+          }`
+        : "-";
+      return [
+        `Linha ${item.numero_linha + 1}\n${item.nome || "Sem nome"}\n${item.telefone_normalizado || item.cpf_normalizado || "Sem documento"}`,
+        `${item.classificacao.replaceAll("_", " ")}\n${item.motivo || "-"}`,
+        duplicado
+          ? `${duplicado.nome} (${duplicado.tipo})\nTelefone: ${duplicado.telefone || "-"}`
+          : "Sem cadastro externo associado",
+        duplicado?.responsavel_nome
+          ? `${duplicado.responsavel_nome} (${papel(duplicado.responsavel_tipo).toLowerCase()})`
+          : "Sem responsável",
+        duplicado
+          ? `${duplicado.is_voluntario ? "Voluntário" : valor}\n${periodo}`
+          : "Não se aplica",
+      ];
+    }),
+    theme: "grid",
+    styles: { fontSize: 7.5, cellPadding: 4, overflow: "linebreak", valign: "top" },
+    headStyles: { fillColor: [127, 29, 29] },
+    alternateRowStyles: { fillColor: [254, 242, 242] },
+    columnStyles: {
+      0: { cellWidth: 145 },
+      1: { cellWidth: 140 },
+      2: { cellWidth: 170 },
+      3: { cellWidth: 145 },
+      4: { cellWidth: "auto" },
+    },
+  });
+
+  const paginas = doc.getNumberOfPages();
+  for (let pagina = 1; pagina <= paginas; pagina++) {
+    doc.setPage(pagina);
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margem, altura - 27, largura - margem, altura - 27);
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(8);
+    doc.text(
+      `Gerado em ${new Date().toLocaleString("pt-BR")} - Página ${pagina} de ${paginas}`,
+      margem,
+      altura - 13,
+    );
+  }
+
+  const arquivo = nomeLote
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
+  doc.save(`ocorrencias-${arquivo || "importacao"}-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
