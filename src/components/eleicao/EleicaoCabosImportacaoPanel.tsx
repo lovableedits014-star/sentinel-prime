@@ -67,7 +67,9 @@ type DuplicatePerson = {
   nome: string;
   tipo: string;
   telefone: string | null;
+  responsavel_id: string | null;
   responsavel_nome: string | null;
+  responsavel_tipo: string | null;
   valor_contratacao: number | null;
   is_voluntario: boolean | null;
   contrato_fim: string | null;
@@ -76,6 +78,12 @@ type DuplicateGroup = {
   tipo: "telefone" | "cpf";
   chave: string;
   cadastros: DuplicatePerson[];
+};
+type DuplicateFolder = {
+  key: string;
+  name: string;
+  role: string;
+  groups: DuplicateGroup[];
 };
 type Parent = {
   id: string;
@@ -106,6 +114,13 @@ const key = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
+const roleLabel = (role: string | null) =>
+  role === "coordenador" ? "Coordenador" : role === "lider" ? "Líder" : "Sem responsável";
+const duplicateOwnerKey = (person: DuplicatePerson) => person.responsavel_id || "sem-responsavel";
+const duplicateOwnerLabel = (person: DuplicatePerson) =>
+  person.responsavel_nome
+    ? `${person.responsavel_nome} (${roleLabel(person.responsavel_tipo).toLowerCase()})`
+    : "sem responsável";
 
 const aliases: Record<string, string[]> = {
   nome: ["nome", "nomecompleto", "cabo", "caboseleitorais"],
@@ -213,24 +228,28 @@ export default function EleicaoCabosImportacaoPanel({
     [analysis],
   );
   const duplicateFolders = useMemo(() => {
-    const folders = new Map<string, DuplicateGroup[]>();
+    const folders = new Map<string, DuplicateFolder>();
     for (const group of databaseDuplicates) {
-      const names = new Set(
-        group.cadastros.map(
-          (person) =>
-            person.responsavel_nome ||
-            (person.tipo === "coordenador" || person.tipo === "lider"
-              ? person.nome
-              : "Sem responsável"),
-        ),
-      );
-      for (const folderName of names) {
-        const groups = folders.get(folderName) || [];
-        groups.push(group);
-        folders.set(folderName, groups);
+      const owners = new Map<string, { name: string; role: string }>();
+      for (const person of group.cadastros) {
+        const ownerId = duplicateOwnerKey(person);
+        owners.set(ownerId, {
+          name: person.responsavel_nome || "Sem responsável",
+          role: person.responsavel_tipo || "",
+        });
+      }
+      for (const [ownerId, owner] of owners) {
+        const folder = folders.get(ownerId) || {
+          key: ownerId,
+          name: owner.name,
+          role: owner.role,
+          groups: [],
+        };
+        folder.groups.push(group);
+        folders.set(ownerId, folder);
       }
     }
-    return Array.from(folders.entries()).sort(([a], [b]) => a.localeCompare(b, "pt-BR"));
+    return Array.from(folders.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   }, [databaseDuplicates]);
 
   const readFile = async (selected: File) => {
@@ -577,25 +596,40 @@ export default function EleicaoCabosImportacaoPanel({
             </div>
           ) : (
             <div className="space-y-2">
-              {duplicateFolders.map(([folderName, groups]) => (
-                <details key={folderName} className="group rounded-lg border bg-background">
+              {duplicateFolders.map((folder) => (
+                <details key={folder.key} className="group rounded-lg border bg-background">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40">
                     <span className="flex min-w-0 items-center gap-2 font-medium">
                       <Folder className="h-5 w-5 shrink-0 text-amber-500" />
-                      <span className="truncate">{folderName}</span>
+                      <span className="truncate">{folder.name}</span>
+                      <Badge variant="outline">{roleLabel(folder.role)}</Badge>
                     </span>
-                    <Badge variant="secondary">{groups.length} conflito(s)</Badge>
+                    <Badge variant="secondary">{folder.groups.length} conflito(s)</Badge>
                   </summary>
                   <div className="max-h-[420px] space-y-3 overflow-y-auto border-t p-3">
-                    {groups.map((group) => (
+                    <p className="text-xs text-muted-foreground">
+                      Duplicidades dos cadastros que pertencem a {folder.name} (
+                      {roleLabel(folder.role).toLowerCase()}).
+                    </p>
+                    {folder.groups.map((group) => (
                       <div
-                        key={`${folderName}:${group.tipo}:${group.chave}`}
+                        key={`${folder.key}:${group.tipo}:${group.chave}`}
                         className="rounded-lg border p-3"
                       >
                         <p className="mb-2 text-sm font-semibold">
                           Mesmo {group.tipo}:{" "}
                           {group.tipo === "cpf" ? `***${group.chave.slice(-4)}` : group.chave}
                         </p>
+                        <div className="mb-3 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs">
+                          <strong>Duplicado também encontrado em:</strong>{" "}
+                          {Array.from(
+                            new Set(
+                              group.cadastros
+                                .filter((person) => duplicateOwnerKey(person) !== folder.key)
+                                .map(duplicateOwnerLabel),
+                            ),
+                          ).join(", ") || "na própria equipe"}
+                        </div>
                         <div className="space-y-2">
                           {group.cadastros.map((person) => (
                             <div
@@ -612,9 +646,20 @@ export default function EleicaoCabosImportacaoPanel({
                                       ? `Contrato de ${money(person.valor_contratacao)}`
                                       : "Sem contrato"}
                                 </span>
+                                <Badge
+                                  variant={
+                                    duplicateOwnerKey(person) === folder.key
+                                      ? "secondary"
+                                      : "destructive"
+                                  }
+                                >
+                                  {duplicateOwnerKey(person) === folder.key
+                                    ? "Cadastro desta equipe"
+                                    : "Duplicado em outra equipe"}
+                                </Badge>
                               </div>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                Responsável: {person.responsavel_nome || "sem responsável"}
+                                Localização do cadastro: {duplicateOwnerLabel(person)}
                               </p>
                             </div>
                           ))}

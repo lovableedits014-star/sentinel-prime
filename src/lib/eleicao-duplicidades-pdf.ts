@@ -3,7 +3,9 @@ export type DuplicidadePessoaPdf = {
   nome: string;
   tipo: string;
   telefone: string | null;
+  responsavel_id: string | null;
   responsavel_nome: string | null;
+  responsavel_tipo: string | null;
   valor_contratacao: number | null;
   is_voluntario: boolean | null;
   contrato_fim: string | null;
@@ -15,9 +17,8 @@ export type DuplicidadeGrupoPdf = {
   cadastros: DuplicidadePessoaPdf[];
 };
 
-const pastaDaPessoa = (pessoa: DuplicidadePessoaPdf) =>
-  pessoa.responsavel_nome ||
-  (pessoa.tipo === "coordenador" || pessoa.tipo === "lider" ? pessoa.nome : "Sem responsável");
+const papel = (tipo: string | null) =>
+  tipo === "coordenador" ? "Coordenador" : tipo === "lider" ? "Líder" : "Sem responsável";
 
 const contratoDaPessoa = (pessoa: DuplicidadePessoaPdf) => {
   if (pessoa.is_voluntario) return "Voluntário";
@@ -40,13 +41,22 @@ export async function gerarRelatorioDuplicidadesPdf(grupos: DuplicidadeGrupoPdf[
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 36;
 
-  const pastas = new Map<string, DuplicidadeGrupoPdf[]>();
+  const pastas = new Map<
+    string,
+    { id: string; nome: string; tipo: string | null; conflitos: DuplicidadeGrupoPdf[] }
+  >();
   for (const grupo of grupos) {
-    const nomes = new Set(grupo.cadastros.map(pastaDaPessoa));
-    for (const nome of nomes) {
-      const lista = pastas.get(nome) || [];
-      lista.push(grupo);
-      pastas.set(nome, lista);
+    const responsaveis = new Map<string, { nome: string; tipo: string | null }>();
+    for (const pessoa of grupo.cadastros) {
+      responsaveis.set(pessoa.responsavel_id || "sem-responsavel", {
+        nome: pessoa.responsavel_nome || "Sem responsável",
+        tipo: pessoa.responsavel_tipo,
+      });
+    }
+    for (const [id, responsavel] of responsaveis) {
+      const pasta = pastas.get(id) || { id, ...responsavel, conflitos: [] };
+      pasta.conflitos.push(grupo);
+      pastas.set(id, pasta);
     }
   }
 
@@ -109,26 +119,32 @@ export async function gerarRelatorioDuplicidadesPdf(grupos: DuplicidadeGrupoPdf[
     columnStyles: { 0: { cellWidth: 230 }, 1: { cellWidth: 100, halign: "right" } },
   });
 
-  const ordenadas = Array.from(pastas.entries()).sort(([a], [b]) => a.localeCompare(b, "pt-BR"));
-  for (const [responsavel, conflitos] of ordenadas) {
+  const ordenadas = Array.from(pastas.values()).sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR"),
+  );
+  for (const pasta of ordenadas) {
     doc.addPage("a4", "landscape");
-    desenharCabecalho(`Pasta: ${responsavel}`);
+    desenharCabecalho(`Pasta: ${pasta.nome} — ${papel(pasta.tipo)}`);
     doc.setTextColor(51, 65, 85);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text(`${conflitos.length} conflito(s) relacionado(s) a esta equipe.`, margin, 75);
+    doc.text(`${pasta.conflitos.length} conflito(s) relacionado(s) a esta equipe.`, margin, 75);
 
     autoTable(doc, {
       startY: 88,
       margin: { left: margin, right: margin, bottom: 40 },
-      head: [["Conflito", "Nome", "Papel", "Telefone", "Responsável", "Contrato"]],
-      body: conflitos.flatMap((grupo) =>
+      head: [["Conflito", "Nome", "Papel", "Telefone", "Onde está cadastrado", "Contrato"]],
+      body: pasta.conflitos.flatMap((grupo) =>
         grupo.cadastros.map((pessoa) => [
           grupo.tipo === "cpf" ? `CPF final ${grupo.chave.slice(-4)}` : `Telefone ${grupo.chave}`,
           pessoa.nome,
           pessoa.tipo,
           pessoa.telefone || "-",
-          pessoa.responsavel_nome || "Sem responsável",
+          `${(pessoa.responsavel_id || "sem-responsavel") === pasta.id ? "NESTA EQUIPE" : "DUPLICADO EM OUTRA EQUIPE"}: ${
+            pessoa.responsavel_nome
+              ? `${pessoa.responsavel_nome} (${papel(pessoa.responsavel_tipo).toLowerCase()})`
+              : "Sem responsável"
+          }`,
           contratoDaPessoa(pessoa),
         ]),
       ),
