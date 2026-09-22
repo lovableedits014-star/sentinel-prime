@@ -75,9 +75,13 @@ interface CampanhaScript {
 interface FilaDiagnostico {
   filas_autorizadas: number;
   fila_solicitada_valida: boolean;
+  total_pendentes_cadastrais?: number;
   disponiveis: number;
   aguardando_retorno: number;
   reservados_ativos: number;
+  telefones_invalidos?: number;
+  ja_concluidos_outro_cadastro?: number;
+  pulados_em_espera?: number;
 }
 
 interface GabineteContexto {
@@ -90,7 +94,7 @@ interface GabineteContexto {
   historico?: { data: string | null; area: string | null }[];
 }
 
-const TELE_APP_VERSION = "2026.08.31.2";
+const TELE_APP_VERSION = "2026.09.22.1";
 const CONTACT_LOCK_SECONDS = 30 * 60;
 const CONTACT_PAGE_SIZE = 1000;
 
@@ -203,7 +207,7 @@ export default function Telemarketing() {
     while (true) {
       const from = page * CONTACT_PAGE_SIZE;
       const response = await supabase
-        .rpc("tele_list_contatos" as any, {
+        .rpc("tele_list_contatos_disponiveis" as any, {
           _client_id: clientId!,
           _nome: operadorNome.trim(),
           _senha: operadorSenha.trim(),
@@ -1934,7 +1938,15 @@ export default function Telemarketing() {
                 ? "Peça ao administrador para liberar uma fila para seu operador."
                 : diagnostico && diagnostico.aguardando_retorno > 0
                   ? `${diagnostico.aguardando_retorno} contato(s) voltarão à fila no horário agendado.`
-                  : "A fila pode estar concluída ou os contatos podem estar em atendimento."}
+                  : diagnostico && Number(diagnostico.pulados_em_espera || 0) > 0
+                    ? `${diagnostico.pulados_em_espera} contato(s) pulado(s) voltarão automaticamente após o tempo de espera.`
+                    : diagnostico && Number(diagnostico.ja_concluidos_outro_cadastro || 0) > 0
+                      ? `${diagnostico.ja_concluidos_outro_cadastro} registro(s) pendente(s) eram cópias de telefones já concluídos em outro cadastro.`
+                      : diagnostico && Number(diagnostico.telefones_invalidos || 0) > 0
+                        ? `${diagnostico.telefones_invalidos} contato(s) possuem telefone inválido e precisam ser corrigidos pelo administrador.`
+                        : diagnostico && diagnostico.reservados_ativos > 0
+                          ? `${diagnostico.reservados_ativos} contato(s) estão temporariamente reservados por outros operadores.`
+                          : "A fila foi concluída para este operador."}
             </p>
             <Button
               variant="outline"
