@@ -1325,7 +1325,7 @@ export default function Eleicao() {
     // Filtro especial para Líderes Avulsos
     if (cfg.apenasAvulsos) {
       listaTipada = listaTipada.filter((p) => p.tipo === "lider" && !p.parent_id);
-    } else if (!cfg.incluirAvulsos) {
+    } else if (!cfg.incluirAvulsos && cfg.tipos.includes("lider")) {
       // Remove líderes sem coordenador vinculado (avulsos) e os cabos abaixo deles
       const avulsosIds = new Set(
         pessoas.filter((p) => p.tipo === "lider" && !p.parent_id).map((p) => p.id),
@@ -1432,7 +1432,7 @@ export default function Eleicao() {
         value:
           situacaoRelatorio === "ativos" ? "Todos os ativos" : situacaoRelatorio.replace("_", " "),
       });
-      if (!cfg.incluirAvulsos && !cfg.apenasAvulsos)
+      if (!cfg.incluirAvulsos && !cfg.apenasAvulsos && cfg.tipos.includes("lider"))
         f.push({ label: "Líderes avulsos", value: "Excluídos" });
       return f;
     };
