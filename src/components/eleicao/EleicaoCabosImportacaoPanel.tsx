@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
   AlertTriangle,
@@ -126,6 +126,7 @@ type ImportLot = {
 };
 
 type Analysis = { lote: ImportLot; itens: ImportItem[] };
+type LotValueEdit = { id: string; valor: string; motivo: string };
 type DuplicateCorrection = {
   id: number;
   nome: string;
@@ -278,6 +279,7 @@ export default function EleicaoCabosImportacaoPanel({
   const [auditItems, setAuditItems] = useState<ImportItem[]>([]);
   const [auditLot, setAuditLot] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [lotValueEdit, setLotValueEdit] = useState<LotValueEdit | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
@@ -536,6 +538,39 @@ export default function EleicaoCabosImportacaoPanel({
         await db.rpc("eleicao_cabo_import_descartar", { p_lote_id: pendingLotId });
       }
       toast.error(errorMessage(error, "Falha ao confirmar a importação."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveLotValue = async () => {
+    if (!lotValueEdit) return;
+    const newValue = Number(lotValueEdit.valor.replace(/\./g, "").replace(",", "."));
+    if (!newValue || newValue <= 0) return toast.error("Informe um valor maior que zero.");
+    if (!lotValueEdit.motivo.trim()) return toast.error("Informe o motivo da alteração.");
+    if (
+      !window.confirm(
+        "Confirmar a alteração? O valor dos cabos contratados por este lote e o custo total serão recalculados.",
+      )
+    )
+      return;
+
+    setBusy(true);
+    try {
+      const { data, error } = await db.rpc("eleicao_cabo_import_alterar_valor", {
+        p_lote_id: lotValueEdit.id,
+        p_valor_unitario: newValue,
+        p_motivo: lotValueEdit.motivo.trim(),
+      });
+      if (error) throw error;
+      setLotValueEdit(null);
+      await loadBase();
+      onChanged();
+      toast.success(
+        `${data?.contratos_atualizados || 0} contrato(s) atualizado(s) — novo custo ${money(data?.custo_novo || 0)}.`,
+      );
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível alterar o valor do lote."));
     } finally {
       setBusy(false);
     }
@@ -1197,45 +1232,115 @@ export default function EleicaoCabosImportacaoPanel({
             </TableHeader>
             <TableBody>
               {activeHistory.map((lot) => (
-                <TableRow key={lot.id}>
-                  <TableCell>{format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
-                  <TableCell>
-                    <p className="font-medium">{lot.nome}</p>
-                    <p className="text-xs text-muted-foreground">{lot.arquivo_nome}</p>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{lot.status}</Badge>
-                  </TableCell>
-                  <TableCell>{lot.total_linhas}</TableCell>
-                  <TableCell>{lot.total_duplicados}</TableCell>
-                  <TableCell>{lot.total_repetidos_arquivo || 0}</TableCell>
-                  <TableCell>{lot.total_invalidos}</TableCell>
-                  <TableCell className="text-right">
-                    {money(
-                      lot.status === "confirmado"
-                        ? lot.custo_confirmado
-                        : lot.status === "cancelado"
-                          ? 0
-                          : lot.custo_previsto,
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={
-                          !lot.total_duplicados &&
-                          !lot.total_repetidos_arquivo &&
-                          !lot.total_invalidos
-                        }
-                        onClick={() => void loadAudit(lot.id)}
-                      >
-                        Ver ocorrências
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                <Fragment key={lot.id}>
+                  <TableRow>
+                    <TableCell>{format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
+                    <TableCell>
+                      <p className="font-medium">{lot.nome}</p>
+                      <p className="text-xs text-muted-foreground">{lot.arquivo_nome}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{lot.status}</Badge>
+                    </TableCell>
+                    <TableCell>{lot.total_linhas}</TableCell>
+                    <TableCell>{lot.total_duplicados}</TableCell>
+                    <TableCell>{lot.total_repetidos_arquivo || 0}</TableCell>
+                    <TableCell>{lot.total_invalidos}</TableCell>
+                    <TableCell className="text-right">
+                      {money(
+                        lot.status === "confirmado"
+                          ? lot.custo_confirmado
+                          : lot.status === "cancelado"
+                            ? 0
+                            : lot.custo_previsto,
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          title="Editar valor por cabo"
+                          onClick={() =>
+                            setLotValueEdit({
+                              id: lot.id,
+                              valor: Number(lot.valor_unitario || 0)
+                                .toFixed(2)
+                                .replace(".", ","),
+                              motivo: "",
+                            })
+                          }
+                        >
+                          <Pencil className="mr-1 h-3.5 w-3.5" />
+                          Editar valor
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={
+                            !lot.total_duplicados &&
+                            !lot.total_repetidos_arquivo &&
+                            !lot.total_invalidos
+                          }
+                          onClick={() => void loadAudit(lot.id)}
+                        >
+                          Ver ocorrências
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {lotValueEdit?.id === lot.id && (
+                    <TableRow className="bg-muted/30">
+                      <TableCell colSpan={9}>
+                        <div className="flex flex-wrap items-end gap-3 rounded-md border bg-background p-3">
+                          <div className="min-w-40 space-y-1">
+                            <Label htmlFor={`valor-lote-${lot.id}`}>Novo valor por cabo</Label>
+                            <Input
+                              id={`valor-lote-${lot.id}`}
+                              inputMode="decimal"
+                              value={lotValueEdit.valor}
+                              onChange={(event) =>
+                                setLotValueEdit((current) =>
+                                  current ? { ...current, valor: event.target.value } : current,
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="min-w-64 flex-1 space-y-1">
+                            <Label htmlFor={`motivo-lote-${lot.id}`}>Motivo da alteração</Label>
+                            <Input
+                              id={`motivo-lote-${lot.id}`}
+                              placeholder="Ex.: valor informado incorretamente na importação"
+                              value={lotValueEdit.motivo}
+                              onChange={(event) =>
+                                setLotValueEdit((current) =>
+                                  current ? { ...current, motivo: event.target.value } : current,
+                                )
+                              }
+                            />
+                          </div>
+                          <Button disabled={busy} onClick={() => void saveLotValue()}>
+                            {busy ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Save className="mr-2 h-4 w-4" />
+                            )}
+                            Salvar alteração
+                          </Button>
+                          <Button
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => setLotValueEdit(null)}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Cancelar
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
               ))}
               {!activeHistory.length && (
                 <TableRow>
