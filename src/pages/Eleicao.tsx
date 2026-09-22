@@ -1252,7 +1252,10 @@ export default function Eleicao() {
     // O diálogo de exportação é a fonte única dos filtros do arquivo. A busca e
     // os filtros visuais da tela não podem zerar silenciosamente uma exportação
     // configurada como "todos".
-    let base = pessoas.filter((p) => p.escopo === escopo);
+    // O relatório precisa partir do mesmo universo exibido nos KPIs. Na aba
+    // "Coord. Geral", Campo Grande e Interior são somados; filtrar pelo estado
+    // interno `escopo` fazia o PDF omitir silenciosamente um dos dois grupos.
+    let base = pessoas.filter((p) => escopoTab === "geral" || p.escopo === escopo);
     const situacaoRelatorio = cfg.situacaoContrato || "ativos";
     if (situacaoRelatorio === "ativos") base = base.filter((p) => !p.arquivado_em);
     if (situacaoRelatorio === "contratados") base = base.filter(isEleicaoContratado);
@@ -1349,7 +1352,12 @@ export default function Eleicao() {
     }
 
     const byId = new Map(pessoas.map((p) => [p.id, p.nome]));
-    const escopoLabel = escopo === "campo_grande" ? "Campo Grande" : "Interior";
+    const escopoLabel =
+      escopoTab === "geral"
+        ? "Geral - Campo Grande + Interior"
+        : escopo === "campo_grande"
+          ? "Campo Grande"
+          : "Interior";
     const parceiroById = new Map(PARCEIROS.map((p) => [p.id, p]));
 
     const toExportPessoa = (p: Pessoa): ExportPessoa => ({
@@ -1601,16 +1609,26 @@ export default function Eleicao() {
   const coordenadoresEscopo = useMemo(
     () =>
       pessoas
-        .filter((p) => p.tipo === "coordenador" && p.escopo === escopo)
+        .filter(
+          (p) =>
+            p.tipo === "coordenador" &&
+            !p.arquivado_em &&
+            (escopoTab === "geral" || p.escopo === escopo),
+        )
         .map((p) => ({
           id: p.id,
           nome: p.nome,
-          regiao: escopo === "interior" ? p.cidade || "" : p.regiao || "",
+          regiao:
+            escopoTab === "geral" ? "" : escopo === "interior" ? p.cidade || "" : p.regiao || "",
         })),
-    [pessoas, escopo],
+    [pessoas, escopo, escopoTab],
   );
 
   const regioesExport = useMemo(() => {
+    // Um único seletor não pode representar simultaneamente região de Campo
+    // Grande e cidade do Interior. Na visão geral, a ausência deste filtro
+    // garante que o total exportado corresponda ao cartão da tela.
+    if (escopoTab === "geral") return [];
     const noEscopo = pessoas.filter((p) => p.escopo === escopo);
     if (escopo === "interior") {
       const set = new Set(noEscopo.map((p) => p.cidade || "").filter(Boolean));
@@ -1624,7 +1642,7 @@ export default function Eleicao() {
     return Array.from(set)
       .sort()
       .map((v) => ({ value: v, label: byValue[v] || v }));
-  }, [pessoas, escopo, REGIOES]);
+  }, [pessoas, escopo, escopoTab, REGIOES]);
 
   const formularioData = (lider: Pessoa): LiderFormularioCabos => {
     const coordenador = lider.parent_id
