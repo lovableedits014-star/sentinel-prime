@@ -7,7 +7,10 @@ import {
   FileSpreadsheet,
   Folder,
   Loader2,
+  Pencil,
+  Save,
   Upload,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
@@ -53,6 +56,8 @@ type DuplicateCase = {
   cadastro_existente_nome: string;
   cadastro_existente_tipo: string;
   cadastro_existente_telefone: string | null;
+  cadastro_existente_cpf: string | null;
+  fatores_duplicidade: string[];
   responsavel_existente_nome: string | null;
   responsavel_existente_tipo: string | null;
   valor_contratacao: number;
@@ -113,6 +118,13 @@ type ImportLot = {
 };
 
 type Analysis = { lote: ImportLot; itens: ImportItem[] };
+type DuplicateCorrection = {
+  id: number;
+  nome: string;
+  cpf: string;
+  telefone: string;
+  motivo: string;
+};
 type DuplicatePerson = {
   id: string;
   nome: string;
@@ -178,10 +190,28 @@ const duplicateOwnerLabel = (person: DuplicatePerson) =>
     : "sem responsável";
 
 const aliases: Record<string, string[]> = {
-  nome: ["nome", "nomecompleto", "cabo", "caboseleitorais"],
-  cpf: ["cpf", "documento"],
-  telefone: ["telefone", "celular", "whatsapp", "fone"],
-  endereco: ["endereco", "logradouro"],
+  nome: ["nome", "nomecompleto", "nomedocabo", "cabo", "caboseleitorais"],
+  cpf: ["cpf", "cpfdocabo", "documento"],
+  telefone: [
+    "telefone",
+    "telefonecelular",
+    "numerodetelefone",
+    "celular",
+    "celularwhatsapp",
+    "whatsapp",
+    "fone",
+  ],
+  endereco: [
+    "endereco",
+    "enderecocompleto",
+    "enderecoresidencial",
+    "logradouro",
+    "rua",
+    "avenida",
+    "residencia",
+  ],
+  numero: ["numero", "numerodacasa", "nro", "num"],
+  complemento: ["complemento", "complementoendereco"],
   bairro: ["bairro"],
   cidade: ["cidade", "municipio"],
   regiao: ["regiao", "regional"],
@@ -195,11 +225,14 @@ function normalizeRows(rows: SheetRow[]) {
       );
       const get = (field: string) =>
         aliases[field].map((alias) => indexed[alias]).find((value) => value !== undefined);
+      const endereco = norm(get("endereco"));
+      const numero = norm(get("numero"));
+      const complemento = norm(get("complemento"));
       return {
         nome: norm(get("nome")),
         cpf: digits(get("cpf")),
         telefone: digits(get("telefone")),
-        endereco: norm(get("endereco")),
+        endereco: [endereco, numero, complemento].filter(Boolean).join(", "),
         bairro: norm(get("bairro")),
         cidade: norm(get("cidade")),
         regiao: key(norm(get("regiao"))).replace("regiao", ""),
@@ -233,6 +266,7 @@ export default function EleicaoCabosImportacaoPanel({
   const [databaseDuplicates, setDatabaseDuplicates] = useState<DuplicateGroup[]>([]);
   const [duplicateCases, setDuplicateCases] = useState<DuplicateCase[]>([]);
   const [selectedCaseIds, setSelectedCaseIds] = useState<Set<number>>(new Set());
+  const [duplicateCorrection, setDuplicateCorrection] = useState<DuplicateCorrection | null>(null);
   const [auditItems, setAuditItems] = useState<ImportItem[]>([]);
   const [auditLot, setAuditLot] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -329,6 +363,49 @@ export default function EleicaoCabosImportacaoPanel({
       else next.add(id);
       return next;
     });
+
+  const startDuplicateCorrection = (item: DuplicateCase) =>
+    setDuplicateCorrection({
+      id: item.id,
+      nome: item.nome_tentativa || "",
+      cpf: item.cpf_tentativa || "",
+      telefone: item.telefone_tentativa || "",
+      motivo: "Correção de dados informados na planilha",
+    });
+
+  const saveDuplicateCorrection = async () => {
+    if (!duplicateCorrection) return;
+    if (
+      !window.confirm(
+        "Confirmar a correção e tentar contratar este cabo? CPF e telefone serão verificados novamente em toda a base.",
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const { data, error } = await db.rpc("eleicao_caso_duplicado_corrigir_contratar", {
+        p_item_id: duplicateCorrection.id,
+        p_nome: duplicateCorrection.nome,
+        p_cpf: duplicateCorrection.cpf || null,
+        p_telefone: duplicateCorrection.telefone,
+        p_motivo: duplicateCorrection.motivo,
+      });
+      if (error) throw error;
+      setDuplicateCorrection(null);
+      setSelectedCaseIds((current) => {
+        const next = new Set(current);
+        next.delete(Number(data?.item_id));
+        return next;
+      });
+      await loadBase();
+      onChanged();
+      toast.success(`Cabo contratado após a correção — ${money(data?.valor || 0)}.`);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível contratar com os dados corrigidos."));
+    } finally {
+      setBusy(false);
+    }
+  };
   const duplicateFolders = useMemo(() => {
     const folders = new Map<string, DuplicateFolder>();
     for (const group of activeContractDuplicates) {
@@ -603,8 +680,9 @@ export default function EleicaoCabosImportacaoPanel({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>
-              Colunas reconhecidas: nome, CPF, telefone/celular/WhatsApp, endereço e bairro. Escopo,
-              região ou cidade serão herdados automaticamente do responsável.
+              Obrigatórios: nome e telefone/celular/WhatsApp. Opcionais: CPF, endereço/rua, número,
+              complemento e bairro. Escopo, região ou cidade serão herdados automaticamente do
+              responsável.
             </span>
             <Button onClick={analyze} disabled={busy || !rows.length}>
               {busy ? (
@@ -770,7 +848,23 @@ export default function EleicaoCabosImportacaoPanel({
                             {format(new Date(item.data_tentativa), "dd/MM/yyyy HH:mm")}
                           </p>
                         </div>
-                        <Badge variant="destructive">Contrato ativo encontrado</Badge>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">
+                            Coincidência por{" "}
+                            {item.fatores_duplicidade?.length
+                              ? item.fatores_duplicidade
+                                  .map((fator) =>
+                                    fator === "cpf"
+                                      ? "CPF"
+                                      : fator === "nome_telefone"
+                                        ? "nome + telefone"
+                                        : "telefone",
+                                  )
+                                  .join(" e ")
+                              : "nome + telefone, telefone ou CPF"}
+                          </Badge>
+                          <Badge variant="destructive">Contrato ativo encontrado</Badge>
+                        </div>
                       </div>
                     </summary>
                     <div className="mt-3 grid gap-3 border-t pt-3 md:grid-cols-2">
@@ -778,12 +872,15 @@ export default function EleicaoCabosImportacaoPanel({
                         <p className="font-medium">Tentativa recusada</p>
                         <p>Líder/coordenador: {item.responsavel_tentativa_nome || "—"}</p>
                         <p>Telefone informado: {item.telefone_tentativa || "—"}</p>
+                        <p>CPF informado: {item.cpf_tentativa || "—"}</p>
                         <p>Arquivo: {item.arquivo_nome}</p>
                         <p>Linha: {item.numero_linha + 1}</p>
                       </div>
                       <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm">
                         <p className="font-medium">Onde já está contratado</p>
                         <p>{item.cadastro_existente_nome}</p>
+                        <p>Telefone: {item.cadastro_existente_telefone || "—"}</p>
+                        <p>CPF: {item.cadastro_existente_cpf || "—"}</p>
                         <p>
                           Responsável: {item.responsavel_existente_nome || "sem responsável"}
                           {item.responsavel_existente_tipo
@@ -803,6 +900,107 @@ export default function EleicaoCabosImportacaoPanel({
                         </p>
                       </div>
                     </div>
+                    {duplicateCorrection?.id === item.id ? (
+                      <div className="mt-3 rounded-md border border-amber-300 bg-amber-50/50 p-3">
+                        <div className="mb-3">
+                          <p className="font-medium">Corrigir dados e revalidar contratação</p>
+                          <p className="text-xs text-muted-foreground">
+                            A contratação continuará bloqueada se o CPF ou telefone corrigido ainda
+                            pertencer a qualquer cadastro ativo.
+                          </p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                          <div className="space-y-1">
+                            <Label>Nome</Label>
+                            <Input
+                              value={duplicateCorrection.nome}
+                              onChange={(event) =>
+                                setDuplicateCorrection({
+                                  ...duplicateCorrection,
+                                  nome: event.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>CPF</Label>
+                            <Input
+                              value={duplicateCorrection.cpf}
+                              onChange={(event) =>
+                                setDuplicateCorrection({
+                                  ...duplicateCorrection,
+                                  cpf: event.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Telefone com DDD</Label>
+                            <Input
+                              value={duplicateCorrection.telefone}
+                              onChange={(event) =>
+                                setDuplicateCorrection({
+                                  ...duplicateCorrection,
+                                  telefone: event.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Motivo da correção</Label>
+                            <Input
+                              value={duplicateCorrection.motivo}
+                              onChange={(event) =>
+                                setDuplicateCorrection({
+                                  ...duplicateCorrection,
+                                  motivo: event.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={() => setDuplicateCorrection(null)}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={
+                              busy ||
+                              !duplicateCorrection.nome.trim() ||
+                              !duplicateCorrection.telefone.trim() ||
+                              !duplicateCorrection.motivo.trim()
+                            }
+                            onClick={() => void saveDuplicateCorrection()}
+                          >
+                            {busy ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Save className="mr-2 h-4 w-4" />
+                            )}
+                            Revalidar e contratar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => startDuplicateCorrection(item)}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Corrigir dados e tentar contratar
+                        </Button>
+                      </div>
+                    )}
                   </details>
                 </div>
               ))}
@@ -834,8 +1032,8 @@ export default function EleicaoCabosImportacaoPanel({
             </div>
           </div>
           <CardDescription>
-            Varredura de ponta a ponta por telefone e CPF. Mostra somente os casos em que dois ou
-            mais cadastros da mesma pessoa possuem contrato ativo simultaneamente.
+            Varredura de ponta a ponta. Nome + telefone é a identificação principal; telefone e CPF
+            também são conferidos separadamente para impedir contratos ativos simultâneos.
           </CardDescription>
         </CardHeader>
         <CardContent>

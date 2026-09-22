@@ -391,6 +391,8 @@ export type CasoRecusadoPdf = {
   numero_linha: number;
   nome_tentativa: string | null;
   telefone_tentativa: string | null;
+  cpf_tentativa?: string | null;
+  fatores_duplicidade?: string[];
   responsavel_tentativa_nome: string | null;
   cadastro_existente_nome: string;
   cadastro_existente_telefone: string | null;
@@ -439,7 +441,7 @@ export async function gerarRelatorioCasosRecusadosPdf(casos: CasoRecusadoPdf[]) 
       ],
     ],
     body: casos.map((item) => [
-      `${item.nome_tentativa || "Sem nome"}\n${item.telefone_tentativa || "Sem telefone"}`,
+      `${item.nome_tentativa || "Sem nome"}\nTelefone: ${item.telefone_tentativa || "-"}\nCPF: ${item.cpf_tentativa || "-"}\nCoincidência: ${item.fatores_duplicidade?.length ? item.fatores_duplicidade.map((fator) => (fator === "cpf" ? "CPF" : fator === "nome_telefone" ? "nome + telefone" : "telefone")).join(" e ") : "nome + telefone, telefone ou CPF"}`,
       `${item.responsavel_tentativa_nome || "Sem responsável"}\n${item.lote_nome} - linha ${item.numero_linha + 1}\n${new Date(item.data_tentativa).toLocaleString("pt-BR")}`,
       `${item.cadastro_existente_nome}\n${item.cadastro_existente_telefone || "Sem telefone"}`,
       item.responsavel_existente_nome
