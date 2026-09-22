@@ -44,6 +44,12 @@ export type OcorrenciaImportacaoPdf = {
     contrato_inicio: string | null;
     contrato_fim: string | null;
   } | null;
+  repetido_no_arquivo?: {
+    numero_linha: number;
+    nome: string | null;
+    cpf_normalizado: string | null;
+    telefone_normalizado: string | null;
+  } | null;
 };
 
 const papel = (tipo: string | null) =>
@@ -231,8 +237,13 @@ export async function gerarRelatorioOcorrenciasLotePdf(
   const duplicadosAtivos = ocorrencias.filter(
     (item) => item.classificacao === "duplicado_contrato_ativo" && item.duplicado,
   );
+  const repetidosArquivo = ocorrencias.filter(
+    (item) => item.classificacao === "duplicado_no_arquivo",
+  );
   const outrasOcorrencias = ocorrencias.filter(
-    (item) => item.classificacao !== "duplicado_contrato_ativo" || !item.duplicado,
+    (item) =>
+      item.classificacao !== "duplicado_contrato_ativo" &&
+      item.classificacao !== "duplicado_no_arquivo",
   );
   const contexto = ocorrencias[0];
   const responsavel = contexto?.responsavel_tentativa_nome || "Responsável não identificado";
@@ -251,14 +262,14 @@ export async function gerarRelatorioOcorrenciasLotePdf(
   };
 
   cabecalho(
-    "Relatório de cabos recusados por contrato ativo",
+    "Relatorio de ocorrencias da importacao de cabos",
     `${responsavel} - ${responsavelTipo} | Lote: ${nomeLote}`,
   );
   doc.setTextColor(51, 65, 85);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(
-    `Arquivo: ${arquivoOrigem}. Este documento comprova por que cada cabo abaixo não foi cadastrado para ${responsavel}.`,
+    `Arquivo: ${arquivoOrigem}. O documento separa contratos ativos, repeticoes internas e erros de dados da planilha de ${responsavel}.`,
     margem,
     78,
   );
@@ -269,6 +280,7 @@ export async function gerarRelatorioOcorrenciasLotePdf(
     head: [["Resumo", "Quantidade"]],
     body: [
       ["Cabos recusados por contrato ativo", String(duplicadosAtivos.length)],
+      ["Linhas repetidas dentro da planilha", String(repetidosArquivo.length)],
       ["Outras ocorrências da planilha", String(outrasOcorrencias.length)],
       ["Responsável da importação", `${responsavel} (${responsavelTipo.toLowerCase()})`],
     ],
@@ -324,6 +336,47 @@ export async function gerarRelatorioOcorrenciasLotePdf(
     });
   }
 
+  if (repetidosArquivo.length) {
+    doc.addPage("a4", "landscape");
+    cabecalho("Anexo - repeticoes dentro da planilha", `${arquivoOrigem} | ${nomeLote}`);
+    doc.setTextColor(51, 65, 85);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(
+      "Estas linhas repetem CPF ou telefone informado anteriormente no mesmo arquivo; nao representam outro contrato ativo.",
+      margem,
+      78,
+    );
+    autoTable(doc, {
+      startY: 90,
+      margin: { left: margem, right: margem, bottom: 40 },
+      head: [["Linha repetida", "Pessoa", "Contato/documento", "Primeira ocorrencia", "Motivo"]],
+      body: repetidosArquivo.map((item) => {
+        const original = item.repetido_no_arquivo;
+        return [
+          String(item.numero_linha + 1),
+          item.nome || "Sem nome",
+          item.telefone_normalizado || item.cpf_normalizado || "Sem documento",
+          original
+            ? `Linha ${original.numero_linha + 1}: ${original.nome || "Sem nome"}\nTelefone: ${original.telefone_normalizado || "-"}\nCPF: ${original.cpf_normalizado || "-"}`
+            : "Primeira linha nao localizada",
+          item.motivo || "Repetido dentro da planilha",
+        ];
+      }),
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak", valign: "top" },
+      headStyles: { fillColor: [180, 83, 9] },
+      alternateRowStyles: { fillColor: [255, 251, 235] },
+      columnStyles: {
+        0: { cellWidth: 80 },
+        1: { cellWidth: 160 },
+        2: { cellWidth: 145 },
+        3: { cellWidth: 230 },
+        4: { cellWidth: "auto" },
+      },
+    });
+  }
+
   if (outrasOcorrencias.length) {
     doc.addPage("a4", "landscape");
     cabecalho("Anexo - outras ocorrências da planilha", `${arquivoOrigem} | ${nomeLote}`);
@@ -331,7 +384,7 @@ export async function gerarRelatorioOcorrenciasLotePdf(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.text(
-      "Estes itens são erros de dados, conflitos de identidade ou repetições no próprio arquivo; não representam outro contrato ativo.",
+      "Estes itens sao erros de dados ou conflitos de identidade; nao representam outro contrato ativo.",
       margem,
       78,
     );

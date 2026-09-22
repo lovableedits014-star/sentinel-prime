@@ -99,6 +99,13 @@ type ImportItem = {
   valor_aplicado: number;
   pessoa_existente_id: string | null;
   duplicado: ImportDuplicateDetail | null;
+  repetido_no_arquivo?: {
+    id: number;
+    numero_linha: number;
+    nome: string | null;
+    cpf_normalizado: string | null;
+    telefone_normalizado: string | null;
+  } | null;
 };
 
 type ImportLot = {
@@ -110,6 +117,7 @@ type ImportLot = {
   total_linhas: number;
   total_elegiveis: number;
   total_duplicados: number;
+  total_repetidos_arquivo: number;
   total_invalidos: number;
   custo_bruto: number;
   custo_previsto: number;
@@ -1180,7 +1188,8 @@ export default function EleicaoCabosImportacaoPanel({
                 <TableHead>Lote</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Linhas</TableHead>
-                <TableHead>Duplicados</TableHead>
+                <TableHead>Contratos ativos</TableHead>
+                <TableHead>Repetidos na planilha</TableHead>
                 <TableHead>Inválidos</TableHead>
                 <TableHead className="text-right">Custo</TableHead>
                 <TableHead />
@@ -1199,6 +1208,7 @@ export default function EleicaoCabosImportacaoPanel({
                   </TableCell>
                   <TableCell>{lot.total_linhas}</TableCell>
                   <TableCell>{lot.total_duplicados}</TableCell>
+                  <TableCell>{lot.total_repetidos_arquivo || 0}</TableCell>
                   <TableCell>{lot.total_invalidos}</TableCell>
                   <TableCell className="text-right">
                     {money(
@@ -1214,7 +1224,11 @@ export default function EleicaoCabosImportacaoPanel({
                       <Button
                         size="sm"
                         variant="ghost"
-                        disabled={!lot.total_duplicados && !lot.total_invalidos}
+                        disabled={
+                          !lot.total_duplicados &&
+                          !lot.total_repetidos_arquivo &&
+                          !lot.total_invalidos
+                        }
                         onClick={() => void loadAudit(lot.id)}
                       >
                         Ver ocorrências
@@ -1225,7 +1239,7 @@ export default function EleicaoCabosImportacaoPanel({
               ))}
               {!activeHistory.length && (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                     Nenhuma importação realizada.
                   </TableCell>
                 </TableRow>
@@ -1367,6 +1381,13 @@ function ItemTable({ items }: { items: ImportItem[] }) {
                           : " • sem término"}
                       </p>
                       <p>Telefone cadastrado: {item.duplicado.telefone || "—"}</p>
+                    </div>
+                  ) : item.repetido_no_arquivo ? (
+                    <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-950">
+                      <p className="font-medium">Repetido dentro desta planilha</p>
+                      <p>Primeira ocorrencia: linha {item.repetido_no_arquivo.numero_linha + 1}</p>
+                      <p>{item.repetido_no_arquivo.nome || "Sem nome"}</p>
+                      <p>Telefone: {item.repetido_no_arquivo.telefone_normalizado || "-"}</p>
                     </div>
                   ) : (
                     <span className="text-muted-foreground">
