@@ -551,21 +551,22 @@ export default function Eleicao() {
       toast.error("Selecione pelo menos uma rede para as missões");
       return;
     }
-    const cadastroHierarquiaRapido =
+    const cadastroCaboRapido = !editing && form.tipo === "cabo" && !!form.parent_id;
+    const contratacaoComValorObrigatorio =
       !editing && (form.tipo === "lider" || form.tipo === "cabo") && !!form.parent_id;
     if (
       !form.nome.trim() ||
       !form.telefone.trim() ||
-      (!cadastroHierarquiaRapido && !form.bairro.trim())
+      (!cadastroCaboRapido && !form.bairro.trim())
     ) {
       toast.error(
-        cadastroHierarquiaRapido
+        cadastroCaboRapido
           ? "Nome e telefone são obrigatórios"
           : "Nome, telefone e bairro são obrigatórios",
       );
       return;
     }
-    if (cadastroHierarquiaRapido && parseValorContratacao(form.valor_contratacao) <= 0) {
+    if (contratacaoComValorObrigatorio && parseValorContratacao(form.valor_contratacao) <= 0) {
       toast.error(
         form.tipo === "lider"
           ? "Informe o valor do pagamento do líder"
@@ -1726,12 +1727,13 @@ export default function Eleicao() {
     });
   };
 
-  const cadastroRapidoResponsavel =
-    !editing && (form.tipo === "lider" || form.tipo === "cabo") && form.parent_id
+  const cadastroCaboResponsavel =
+    !editing && form.tipo === "cabo" && form.parent_id
       ? pessoas.find(
           (p) => p.id === form.parent_id && (p.tipo === "lider" || p.tipo === "coordenador"),
         )
       : null;
+  const novoLiderComCoordenador = !editing && form.tipo === "lider" && !!form.parent_id;
 
   return (
     <EleicaoActionsContext.Provider
@@ -2289,25 +2291,25 @@ export default function Eleicao() {
                 <DialogTitle>
                   {editing
                     ? "Editar cadastro"
-                    : cadastroRapidoResponsavel
-                      ? form.tipo === "lider"
-                        ? "Cadastrar líder"
-                        : "Cadastrar cabo eleitoral"
-                      : "Novo cadastro"}
+                    : novoLiderComCoordenador
+                      ? "Cadastrar líder"
+                      : cadastroCaboResponsavel
+                        ? "Cadastrar cabo eleitoral"
+                        : "Novo cadastro"}
                 </DialogTitle>
               </DialogHeader>
-              {cadastroRapidoResponsavel ? (
+              {cadastroCaboResponsavel ? (
                 <div className="space-y-4 px-6 py-3 overflow-y-auto flex-1 min-h-0">
                   <div className="rounded-lg border bg-muted/30 p-3">
                     <p className="text-xs text-muted-foreground">
-                      {cadastroRapidoResponsavel.tipo === "coordenador"
+                      {cadastroCaboResponsavel.tipo === "coordenador"
                         ? "Coordenador responsável"
                         : "Líder responsável"}
                     </p>
-                    <p className="font-semibold">{cadastroRapidoResponsavel.nome}</p>
+                    <p className="font-semibold">{cadastroCaboResponsavel.nome}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       O vínculo e a localização serão herdados automaticamente deste{" "}
-                      {cadastroRapidoResponsavel.tipo === "coordenador" ? "coordenador" : "líder"}.
+                      {cadastroCaboResponsavel.tipo === "coordenador" ? "coordenador" : "líder"}.
                     </p>
                   </div>
                   <div>
@@ -2626,11 +2628,13 @@ export default function Eleicao() {
                       )}
                     </div>
                   )}
-                  {editing && (
+                  {(editing || novoLiderComCoordenador) && (
                     <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
                       <Label htmlFor="edit-valor-contratacao" className="flex items-center gap-1.5">
                         <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
-                        Valor da contratação
+                        {novoLiderComCoordenador
+                          ? "Valor da contratação do líder *"
+                          : "Valor da contratação"}
                       </Label>
                       <div className="relative mt-1.5">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
@@ -2654,8 +2658,9 @@ export default function Eleicao() {
                         />
                       </div>
                       <p className="mt-1 text-[10px] text-muted-foreground">
-                        Use 0 ou deixe vazio para voltar a “Sem contrato”. A aba Pendentes de valor
-                        continuará disponível.
+                        {novoLiderComCoordenador
+                          ? "Informe o valor acordado para concluir a contratação do líder."
+                          : "Use 0 ou deixe vazio para voltar a “Sem contrato”. A aba Pendentes de valor continuará disponível."}
                       </p>
                     </div>
                   )}
