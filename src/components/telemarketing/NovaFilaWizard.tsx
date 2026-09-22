@@ -204,9 +204,19 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
 
   useEffect(() => {
     if (!clientId || !open) return;
-    supabase.rpc("tele_list_indicadores" as any, { _client_id: clientId }).then(({ data }) => {
-      setIndicadores((data as any[]) || []);
-    });
+    supabase
+      .rpc("tele_list_responsaveis_fila" as any, {
+        _client_id: clientId,
+        _origem: "indicados_eleicao",
+      })
+      .then(({ data, error }) => {
+        if (error) {
+          setIndicadores([]);
+          toast.error("Erro ao carregar indicadores", { description: error.message });
+          return;
+        }
+        setIndicadores(Array.isArray(data) ? data : []);
+      });
     supabase
       .from("telemarketing_operadores")
       .select("id, nome, ativo")

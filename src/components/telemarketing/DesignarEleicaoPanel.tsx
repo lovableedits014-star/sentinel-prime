@@ -4,20 +4,33 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Vote, Target, Users2, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import IndicadorCombobox from "./IndicadorCombobox";
 
-interface Campanha { id: string; nome: string; }
-interface Indicador { id: string; nome: string; tipo: string; cidade: string | null; }
+interface Campanha {
+  id: string;
+  nome: string;
+}
+interface Indicador {
+  id: string;
+  nome: string;
+  tipo: string;
+  cidade: string | null;
+}
 
-const TIPO_LABEL: Record<string, string> = {
-  coordenador: "Coordenador",
-  lider: "Líder",
-  cabo: "Cabo",
-};
-
-export default function DesignarEleicaoPanel({ clientId, campanhas, onChanged }: {
+export default function DesignarEleicaoPanel({
+  clientId,
+  campanhas,
+  onChanged,
+}: {
   clientId: string;
   campanhas: Campanha[];
   onChanged?: () => void;
@@ -36,9 +49,19 @@ export default function DesignarEleicaoPanel({ clientId, campanhas, onChanged }:
 
   useEffect(() => {
     if (!clientId) return;
-    supabase.rpc("tele_list_indicadores" as any, { _client_id: clientId }).then(({ data }) => {
-      setIndicadores((data as any[]) || []);
-    });
+    supabase
+      .rpc("tele_list_responsaveis_fila" as any, {
+        _client_id: clientId,
+        _origem: "indicados_eleicao",
+      })
+      .then(({ data, error }) => {
+        if (error) {
+          setIndicadores([]);
+          toast.error("Erro ao carregar indicadores", { description: error.message });
+          return;
+        }
+        setIndicadores(Array.isArray(data) ? data : []);
+      });
   }, [clientId]);
 
   const filtros = () => ({
@@ -57,12 +80,18 @@ export default function DesignarEleicaoPanel({ clientId, campanhas, onChanged }:
       _filtros: filtros() as any,
     });
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     setPreview(data as any);
   };
 
   const designar = async () => {
-    if (!campanhaId) { toast.error("Selecione a campanha"); return; }
+    if (!campanhaId) {
+      toast.error("Selecione a campanha");
+      return;
+    }
     setBusy(true);
     const { data, error } = await supabase.rpc("tele_designar_eleicao_indicados" as any, {
       _client_id: clientId,
@@ -71,15 +100,17 @@ export default function DesignarEleicaoPanel({ clientId, campanhas, onChanged }:
       _substituir: substituir,
     });
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success(`${(data as any)?.atribuidos ?? 0} indicado(s) designados à campanha`);
     setPreview(null);
     onChanged?.();
   };
 
-  const indicadoresFiltrados = tipo === "__all__"
-    ? indicadores
-    : indicadores.filter(i => i.tipo === tipo);
+  const indicadoresFiltrados =
+    tipo === "__all__" ? indicadores : indicadores.filter((i) => i.tipo === tipo);
 
   return (
     <Card className="lg:col-span-2 border-primary/30">
@@ -89,8 +120,9 @@ export default function DesignarEleicaoPanel({ clientId, campanhas, onChanged }:
           Designar indicados da Eleição
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Selecione subset de indicados (de coordenadores, líderes ou cabos) e atribua a uma campanha de telemarketing.
-          A fila do operador passa a incluir esses contatos automaticamente.
+          Selecione subset de indicados (de coordenadores, líderes ou cabos) e atribua a uma
+          campanha de telemarketing. A fila do operador passa a incluir esses contatos
+          automaticamente.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -98,16 +130,30 @@ export default function DesignarEleicaoPanel({ clientId, campanhas, onChanged }:
           <div>
             <label className="text-xs font-medium mb-1 block">Campanha destino *</label>
             <Select value={campanhaId} onValueChange={setCampanhaId}>
-              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
               <SelectContent>
-                {campanhas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                {campanhas.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.nome}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block">Tipo de indicador</label>
-            <Select value={tipo} onValueChange={(v) => { setTipo(v); setIndicadorId("__all__"); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={tipo}
+              onValueChange={(v) => {
+                setTipo(v);
+                setIndicadorId("__all__");
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Todos</SelectItem>
                 <SelectItem value="coordenador">Coordenador</SelectItem>
@@ -118,22 +164,20 @@ export default function DesignarEleicaoPanel({ clientId, campanhas, onChanged }:
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block">Indicador específico</label>
-            <Select value={indicadorId} onValueChange={setIndicadorId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                {indicadoresFiltrados.map(i => (
-                  <SelectItem key={i.id} value={i.id}>
-                    {i.nome} <span className="text-muted-foreground">· {TIPO_LABEL[i.tipo] ?? i.tipo}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <IndicadorCombobox
+              value={indicadorId}
+              onChange={setIndicadorId}
+              options={indicadoresFiltrados}
+              allValue="__all__"
+              allLabel="Todos os indicadores"
+            />
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block">Status atual</label>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Todos</SelectItem>
                 <SelectItem value="pendente">Pendente</SelectItem>
@@ -147,22 +191,40 @@ export default function DesignarEleicaoPanel({ clientId, campanhas, onChanged }:
             </Select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1 block flex items-center gap-1"><MapPin className="w-3 h-3" /> Cidade</label>
-            <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Ex: Campo Grande" />
+            <label className="text-xs font-medium mb-1 block flex items-center gap-1">
+              <MapPin className="w-3 h-3" /> Cidade
+            </label>
+            <Input
+              value={cidade}
+              onChange={(e) => setCidade(e.target.value)}
+              placeholder="Ex: Campo Grande"
+            />
           </div>
           <div>
             <label className="text-xs font-medium mb-1 block">Bairro</label>
-            <Input value={bairro} onChange={(e) => setBairro(e.target.value)} placeholder="Ex: Centro" />
+            <Input
+              value={bairro}
+              onChange={(e) => setBairro(e.target.value)}
+              placeholder="Ex: Centro"
+            />
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-4 pt-1">
           <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={apenasNaoLigados} onChange={(e) => setApenasNaoLigados(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={apenasNaoLigados}
+              onChange={(e) => setApenasNaoLigados(e.target.checked)}
+            />
             Apenas ainda não ligados
           </label>
           <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={substituir} onChange={(e) => setSubstituir(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={substituir}
+              onChange={(e) => setSubstituir(e.target.checked)}
+            />
             Substituir designação existente
           </label>
         </div>
