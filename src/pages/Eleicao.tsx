@@ -337,6 +337,7 @@ type EleicaoActions = {
   onArchive: (p: Pessoa) => void;
   onFormularioCabos: (p: Pessoa) => void;
   onReciboDocumentacao: (p: Pessoa) => void;
+  onNovoLider: (p: Pessoa) => void;
   onNovoCabo: (p: Pessoa) => void;
 };
 const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
@@ -550,21 +551,26 @@ export default function Eleicao() {
       toast.error("Selecione pelo menos uma rede para as missões");
       return;
     }
-    const cadastroCaboRapido = !editing && form.tipo === "cabo" && !!form.parent_id;
+    const cadastroHierarquiaRapido =
+      !editing && (form.tipo === "lider" || form.tipo === "cabo") && !!form.parent_id;
     if (
       !form.nome.trim() ||
       !form.telefone.trim() ||
-      (!cadastroCaboRapido && !form.bairro.trim())
+      (!cadastroHierarquiaRapido && !form.bairro.trim())
     ) {
       toast.error(
-        cadastroCaboRapido
+        cadastroHierarquiaRapido
           ? "Nome e telefone são obrigatórios"
           : "Nome, telefone e bairro são obrigatórios",
       );
       return;
     }
-    if (cadastroCaboRapido && parseValorContratacao(form.valor_contratacao) <= 0) {
-      toast.error("Informe o valor do pagamento do cabo eleitoral");
+    if (cadastroHierarquiaRapido && parseValorContratacao(form.valor_contratacao) <= 0) {
+      toast.error(
+        form.tipo === "lider"
+          ? "Informe o valor do pagamento do líder"
+          : "Informe o valor do pagamento do cabo eleitoral",
+      );
       return;
     }
 
@@ -1707,8 +1713,21 @@ export default function Eleicao() {
     });
   };
 
-  const caboRapidoResponsavel =
-    !editing && form.tipo === "cabo" && form.parent_id
+  const abrirNovoLider = (coordenador: Pessoa) => {
+    openNew({
+      tipo: "lider",
+      parent_id: coordenador.id,
+      escopo: coordenador.escopo,
+      regiao: (coordenador.regiao || "centro") as Regiao,
+      cidade: coordenador.cidade || (coordenador.escopo === "campo_grande" ? "Campo Grande" : ""),
+      rua: "",
+      numero: "",
+      bairro: coordenador.bairro || "",
+    });
+  };
+
+  const cadastroRapidoResponsavel =
+    !editing && (form.tipo === "lider" || form.tipo === "cabo") && form.parent_id
       ? pessoas.find(
           (p) => p.id === form.parent_id && (p.tipo === "lider" || p.tipo === "coordenador"),
         )
@@ -1722,6 +1741,7 @@ export default function Eleicao() {
         onArchive: toggleArchive,
         onFormularioCabos: baixarFormularioCabos,
         onReciboDocumentacao: baixarReciboDocumentacao,
+        onNovoLider: abrirNovoLider,
         onNovoCabo: abrirNovoCabo,
       }}
     >
@@ -2269,23 +2289,25 @@ export default function Eleicao() {
                 <DialogTitle>
                   {editing
                     ? "Editar cadastro"
-                    : caboRapidoResponsavel
-                      ? "Cadastrar cabo eleitoral"
+                    : cadastroRapidoResponsavel
+                      ? form.tipo === "lider"
+                        ? "Cadastrar líder"
+                        : "Cadastrar cabo eleitoral"
                       : "Novo cadastro"}
                 </DialogTitle>
               </DialogHeader>
-              {caboRapidoResponsavel ? (
+              {cadastroRapidoResponsavel ? (
                 <div className="space-y-4 px-6 py-3 overflow-y-auto flex-1 min-h-0">
                   <div className="rounded-lg border bg-muted/30 p-3">
                     <p className="text-xs text-muted-foreground">
-                      {caboRapidoResponsavel.tipo === "coordenador"
+                      {cadastroRapidoResponsavel.tipo === "coordenador"
                         ? "Coordenador responsável"
                         : "Líder responsável"}
                     </p>
-                    <p className="font-semibold">{caboRapidoResponsavel.nome}</p>
+                    <p className="font-semibold">{cadastroRapidoResponsavel.nome}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       O vínculo e a localização serão herdados automaticamente deste{" "}
-                      {caboRapidoResponsavel.tipo === "coordenador" ? "coordenador" : "líder"}.
+                      {cadastroRapidoResponsavel.tipo === "coordenador" ? "coordenador" : "líder"}.
                     </p>
                   </div>
                   <div>
@@ -2330,7 +2352,7 @@ export default function Eleicao() {
                     />
                   </div>
                   <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-                    <Label htmlFor="cabo-valor-pagamento" className="flex items-center gap-1.5">
+                    <Label htmlFor="cadastro-rapido-valor" className="flex items-center gap-1.5">
                       <DollarSign className="h-4 w-4 text-emerald-600" />
                       Valor do pagamento único *
                     </Label>
@@ -2339,7 +2361,7 @@ export default function Eleicao() {
                         R$
                       </span>
                       <Input
-                        id="cabo-valor-pagamento"
+                        id="cadastro-rapido-valor"
                         className="pl-10"
                         value={form.valor_contratacao}
                         onChange={(e) =>
@@ -3742,6 +3764,7 @@ function PessoaRow({
   const onArchive = actions?.onArchive;
   const onFormularioCabos = actions?.onFormularioCabos;
   const onReciboDocumentacao = actions?.onReciboDocumentacao;
+  const onNovoLider = actions?.onNovoLider;
   const onNovoCabo = actions?.onNovoCabo;
   const { searchActive, matchedIds, nameById, tipoById } = React.useContext(EleicaoSearchContext);
   const isMatch = searchActive && matchedIds.has(p.id);
@@ -4015,6 +4038,12 @@ function PessoaRow({
           )}
           {p.tipo === "coordenador" && onFormularioCabos && (
             <>
+              {onNovoLider && (
+                <DropdownMenuItem onClick={() => onNovoLider(p)}>
+                  <Plus className="w-3.5 h-3.5 mr-2" />
+                  Cadastrar líder eleitoral
+                </DropdownMenuItem>
+              )}
               {onNovoCabo && (
                 <DropdownMenuItem onClick={() => onNovoCabo(p)}>
                   <Plus className="w-3.5 h-3.5 mr-2" />
