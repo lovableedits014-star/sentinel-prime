@@ -78,6 +78,7 @@ import PrevisaoCustos from "@/components/eleicao/PrevisaoCustos";
 import PendentesValorPanel from "@/components/eleicao/PendentesValorPanel";
 import ReunioesPanel from "@/components/eleicao/ReunioesPanel";
 import EleicaoContractTemplates from "@/components/eleicao/EleicaoContractTemplates";
+import ContratosCabosTextoDialog from "@/components/eleicao/ContratosCabosTextoDialog";
 import EnviarFluxoMenu from "@/components/eleicao/EnviarFluxoMenu";
 import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog";
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
@@ -1758,6 +1759,7 @@ export default function Eleicao() {
             </div>
             <div className="flex items-center gap-2">
               {clientId && <EleicaoContractTemplates clientId={clientId} />}
+              {clientId && <ContratosCabosTextoDialog clientId={clientId} />}
               {view === "cadastros" && (
                 <>
                   <Button variant="outline" onClick={baixarTodosFormulariosCabos}>
