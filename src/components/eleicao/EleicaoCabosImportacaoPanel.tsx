@@ -112,6 +112,7 @@ type ImportLot = {
   id: string;
   nome: string;
   arquivo_nome: string;
+  parent_id_padrao: string | null;
   valor_unitario: number;
   status: string;
   total_linhas: number;
@@ -126,7 +127,7 @@ type ImportLot = {
 };
 
 type Analysis = { lote: ImportLot; itens: ImportItem[] };
-type LotValueEdit = { id: string; valor: string; motivo: string };
+type LotValueEdit = { id: string; valor: string; parentId: string; motivo: string };
 type DuplicateCorrection = {
   id: number;
   nome: string;
@@ -547,30 +548,34 @@ export default function EleicaoCabosImportacaoPanel({
     if (!lotValueEdit) return;
     const newValue = Number(lotValueEdit.valor.replace(/\./g, "").replace(",", "."));
     if (!newValue || newValue <= 0) return toast.error("Informe um valor maior que zero.");
+    if (!lotValueEdit.parentId) return toast.error("Selecione o líder ou coordenador responsável.");
     if (!lotValueEdit.motivo.trim()) return toast.error("Informe o motivo da alteração.");
     if (
       !window.confirm(
-        "Confirmar a alteração? O valor dos cabos contratados por este lote e o custo total serão recalculados.",
+        "Confirmar a alteração do lote? Se o responsável mudou, os cabos confirmados serão transferidos para ele e herdarão sua localização.",
       )
     )
       return;
 
     setBusy(true);
     try {
-      const { data, error } = await db.rpc("eleicao_cabo_import_alterar_valor", {
+      const { data, error } = await db.rpc("eleicao_cabo_import_editar", {
         p_lote_id: lotValueEdit.id,
         p_valor_unitario: newValue,
+        p_parent_id: lotValueEdit.parentId,
         p_motivo: lotValueEdit.motivo.trim(),
       });
       if (error) throw error;
       setLotValueEdit(null);
       await loadBase();
       onChanged();
-      toast.success(
-        `${data?.contratos_atualizados || 0} contrato(s) atualizado(s) — novo custo ${money(data?.custo_novo || 0)}.`,
-      );
+      const actions = [
+        data?.valor_alterado ? `${data?.contratos_atualizados || 0} valor(es) atualizado(s)` : null,
+        data?.responsavel_alterado ? `${data?.cabos_movidos || 0} cabo(s) transferido(s)` : null,
+      ].filter(Boolean);
+      toast.success(`${actions.join(" e ")} — custo ${money(data?.custo_novo || 0)}.`);
     } catch (error: unknown) {
-      toast.error(errorMessage(error, "Não foi possível alterar o valor do lote."));
+      toast.error(errorMessage(error, "Não foi possível alterar o lote."));
     } finally {
       setBusy(false);
     }
@@ -1261,19 +1266,20 @@ export default function EleicaoCabosImportacaoPanel({
                           size="sm"
                           variant="ghost"
                           disabled={busy}
-                          title="Editar valor por cabo"
+                          title="Editar valor ou responsável do lote"
                           onClick={() =>
                             setLotValueEdit({
                               id: lot.id,
                               valor: Number(lot.valor_unitario || 0)
                                 .toFixed(2)
                                 .replace(".", ","),
+                              parentId: lot.parent_id_padrao || "",
                               motivo: "",
                             })
                           }
                         >
                           <Pencil className="mr-1 h-3.5 w-3.5" />
-                          Editar valor
+                          Editar lote
                         </Button>
                         <Button
                           size="sm"
@@ -1306,6 +1312,28 @@ export default function EleicaoCabosImportacaoPanel({
                                 )
                               }
                             />
+                          </div>
+                          <div className="min-w-64 space-y-1">
+                            <Label>Responsável pelo lote</Label>
+                            <Select
+                              value={lotValueEdit.parentId}
+                              onValueChange={(parentId) =>
+                                setLotValueEdit((current) =>
+                                  current ? { ...current, parentId } : current,
+                                )
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um responsável" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {parents.map((parent) => (
+                                  <SelectItem key={parent.id} value={parent.id}>
+                                    {parent.nome} · {roleLabel(parent.tipo)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div className="min-w-64 flex-1 space-y-1">
                             <Label htmlFor={`motivo-lote-${lot.id}`}>Motivo da alteração</Label>

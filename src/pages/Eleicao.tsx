@@ -3382,9 +3382,10 @@ function RegionBlock({
                 </Button>
               </div>
               {lideresOrfaos.map((l) => (
-                <PessoaRow
+                <LiderBlock
                   key={l.id}
-                  p={l}
+                  lider={l}
+                  all={pessoas}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onCredentials={onCredentials}
