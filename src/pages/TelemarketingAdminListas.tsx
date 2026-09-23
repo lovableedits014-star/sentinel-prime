@@ -48,6 +48,7 @@ export default function TelemarketingAdminListas() {
   const [selectedLista, setSelectedLista] = useState<any>(null);
   const [dupes, setDupes] = useState<any[]>([]);
   const [loadingDupes, setLoadingDupes] = useState(false);
+  const [revertingId, setRevertingId] = useState<string | null>(null);
   const { toast } = useToast();
   const { clientId, isLoading: ctxLoading } = useActiveClientId();
   const navigate = useNavigate();
@@ -110,6 +111,41 @@ export default function TelemarketingAdminListas() {
   const filteredListas = listas.filter(l => 
     l.nome?.toLowerCase().includes(filtro.toLowerCase())
   );
+
+  const reverterLista = async (lista: any) => {
+    if (!clientId || revertingId) return;
+    setRevertingId(lista.id);
+    try {
+      const { data: preview, error: previewError } = await supabase.rpc(
+        "tele_reverter_lista_importada" as any,
+        { _client_id: clientId, _lista_id: lista.id, _confirmar: false },
+      );
+      if (previewError) throw previewError;
+      const info = (preview as any) || {};
+      if (!info.pode_reverter) {
+        toast({
+          title: "Esta lista já começou a ser trabalhada",
+          description: `${info.trabalhados || 0} contato(s) têm ligação ou tentativa registrada. A reversão automática foi bloqueada para preservar o histórico.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!window.confirm(`Reverter a importação “${lista.nome}”?\n\nSerão removidos ${info.total || 0} contato(s) trazidos por este lote. Os contatos das outras listas serão preservados.`)) return;
+      const { data, error } = await supabase.rpc("tele_reverter_lista_importada" as any, {
+        _client_id: clientId, _lista_id: lista.id, _confirmar: true,
+      });
+      if (error) throw error;
+      toast({
+        title: "Importação revertida",
+        description: `${Number((data as any)?.removidos || 0)} contato(s) duplicados foram removidos.`,
+      });
+      await fetchListas();
+    } catch (err: any) {
+      toast({ title: "Não foi possível reverter a lista", description: err.message, variant: "destructive" });
+    } finally {
+      setRevertingId(null);
+    }
+  };
 
   const totalContatos = listas.reduce((acc, curr) => acc + (curr.total_contatos || 0), 0);
   const totalConcluidos = listas.reduce((acc, curr) => acc + (curr.concluidos || 0), 0);
@@ -289,8 +325,12 @@ export default function TelemarketingAdminListas() {
                           <DropdownMenuItem className="gap-2">
                             <BarChart3 className="w-4 h-4" /> Relatório Completo
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 text-destructive">
-                            <Trash2 className="w-4 h-4" /> Excluir Lista
+                          <DropdownMenuItem
+                            className="gap-2 text-destructive"
+                            disabled={revertingId === lista.id}
+                            onClick={() => reverterLista(lista)}
+                          >
+                            <Trash2 className="w-4 h-4" /> Reverter importação
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

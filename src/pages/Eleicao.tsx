@@ -121,6 +121,7 @@ import {
   type LiderFormularioCabos,
 } from "@/lib/eleicao-cabos-formulario-pdf";
 import { gerarReciboDocumentacaoPdf } from "@/lib/eleicao-recibo-documentacao-pdf";
+import { gerarRaizPagamentoPdf } from "@/lib/eleicao-raiz-pagamento-pdf";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -3491,13 +3492,15 @@ function CoordBlock({
   const totalEquipe = lideres.length + cabosDir.length + cabosLid.length;
   const hasTeam = totalEquipe > 0;
   const allDoTime = [coord, ...lideres, ...cabosDir, ...cabosLid];
-  const valorCoordenador = Number(coord.valor_contratacao || 0);
-  const valorLideres = lideres.reduce(
+  const valorCoordenador = isEleicaoContratado(coord) ? Number(coord.valor_contratacao || 0) : 0;
+  const valorLideres = lideres.filter(isEleicaoContratado).reduce(
     (total, pessoa) => total + Number(pessoa.valor_contratacao || 0),
     0,
   );
   const todosCabos = [...cabosDir, ...cabosLid];
-  const valorCabos = todosCabos.reduce(
+  const lideresContratados = lideres.filter(isEleicaoContratado);
+  const todosCabosContratados = todosCabos.filter(isEleicaoContratado);
+  const valorCabos = todosCabos.filter(isEleicaoContratado).reduce(
     (total, pessoa) => total + Number(pessoa.valor_contratacao || 0),
     0,
   );
@@ -3535,11 +3538,19 @@ function CoordBlock({
         matchInTeam={matchesNaEquipe}
         teamFinancials={{
           valorCoordenador,
-          lideres: lideres.length,
+          lideres: lideresContratados.length,
           valorLideres,
-          cabos: todosCabos.length,
+          cabos: todosCabosContratados.length,
           valorCabos,
           valorTotal: valorTotalArvore,
+        }}
+        onExportPaymentRoot={async () => {
+          try {
+            const result = await gerarRaizPagamentoPdf(coord, allDoTime);
+            toast.success(`PDF gerado com ${result.contratados} contratado(s) para pagamento.`);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Erro ao gerar PDF da raiz.");
+          }
         }}
         expanded={expanded}
         onToggle={
@@ -3645,6 +3656,14 @@ function LiderBlock({
         matchInTeam={matchesNaEquipe}
         expanded={open}
         onToggle={hasCabos ? () => setOpen((o) => !o) : undefined}
+        onExportPaymentRoot={async () => {
+          try {
+            const result = await gerarRaizPagamentoPdf(lider, [lider, ...cabos]);
+            toast.success(`PDF gerado com ${result.contratados} contratado(s) para pagamento.`);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Erro ao gerar PDF da raiz.");
+          }
+        }}
       />
       {open &&
         cabos.map((cb) => (
@@ -3760,6 +3779,7 @@ function PessoaRow({
   bulkAction,
   matchInTeam,
   teamFinancials,
+  onExportPaymentRoot,
 }: {
   p: Pessoa;
   onEdit: (p: Pessoa) => void;
@@ -3782,6 +3802,7 @@ function PessoaRow({
     valorCabos: number;
     valorTotal: number;
   };
+  onExportPaymentRoot?: () => void;
 }) {
   const actions = React.useContext(EleicaoActionsContext);
   const onTogglePermissao = actions?.onTogglePermissao;
@@ -4044,6 +4065,15 @@ function PessoaRow({
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
+          {(p.tipo === "coordenador" || p.tipo === "lider") && onExportPaymentRoot && (
+            <DropdownMenuItem onClick={onExportPaymentRoot}>
+              <FileDown className="w-3.5 h-3.5 mr-2" />
+              Exportar Raiz para Pagamento
+            </DropdownMenuItem>
+          )}
+          {(p.tipo === "coordenador" || p.tipo === "lider") && onExportPaymentRoot && (
+            <DropdownMenuSeparator />
+          )}
           <EnviarFluxoMenu pessoa={p as any} />
           <DropdownMenuSeparator />
           {p.tipo === "lider" && onFormularioCabos && (

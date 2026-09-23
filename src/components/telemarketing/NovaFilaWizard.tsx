@@ -475,6 +475,10 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     total: number;
     pendentes: number;
     ja_em_outra_fila: number;
+    ja_na_mesma_fila?: number;
+    duplicados_na_planilha?: number;
+    novos?: number;
+    amostras?: Array<{ nome: string; telefone: string; tipo: string; locais?: Array<{ lista_nome?: string; campanha_nome?: string }> }>;
   } | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
@@ -483,13 +487,12 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
     let cancel = false;
     setPreviewing(true);
     setPreview(null);
+    const isPlanilha = origem === "csv" || origem === "gabinete_atendidos";
     supabase
-      .rpc("tele_preview_fila" as any, {
-        _client_id: clientId,
-        _origem: origem === "gabinete_atendidos" ? "csv" : origem,
-        _filtros: buildFiltros(),
-        _csv_count: origem === "csv" || origem === "gabinete_atendidos" ? csvRows.length : 0,
-      })
+      .rpc((isPlanilha ? "tele_preview_importacao_avulsos" : "tele_preview_fila") as any,
+        isPlanilha
+          ? { _client_id: clientId, _campanha_id: null, _rows: csvRows as any }
+          : { _client_id: clientId, _origem: origem, _filtros: buildFiltros(), _csv_count: 0 })
       .then(({ data, error }) => {
         if (cancel) return;
         setPreviewing(false);
@@ -499,9 +502,13 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
         }
         const r = (data as any) || {};
         setPreview({
-          total: Number(r.total || 0),
-          pendentes: Number(r.pendentes || 0),
+          total: Number(r.total ?? r.validos ?? 0),
+          pendentes: Number(r.pendentes ?? r.validos ?? 0),
           ja_em_outra_fila: Number(r.ja_em_outra_fila || 0),
+          ja_na_mesma_fila: Number(r.ja_na_mesma_fila || 0),
+          duplicados_na_planilha: Number(r.duplicados_na_planilha || 0),
+          novos: r.novos == null ? undefined : Number(r.novos),
+          amostras: Array.isArray(r.amostras) ? r.amostras : [],
         });
       });
     return () => {
@@ -523,8 +530,10 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
   ]);
 
   const previewEntrarao = preview
-    ? (apenasPendentes ? preview.pendentes : preview.total) -
-      (substituir ? 0 : preview.ja_em_outra_fila)
+    ? origem === "csv" || origem === "gabinete_atendidos"
+      ? skipGlobalDupes ? Number(preview.novos || 0) : Number(preview.total || 0) - Number(preview.duplicados_na_planilha || 0)
+      : (apenasPendentes ? preview.pendentes : preview.total) -
+        (substituir ? 0 : preview.ja_em_outra_fila)
     : 0;
 
   const finish = async () => {
@@ -1041,8 +1050,8 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
                     onChange={(e) => setSkipGlobalDupes(e.target.checked)}
                   />
                   <span>
-                    <strong>Ignorar contatos que já estão em outra fila</strong> deste cliente
-                    (evita ligações duplicadas).
+                    <strong>Não importar números que já existem</strong> neste cliente (recomendado).
+                    Desmarque somente se quiser criar duplicados conscientemente.
                   </span>
                 </label>
               </>
@@ -1328,9 +1337,21 @@ export default function NovaFilaWizard({ open, onOpenChange, clientId, onCreated
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {preview.total} encontrado(s) no total · {preview.pendentes} ainda não ligados
-                    {preview.ja_em_outra_fila > 0 &&
-                      ` · ${preview.ja_em_outra_fila} já em outra fila (${substituir ? "serão movidos para cá" : "serão ignorados"})`}
+                    {origem === "csv" || origem === "gabinete_atendidos" ? (
+                      <>
+                        {preview.total} válido(s) · {preview.duplicados_na_planilha || 0} repetido(s) na planilha · {preview.ja_em_outra_fila} já no sistema
+                        {preview.amostras?.slice(0, 5).map((item, index) => (
+                          <span key={`${item.telefone}-${index}`} className="block mt-1">
+                            {item.nome} · {item.telefone} — {item.tipo === "na_planilha" ? "repetido nesta planilha" : item.locais?.map(l => l.lista_nome || l.campanha_nome || "lista sem nome").join(", ")}
+                          </span>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        {preview.total} encontrado(s) no total · {preview.pendentes} ainda não ligados
+                        {preview.ja_em_outra_fila > 0 && ` · ${preview.ja_em_outra_fila} já em outra fila (${substituir ? "serão movidos para cá" : "serão ignorados"})`}
+                      </>
+                    )}
                   </p>
                   {previewEntrarao === 0 && (
                     <p className="text-xs text-amber-600">

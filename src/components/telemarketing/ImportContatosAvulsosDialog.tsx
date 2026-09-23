@@ -24,6 +24,17 @@ interface Props {
 
 const NONE = "__none__";
 type Row = Record<string, any>;
+interface ImportPreview {
+  novos: number;
+  duplicados_na_planilha: number;
+  ja_na_mesma_fila: number;
+  ja_em_outra_fila: number;
+  amostras: Array<{
+    nome: string; telefone: string;
+    tipo: "na_planilha" | "na_mesma_fila" | "em_outra_fila";
+    locais: Array<{ lista_nome?: string | null; campanha_nome?: string | null }>;
+  }>;
+}
 
 const guessCol = (headers: string[], patterns: string[]): string => {
   for (const h of headers) {
@@ -50,6 +61,8 @@ export default function ImportContatosAvulsosDialog({
   const [skipGlobalDupes, setSkipGlobalDupes] = useState(true);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
 
 
   useEffect(() => {
@@ -131,6 +144,26 @@ export default function ImportContatosAvulsosDialog({
   const invalidos = rows.length - contatosValidos.length;
   const podeImportar = contatosValidos.length > 0 && !!campanhaId;
 
+  useEffect(() => {
+    setPreview(null);
+    if (!open || !clientId || !campanhaId || !contatosValidos.length) return;
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setPreviewing(true);
+      const { data, error } = await supabase.rpc("tele_preview_importacao_avulsos" as any, {
+        _client_id: clientId, _campanha_id: campanhaId, _rows: contatosValidos as any,
+      });
+      if (!active) return;
+      setPreviewing(false);
+      if (error) {
+        toast.error("Não foi possível conferir duplicados", { description: error.message });
+        return;
+      }
+      setPreview(data as unknown as ImportPreview);
+    }, 350);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [open, clientId, campanhaId, contatosValidos]);
+
   const doImport = async () => {
     if (!podeImportar) return;
     setImporting(true);
@@ -140,6 +173,7 @@ export default function ImportContatosAvulsosDialog({
       _rows: contatosValidos as any,
       _assigned_operador_id: operadorId !== NONE ? operadorId : null,
       _skip_global_dupes: skipGlobalDupes,
+      _lista_nome: fileName.replace(/\.[^.]+$/, "") || "Lista importada",
     });
     setImporting(false);
     if (error) { toast.error(error.message); return; }
@@ -147,6 +181,7 @@ export default function ImportContatosAvulsosDialog({
     const parts: string[] = [];
     if (r.skipped_same_campaign) parts.push(`${r.skipped_same_campaign} já estavam nesta fila`);
     if (r.skipped_other_campaign) parts.push(`${r.skipped_other_campaign} já em outra fila`);
+    if (r.duplicates_in_file) parts.push(`${r.duplicates_in_file} repetidos na própria planilha`);
     toast.success(`${r.inserted ?? 0} contatos importados`, {
       description: parts.length ? parts.join(" · ") : undefined,
     });
@@ -240,6 +275,31 @@ export default function ImportContatosAvulsosDialog({
               </div>
             </Card>
 
+            {previewing && (
+              <Card className="p-3 text-sm flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> Conferindo números já existentes…
+              </Card>
+            )}
+            {preview && (
+              <Card className={preview.duplicados_na_planilha + preview.ja_na_mesma_fila + preview.ja_em_outra_fila > 0 ? "p-3 border-amber-400" : "p-3 border-emerald-400"}>
+                <div className="text-sm font-medium">
+                  {preview.novos} novo(s) · {preview.duplicados_na_planilha} repetido(s) na planilha · {preview.ja_na_mesma_fila} já nesta fila · {preview.ja_em_outra_fila} em outra fila
+                </div>
+                {preview.amostras?.length > 0 && (
+                  <div className="mt-2 max-h-32 overflow-y-auto space-y-1 text-xs text-muted-foreground">
+                    {preview.amostras.slice(0, 8).map((item, index) => (
+                      <div key={`${item.telefone}-${index}`}>
+                        <strong className="text-foreground">{item.nome}</strong> · {item.telefone} — {item.tipo === "na_planilha" ? "repetido na própria planilha" : item.locais?.map(l => l.lista_nome || l.campanha_nome || "lista sem nome").join(", ")}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {preview.ja_na_mesma_fila + preview.ja_em_outra_fila > 0 && (
+                  <p className="mt-2 text-xs">Escolha abaixo se os números existentes devem ser ignorados ou importados novamente.</p>
+                )}
+              </Card>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 border-t">
               <div>
                 <Label>Campanha *</Label>
@@ -271,8 +331,8 @@ export default function ImportContatosAvulsosDialog({
                 onChange={(e) => setSkipGlobalDupes(e.target.checked)}
               />
               <span>
-                <strong>Ignorar contatos que já estão em outra fila</strong> deste cliente
-                (recomendado para evitar ligações duplicadas por operadores diferentes).
+                <strong>Não importar números que já existem</strong> neste cliente
+                (recomendado). Desmarque somente se quiser criar duplicados conscientemente.
               </span>
             </label>
           </div>
