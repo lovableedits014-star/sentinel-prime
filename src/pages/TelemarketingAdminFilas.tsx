@@ -16,6 +16,7 @@ import {
   RotateCw,
   RefreshCcw,
   Pencil,
+  CopyX,
 } from "lucide-react";
 import TelemarketingSubNav from "@/components/telemarketing/TelemarketingSubNav";
 import { useActiveClientId } from "@/hooks/useActiveClientId";
@@ -89,6 +90,7 @@ export default function TelemarketingAdminFilas() {
   const [repopulando, setRepopulando] = useState<string | null>(null);
   const [resetando, setResetando] = useState<string | null>(null);
   const [retrabalhandoInvalidos, setRetrabalhandoInvalidos] = useState<string | null>(null);
+  const [limpandoDuplicados, setLimpandoDuplicados] = useState<string | null>(null);
   const [renameDialog, setRenameDialog] = useState<{
     open: boolean;
     campanhaId: string;
@@ -154,6 +156,65 @@ export default function TelemarketingAdminFilas() {
         : "Esta fila não possui números inválidos",
     );
     load();
+  };
+
+  const limparDuplicados = async (f: FilaResumo) => {
+    if (!clientId || limpandoDuplicados) return;
+    setLimpandoDuplicados(f.campanha_id);
+    try {
+      const { data: preview, error: previewError } = await supabase.rpc(
+        "tele_limpar_duplicados_fila" as any,
+        {
+          _client_id: clientId,
+          _campanha_id: f.campanha_id,
+          _confirmar: false,
+        },
+      );
+      if (previewError) throw previewError;
+
+      const info = (preview as any) || {};
+      const removiveis = Number(info.removiveis || 0);
+      const protegidos = Number(info.protegidos || 0);
+      if (removiveis === 0) {
+        toast.info(
+          protegidos > 0
+            ? `Existem ${protegidos} duplicado(s), mas todos já possuem atendimento e foram protegidos.`
+            : "Nenhum telefone duplicado encontrado nesta fila.",
+        );
+        return;
+      }
+
+      const avisoProtegidos = protegidos > 0
+        ? `\n\n${protegidos} cópia(s) já trabalhada(s) serão preservadas.`
+        : "";
+      if (!confirm(
+        `Remover ${removiveis} contato(s) duplicado(s) da fila “${f.nome}”?\n\n` +
+        "Será mantido um cadastro por telefone. Somente cópias sem ligação ou tentativa serão retiradas da fila." +
+        avisoProtegidos,
+      )) return;
+
+      const { data, error } = await supabase.rpc("tele_limpar_duplicados_fila" as any, {
+        _client_id: clientId,
+        _campanha_id: f.campanha_id,
+        _confirmar: true,
+      });
+      if (error) throw error;
+
+      const resultado = (data as any) || {};
+      const removidos = Number(resultado.removidos || 0);
+      toast.success(`${removidos} contato(s) duplicado(s) removido(s) da fila.`, {
+        description: protegidos > 0
+          ? `${protegidos} cópia(s) com histórico foram preservadas.`
+          : "Foi mantido um cadastro ativo por telefone.",
+      });
+      await load();
+    } catch (error: any) {
+      toast.error("Não foi possível remover os duplicados", {
+        description: error?.message || "Tente novamente.",
+      });
+    } finally {
+      setLimpandoDuplicados(null);
+    }
   };
 
   const load = async () => {
@@ -543,6 +604,25 @@ export default function TelemarketingAdminFilas() {
                       </Button>
                       <TeleHelp
                         text="Traz de volta imediatamente para a fila os contatos marcados como 'não atendeu' ou 'reagendou'. Normalmente eles voltam sozinhos após 6h; use este botão para adiantar. Quem já foi concluído não é afetado."
+                        className="self-center"
+                      />
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={limpandoDuplicados === f.campanha_id}
+                        onClick={() => limparDuplicados(f)}
+                        title="Localiza telefones repetidos e remove somente as cópias ainda não trabalhadas"
+                      >
+                        {limpandoDuplicados === f.campanha_id ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <CopyX className="w-3.5 h-3.5 mr-1" />
+                        )}{" "}
+                        Remover duplicados
+                      </Button>
+                      <TeleHelp
+                        text="Confere telefones repetidos nesta fila e mostra quantos podem ser removidos. Mantém um cadastro por número e protege qualquer cópia que já tenha ligação ou tentativa registrada."
                         className="self-center"
                       />
 

@@ -6,10 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   Shield, Copy, Trash2, Plus, Loader2, Users, Calendar,
-  CheckCircle2, Clock, LogOut, Link2
+  CheckCircle2, Clock, LogOut, Link2, KeyRound, Eye, EyeOff
 } from "lucide-react";
 import UazapiConfigPanel from "@/components/superadmin/UazapiConfigPanel";
 import TseSyncPanel from "@/components/superadmin/TseSyncPanel";
@@ -44,6 +47,12 @@ export default function SuperAdmin() {
   const [newNote, setNewNote] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     checkAccess();
@@ -120,6 +129,44 @@ export default function SuperAdmin() {
 
   const isExpired = (str: string) => new Date(str) < new Date();
 
+  const closePasswordDialog = () => {
+    if (changingPassword) return;
+    setPasswordOpen(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowPasswords(false);
+  };
+
+  const changeSuperAdminPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!currentPassword) return toast.error("Informe a senha atual.");
+    if (newPassword.length < 12) return toast.error("A nova senha deve ter pelo menos 12 caracteres.");
+    if (newPassword === currentPassword) return toast.error("A nova senha deve ser diferente da atual.");
+    if (newPassword !== confirmPassword) return toast.error("A confirmação não coincide com a nova senha.");
+
+    setChangingPassword(true);
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+        current_password: currentPassword,
+      } as any);
+      if (updateError) throw updateError;
+
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "global" });
+      if (signOutError) throw signOutError;
+
+      toast.success("Senha alterada. Todas as sessões foram encerradas.");
+      navigate("/auth", { replace: true });
+    } catch (err: any) {
+      toast.error("Não foi possível trocar a senha", {
+        description: err?.message || "Confirme a senha atual e tente novamente.",
+      });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -151,6 +198,15 @@ export default function SuperAdmin() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-500/50 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200"
+              onClick={() => setPasswordOpen(true)}
+            >
+              <KeyRound className="w-4 h-4 mr-1.5" />
+              Segurança
+            </Button>
             <Button variant="outline" size="sm" className="border-slate-600 text-slate-300" onClick={() => navigate("/dashboard")}>
               Dashboard
             </Button>
@@ -300,6 +356,85 @@ export default function SuperAdmin() {
         {/* Usuários da plataforma com acesso por aba */}
         <PlatformUsersPanel />
       </div>
+
+      <Dialog open={passwordOpen} onOpenChange={(open) => open ? setPasswordOpen(true) : closePasswordDialog()}>
+        <DialogContent className="max-w-md bg-slate-900 border-slate-700 text-slate-100">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-amber-400" />
+              Trocar senha do Super Admin
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              A nova senha substituirá a atual e todas as sessões serão encerradas. Você precisará entrar novamente.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={changeSuperAdminPassword} className="space-y-4">
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+              Pessoas conectadas em outros aparelhos perderão a sessão. Um acesso já emitido pode permanecer ativo somente até o vencimento curto do token do Supabase.
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="super-admin-current-password">Senha atual</Label>
+              <Input
+                id="super-admin-current-password"
+                type={showPasswords ? "text" : "password"}
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="bg-slate-800 border-slate-700"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="super-admin-new-password">Nova senha</Label>
+              <Input
+                id="super-admin-new-password"
+                type={showPasswords ? "text" : "password"}
+                autoComplete="new-password"
+                placeholder="Mínimo de 12 caracteres"
+                minLength={12}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="bg-slate-800 border-slate-700"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="super-admin-confirm-password">Confirmar nova senha</Label>
+              <div className="relative">
+                <Input
+                  id="super-admin-confirm-password"
+                  type={showPasswords ? "text" : "password"}
+                  autoComplete="new-password"
+                  minLength={12}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="bg-slate-800 border-slate-700 pr-10"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-10 w-10 text-slate-400"
+                  onClick={() => setShowPasswords((value) => !value)}
+                  aria-label={showPasswords ? "Ocultar senhas" : "Mostrar senhas"}
+                >
+                  {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={closePasswordDialog} disabled={changingPassword}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="bg-amber-500 hover:bg-amber-600 text-white" disabled={changingPassword}>
+                {changingPassword ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogOut className="w-4 h-4 mr-2" />}
+                Trocar senha e desconectar todos
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
