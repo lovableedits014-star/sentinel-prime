@@ -49,30 +49,43 @@ export async function gerarRaizPagamentoPdf(
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
     : [raiz];
   const cabosDiretos = raiz.tipo === "coordenador"
-    ? ativos.filter((p) => p.tipo === "cabo" && p.parent_id === raiz.id)
+    ? ativos.filter((p) => p.tipo === "cabo" && p.parent_id === raiz.id && contratado(p))
     : [];
   const cabosPorLider = new Map(lideres.map((lider) => [
     lider.id,
-    ativos.filter((p) => p.tipo === "cabo" && p.parent_id === lider.id)
+    ativos.filter((p) => p.tipo === "cabo" && p.parent_id === lider.id && contratado(p))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
   ]));
+  const lideresVisiveis = lideres.filter((lider) =>
+    contratado(lider) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
+  );
   const membros = raiz.tipo === "coordenador"
-    ? [raiz, ...lideres, ...cabosDiretos, ...lideres.flatMap((l) => cabosPorLider.get(l.id) || [])]
+    ? [raiz, ...lideresVisiveis, ...cabosDiretos, ...lideresVisiveis.flatMap((l) => cabosPorLider.get(l.id) || [])]
     : [raiz, ...(cabosPorLider.get(raiz.id) || [])];
   const contratados = membros.filter(contratado);
   const total = contratados.reduce((sum, pessoa) => sum + Number(pessoa.valor_contratacao || 0), 0);
   const rows: Array<Array<string>> = [];
 
   if (raiz.tipo === "coordenador") {
-    rows.push(["COORDENADOR", raiz.nome, telefone(raiz.telefone), contratado(raiz) ? dinheiro(Number(raiz.valor_contratacao)) : "Sem contrato"]);
+    if (contratado(raiz)) {
+      rows.push(["COORDENADOR", raiz.nome, telefone(raiz.telefone), dinheiro(Number(raiz.valor_contratacao))]);
+    }
     cabosDiretos.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).forEach((cabo) =>
-      rows.push(["  CABO DIRETO", cabo.nome, telefone(cabo.telefone), contratado(cabo) ? dinheiro(Number(cabo.valor_contratacao)) : "Sem contrato"]));
+      rows.push(["  CABO DIRETO", cabo.nome, telefone(cabo.telefone), dinheiro(Number(cabo.valor_contratacao))]));
   }
-  lideres.forEach((lider) => {
-    rows.push([raiz.tipo === "coordenador" ? "  LIDER" : "LIDER", lider.nome, telefone(lider.telefone), contratado(lider) ? dinheiro(Number(lider.valor_contratacao)) : "Sem contrato"]);
+  lideresVisiveis.forEach((lider) => {
+    rows.push([
+      raiz.tipo === "coordenador" ? "  LIDER" : "LIDER",
+      lider.nome,
+      telefone(lider.telefone),
+      contratado(lider) ? dinheiro(Number(lider.valor_contratacao)) : "-",
+    ]);
     (cabosPorLider.get(lider.id) || []).forEach((cabo) =>
-      rows.push([raiz.tipo === "coordenador" ? "    CABO" : "  CABO", cabo.nome, telefone(cabo.telefone), contratado(cabo) ? dinheiro(Number(cabo.valor_contratacao)) : "Sem contrato"]));
+      rows.push([raiz.tipo === "coordenador" ? "    CABO" : "  CABO", cabo.nome, telefone(cabo.telefone), dinheiro(Number(cabo.valor_contratacao))]));
   });
+  if (!rows.length) {
+    throw new Error("Esta raiz nao possui contratos com valor para pagamento.");
+  }
 
   const drawHeader = () => {
     doc.setFillColor(15, 52, 120);
@@ -106,15 +119,17 @@ export async function gerarRaizPagamentoPdf(
     styles: { font: "helvetica", fontSize: 8.5, cellPadding: 5, lineColor: [203, 213, 225], lineWidth: 0.5, valign: "middle" },
     headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 88, fontStyle: "bold" },
-      1: { cellWidth: 207 },
-      2: { cellWidth: 102 },
-      3: { cellWidth: 110, halign: "right", fontStyle: "bold" },
+      0: { cellWidth: 80, fontStyle: "bold" },
+      1: { cellWidth: 200 },
+      2: { cellWidth: 100 },
+      3: { cellWidth: 100, halign: "right", fontStyle: "bold" },
     },
     didParseCell: (data: any) => {
-      if (data.section === "body" && data.column.index === 3 && data.cell.raw === "Sem contrato") {
-        data.cell.styles.textColor = [180, 83, 9];
-        data.cell.styles.fontStyle = "normal";
+      if (data.section === "body" && String(data.row.raw?.[0] || "").trim() === "LIDER") {
+        data.cell.styles.fillColor = [219, 234, 254];
+        data.cell.styles.textColor = [30, 64, 175];
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.lineColor = [147, 197, 253];
       }
     },
     didDrawPage: (data: any) => {
