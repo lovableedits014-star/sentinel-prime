@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
   AlertTriangle,
+  Archive,
   CheckCircle2,
   Download,
   FileSpreadsheet,
@@ -413,6 +414,45 @@ export default function EleicaoCabosImportacaoPanel({
       toast.success(`Cabo contratado após a correção — ${money(data?.valor || 0)}.`);
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Não foi possível contratar com os dados corrigidos."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const archiveDuplicateCases = async (ids: number[]) => {
+    if (!ids.length || busy) return;
+    const quantidade = ids.length;
+    if (!window.confirm(
+      quantidade === 1
+        ? "Arquivar este caso já conferido? Ele sairá da Central, mas continuará registrado no histórico da importação."
+        : `Arquivar os ${quantidade} casos selecionados? Eles sairão da Central, mas continuarão registrados no histórico das importações.`,
+    )) return;
+
+    setBusy(true);
+    try {
+      const { data, error } = await db.rpc("eleicao_casos_duplicados_arquivar", {
+        p_client_id: clientId,
+        p_item_ids: ids,
+        p_motivo: "Duplicidade conferida manualmente",
+      });
+      if (error) throw error;
+      const arquivados = Number(data?.arquivados || 0);
+      setSelectedCaseIds((current) => {
+        const next = new Set(current);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      if (duplicateCorrection && ids.includes(duplicateCorrection.id)) {
+        setDuplicateCorrection(null);
+      }
+      await loadBase();
+      toast.success(
+        arquivados === 1
+          ? "Caso arquivado e retirado da Central."
+          : `${arquivados} casos arquivados e retirados da Central.`,
+      );
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível arquivar os casos selecionados."));
     } finally {
       setBusy(false);
     }
@@ -866,6 +906,19 @@ export default function EleicaoCabosImportacaoPanel({
                 <Download className="mr-2 h-4 w-4" />
                 Gerar relatório ({selectedCases.length})
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!selectedCases.length || busy}
+                onClick={() => void archiveDuplicateCases(selectedCases.map((item) => item.id))}
+              >
+                {busy ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Archive className="mr-2 h-4 w-4" />
+                )}
+                Arquivar selecionados ({selectedCases.length})
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -1037,7 +1090,16 @@ export default function EleicaoCabosImportacaoPanel({
                         </div>
                       </div>
                     ) : (
-                      <div className="mt-3 flex justify-end">
+                      <div className="mt-3 flex flex-wrap justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => void archiveDuplicateCases([item.id])}
+                        >
+                          <Archive className="mr-2 h-4 w-4" />
+                          Arquivar caso
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

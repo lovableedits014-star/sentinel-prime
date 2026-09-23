@@ -1701,22 +1701,14 @@ export default function Eleicao() {
     }
   };
 
-  const baixarReciboDocumentacao = async (coordenador: Pessoa) => {
-    if (!isEleicaoContratado(coordenador)) {
-      return toast.error("Este coordenador não possui contrato ativo.");
-    }
-    const lideresContratados = pessoas
-      .filter((p) => p.tipo === "lider" && p.parent_id === coordenador.id && isEleicaoContratado(p))
-      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-    if (!lideresContratados.length) {
-      return toast.error("Nenhum líder com contrato ativo vinculado a este coordenador.");
-    }
+  const baixarRaizDocumentacao = async (raiz: Pessoa) => {
+    if (raiz.tipo === "cabo") return;
     try {
-      await gerarReciboDocumentacaoPdf(coordenador, lideresContratados);
-      toast.success(`Recibo gerado com ${lideresContratados.length} líder(es).`);
+      const result = await gerarReciboDocumentacaoPdf(raiz, pessoas);
+      toast.success(`Raiz de documentação gerada para ${result.contratados} contratado(s).`);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Erro ao gerar o recibo de documentação.",
+        error instanceof Error ? error.message : "Erro ao gerar a raiz de documentação.",
       );
     }
   };
@@ -1762,7 +1754,7 @@ export default function Eleicao() {
         onResendLiderFlow: openResendLiderFlow,
         onArchive: toggleArchive,
         onFormularioCabos: baixarFormularioCabos,
-        onReciboDocumentacao: baixarReciboDocumentacao,
+        onReciboDocumentacao: baixarRaizDocumentacao,
         onNovoLider: abrirNovoLider,
         onNovoCabo: abrirNovoCabo,
       }}
@@ -4071,7 +4063,14 @@ function PessoaRow({
               Exportar Raiz para Pagamento
             </DropdownMenuItem>
           )}
-          {(p.tipo === "coordenador" || p.tipo === "lider") && onExportPaymentRoot && (
+          {(p.tipo === "coordenador" || p.tipo === "lider") && onReciboDocumentacao && (
+            <DropdownMenuItem onClick={() => onReciboDocumentacao(p)}>
+              <FileText className="w-3.5 h-3.5 mr-2" />
+              Exportar Raiz de Documentação
+            </DropdownMenuItem>
+          )}
+          {(p.tipo === "coordenador" || p.tipo === "lider") &&
+            (onExportPaymentRoot || onReciboDocumentacao) && (
             <DropdownMenuSeparator />
           )}
           <EnviarFluxoMenu pessoa={p as any} />
@@ -4109,12 +4108,6 @@ function PessoaRow({
                 <Printer className="w-3.5 h-3.5 mr-2" />
                 Formulários dos líderes
               </DropdownMenuItem>
-              {onReciboDocumentacao && (
-                <DropdownMenuItem onClick={() => onReciboDocumentacao(p)}>
-                  <FileText className="w-3.5 h-3.5 mr-2" />
-                  Formulário Recibo de Documentação
-                </DropdownMenuItem>
-              )}
               <DropdownMenuSeparator />
             </>
           )}
