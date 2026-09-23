@@ -123,10 +123,10 @@ export async function gerarReciboDocumentacaoPdf(
       fontStyle: "bold", minCellHeight: 28,
     },
     columnStyles: {
-      0: { cellWidth: 76, fontStyle: "bold" },
+      0: { cellWidth: 92, fontStyle: "bold" },
       1: { cellWidth: 154 },
       2: { cellWidth: 93 },
-      3: { cellWidth: 196.25, textColor: [100, 116, 139], fontSize: 7.5, halign: "center" },
+      3: { cellWidth: 180.25, textColor: [100, 116, 139], fontSize: 7.5, halign: "center" },
     },
     didParseCell: (data: any) => {
       if (data.section !== "body") return;
