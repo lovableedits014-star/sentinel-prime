@@ -136,6 +136,9 @@ type ManagedContract = {
   valor: number | null; contrato_inicio: string | null; contrato_fim: string | null;
   responsavel_id: string | null; responsavel_nome: string | null; arquivado_em: string | null;
   pertence_ao_lote: boolean; lote_contrato_nome: string | null;
+  conflito_pessoa_id?: string | null; conflito_nome?: string | null;
+  conflito_telefone?: string | null; conflito_cpf?: string | null;
+  conflito_responsavel?: string | null;
 };
 type ContractEdit = ManagedContract & { valorTexto: string; ativo: boolean };
 type LotValueEdit = { id: string; valor: string; parentId: string; motivo: string };
@@ -293,6 +296,8 @@ export default function EleicaoCabosImportacaoPanel({
   const [managedLot, setManagedLot] = useState<string | null>(null);
   const [managedContracts, setManagedContracts] = useState<ManagedContract[]>([]);
   const [contractEdit, setContractEdit] = useState<ContractEdit | null>(null);
+  const [expandedOccurrence, setExpandedOccurrence] = useState<number | null>(null);
+  const [exceptionReason, setExceptionReason] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [lotValueEdit, setLotValueEdit] = useState<LotValueEdit | null>(null);
   const [busy, setBusy] = useState(false);
@@ -658,6 +663,8 @@ export default function EleicaoCabosImportacaoPanel({
       setManagedContracts(Array.isArray(data) ? data : []);
       setManagedLot(lotId);
       setContractEdit(null);
+      setExpandedOccurrence(null);
+      setExceptionReason("");
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Não foi possível carregar os contratos do lote."));
     } finally { setBusy(false); }
@@ -696,6 +703,23 @@ export default function EleicaoCabosImportacaoPanel({
       toast.success(`${Number(data?.arquivados || 0)} contrato(s) arquivado(s).`);
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Não foi possível excluir os contratos do lote."));
+    } finally { setBusy(false); }
+  };
+
+  const approveSharedPhone = async (item: ManagedContract) => {
+    if (!managedLot || !exceptionReason.trim()) return toast.error("Informe por que o telefone pode ser compartilhado.");
+    if (!window.confirm(`Validar o contrato de ${item.nome_importado || item.nome} mesmo usando o telefone de ${item.conflito_nome || "outra pessoa"}? Esta exceção ficará registrada.`)) return;
+    setBusy(true);
+    try {
+      const { error } = await db.rpc("eleicao_cabo_import_aprovar_telefone_compartilhado", {
+        p_lote_id: managedLot, p_item_id: item.item_id, p_motivo: exceptionReason.trim(),
+      });
+      if (error) throw error;
+      setExpandedOccurrence(null); setExceptionReason("");
+      await Promise.all([loadManagedContracts(managedLot), loadBase()]);
+      onChanged(); toast.success("Contrato validado com telefone compartilhado.");
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível validar a exceção."));
     } finally { setBusy(false); }
   };
 
@@ -1546,13 +1570,14 @@ export default function EleicaoCabosImportacaoPanel({
                 <div><p className="font-medium">Contratos e linhas do lote</p><p className="text-xs text-muted-foreground">Todos os registros são exibidos. Contratos originados em outro lote aparecem somente para consulta.</p></div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="destructive" disabled={busy || !managedContracts.some((item) => item.pertence_ao_lote && !item.arquivado_em)} onClick={() => void archiveManagedLot()}><Trash2 className="mr-2 h-4 w-4" />Excluir todos os contratos deste lote</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setManagedLot(null); setManagedContracts([]); setContractEdit(null); }}>Fechar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setManagedLot(null); setManagedContracts([]); setContractEdit(null); setExpandedOccurrence(null); setExceptionReason(""); }}>Fechar</Button>
                 </div>
               </div>
               <div className="max-h-[520px] overflow-auto rounded-md border">
                 <Table><TableHeader><TableRow><TableHead>Linha</TableHead><TableHead>Nome</TableHead><TableHead>Telefone/CPF</TableHead><TableHead>Situação</TableHead><TableHead>Responsável</TableHead><TableHead>Valor</TableHead><TableHead /></TableRow></TableHeader>
-                  <TableBody>{managedContracts.map((item) => <Fragment key={item.item_id}><TableRow><TableCell>{item.numero_linha}</TableCell><TableCell><p className="font-medium">{item.nome || item.nome_importado || "—"}</p>{!item.pertence_ao_lote && item.lote_contrato_nome && <p className="text-xs text-muted-foreground">Contrato no lote: {item.lote_contrato_nome}</p>}</TableCell><TableCell className="text-xs"><p>{item.telefone || item.telefone_importado || "—"}</p><p>{item.cpf || item.cpf_importado || "—"}</p></TableCell><TableCell><Badge variant={item.arquivado_em ? "secondary" : item.pertence_ao_lote ? "default" : "outline"}>{item.pessoa_id ? item.arquivado_em ? "Arquivado" : item.pertence_ao_lote ? "Ativo" : "Duplicado / outro lote" : classificationLabel[item.classificacao] || item.classificacao}</Badge><p className="mt-1 max-w-48 text-xs text-muted-foreground">{item.motivo}</p></TableCell><TableCell>{item.responsavel_nome || "—"}</TableCell><TableCell>{item.valor ? money(item.valor) : "—"}</TableCell><TableCell>{item.pertence_ao_lote && item.pessoa_id ? <Button size="sm" variant="outline" onClick={() => setContractEdit({ ...item, valorTexto: Number(item.valor || 0).toFixed(2).replace(".", ","), ativo: !item.arquivado_em })}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button> : "—"}</TableCell></TableRow>
+                  <TableBody>{managedContracts.map((item) => <Fragment key={item.item_id}><TableRow><TableCell>{item.numero_linha}</TableCell><TableCell><p className="font-medium">{item.nome || item.nome_importado || "—"}</p>{!item.pertence_ao_lote && item.lote_contrato_nome && <p className="text-xs text-muted-foreground">Contrato no lote: {item.lote_contrato_nome}</p>}</TableCell><TableCell className="text-xs"><p>{item.telefone || item.telefone_importado || "—"}</p><p>{item.cpf || item.cpf_importado || "—"}</p></TableCell><TableCell><Badge variant={item.arquivado_em ? "secondary" : item.pertence_ao_lote ? "default" : "outline"}>{item.pessoa_id ? item.arquivado_em ? "Arquivado" : "Ativo" : classificationLabel[item.classificacao] || item.classificacao}</Badge><p className="mt-1 max-w-48 text-xs text-muted-foreground">{item.motivo}</p></TableCell><TableCell>{item.responsavel_nome || "—"}</TableCell><TableCell>{item.valor ? money(item.valor) : "—"}</TableCell><TableCell><div className="flex gap-1">{item.pertence_ao_lote && item.pessoa_id && <Button size="sm" variant="outline" onClick={() => setContractEdit({ ...item, valorTexto: Number(item.valor || 0).toFixed(2).replace(".", ","), ativo: !item.arquivado_em })}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button>}{!item.pertence_ao_lote && <Button size="sm" variant="outline" onClick={() => { setExpandedOccurrence(expandedOccurrence === item.item_id ? null : item.item_id); setExceptionReason(""); }}>Ver ocorrência</Button>}</div></TableCell></TableRow>
                     {contractEdit?.item_id === item.item_id && <TableRow className="bg-muted/30"><TableCell colSpan={7}><div className="grid gap-3 rounded-md border bg-background p-3 md:grid-cols-3"><div><Label>Nome</Label><Input value={contractEdit.nome || ""} onChange={(e) => setContractEdit({ ...contractEdit, nome: e.target.value })} /></div><div><Label>Telefone</Label><Input value={contractEdit.telefone || ""} onChange={(e) => setContractEdit({ ...contractEdit, telefone: e.target.value })} /></div><div><Label>CPF</Label><Input value={contractEdit.cpf || ""} onChange={(e) => setContractEdit({ ...contractEdit, cpf: e.target.value })} /></div><div><Label>Valor</Label><Input value={contractEdit.valorTexto} onChange={(e) => setContractEdit({ ...contractEdit, valorTexto: e.target.value })} /></div><div><Label>Responsável</Label><Select value={contractEdit.responsavel_id || ""} onValueChange={(responsavel_id) => setContractEdit({ ...contractEdit, responsavel_id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{parents.map((parent) => <SelectItem key={parent.id} value={parent.id}>{parent.nome} · {roleLabel(parent.tipo)}</SelectItem>)}</SelectContent></Select></div><div><Label>Status</Label><Select value={contractEdit.ativo ? "ativo" : "arquivado"} onValueChange={(status) => setContractEdit({ ...contractEdit, ativo: status === "ativo" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ativo">Ativo</SelectItem><SelectItem value="arquivado">Excluído/arquivado</SelectItem></SelectContent></Select></div><div><Label>Início</Label><Input type="date" value={contractEdit.contrato_inicio || ""} onChange={(e) => setContractEdit({ ...contractEdit, contrato_inicio: e.target.value })} /></div><div><Label>Término</Label><Input type="date" value={contractEdit.contrato_fim || ""} onChange={(e) => setContractEdit({ ...contractEdit, contrato_fim: e.target.value || null })} /></div><div className="flex items-end gap-2"><Button disabled={busy} onClick={() => void saveManagedContract()}><Save className="mr-2 h-4 w-4" />Salvar</Button><Button variant="outline" onClick={() => setContractEdit(null)}>Cancelar</Button></div></div></TableCell></TableRow>}
+                    {expandedOccurrence === item.item_id && <TableRow className="bg-amber-50/60 dark:bg-amber-950/20"><TableCell colSpan={7}><div className="space-y-3 rounded-md border border-amber-300 p-3"><div><p className="font-semibold">Ocorrência deste contrato</p><p className="text-sm">{item.motivo || "Registro bloqueado pela validação automática."}</p></div><div className="grid gap-3 text-sm md:grid-cols-2"><div><p className="font-medium">Pessoa da planilha</p><p>{item.nome_importado || "—"}</p><p>Telefone: {item.telefone_importado || "—"}</p><p>CPF: {item.cpf_importado || "—"}</p></div><div><p className="font-medium">Cadastro que causou o bloqueio</p><p>{item.conflito_nome || "—"}</p><p>Telefone: {item.conflito_telefone || "—"}</p><p>CPF: {item.conflito_cpf || "—"}</p><p>Responsável: {item.conflito_responsavel || "—"}</p><p>Lote: {item.lote_contrato_nome || "Sem lote vinculado"}</p></div></div>{["duplicado_no_arquivo", "duplicado_contrato_ativo"].includes(item.classificacao) && item.telefone_importado && <div className="space-y-2 border-t pt-3"><p className="text-xs text-muted-foreground">Use somente quando forem pessoas diferentes que compartilham o mesmo telefone. CPF repetido continuará bloqueado.</p><Label>Motivo da exceção manual</Label><Input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} placeholder="Ex.: telefone compartilhado com o marido" /><Button disabled={busy || !exceptionReason.trim()} onClick={() => void approveSharedPhone(item)}><CheckCircle2 className="mr-2 h-4 w-4" />Validar contrato mesmo assim</Button></div>}</div></TableCell></TableRow>}
                   </Fragment>)}</TableBody></Table>
               </div>
             </div>
