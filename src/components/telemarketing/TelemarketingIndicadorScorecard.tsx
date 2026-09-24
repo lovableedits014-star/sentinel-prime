@@ -39,6 +39,15 @@ interface ReportRow {
   campanha_nome: string | null;
   inativo: boolean;
   inativado_em: string | null;
+  bloqueado_por_outro_cadastro: boolean;
+  bloqueio_tabela: string | null;
+  bloqueio_contato_id: string | null;
+  bloqueio_contato_nome: string | null;
+  bloqueio_campanha_id: string | null;
+  bloqueio_campanha_nome: string | null;
+  bloqueio_status: string | null;
+  bloqueio_operador_nome: string | null;
+  bloqueio_em: string | null;
 }
 
 interface Summary {
@@ -61,6 +70,7 @@ interface Summary {
   pendentes: number;
   reagendados: number;
   inativos: number;
+  bloqueadosOutraFila: number;
   cobertura: number;
   taxaContato: number;
   conversao: number;
@@ -103,12 +113,15 @@ function summarize(rows: ReportRow[]): Summary[] {
     const invalidos = data.filter((r) => ["invalido", "numero_invalido"].includes(r.ultimo_status_ligacao || "") || r.status_telemarketing === "descartado").length;
     const reagendados = data.filter((r) => r.status_telemarketing === "agendado" && !!r.proxima_tentativa_em).length;
     const inativos = data.filter((r) => r.inativo).length;
+    const bloqueadosOutraFila = data.filter((r) => r.bloqueado_por_outro_cadastro).length;
     const tentativas = data.reduce((sum, r) => sum + (r.total_tentativas || 0), 0);
     return {
       indicadorId, nome: first?.indicador_nome || "Sem nome", tipo: first?.indicador_tipo || "—",
       regiao: first?.indicador_regiao || "—", total: data.length, trabalhados, tentativas, atendidos,
-      sim, nao, indecisos, naoQuisOpinar, semRespostaAtendidos, naoAtendeu, recusou, invalidos, pendentes: data.length - trabalhados,
-      reagendados, inativos, cobertura: pct(trabalhados, data.length), taxaContato: pct(atendidos, trabalhados),
+      sim, nao, indecisos, naoQuisOpinar, semRespostaAtendidos, naoAtendeu, recusou, invalidos,
+      reagendados, inativos, bloqueadosOutraFila,
+      pendentes: Math.max(0, data.length - trabalhados - bloqueadosOutraFila),
+      cobertura: pct(trabalhados, data.length), taxaContato: pct(atendidos, trabalhados),
       conversao: pct(sim, atendidos), votoBase: pct(sim, data.length),
     };
   });
@@ -198,7 +211,9 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
     if (city !== ALL && clean(r.cidade) !== city) return false;
     if (neighborhood !== ALL && clean(r.bairro) !== neighborhood) return false;
     if (vote !== ALL && (r.vota_candidato || "sem_resposta") !== vote) return false;
-    const normalizedResult = r.ultima_ligacao_em ? (r.ultimo_status_ligacao || "trabalhado") : "pendente";
+    const normalizedResult = r.bloqueado_por_outro_cadastro
+      ? "outra_fila"
+      : r.ultima_ligacao_em ? (r.ultimo_status_ligacao || "trabalhado") : "pendente";
     if (result !== ALL && normalizedResult !== result) return false;
     if (from && (!r.ultima_ligacao_em || r.ultima_ligacao_em.slice(0, 10) < from)) return false;
     if (to && (!r.ultima_ligacao_em || r.ultima_ligacao_em.slice(0, 10) > to)) return false;
@@ -234,12 +249,22 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
       Trabalhados: s.trabalhados, "Cobertura (%)": s.cobertura, Tentativas: s.tentativas, Atendidos: s.atendidos,
       "Taxa contato (%)": s.taxaContato, Sim: s.sim, Não: s.nao, Indecisos: s.indecisos,
       "Conversão atendidos (%)": s.conversao, "Voto/base (%)": s.votoBase, "Não atendeu": s.naoAtendeu,
-      Recusou: s.recusou, Inválidos: s.invalidos, Pendentes: s.pendentes, Reagendados: s.reagendados, Inativos: s.inativos,
+      Recusou: s.recusou, Inválidos: s.invalidos, Pendentes: s.pendentes,
+      "Telefone ligado em outra fila": s.bloqueadosOutraFila,
+      Reagendados: s.reagendados, Inativos: s.inativos,
     }));
     const detail = data.map((r) => ({
       Indicador: r.indicador_nome, Cargo: TIPO_LABEL[r.indicador_tipo] || r.indicador_tipo,
       Região: clean(r.indicador_regiao), Contato: r.nome, Telefone: r.telefone, Cidade: clean(r.cidade), Bairro: clean(r.bairro),
-      Campanha: clean(r.campanha_nome), Resultado: r.ultima_ligacao_em ? clean(r.ultimo_status_ligacao) : "pendente",
+      Campanha: clean(r.campanha_nome),
+      Resultado: r.bloqueado_por_outro_cadastro
+        ? "ligado em outra fila"
+        : r.ultima_ligacao_em ? clean(r.ultimo_status_ligacao) : "pendente",
+      "Fila da ligação": r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_campanha_nome) : "—",
+      "Contato que recebeu a ligação": r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_contato_nome) : "—",
+      "Resultado na outra fila": r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_status) : "—",
+      "Operador na outra fila": r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : "—",
+      "Data na outra fila": r.bloqueio_em ? new Date(r.bloqueio_em).toLocaleString("pt-BR") : "—",
       "Intenção de voto": voteLabel(r.vota_candidato), "Vota em (se respondeu não)": alternativeCandidate(r),
       Operador: clean(r.operador_nome), Tentativas: r.total_tentativas,
       Situação: r.inativo ? "Inativo" : "Ativo",
@@ -268,13 +293,13 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
     doc.setFontSize(9); doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} | ${filterDescription()}`, 36, 55, { maxWidth: 760 });
     autoTable(doc, {
       startY: 72,
-      head: [["Indicador", "Indicados", "Trabalhados", "Atendidos", "Sim", "Não", "Indecisos", "Não atendeu", "Inválidos", "Inativos", "Cobertura", "Conversão"]],
-      body: summary.map((s) => [s.nome, s.total, s.trabalhados, s.atendidos, s.sim, s.nao, s.indecisos, s.naoAtendeu, s.invalidos, s.inativos, `${s.cobertura}%`, `${s.conversao}%`]),
+      head: [["Indicador", "Indicados", "Trabalhados", "Outra fila", "Pendentes", "Atendidos", "Sim", "Não", "Indecisos", "Não atendeu", "Inválidos", "Inativos", "Cobertura", "Conversão"]],
+      body: summary.map((s) => [s.nome, s.total, s.trabalhados, s.bloqueadosOutraFila, s.pendentes, s.atendidos, s.sim, s.nao, s.indecisos, s.naoAtendeu, s.invalidos, s.inativos, `${s.cobertura}%`, `${s.conversao}%`]),
       styles: { fontSize: 7 }, headStyles: { fillColor: [30, 64, 52] },
     });
     autoTable(doc, {
-      head: [["Indicador", "Contato", "Telefone", "Bairro", "Resultado", "Situação", "Intenção", "Vota em (se não)", "Operador", "Tent.", "Última ligação"]],
-      body: data.map((r) => [r.indicador_nome, r.nome, r.telefone, clean(r.bairro), r.ultima_ligacao_em ? clean(r.ultimo_status_ligacao) : "pendente", r.inativo ? "Inativo" : "Ativo", voteLabel(r.vota_candidato), alternativeCandidate(r), clean(r.operador_nome), r.total_tentativas, r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—"]),
+      head: [["Indicador", "Contato", "Telefone", "Bairro", "Resultado", "Fila da ligação", "Contato ligado", "Situação", "Intenção", "Operador", "Tent.", "Data"]],
+      body: data.map((r) => [r.indicador_nome, r.nome, r.telefone, clean(r.bairro), r.bloqueado_por_outro_cadastro ? "ligado em outra fila" : r.ultima_ligacao_em ? clean(r.ultimo_status_ligacao) : "pendente", r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_campanha_nome) : "—", r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_contato_nome) : "—", r.inativo ? "Inativo" : "Ativo", voteLabel(r.vota_candidato), r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : clean(r.operador_nome), r.total_tentativas, r.bloqueio_em ? new Date(r.bloqueio_em).toLocaleString("pt-BR") : r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—"]),
       styles: { fontSize: 6.5 }, headStyles: { fillColor: [30, 64, 52] }, showHead: "everyPage",
     });
     doc.save(`telemarketing-indicadores-${filename(label)}-${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -308,6 +333,8 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
   const metricCards = totals ? [
     { label: "Indicados", value: totals.total, Icon: Users },
     { label: "Trabalhados", value: totals.trabalhados, Icon: Phone },
+    { label: "Ligado em outra fila", value: totals.bloqueadosOutraFila, Icon: CheckCircle2 },
+    { label: "Aguardando ligação", value: totals.pendentes, Icon: Phone },
     { label: "Tentativas", value: totals.tentativas, Icon: RefreshCw },
     { label: "Atendidos", value: totals.atendidos, Icon: UserCheck },
     { label: "Sim", value: totals.sim, Icon: CheckCircle2 },
@@ -342,7 +369,7 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
           <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos os cargos</SelectItem>{Object.entries(TIPO_LABEL).map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}</SelectContent></Select>
           <Select value={campaign} onValueChange={setCampaign}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todas as campanhas</SelectItem>{options.campaigns.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>
           <Select value={operator} onValueChange={setOperator}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos os operadores</SelectItem>{options.operators.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>
-          <Select value={result} onValueChange={setResult}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos os resultados</SelectItem><SelectItem value="pendente">Pendente</SelectItem><SelectItem value="atendeu">Atendeu</SelectItem><SelectItem value="nao_atendeu">Não atendeu</SelectItem><SelectItem value="recusou">Recusou</SelectItem><SelectItem value="numero_invalido">Número inválido</SelectItem></SelectContent></Select>
+          <Select value={result} onValueChange={setResult}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos os resultados</SelectItem><SelectItem value="pendente">Aguardando ligação</SelectItem><SelectItem value="outra_fila">Ligado em outra fila</SelectItem><SelectItem value="atendeu">Atendeu</SelectItem><SelectItem value="nao_atendeu">Não atendeu</SelectItem><SelectItem value="recusou">Recusou</SelectItem><SelectItem value="numero_invalido">Número inválido</SelectItem></SelectContent></Select>
           <Select value={vote} onValueChange={setVote}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todas as intenções</SelectItem><SelectItem value="sim">Sim</SelectItem><SelectItem value="nao">Não</SelectItem><SelectItem value="indeciso">Indeciso</SelectItem><SelectItem value="sem_resposta">Sem resposta</SelectItem></SelectContent></Select>
           <Select value={region} onValueChange={setRegion}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todas as regiões</SelectItem>{options.regions.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>
           <Select value={city} onValueChange={setCity}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todas as cidades</SelectItem>{options.cities.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>
@@ -353,7 +380,7 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
         {activeFilters > 0 && <Button variant="ghost" size="sm" onClick={resetFilters}><FilterX className="size-4" />Limpar {activeFilters} filtro(s)</Button>}
 
         {loading ? <div className="flex justify-center py-12"><Loader2 className="size-7 animate-spin text-primary" /></div> : !totals ? <p className="py-10 text-center text-sm text-muted-foreground">Nenhum resultado encontrado para os filtros selecionados.</p> : <>
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-5 xl:grid-cols-10">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-5 xl:grid-cols-12">
             {metricCards.map(({ label, value, Icon }) => <div key={label} className="rounded-md border p-3"><div className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground"><Icon className="size-3" />{label}</div><p className="mt-1 text-xl font-bold">{value}</p></div>)}
           </div>
 
@@ -375,8 +402,8 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
 
           <div className="overflow-hidden rounded-md border">
             <Table>
-              <TableHeader><TableRow><TableHead>Indicador</TableHead>{[["total", "Indicados"], ["trabalhados", "Trab."], ["tentativas", "Tent."], ["atendidos", "Atend."], ["sim", "Sim"], ["nao", "Não"], ["indecisos", "Indec."], ["naoQuisOpinar", "N/opin."], ["semRespostaAtendidos", "S/resp."], ["naoAtendeu", "N/atend."], ["invalidos", "Invál."], ["cobertura", "Cobert."], ["conversao", "Conversão"]].map(([key, label]) => <TableHead key={key} className="text-center"><Button variant="ghost" size="sm" className="h-auto px-1 text-xs" title={key === "naoQuisOpinar" ? "Não quis opinar" : key === "semRespostaAtendidos" ? "Atendido sem intenção registrada" : undefined} onClick={() => setSort(key as keyof Summary)}>{label}<ArrowDownUp className="size-3" /></Button></TableHead>)}</TableRow></TableHeader>
-              <TableBody>{summaries.map((s) => <TableRow key={s.indicadorId} className="cursor-pointer" onClick={() => setSelected(s)}><TableCell><button type="button" className="text-left font-medium text-primary hover:underline" onClick={() => setSelected(s)}>{s.nome}</button><p className="text-[10px] text-muted-foreground">{TIPO_LABEL[s.tipo] || s.tipo} · {s.regiao}</p></TableCell><TableCell className="text-center">{s.total}</TableCell><TableCell className="text-center">{s.trabalhados}</TableCell><TableCell className="text-center">{s.tentativas}</TableCell><TableCell className="text-center">{s.atendidos}</TableCell><TableCell className="text-center font-semibold text-emerald-600">{s.sim}</TableCell><TableCell className="text-center text-destructive">{s.nao}</TableCell><TableCell className="text-center">{s.indecisos}</TableCell><TableCell className="text-center">{s.naoQuisOpinar}</TableCell><TableCell className="text-center">{s.semRespostaAtendidos}</TableCell><TableCell className="text-center">{s.naoAtendeu}</TableCell><TableCell className="text-center">{s.invalidos}</TableCell><TableCell className="text-center">{s.cobertura}%</TableCell><TableCell className="text-center font-semibold">{s.conversao}%</TableCell></TableRow>)}</TableBody>
+              <TableHeader><TableRow><TableHead>Indicador</TableHead>{[["total", "Indicados"], ["trabalhados", "Trab."], ["bloqueadosOutraFila", "Outra fila"], ["pendentes", "Aguard."], ["tentativas", "Tent."], ["atendidos", "Atend."], ["sim", "Sim"], ["nao", "Não"], ["indecisos", "Indec."], ["naoQuisOpinar", "N/opin."], ["semRespostaAtendidos", "S/resp."], ["naoAtendeu", "N/atend."], ["invalidos", "Invál."], ["cobertura", "Cobert."], ["conversao", "Conversão"]].map(([key, label]) => <TableHead key={key} className="text-center"><Button variant="ghost" size="sm" className="h-auto px-1 text-xs" title={key === "naoQuisOpinar" ? "Não quis opinar" : key === "semRespostaAtendidos" ? "Atendido sem intenção registrada" : key === "bloqueadosOutraFila" ? "Telefone já ligado em outra fila" : undefined} onClick={() => setSort(key as keyof Summary)}>{label}<ArrowDownUp className="size-3" /></Button></TableHead>)}</TableRow></TableHeader>
+              <TableBody>{summaries.map((s) => <TableRow key={s.indicadorId} className="cursor-pointer" onClick={() => setSelected(s)}><TableCell><button type="button" className="text-left font-medium text-primary hover:underline" onClick={() => setSelected(s)}>{s.nome}</button><p className="text-[10px] text-muted-foreground">{TIPO_LABEL[s.tipo] || s.tipo} · {s.regiao}</p></TableCell><TableCell className="text-center">{s.total}</TableCell><TableCell className="text-center">{s.trabalhados}</TableCell><TableCell className="text-center">{s.bloqueadosOutraFila}</TableCell><TableCell className="text-center">{s.pendentes}</TableCell><TableCell className="text-center">{s.tentativas}</TableCell><TableCell className="text-center">{s.atendidos}</TableCell><TableCell className="text-center font-semibold text-emerald-600">{s.sim}</TableCell><TableCell className="text-center text-destructive">{s.nao}</TableCell><TableCell className="text-center">{s.indecisos}</TableCell><TableCell className="text-center">{s.naoQuisOpinar}</TableCell><TableCell className="text-center">{s.semRespostaAtendidos}</TableCell><TableCell className="text-center">{s.naoAtendeu}</TableCell><TableCell className="text-center">{s.invalidos}</TableCell><TableCell className="text-center">{s.cobertura}%</TableCell><TableCell className="text-center font-semibold">{s.conversao}%</TableCell></TableRow>)}</TableBody>
             </Table>
           </div>
         </>}
@@ -391,9 +418,9 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
             </div>
           </DialogHeader>
           {selected && <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-2 md:grid-cols-6">{[["Indicados", selected.total], ["Trabalhados", selected.trabalhados], ["Atendidos", selected.atendidos], ["Sim", selected.sim], ["Não", selected.nao], ["Indecisos", selected.indecisos], ["Não quis opinar", selected.naoQuisOpinar], ["Atendido sem resposta", selected.semRespostaAtendidos], ["Não atendeu", selected.naoAtendeu], ["Inválidos", selected.invalidos], ["Inativos", selected.inativos]].map(([label, value]) => <div key={String(label)} className="rounded-md border p-2 text-center"><p className="text-lg font-bold">{value}</p><p className="text-[10px] text-muted-foreground">{label}</p></div>)}</div>
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-6">{[["Indicados", selected.total], ["Trabalhados", selected.trabalhados], ["Ligado em outra fila", selected.bloqueadosOutraFila], ["Aguardando ligação", selected.pendentes], ["Atendidos", selected.atendidos], ["Sim", selected.sim], ["Não", selected.nao], ["Indecisos", selected.indecisos], ["Não quis opinar", selected.naoQuisOpinar], ["Atendido sem resposta", selected.semRespostaAtendidos], ["Não atendeu", selected.naoAtendeu], ["Inválidos", selected.invalidos], ["Inativos", selected.inativos]].map(([label, value]) => <div key={String(label)} className="rounded-md border p-2 text-center"><p className="text-lg font-bold">{value}</p><p className="text-[10px] text-muted-foreground">{label}</p></div>)}</div>
             {selected.nao > 0 && <div className="rounded-md border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/20"><p className="text-xs font-semibold">Candidatos citados por quem respondeu “Não”</p>{citedCandidates.length ? <div className="mt-2 flex flex-wrap gap-2">{citedCandidates.map((item) => <Badge key={item.nome} variant="outline" className="bg-background">{item.nome} <span className="ml-1 text-muted-foreground">({item.total})</span></Badge>)}</div> : <p className="mt-1 text-xs text-muted-foreground">Nenhum candidato alternativo foi informado.</p>}</div>}
-            <div className="max-h-[58vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>Contato</TableHead><TableHead>Telefone</TableHead><TableHead>Bairro/cidade</TableHead><TableHead>Resultado</TableHead><TableHead>Situação</TableHead><TableHead>Intenção</TableHead><TableHead>Disse que vota em</TableHead><TableHead>Operador</TableHead><TableHead>Tent.</TableHead><TableHead>Última ligação</TableHead><TableHead>Ação</TableHead></TableRow></TableHeader><TableBody>{selectedRows.map((r) => <TableRow key={r.contato_id}><TableCell className="font-medium">{r.nome}</TableCell><TableCell>{r.telefone}</TableCell><TableCell>{clean(r.bairro)} / {clean(r.cidade)}</TableCell><TableCell><Badge variant="outline">{r.ultima_ligacao_em ? RESULT_LABEL[r.ultimo_status_ligacao || ""] || clean(r.ultimo_status_ligacao) : "Pendente"}</Badge></TableCell><TableCell>{r.inativo ? <Badge variant="secondary">Inativo</Badge> : <Badge variant="outline">Ativo</Badge>}</TableCell><TableCell><Badge variant={r.vota_candidato === "nao" ? "destructive" : "outline"}>{voteLabel(r.vota_candidato)}</Badge></TableCell><TableCell className={r.vota_candidato === "nao" ? "font-semibold text-amber-700 dark:text-amber-400" : "text-muted-foreground"}>{alternativeCandidate(r)}</TableCell><TableCell>{clean(r.operador_nome)}</TableCell><TableCell className="text-center"><button type="button" className="font-semibold text-primary underline underline-offset-2 disabled:no-underline disabled:text-foreground" disabled={!r.total_tentativas} title="Ver datas e horários das tentativas" onClick={() => void openAttempts(r)}>{r.total_tentativas}</button></TableCell><TableCell>{r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—"}</TableCell><TableCell>{r.inativo ? <Button variant="outline" size="sm" onClick={() => void reactivateContact(r)}><RefreshCw className="size-3" />Reativar</Button> : "—"}</TableCell></TableRow>)}</TableBody></Table></div>
+            <div className="max-h-[58vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>Contato</TableHead><TableHead>Telefone</TableHead><TableHead>Bairro/cidade</TableHead><TableHead>Resultado</TableHead><TableHead>Fila da ligação</TableHead><TableHead>Contato ligado</TableHead><TableHead>Situação</TableHead><TableHead>Intenção</TableHead><TableHead>Operador</TableHead><TableHead>Tent.</TableHead><TableHead>Data</TableHead><TableHead>Ação</TableHead></TableRow></TableHeader><TableBody>{selectedRows.map((r) => <TableRow key={r.contato_id}><TableCell className="font-medium">{r.nome}</TableCell><TableCell>{r.telefone}</TableCell><TableCell>{clean(r.bairro)} / {clean(r.cidade)}</TableCell><TableCell><Badge variant={r.bloqueado_por_outro_cadastro ? "secondary" : "outline"}>{r.bloqueado_por_outro_cadastro ? "Ligado em outra fila" : r.ultima_ligacao_em ? RESULT_LABEL[r.ultimo_status_ligacao || ""] || clean(r.ultimo_status_ligacao) : "Aguardando ligação"}</Badge></TableCell><TableCell>{r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_campanha_nome) : "—"}</TableCell><TableCell>{r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_contato_nome) : "—"}</TableCell><TableCell>{r.inativo ? <Badge variant="secondary">Inativo</Badge> : <Badge variant="outline">Ativo</Badge>}</TableCell><TableCell><Badge variant={r.vota_candidato === "nao" ? "destructive" : "outline"}>{voteLabel(r.vota_candidato)}</Badge></TableCell><TableCell>{r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : clean(r.operador_nome)}</TableCell><TableCell className="text-center"><button type="button" className="font-semibold text-primary underline underline-offset-2 disabled:no-underline disabled:text-foreground" disabled={!r.total_tentativas} title="Ver datas e horários das tentativas" onClick={() => void openAttempts(r)}>{r.total_tentativas}</button></TableCell><TableCell>{r.bloqueio_em ? new Date(r.bloqueio_em).toLocaleString("pt-BR") : r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—"}</TableCell><TableCell>{r.inativo ? <Button variant="outline" size="sm" onClick={() => void reactivateContact(r)}><RefreshCw className="size-3" />Reativar</Button> : "—"}</TableCell></TableRow>)}</TableBody></Table></div>
           </div>}
         </DialogContent>
       </Dialog>
