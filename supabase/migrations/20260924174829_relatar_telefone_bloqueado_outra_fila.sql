@@ -34,6 +34,9 @@ RETURNS TABLE(
   bloqueio_campanha_id uuid,
   bloqueio_campanha_nome text,
   bloqueio_status text,
+  bloqueio_vota_candidato text,
+  bloqueio_candidato_alternativo text,
+  bloqueio_total_tentativas integer,
   bloqueio_operador_nome text,
   bloqueio_em timestamptz
 )
@@ -52,6 +55,31 @@ AS $function$
       o.operador_nome,
       o.concluded_at,
       COALESCE(av.nome, ci.nome, ct.nome, ei.nome, ep.nome) AS contato_nome,
+      COALESCE(
+        av.vota_candidato,
+        ci.vota_candidato,
+        ct.vota_candidato,
+        ei.vota_candidato,
+        ep.vota_candidato
+      ) AS vota_candidato,
+      COALESCE(
+        av.candidato_alternativo,
+        ci.candidato_alternativo,
+        ct.candidato_alternativo,
+        ei.candidato_alternativo,
+        ep.candidato_alternativo
+      ) AS candidato_alternativo,
+      GREATEST(
+        COALESCE(
+          av.tentativas_count,
+          ci.tentativas_count,
+          ct.tentativas_count,
+          ei.total_tentativas,
+          ep.tentativas_count,
+          0
+        ),
+        1
+      ) AS total_tentativas,
       COALESCE(
         av.campanha_id,
         ci.campanha_id,
@@ -114,6 +142,9 @@ AS $function$
       ELSE COALESCE(campanha_bloqueio.nome, 'Sem fila vinculada')
     END,
     outcome.ligacao_status,
+    outcome.vota_candidato,
+    outcome.candidato_alternativo,
+    outcome.total_tentativas,
     outcome.operador_nome,
     outcome.concluded_at
   FROM public.eleicao_indicados ei

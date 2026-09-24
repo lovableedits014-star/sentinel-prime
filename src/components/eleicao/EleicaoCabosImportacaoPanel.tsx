@@ -10,6 +10,7 @@ import {
   Loader2,
   Pencil,
   Save,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -128,6 +129,15 @@ type ImportLot = {
 };
 
 type Analysis = { lote: ImportLot; itens: ImportItem[] };
+type ManagedContract = {
+  item_id: number; numero_linha: number; classificacao: string; motivo: string | null;
+  nome_importado: string | null; cpf_importado: string | null; telefone_importado: string | null;
+  pessoa_id: string | null; nome: string | null; cpf: string | null; telefone: string | null;
+  valor: number | null; contrato_inicio: string | null; contrato_fim: string | null;
+  responsavel_id: string | null; responsavel_nome: string | null; arquivado_em: string | null;
+  pertence_ao_lote: boolean; lote_contrato_nome: string | null;
+};
+type ContractEdit = ManagedContract & { valorTexto: string; ativo: boolean };
 type LotValueEdit = { id: string; valor: string; parentId: string; motivo: string };
 type DuplicateCorrection = {
   id: number;
@@ -280,6 +290,9 @@ export default function EleicaoCabosImportacaoPanel({
   const [duplicateCorrection, setDuplicateCorrection] = useState<DuplicateCorrection | null>(null);
   const [auditItems, setAuditItems] = useState<ImportItem[]>([]);
   const [auditLot, setAuditLot] = useState<string | null>(null);
+  const [managedLot, setManagedLot] = useState<string | null>(null);
+  const [managedContracts, setManagedContracts] = useState<ManagedContract[]>([]);
+  const [contractEdit, setContractEdit] = useState<ContractEdit | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [lotValueEdit, setLotValueEdit] = useState<LotValueEdit | null>(null);
   const [busy, setBusy] = useState(false);
@@ -635,6 +648,55 @@ export default function EleicaoCabosImportacaoPanel({
     } finally {
       setBusy(false);
     }
+  };
+
+  const loadManagedContracts = async (lotId: string) => {
+    setBusy(true);
+    try {
+      const { data, error } = await db.rpc("eleicao_cabo_import_contratos", { p_lote_id: lotId });
+      if (error) throw error;
+      setManagedContracts(Array.isArray(data) ? data : []);
+      setManagedLot(lotId);
+      setContractEdit(null);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível carregar os contratos do lote."));
+    } finally { setBusy(false); }
+  };
+
+  const saveManagedContract = async () => {
+    if (!managedLot || !contractEdit || !contractEdit.pessoa_id) return;
+    const valorContrato = Number(contractEdit.valorTexto.replace(/\./g, "").replace(",", "."));
+    setBusy(true);
+    try {
+      const { error } = await db.rpc("eleicao_cabo_import_editar_contrato", {
+        p_lote_id: managedLot, p_item_id: contractEdit.item_id,
+        p_nome: contractEdit.nome, p_cpf: contractEdit.cpf || null,
+        p_telefone: contractEdit.telefone, p_valor: valorContrato,
+        p_parent_id: contractEdit.responsavel_id,
+        p_inicio: contractEdit.contrato_inicio, p_fim: contractEdit.contrato_fim || null,
+        p_ativo: contractEdit.ativo,
+      });
+      if (error) throw error;
+      await Promise.all([loadManagedContracts(managedLot), loadBase()]);
+      onChanged();
+      toast.success(contractEdit.ativo ? "Contrato salvo e ativo." : "Contrato arquivado.");
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível salvar o contrato."));
+    } finally { setBusy(false); }
+  };
+
+  const archiveManagedLot = async () => {
+    if (!managedLot || !window.confirm("Excluir todos os contratos deste lote? Eles serão arquivados e poderão ser reativados individualmente. As linhas da importação continuarão no histórico.")) return;
+    setBusy(true);
+    try {
+      const { data, error } = await db.rpc("eleicao_cabo_import_arquivar_todos", { p_lote_id: managedLot });
+      if (error) throw error;
+      await Promise.all([loadManagedContracts(managedLot), loadBase()]);
+      onChanged();
+      toast.success(`${Number(data?.arquivados || 0)} contrato(s) arquivado(s).`);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível excluir os contratos do lote."));
+    } finally { setBusy(false); }
   };
 
   const resolveActiveDuplicate = async (group: DuplicateGroup, keep: DuplicatePerson) => {
@@ -1218,7 +1280,7 @@ export default function EleicaoCabosImportacaoPanel({
                                   {person.is_voluntario
                                     ? "Voluntário"
                                     : Number(person.valor_contratacao || 0) > 0
-                                      ? `Contrato de ${money(person.valor_contratacao)}`
+                                      ? `Contrato de ${money(person.valor_contratacao || 0)}`
                                       : "Sem contrato"}
                                 </span>
                                 <Badge
@@ -1310,7 +1372,7 @@ export default function EleicaoCabosImportacaoPanel({
                       <Badge variant="outline">{lot.status}</Badge>
                     </TableCell>
                     <TableCell>{lot.total_linhas}</TableCell>
-                    <TableCell>{lot.total_duplicados}</TableCell>
+                    <TableCell>{lot.total_elegiveis}</TableCell>
                     <TableCell>{lot.total_repetidos_arquivo || 0}</TableCell>
                     <TableCell>{lot.total_invalidos}</TableCell>
                     <TableCell className="text-right">
@@ -1342,6 +1404,14 @@ export default function EleicaoCabosImportacaoPanel({
                         >
                           <Pencil className="mr-1 h-3.5 w-3.5" />
                           Editar lote
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => void loadManagedContracts(lot.id)}
+                        >
+                          Gerenciar contratos
                         </Button>
                         <Button
                           size="sm"
@@ -1469,6 +1539,23 @@ export default function EleicaoCabosImportacaoPanel({
                 ))}
               </div>
             </details>
+          )}
+          {managedLot && (
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><p className="font-medium">Contratos e linhas do lote</p><p className="text-xs text-muted-foreground">Todos os registros são exibidos. Contratos originados em outro lote aparecem somente para consulta.</p></div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="destructive" disabled={busy || !managedContracts.some((item) => item.pertence_ao_lote && !item.arquivado_em)} onClick={() => void archiveManagedLot()}><Trash2 className="mr-2 h-4 w-4" />Excluir todos os contratos deste lote</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setManagedLot(null); setManagedContracts([]); setContractEdit(null); }}>Fechar</Button>
+                </div>
+              </div>
+              <div className="max-h-[520px] overflow-auto rounded-md border">
+                <Table><TableHeader><TableRow><TableHead>Linha</TableHead><TableHead>Nome</TableHead><TableHead>Telefone/CPF</TableHead><TableHead>Situação</TableHead><TableHead>Responsável</TableHead><TableHead>Valor</TableHead><TableHead /></TableRow></TableHeader>
+                  <TableBody>{managedContracts.map((item) => <Fragment key={item.item_id}><TableRow><TableCell>{item.numero_linha}</TableCell><TableCell><p className="font-medium">{item.nome || item.nome_importado || "—"}</p>{!item.pertence_ao_lote && item.lote_contrato_nome && <p className="text-xs text-muted-foreground">Contrato no lote: {item.lote_contrato_nome}</p>}</TableCell><TableCell className="text-xs"><p>{item.telefone || item.telefone_importado || "—"}</p><p>{item.cpf || item.cpf_importado || "—"}</p></TableCell><TableCell><Badge variant={item.arquivado_em ? "secondary" : item.pertence_ao_lote ? "default" : "outline"}>{item.pessoa_id ? item.arquivado_em ? "Arquivado" : item.pertence_ao_lote ? "Ativo" : "Duplicado / outro lote" : classificationLabel[item.classificacao] || item.classificacao}</Badge><p className="mt-1 max-w-48 text-xs text-muted-foreground">{item.motivo}</p></TableCell><TableCell>{item.responsavel_nome || "—"}</TableCell><TableCell>{item.valor ? money(item.valor) : "—"}</TableCell><TableCell>{item.pertence_ao_lote && item.pessoa_id ? <Button size="sm" variant="outline" onClick={() => setContractEdit({ ...item, valorTexto: Number(item.valor || 0).toFixed(2).replace(".", ","), ativo: !item.arquivado_em })}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button> : "—"}</TableCell></TableRow>
+                    {contractEdit?.item_id === item.item_id && <TableRow className="bg-muted/30"><TableCell colSpan={7}><div className="grid gap-3 rounded-md border bg-background p-3 md:grid-cols-3"><div><Label>Nome</Label><Input value={contractEdit.nome || ""} onChange={(e) => setContractEdit({ ...contractEdit, nome: e.target.value })} /></div><div><Label>Telefone</Label><Input value={contractEdit.telefone || ""} onChange={(e) => setContractEdit({ ...contractEdit, telefone: e.target.value })} /></div><div><Label>CPF</Label><Input value={contractEdit.cpf || ""} onChange={(e) => setContractEdit({ ...contractEdit, cpf: e.target.value })} /></div><div><Label>Valor</Label><Input value={contractEdit.valorTexto} onChange={(e) => setContractEdit({ ...contractEdit, valorTexto: e.target.value })} /></div><div><Label>Responsável</Label><Select value={contractEdit.responsavel_id || ""} onValueChange={(responsavel_id) => setContractEdit({ ...contractEdit, responsavel_id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{parents.map((parent) => <SelectItem key={parent.id} value={parent.id}>{parent.nome} · {roleLabel(parent.tipo)}</SelectItem>)}</SelectContent></Select></div><div><Label>Status</Label><Select value={contractEdit.ativo ? "ativo" : "arquivado"} onValueChange={(status) => setContractEdit({ ...contractEdit, ativo: status === "ativo" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ativo">Ativo</SelectItem><SelectItem value="arquivado">Excluído/arquivado</SelectItem></SelectContent></Select></div><div><Label>Início</Label><Input type="date" value={contractEdit.contrato_inicio || ""} onChange={(e) => setContractEdit({ ...contractEdit, contrato_inicio: e.target.value })} /></div><div><Label>Término</Label><Input type="date" value={contractEdit.contrato_fim || ""} onChange={(e) => setContractEdit({ ...contractEdit, contrato_fim: e.target.value || null })} /></div><div className="flex items-end gap-2"><Button disabled={busy} onClick={() => void saveManagedContract()}><Save className="mr-2 h-4 w-4" />Salvar</Button><Button variant="outline" onClick={() => setContractEdit(null)}>Cancelar</Button></div></div></TableCell></TableRow>}
+                  </Fragment>)}</TableBody></Table>
+              </div>
+            </div>
           )}
           {auditLot && (
             <div>

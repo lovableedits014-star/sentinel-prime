@@ -46,6 +46,9 @@ interface ReportRow {
   bloqueio_campanha_id: string | null;
   bloqueio_campanha_nome: string | null;
   bloqueio_status: string | null;
+  bloqueio_vota_candidato: string | null;
+  bloqueio_candidato_alternativo: string | null;
+  bloqueio_total_tentativas: number | null;
   bloqueio_operador_nome: string | null;
   bloqueio_em: string | null;
 }
@@ -91,8 +94,41 @@ const VOTE_LABEL: Record<string, string> = {
 const pct = (part: number, total: number) => total > 0 ? Math.round((part / total) * 1000) / 10 : 0;
 const clean = (value: string | null | undefined) => value?.trim() || "—";
 const voteLabel = (value: string | null) => value ? VOTE_LABEL[value] || value : "Sem resposta";
-const alternativeCandidate = (row: ReportRow) => row.vota_candidato === "nao"
-  ? row.candidato_alternativo?.trim() || "Não informado"
+const effectiveStatus = (row: ReportRow) => row.bloqueado_por_outro_cadastro
+  ? row.bloqueio_status
+  : row.ultimo_status_ligacao;
+const effectiveVote = (row: ReportRow) => row.bloqueado_por_outro_cadastro
+  ? row.bloqueio_vota_candidato
+  : row.vota_candidato;
+const effectiveAlternativeCandidate = (row: ReportRow) => row.bloqueado_por_outro_cadastro
+  ? row.bloqueio_candidato_alternativo
+  : row.candidato_alternativo;
+const effectiveAttempts = (row: ReportRow) => row.bloqueado_por_outro_cadastro
+  ? Math.max(row.bloqueio_total_tentativas || 0, 1)
+  : row.total_tentativas;
+const intentionLabel = (row: ReportRow) => {
+  if (effectiveStatus(row) !== "atendeu") return "—";
+  return effectiveVote(row) ? voteLabel(effectiveVote(row)) : "Atendido sem resposta";
+};
+const normalizedPersonName = (value: string | null | undefined) => (value || "")
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLocaleLowerCase("pt-BR")
+  .split(/[^a-z0-9]+/)
+  .filter((part) => part && !["da", "das", "de", "do", "dos", "e"].includes(part))
+  .join(" ");
+const linkedContactLabel = (row: ReportRow) => {
+  if (!row.bloqueado_por_outro_cadastro || !row.bloqueio_contato_nome) return "—";
+  return normalizedPersonName(row.nome) === normalizedPersonName(row.bloqueio_contato_nome)
+    ? "—"
+    : row.bloqueio_contato_nome;
+};
+const resultLabel = (row: ReportRow) => {
+  const status = effectiveStatus(row);
+  return status ? RESULT_LABEL[status] || clean(status) : "Aguardando ligação";
+};
+const alternativeCandidate = (row: ReportRow) => effectiveVote(row) === "nao"
+  ? effectiveAlternativeCandidate(row)?.trim() || "Não informado"
   : "—";
 const filename = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
 
@@ -150,9 +186,12 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
 
   const openAttempts = async (row: ReportRow) => {
     setAttemptContact(row); setAttempts([]); setAttemptsLoading(true);
+    const tabela = row.bloqueado_por_outro_cadastro ? row.bloqueio_tabela : "eleicao_indicados";
+    const contatoId = row.bloqueado_por_outro_cadastro ? row.bloqueio_contato_id : row.contato_id;
+    if (!tabela || !contatoId) { setAttemptsLoading(false); return; }
     const { data, error } = await supabase.from("telemarketing_call_log" as any)
       .select("id,operador_nome,ligacao_status,vota_candidato,observacao,proxima_tentativa_em,created_at")
-      .eq("client_id", clientId).eq("tabela", "eleicao_indicados").eq("contato_id", row.contato_id)
+      .eq("client_id", clientId).eq("tabela", tabela).eq("contato_id", contatoId)
       .order("created_at", { ascending: false });
     setAttemptsLoading(false);
     if (error) { toast.error("Não foi possível abrir os horários das tentativas: " + error.message); return; }
@@ -172,7 +211,7 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
         .order("contato_id", { ascending: true })
         .range(fromRow, fromRow + INDICATOR_PAGE_SIZE - 1);
       if (response.error) { error = response.error; break; }
-      const pageRows = (response.data || []) as ReportRow[];
+      const pageRows = (response.data || []) as unknown as ReportRow[];
       allRows.push(...pageRows);
       if (pageRows.length < INDICATOR_PAGE_SIZE) break;
       page += 1;
@@ -257,16 +296,14 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
       Indicador: r.indicador_nome, Cargo: TIPO_LABEL[r.indicador_tipo] || r.indicador_tipo,
       Região: clean(r.indicador_regiao), Contato: r.nome, Telefone: r.telefone, Cidade: clean(r.cidade), Bairro: clean(r.bairro),
       Campanha: clean(r.campanha_nome),
-      Resultado: r.bloqueado_por_outro_cadastro
-        ? "ligado em outra fila"
-        : r.ultima_ligacao_em ? clean(r.ultimo_status_ligacao) : "pendente",
+      Resultado: resultLabel(r),
       "Fila da ligação": r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_campanha_nome) : "—",
-      "Contato que recebeu a ligação": r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_contato_nome) : "—",
-      "Resultado na outra fila": r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_status) : "—",
+      "Contato que recebeu a ligação": linkedContactLabel(r),
       "Operador na outra fila": r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : "—",
       "Data na outra fila": r.bloqueio_em ? new Date(r.bloqueio_em).toLocaleString("pt-BR") : "—",
-      "Intenção de voto": voteLabel(r.vota_candidato), "Vota em (se respondeu não)": alternativeCandidate(r),
-      Operador: clean(r.operador_nome), Tentativas: r.total_tentativas,
+      "Intenção de voto": intentionLabel(r), "Vota em (se respondeu não)": alternativeCandidate(r),
+      Operador: r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : clean(r.operador_nome),
+      Tentativas: effectiveAttempts(r),
       Situação: r.inativo ? "Inativo" : "Ativo",
       "Inativado em": r.inativado_em ? new Date(r.inativado_em).toLocaleString("pt-BR") : "—",
       "Última ligação": r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—",
@@ -299,7 +336,7 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
     });
     autoTable(doc, {
       head: [["Indicador", "Contato", "Telefone", "Bairro", "Resultado", "Fila da ligação", "Contato ligado", "Situação", "Intenção", "Operador", "Tent.", "Data"]],
-      body: data.map((r) => [r.indicador_nome, r.nome, r.telefone, clean(r.bairro), r.bloqueado_por_outro_cadastro ? "ligado em outra fila" : r.ultima_ligacao_em ? clean(r.ultimo_status_ligacao) : "pendente", r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_campanha_nome) : "—", r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_contato_nome) : "—", r.inativo ? "Inativo" : "Ativo", voteLabel(r.vota_candidato), r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : clean(r.operador_nome), r.total_tentativas, r.bloqueio_em ? new Date(r.bloqueio_em).toLocaleString("pt-BR") : r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—"]),
+      body: data.map((r) => [r.indicador_nome, r.nome, r.telefone, clean(r.bairro), resultLabel(r), r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_campanha_nome) : "—", linkedContactLabel(r), r.inativo ? "Inativo" : "Ativo", intentionLabel(r), r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : clean(r.operador_nome), effectiveAttempts(r), r.bloqueio_em ? new Date(r.bloqueio_em).toLocaleString("pt-BR") : r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—"]),
       styles: { fontSize: 6.5 }, headStyles: { fillColor: [30, 64, 52] }, showHead: "everyPage",
     });
     doc.save(`telemarketing-indicadores-${filename(label)}-${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -420,7 +457,7 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
           {selected && <div className="space-y-4">
             <div className="grid grid-cols-3 gap-2 md:grid-cols-6">{[["Indicados", selected.total], ["Trabalhados", selected.trabalhados], ["Ligado em outra fila", selected.bloqueadosOutraFila], ["Aguardando ligação", selected.pendentes], ["Atendidos", selected.atendidos], ["Sim", selected.sim], ["Não", selected.nao], ["Indecisos", selected.indecisos], ["Não quis opinar", selected.naoQuisOpinar], ["Atendido sem resposta", selected.semRespostaAtendidos], ["Não atendeu", selected.naoAtendeu], ["Inválidos", selected.invalidos], ["Inativos", selected.inativos]].map(([label, value]) => <div key={String(label)} className="rounded-md border p-2 text-center"><p className="text-lg font-bold">{value}</p><p className="text-[10px] text-muted-foreground">{label}</p></div>)}</div>
             {selected.nao > 0 && <div className="rounded-md border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/20"><p className="text-xs font-semibold">Candidatos citados por quem respondeu “Não”</p>{citedCandidates.length ? <div className="mt-2 flex flex-wrap gap-2">{citedCandidates.map((item) => <Badge key={item.nome} variant="outline" className="bg-background">{item.nome} <span className="ml-1 text-muted-foreground">({item.total})</span></Badge>)}</div> : <p className="mt-1 text-xs text-muted-foreground">Nenhum candidato alternativo foi informado.</p>}</div>}
-            <div className="max-h-[58vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>Contato</TableHead><TableHead>Telefone</TableHead><TableHead>Bairro/cidade</TableHead><TableHead>Resultado</TableHead><TableHead>Fila da ligação</TableHead><TableHead>Contato ligado</TableHead><TableHead>Situação</TableHead><TableHead>Intenção</TableHead><TableHead>Operador</TableHead><TableHead>Tent.</TableHead><TableHead>Data</TableHead><TableHead>Ação</TableHead></TableRow></TableHeader><TableBody>{selectedRows.map((r) => <TableRow key={r.contato_id}><TableCell className="font-medium">{r.nome}</TableCell><TableCell>{r.telefone}</TableCell><TableCell>{clean(r.bairro)} / {clean(r.cidade)}</TableCell><TableCell><Badge variant={r.bloqueado_por_outro_cadastro ? "secondary" : "outline"}>{r.bloqueado_por_outro_cadastro ? "Ligado em outra fila" : r.ultima_ligacao_em ? RESULT_LABEL[r.ultimo_status_ligacao || ""] || clean(r.ultimo_status_ligacao) : "Aguardando ligação"}</Badge></TableCell><TableCell>{r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_campanha_nome) : "—"}</TableCell><TableCell>{r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_contato_nome) : "—"}</TableCell><TableCell>{r.inativo ? <Badge variant="secondary">Inativo</Badge> : <Badge variant="outline">Ativo</Badge>}</TableCell><TableCell><Badge variant={r.vota_candidato === "nao" ? "destructive" : "outline"}>{voteLabel(r.vota_candidato)}</Badge></TableCell><TableCell>{r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : clean(r.operador_nome)}</TableCell><TableCell className="text-center"><button type="button" className="font-semibold text-primary underline underline-offset-2 disabled:no-underline disabled:text-foreground" disabled={!r.total_tentativas} title="Ver datas e horários das tentativas" onClick={() => void openAttempts(r)}>{r.total_tentativas}</button></TableCell><TableCell>{r.bloqueio_em ? new Date(r.bloqueio_em).toLocaleString("pt-BR") : r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—"}</TableCell><TableCell>{r.inativo ? <Button variant="outline" size="sm" onClick={() => void reactivateContact(r)}><RefreshCw className="size-3" />Reativar</Button> : "—"}</TableCell></TableRow>)}</TableBody></Table></div>
+            <div className="max-h-[58vh] overflow-auto rounded-md border"><Table><TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>Contato</TableHead><TableHead>Telefone</TableHead><TableHead>Bairro/cidade</TableHead><TableHead>Resultado</TableHead><TableHead>Fila da ligação</TableHead><TableHead>Contato ligado</TableHead><TableHead>Situação</TableHead><TableHead>Intenção</TableHead><TableHead>Operador</TableHead><TableHead>Tent.</TableHead><TableHead>Data</TableHead><TableHead>Ação</TableHead></TableRow></TableHeader><TableBody>{selectedRows.map((r) => <TableRow key={r.contato_id}><TableCell className="font-medium">{r.nome}</TableCell><TableCell>{r.telefone}</TableCell><TableCell>{clean(r.bairro)} / {clean(r.cidade)}</TableCell><TableCell><Badge variant={r.bloqueado_por_outro_cadastro ? "secondary" : "outline"}>{resultLabel(r)}</Badge></TableCell><TableCell>{r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_campanha_nome) : "—"}</TableCell><TableCell>{linkedContactLabel(r)}</TableCell><TableCell>{r.inativo ? <Badge variant="secondary">Inativo</Badge> : <Badge variant="outline">Ativo</Badge>}</TableCell><TableCell><Badge variant={effectiveVote(r) === "nao" ? "destructive" : "outline"}>{intentionLabel(r)}</Badge></TableCell><TableCell>{r.bloqueado_por_outro_cadastro ? clean(r.bloqueio_operador_nome) : clean(r.operador_nome)}</TableCell><TableCell className="text-center"><button type="button" className="font-semibold text-primary underline underline-offset-2 disabled:no-underline disabled:text-foreground" disabled={!effectiveAttempts(r)} title="Ver datas e horários das tentativas" onClick={() => void openAttempts(r)}>{effectiveAttempts(r)}</button></TableCell><TableCell>{r.bloqueio_em ? new Date(r.bloqueio_em).toLocaleString("pt-BR") : r.ultima_ligacao_em ? new Date(r.ultima_ligacao_em).toLocaleString("pt-BR") : "—"}</TableCell><TableCell>{r.inativo ? <Button variant="outline" size="sm" onClick={() => void reactivateContact(r)}><RefreshCw className="size-3" />Reativar</Button> : "—"}</TableCell></TableRow>)}</TableBody></Table></div>
           </div>}
         </DialogContent>
       </Dialog>
@@ -428,11 +465,11 @@ export default function TelemarketingIndicadorScorecard({ clientId, campanhaId =
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Tentativas de contato — {attemptContact?.nome}</DialogTitle></DialogHeader>
           {attemptContact && <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">O relatório registra {attemptContact.total_tentativas} tentativa(s). Abaixo estão as datas e horários disponíveis no histórico de ligações.</p>
+            <p className="text-sm text-muted-foreground">O relatório registra {effectiveAttempts(attemptContact)} tentativa(s). Abaixo estão as datas e horários disponíveis no histórico de ligações.</p>
             {attemptsLoading ? <div className="flex justify-center py-8"><Loader2 className="size-6 animate-spin" /></div> : attempts.length ? <div className="max-h-[55vh] overflow-auto rounded-md border">
-              <Table><TableHeader><TableRow><TableHead>Data e horário</TableHead><TableHead>Resultado</TableHead><TableHead>Intenção</TableHead><TableHead>Operador</TableHead><TableHead>Observação</TableHead></TableRow></TableHeader><TableBody>{attempts.map((item, index) => <TableRow key={item.id}><TableCell className="whitespace-nowrap"><span className="mr-2 text-xs text-muted-foreground">#{attempts.length-index}</span>{new Date(item.created_at).toLocaleString("pt-BR")}</TableCell><TableCell><Badge variant="outline">{RESULT_LABEL[item.ligacao_status] || clean(item.ligacao_status)}</Badge></TableCell><TableCell>{voteLabel(item.vota_candidato)}</TableCell><TableCell>{clean(item.operador_nome)}</TableCell><TableCell className="max-w-[220px] whitespace-pre-wrap">{clean(item.observacao)}</TableCell></TableRow>)}</TableBody></Table>
+              <Table><TableHeader><TableRow><TableHead>Data e horário</TableHead><TableHead>Resultado</TableHead><TableHead>Intenção</TableHead><TableHead>Operador</TableHead><TableHead>Observação</TableHead></TableRow></TableHeader><TableBody>{attempts.map((item, index) => <TableRow key={item.id}><TableCell className="whitespace-nowrap"><span className="mr-2 text-xs text-muted-foreground">#{attempts.length-index}</span>{new Date(item.created_at).toLocaleString("pt-BR")}</TableCell><TableCell><Badge variant="outline">{RESULT_LABEL[item.ligacao_status] || clean(item.ligacao_status)}</Badge></TableCell><TableCell>{item.ligacao_status === "atendeu" ? item.vota_candidato ? voteLabel(item.vota_candidato) : "Atendido sem resposta" : "—"}</TableCell><TableCell>{clean(item.operador_nome)}</TableCell><TableCell className="max-w-[220px] whitespace-pre-wrap">{clean(item.observacao)}</TableCell></TableRow>)}</TableBody></Table>
             </div> : <p className="rounded-md border p-4 text-sm text-muted-foreground">Não há horários detalhados no histórico para este contato. Isso pode acontecer com tentativas antigas, registradas antes da criação do histórico individual.</p>}
-            {!attemptsLoading && attempts.length !== attemptContact.total_tentativas && <p className="rounded-md bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">Atenção: o contador possui {attemptContact.total_tentativas} tentativa(s), mas o histórico detalhado encontrou {attempts.length}. A diferença corresponde a registros antigos ou importados sem data individual.</p>}
+            {!attemptsLoading && attempts.length !== effectiveAttempts(attemptContact) && <p className="rounded-md bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">Atenção: o contador possui {effectiveAttempts(attemptContact)} tentativa(s), mas o histórico detalhado encontrou {attempts.length}. A diferença corresponde a registros antigos ou importados sem data individual.</p>}
           </div>}
         </DialogContent>
       </Dialog>
