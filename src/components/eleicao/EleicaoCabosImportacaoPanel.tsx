@@ -9,6 +9,7 @@ import {
   Folder,
   Loader2,
   Pencil,
+  Plus,
   Save,
   Trash2,
   Upload,
@@ -21,6 +22,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -42,6 +51,7 @@ import {
   gerarRelatorioCasosRecusadosPdf,
   gerarRelatorioOcorrenciasLotePdf,
 } from "@/lib/eleicao-duplicidades-pdf";
+import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 
 type DuplicateCase = {
   id: number;
@@ -185,6 +195,16 @@ type Parent = {
   cidade: string | null;
 };
 type SheetRow = Record<string, unknown>;
+type QuickParentForm = {
+  tipo: "coordenador" | "lider";
+  nome: string;
+  telefone: string;
+  valor: string;
+  escopo: "campo_grande" | "interior";
+  regiao: string;
+  cidade: string;
+  coordenadorId: string;
+};
 
 // As tabelas/RPCs passam a integrar os tipos gerados depois que a migration for aplicada.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -283,6 +303,7 @@ export default function EleicaoCabosImportacaoPanel({
   onChanged: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const { regioes } = useRegioesEleicao(clientId);
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
@@ -306,6 +327,11 @@ export default function EleicaoCabosImportacaoPanel({
   const [start, setStart] = useState(format(new Date(), "yyyy-MM-dd"));
   const [end, setEnd] = useState("");
   const [parentId, setParentId] = useState("");
+  const [quickParentOpen, setQuickParentOpen] = useState(false);
+  const [quickParent, setQuickParent] = useState<QuickParentForm>({
+    tipo: "lider", nome: "", telefone: "", valor: "", escopo: "campo_grande",
+    regiao: "", cidade: "", coordenadorId: "",
+  });
 
   const loadBase = async () => {
     await db.rpc("eleicao_cabo_import_limpar_rascunhos", { p_client_id: clientId });
@@ -378,6 +404,77 @@ export default function EleicaoCabosImportacaoPanel({
     () => history.filter((lot) => lot.status === "confirmado"),
     [history],
   );
+  const coordenadores = useMemo(
+    () => parents.filter((parent) => parent.tipo === "coordenador"),
+    [parents],
+  );
+
+  const openQuickParent = () => {
+    const base = selectedParent;
+    setQuickParent({
+      tipo: "lider",
+      nome: "",
+      telefone: "",
+      valor: value,
+      escopo: base?.escopo || "campo_grande",
+      regiao: base?.regiao || regioes[0]?.value || "",
+      cidade: base?.cidade || "",
+      coordenadorId: base?.tipo === "coordenador" ? base.id : "",
+    });
+    setQuickParentOpen(true);
+  };
+
+  const saveQuickParent = async () => {
+    const nome = quickParent.nome.trim();
+    const telefone = digits(quickParent.telefone);
+    const valorContratacao = Number(quickParent.valor.replace(/\./g, "").replace(",", "."));
+    const coordenador = quickParent.tipo === "lider"
+      ? coordenadores.find((item) => item.id === quickParent.coordenadorId) || null
+      : null;
+    const escopo = coordenador?.escopo || quickParent.escopo;
+    const regiao = coordenador?.regiao || (escopo === "campo_grande" ? quickParent.regiao : null);
+    const cidade = coordenador?.cidade || (escopo === "interior" ? quickParent.cidade.trim() : "Campo Grande");
+
+    if (!nome || telefone.length < 10) return toast.error("Informe nome e telefone válido.");
+    if (!Number.isFinite(valorContratacao) || valorContratacao <= 0)
+      return toast.error("Informe um valor de contratação maior que zero.");
+    if (escopo === "campo_grande" && !regiao) return toast.error("Selecione a região.");
+    if (escopo === "interior" && !cidade) return toast.error("Informe a cidade.");
+
+    setBusy(true);
+    try {
+      const { data, error } = await db.from("eleicao_pessoas").insert({
+        client_id: clientId,
+        tipo: quickParent.tipo,
+        escopo,
+        regiao: escopo === "campo_grande" ? regiao : null,
+        cidade,
+        nome,
+        telefone,
+        endereco: "Não informado",
+        parent_id: quickParent.tipo === "lider" ? coordenador?.id || null : null,
+        valor_contratacao: valorContratacao,
+        is_voluntario: false,
+        status_contratacao: "confirmado",
+        confirmado_em: new Date().toISOString(),
+        vigencia_inicio: start || null,
+        vigencia_fim: end || null,
+        contrato_inicio: start || null,
+        contrato_fim: end || null,
+      }).select("id,nome,tipo,escopo,regiao,cidade").single();
+      if (error) throw error;
+      const novo = data as Parent;
+      setParents((current) => [...current, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
+      setParentId(novo.id);
+      setQuickParentOpen(false);
+      onChanged();
+      toast.success(`${roleLabel(novo.tipo)} cadastrado e selecionado como responsável.`);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível cadastrar o responsável."));
+    } finally {
+      setBusy(false);
+    }
+  };
   const canceledHistory = useMemo(
     () => history.filter((lot) => lot.status === "cancelado"),
     [history],
@@ -820,6 +917,10 @@ export default function EleicaoCabosImportacaoPanel({
                   ))}
                 </SelectContent>
               </Select>
+              <Button type="button" variant="link" className="h-auto px-0 py-1" onClick={openQuickParent}>
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Cadastrar líder ou coordenador
+              </Button>
             </div>
             <div className="space-y-1">
               <Label>Local herdado do responsável</Label>
@@ -1621,6 +1722,33 @@ export default function EleicaoCabosImportacaoPanel({
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={quickParentOpen} onOpenChange={setQuickParentOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Cadastrar responsável</DialogTitle>
+            <DialogDescription>
+              Cadastre sem sair da importação. Ao salvar, o novo responsável será selecionado automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1"><Label>Tipo</Label><Select value={quickParent.tipo} onValueChange={(tipo: "coordenador" | "lider") => setQuickParent({ ...quickParent, tipo, coordenadorId: tipo === "coordenador" ? "" : quickParent.coordenadorId })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="lider">Líder</SelectItem><SelectItem value="coordenador">Coordenador</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1"><Label>Nome</Label><Input value={quickParent.nome} onChange={(e) => setQuickParent({ ...quickParent, nome: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Telefone</Label><Input value={quickParent.telefone} onChange={(e) => setQuickParent({ ...quickParent, telefone: e.target.value })} inputMode="tel" placeholder="(67) 99999-9999" /></div>
+            <div className="space-y-1"><Label>Valor da contratação</Label><Input value={quickParent.valor} onChange={(e) => setQuickParent({ ...quickParent, valor: e.target.value })} inputMode="decimal" placeholder="Ex.: 1.000,00" /><p className="text-xs text-muted-foreground">A vigência usará as datas de início e término desta importação.</p></div>
+            {quickParent.tipo === "lider" && <div className="space-y-1 sm:col-span-2"><Label>Coordenador acima do líder (opcional)</Label><Select value={quickParent.coordenadorId || "avulso"} onValueChange={(coordenadorId) => setQuickParent({ ...quickParent, coordenadorId: coordenadorId === "avulso" ? "" : coordenadorId })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="avulso">Líder avulso</SelectItem>{coordenadores.map((item) => <SelectItem key={item.id} value={item.id}>{item.nome}</SelectItem>)}</SelectContent></Select></div>}
+            {!(quickParent.tipo === "lider" && quickParent.coordenadorId) && <>
+              <div className="space-y-1"><Label>Local</Label><Select value={quickParent.escopo} onValueChange={(escopo: "campo_grande" | "interior") => setQuickParent({ ...quickParent, escopo })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="campo_grande">Campo Grande</SelectItem><SelectItem value="interior">Interior</SelectItem></SelectContent></Select></div>
+              {quickParent.escopo === "campo_grande" ? <div className="space-y-1"><Label>Região</Label><Select value={quickParent.regiao} onValueChange={(regiao) => setQuickParent({ ...quickParent, regiao })}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{regioes.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div> : <div className="space-y-1"><Label>Cidade</Label><Input value={quickParent.cidade} onChange={(e) => setQuickParent({ ...quickParent, cidade: e.target.value })} /></div>}
+            </>}
+            {quickParent.tipo === "lider" && quickParent.coordenadorId && <p className="text-sm text-muted-foreground sm:col-span-2">O líder herdará automaticamente a cidade ou região do coordenador selecionado.</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickParentOpen(false)}>Cancelar</Button>
+            <Button disabled={busy} onClick={() => void saveQuickParent()}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cadastrar e selecionar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
