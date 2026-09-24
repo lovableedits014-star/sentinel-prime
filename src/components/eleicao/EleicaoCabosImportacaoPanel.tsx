@@ -193,6 +193,7 @@ type Parent = {
   escopo: "campo_grande" | "interior";
   regiao: string | null;
   cidade: string | null;
+  arquivado_em?: string | null;
 };
 type SheetRow = Record<string, unknown>;
 type QuickParentForm = {
@@ -307,6 +308,7 @@ export default function EleicaoCabosImportacaoPanel({
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [parents, setParents] = useState<Parent[]>([]);
+  const [historyParents, setHistoryParents] = useState<Parent[]>([]);
   const [history, setHistory] = useState<ImportLot[]>([]);
   const [databaseDuplicates, setDatabaseDuplicates] = useState<DuplicateGroup[]>([]);
   const [duplicateCases, setDuplicateCases] = useState<DuplicateCase[]>([]);
@@ -338,9 +340,8 @@ export default function EleicaoCabosImportacaoPanel({
     const [parentResult, lotsResult, duplicatesResult, casesResult] = await Promise.all([
       db
         .from("eleicao_pessoas")
-        .select("id,nome,tipo,escopo,regiao,cidade")
+        .select("id,nome,tipo,escopo,regiao,cidade,arquivado_em")
         .eq("client_id", clientId)
-        .is("arquivado_em", null)
         .in("tipo", ["coordenador", "lider"])
         .order("nome"),
       db
@@ -352,7 +353,11 @@ export default function EleicaoCabosImportacaoPanel({
       db.rpc("eleicao_auditar_duplicidades", { p_client_id: clientId }),
       db.rpc("eleicao_casos_duplicados_ativos", { p_client_id: clientId }),
     ]);
-    if (!parentResult.error) setParents(parentResult.data || []);
+    if (!parentResult.error) {
+      const responsaveis = (parentResult.data || []) as Parent[];
+      setHistoryParents(responsaveis);
+      setParents(responsaveis.filter((parent) => !parent.arquivado_em));
+    }
     if (!lotsResult.error) setHistory(lotsResult.data || []);
     if (!duplicatesResult.error)
       setDatabaseDuplicates(Array.isArray(duplicatesResult.data) ? duplicatesResult.data : []);
@@ -465,6 +470,7 @@ export default function EleicaoCabosImportacaoPanel({
       if (error) throw error;
       const novo = data as Parent;
       setParents((current) => [...current, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
+      setHistoryParents((current) => [...current, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
       setParentId(novo.id);
       setQuickParentOpen(false);
       onChanged();
@@ -1474,6 +1480,7 @@ export default function EleicaoCabosImportacaoPanel({
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
+                <TableHead>Responsável</TableHead>
                 <TableHead>Lote</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Linhas</TableHead>
@@ -1489,6 +1496,12 @@ export default function EleicaoCabosImportacaoPanel({
                 <Fragment key={lot.id}>
                   <TableRow>
                     <TableCell>{format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const responsavel = historyParents.find((item) => item.id === lot.parent_id_padrao);
+                        return responsavel ? <><p className="font-medium">{responsavel.nome}</p><p className="text-xs text-muted-foreground">{roleLabel(responsavel.tipo)}{responsavel.arquivado_em ? " · arquivado" : ""}</p></> : <span className="text-muted-foreground">Não identificado</span>;
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <p className="font-medium">{lot.nome}</p>
                       <p className="text-xs text-muted-foreground">{lot.arquivo_nome}</p>
@@ -1555,7 +1568,7 @@ export default function EleicaoCabosImportacaoPanel({
                   </TableRow>
                   {lotValueEdit?.id === lot.id && (
                     <TableRow className="bg-muted/30">
-                      <TableCell colSpan={9}>
+                      <TableCell colSpan={10}>
                         <div className="flex flex-wrap items-end gap-3 rounded-md border bg-background p-3">
                           <div className="min-w-40 space-y-1">
                             <Label htmlFor={`valor-lote-${lot.id}`}>Novo valor por cabo</Label>
@@ -1629,7 +1642,7 @@ export default function EleicaoCabosImportacaoPanel({
               ))}
               {!activeHistory.length && (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                     Nenhuma importação realizada.
                   </TableCell>
                 </TableRow>
