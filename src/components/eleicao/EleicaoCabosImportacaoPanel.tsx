@@ -822,15 +822,24 @@ export default function EleicaoCabosImportacaoPanel({
       await Promise.all([loadManagedContracts(managedLot), loadBase()]);
       onChanged(); toast.success("Contrato validado com telefone compartilhado.");
     } catch (error: unknown) {
-      toast.error(errorMessage(error, "Não foi possível validar a exceção."));
+      const message = errorMessage(error, "Não foi possível validar a exceção.");
+      if (message.includes("CPF ou telefone duplicado") || message.includes("Telefone ja cadastrado")) {
+        toast.error("A atualização de telefone compartilhado ainda não foi aplicada no banco.", {
+          description: "Aplique a migration 20260924210000 e tente novamente. O cadastro continua protegido até essa atualização.",
+          duration: 9000,
+        });
+      } else {
+        toast.error(message);
+      }
     } finally { setBusy(false); }
   };
 
   const resolveActiveDuplicate = async (group: DuplicateGroup, keep: DuplicatePerson) => {
     const archive = group.cadastros.filter((person) => person.id !== keep.id);
+    const archiveNames = archive.map((person) => person.nome).join(", ");
     if (
       !window.confirm(
-        `Manter o contrato de ${keep.nome}, vinculado a ${duplicateOwnerLabel(keep)}, e arquivar ${archive.length} cadastro(s) duplicado(s)? A correção fica registrada e é reversível.`,
+        `Esta ação arquivará: ${archiveNames}.\n\nManter somente o contrato de ${keep.nome}, vinculado a ${duplicateOwnerLabel(keep)}? Use apenas quando forem cadastros realmente duplicados, nunca quando pessoas diferentes compartilham telefone.`,
       )
     )
       return;
@@ -1317,7 +1326,7 @@ export default function EleicaoCabosImportacaoPanel({
       >
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Auditoria financeira — contratos ativos duplicados</CardTitle>
+            <CardTitle>Conflitos financeiros pendentes</CardTitle>
             <div className="flex items-center gap-2">
               {!!activeContractDuplicates.length && (
                 <Button
@@ -1335,8 +1344,8 @@ export default function EleicaoCabosImportacaoPanel({
             </div>
           </div>
           <CardDescription>
-            Varredura de ponta a ponta. Nome + telefone é a identificação principal; telefone e CPF
-            também são conferidos separadamente para impedir contratos ativos simultâneos.
+            Visão global de contratos ainda não resolvidos. Telefones compartilhados aprovados em
+            “Contratos e linhas do lote” deixam de aparecer aqui automaticamente.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1451,7 +1460,7 @@ export default function EleicaoCabosImportacaoPanel({
                                   disabled={busy}
                                   onClick={() => void resolveActiveDuplicate(group, person)}
                                 >
-                                  Manter este contrato e arquivar os duplicados
+                                  Manter {person.nome} e arquivar os outros
                                 </Button>
                               )}
                             </div>
