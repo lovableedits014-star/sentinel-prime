@@ -11,6 +11,8 @@ export type PessoaRaizPagamento = {
   arquivado_em?: string | null;
 };
 
+export type TipoRaizPagamento = "cabo_eleitoral" | "cabo_virtual" | "completa";
+
 const slug = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "");
 
@@ -31,6 +33,7 @@ const telefone = (value?: string | null) => {
 export async function gerarRaizPagamentoPdf(
   raiz: PessoaRaizPagamento,
   pessoas: PessoaRaizPagamento[],
+  tipo: TipoRaizPagamento = "completa",
 ) {
   if (raiz.tipo === "cabo") throw new Error("A raiz para pagamento deve ser um coordenador ou lider.");
 
@@ -48,26 +51,31 @@ export async function gerarRaizPagamentoPdf(
     ? ativos.filter((p) => p.tipo === "lider" && p.parent_id === raiz.id)
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
     : [raiz];
+  const valorCabo = tipo === "cabo_eleitoral" ? 150 : tipo === "cabo_virtual" ? 100 : null;
+  const caboDoRelatorio = (pessoa: PessoaRaizPagamento) =>
+    contratado(pessoa) && (valorCabo === null || Number(pessoa.valor_contratacao) === valorCabo);
+  const incluirPagamentoLideranca = tipo === "completa";
   const cabosDiretos = raiz.tipo === "coordenador"
-    ? ativos.filter((p) => p.tipo === "cabo" && p.parent_id === raiz.id && contratado(p))
+    ? ativos.filter((p) => p.tipo === "cabo" && p.parent_id === raiz.id && caboDoRelatorio(p))
     : [];
   const cabosPorLider = new Map(lideres.map((lider) => [
     lider.id,
-    ativos.filter((p) => p.tipo === "cabo" && p.parent_id === lider.id && contratado(p))
+    ativos.filter((p) => p.tipo === "cabo" && p.parent_id === lider.id && caboDoRelatorio(p))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
   ]));
   const lideresVisiveis = lideres.filter((lider) =>
-    contratado(lider) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
+    (incluirPagamentoLideranca && contratado(lider)) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
   );
   const membros = raiz.tipo === "coordenador"
     ? [raiz, ...lideresVisiveis, ...cabosDiretos, ...lideresVisiveis.flatMap((l) => cabosPorLider.get(l.id) || [])]
     : [raiz, ...(cabosPorLider.get(raiz.id) || [])];
-  const contratados = membros.filter(contratado);
+  const contratados = membros.filter((pessoa) =>
+    pessoa.tipo === "cabo" ? caboDoRelatorio(pessoa) : incluirPagamentoLideranca && contratado(pessoa));
   const total = contratados.reduce((sum, pessoa) => sum + Number(pessoa.valor_contratacao || 0), 0);
   const rows: Array<Array<string>> = [];
 
   if (raiz.tipo === "coordenador") {
-    if (contratado(raiz)) {
+    if (incluirPagamentoLideranca && contratado(raiz)) {
       rows.push(["COORDENADOR", raiz.nome, telefone(raiz.telefone), dinheiro(Number(raiz.valor_contratacao))]);
     }
     cabosDiretos.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")).forEach((cabo) =>
@@ -78,7 +86,7 @@ export async function gerarRaizPagamentoPdf(
       raiz.tipo === "coordenador" ? "  LIDER" : "LIDER",
       lider.nome,
       telefone(lider.telefone),
-      contratado(lider) ? dinheiro(Number(lider.valor_contratacao)) : "-",
+      incluirPagamentoLideranca && contratado(lider) ? dinheiro(Number(lider.valor_contratacao)) : "-",
     ]);
     (cabosPorLider.get(lider.id) || []).forEach((cabo) =>
       rows.push([raiz.tipo === "coordenador" ? "    CABO" : "  CABO", cabo.nome, telefone(cabo.telefone), dinheiro(Number(cabo.valor_contratacao))]));
@@ -93,7 +101,12 @@ export async function gerarRaizPagamentoPdf(
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
-    doc.text("RAIZ PARA PAGAMENTO", margin, 31);
+    const titulo = tipo === "cabo_eleitoral"
+      ? "CABOS ELEITORAIS - R$ 150,00"
+      : tipo === "cabo_virtual"
+        ? "CABOS VIRTUAIS - R$ 100,00"
+        : "RAIZ PARA PAGAMENTO";
+    doc.text(titulo, margin, 31);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
     doc.text(`Responsavel: ${raiz.nome}`, margin, 51);
@@ -155,7 +168,12 @@ export async function gerarRaizPagamentoPdf(
   doc.setFontSize(11);
   doc.text(`TOTAL: ${dinheiro(total)}`, width - margin - 12, totalY + 26, { align: "right" });
 
-  const nome = raiz.tipo === "coordenador" ? `Raiz Pagamento - ${raiz.nome}` : `Pagamento Lider - ${raiz.nome}`;
+  const prefixo = tipo === "cabo_eleitoral"
+    ? "Cabos Eleitorais 150"
+    : tipo === "cabo_virtual"
+      ? "Cabos Virtuais 100"
+      : raiz.tipo === "coordenador" ? "Raiz Pagamento" : "Pagamento Lider";
+  const nome = `${prefixo} - ${raiz.nome}`;
   doc.save(`${slug(nome)}.pdf`);
   return { total, contratados: contratados.length, membros: membros.length };
 }

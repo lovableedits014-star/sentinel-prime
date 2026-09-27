@@ -121,7 +121,7 @@ import {
   type LiderFormularioCabos,
 } from "@/lib/eleicao-cabos-formulario-pdf";
 import { gerarReciboDocumentacaoPdf } from "@/lib/eleicao-recibo-documentacao-pdf";
-import { gerarRaizPagamentoPdf } from "@/lib/eleicao-raiz-pagamento-pdf";
+import RaizPagamentoDialog from "@/components/eleicao/RaizPagamentoDialog";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -3476,6 +3476,7 @@ function CoordBlock({
   onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
   sendingId: string | null;
 }) {
+  const [raizPagamentoOpen, setRaizPagamentoOpen] = useState(false);
   const lideres = all.filter((p) => p.tipo === "lider" && p.parent_id === coord.id);
   const cabosDir = all.filter((p) => p.tipo === "cabo" && p.parent_id === coord.id);
   const cabosLid = lideres.flatMap((l) =>
@@ -3536,14 +3537,7 @@ function CoordBlock({
           valorCabos,
           valorTotal: valorTotalArvore,
         }}
-        onExportPaymentRoot={async () => {
-          try {
-            const result = await gerarRaizPagamentoPdf(coord, allDoTime);
-            toast.success(`PDF gerado com ${result.contratados} contratado(s) para pagamento.`);
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Erro ao gerar PDF da raiz.");
-          }
-        }}
+        onExportPaymentRoot={() => setRaizPagamentoOpen(true)}
         expanded={expanded}
         onToggle={
           hasTeam
@@ -3571,6 +3565,12 @@ function CoordBlock({
               }
             : undefined
         }
+      />
+      <RaizPagamentoDialog
+        open={raizPagamentoOpen}
+        onOpenChange={setRaizPagamentoOpen}
+        raiz={coord}
+        pessoas={allDoTime}
       />
       {expanded && hasTeam && (
         <div className="bg-muted/10 pb-1">
@@ -3621,6 +3621,7 @@ function LiderBlock({
   onSend: (p: Pessoa, channel: "whatsapp" | "link_only") => void;
   sendingId: string | null;
 }) {
+  const [raizPagamentoOpen, setRaizPagamentoOpen] = useState(false);
   const cabos = all.filter((p) => p.tipo === "cabo" && p.parent_id === lider.id);
   const cabosContratados = cabos.filter(isEleicaoContratado);
   const hasCabos = cabos.length > 0;
@@ -3648,14 +3649,13 @@ function LiderBlock({
         matchInTeam={matchesNaEquipe}
         expanded={open}
         onToggle={hasCabos ? () => setOpen((o) => !o) : undefined}
-        onExportPaymentRoot={async () => {
-          try {
-            const result = await gerarRaizPagamentoPdf(lider, [lider, ...cabos]);
-            toast.success(`PDF gerado com ${result.contratados} contratado(s) para pagamento.`);
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Erro ao gerar PDF da raiz.");
-          }
-        }}
+        onExportPaymentRoot={() => setRaizPagamentoOpen(true)}
+      />
+      <RaizPagamentoDialog
+        open={raizPagamentoOpen}
+        onOpenChange={setRaizPagamentoOpen}
+        raiz={lider}
+        pessoas={[lider, ...cabos]}
       />
       {open &&
         cabos.map((cb) => (
