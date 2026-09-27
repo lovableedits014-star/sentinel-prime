@@ -3,12 +3,7 @@ import { Banknote, Loader2, MonitorSmartphone, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   gerarRaizPagamentoPdf,
   type PessoaRaizPagamento,
@@ -39,6 +34,12 @@ const OPCOES: Array<{
     titulo: "Cabos virtuais — R$ 100,00",
     descricao: "Gera somente os cabos desta raiz cujo valor contratado é R$ 100,00.",
     icon: MonitorSmartphone,
+  },
+  {
+    tipo: "lideres",
+    titulo: "Somente líderes",
+    descricao: "Gera os líderes remunerados desta raiz, sem incluir coordenador ou cabos.",
+    icon: Users,
   },
   {
     tipo: "completa",
@@ -74,32 +75,34 @@ export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas 
           Escolha a lista de <strong>{raiz.nome}</strong> que deseja gerar.
         </p>
         <div className="grid gap-2 pt-2">
-          {OPCOES.map((opcao) => {
-            const Icon = opcao.icon;
-            const carregando = gerando === opcao.tipo;
-            return (
-              <Button
-                key={opcao.tipo}
-                type="button"
-                variant="outline"
-                className="h-auto justify-start gap-3 p-4 text-left whitespace-normal"
-                disabled={gerando !== null}
-                onClick={() => gerar(opcao.tipo)}
-              >
-                {carregando ? (
-                  <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
-                ) : (
-                  <Icon className="h-5 w-5 shrink-0 text-primary" />
-                )}
-                <span>
-                  <span className="block font-semibold">{opcao.titulo}</span>
-                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                    {opcao.descricao}
+          {OPCOES.filter((opcao) => opcao.tipo !== "lideres" || raiz.tipo === "coordenador").map(
+            (opcao) => {
+              const Icon = opcao.icon;
+              const carregando = gerando === opcao.tipo;
+              return (
+                <Button
+                  key={opcao.tipo}
+                  type="button"
+                  variant="outline"
+                  className="h-auto justify-start gap-3 p-4 text-left whitespace-normal"
+                  disabled={gerando !== null}
+                  onClick={() => gerar(opcao.tipo)}
+                >
+                  {carregando ? (
+                    <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+                  ) : (
+                    <Icon className="h-5 w-5 shrink-0 text-primary" />
+                  )}
+                  <span>
+                    <span className="block font-semibold">{opcao.titulo}</span>
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                      {opcao.descricao}
+                    </span>
                   </span>
-                </span>
-              </Button>
-            );
-          })}
+                </Button>
+              );
+            },
+          )}
         </div>
       </DialogContent>
     </Dialog>
