@@ -40,12 +40,16 @@ export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas 
   );
   const [niveis, setNiveis] = useState<NivelRaizPagamento[]>(niveisDisponiveis);
   const [valores, setValores] = useState<number[]>(valoresDisponiveis);
+  const [exibirValor, setExibirValor] = useState(true);
+  const [incluirAssinatura, setIncluirAssinatura] = useState(false);
   const [gerando, setGerando] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setNiveis(niveisDisponiveis);
     setValores(valoresDisponiveis);
+    setExibirValor(true);
+    setIncluirAssinatura(false);
   }, [open, niveisDisponiveis, valoresDisponiveis]);
 
   const resumo = useMemo(
@@ -66,7 +70,12 @@ export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas 
   const gerar = async () => {
     setGerando(true);
     try {
-      const result = await gerarRaizPagamentoPdf(raiz, pessoas, { niveis, valores });
+      const result = await gerarRaizPagamentoPdf(raiz, pessoas, {
+        niveis,
+        valores,
+        exibirValor,
+        incluirAssinatura,
+      });
       toast.success(`PDF gerado com ${result.contratados} contratado(s) para pagamento.`);
       onOpenChange(false);
     } catch (error) {
@@ -127,6 +136,28 @@ export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas 
             ) : (
               <p className="text-sm text-muted-foreground">Não há contratos remunerados nesta raiz.</p>
             )}
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold">Campos do PDF</h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                Exibir valores
+                <Switch
+                  checked={exibirValor}
+                  onCheckedChange={setExibirValor}
+                  aria-label="Exibir valores no PDF"
+                />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                Campo de assinatura
+                <Switch
+                  checked={incluirAssinatura}
+                  onCheckedChange={setIncluirAssinatura}
+                  aria-label="Adicionar campo de assinatura"
+                />
+              </label>
+            </div>
           </section>
 
           <section className="rounded-lg border bg-muted/40 p-4" aria-live="polite">

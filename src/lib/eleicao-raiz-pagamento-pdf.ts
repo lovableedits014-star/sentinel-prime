@@ -16,6 +16,8 @@ export type NivelRaizPagamento = "coordenador" | "lider" | "cabo";
 export type FiltrosRaizPagamento = {
   niveis: NivelRaizPagamento[];
   valores: number[];
+  exibirValor?: boolean;
+  incluirAssinatura?: boolean;
 };
 
 export type ResumoRaizPagamento = {
@@ -165,44 +167,31 @@ export async function gerarRaizPagamentoPdf(
       : [raiz, ...(cabosPorLider.get(raiz.id) || [])];
   const contratados = resumo.pessoas;
   const total = resumo.total;
+  const exibirValor = filtros.exibirValor !== false;
+  const incluirAssinatura = filtros.incluirAssinatura === true;
   const rows: Array<Array<string>> = [];
+  const criarLinha = (nivel: string, pessoa: PessoaRaizPagamento) => [
+    nivel,
+    pessoa.nome,
+    telefone(pessoa.telefone),
+    ...(exibirValor ? [dinheiro(Number(pessoa.valor_contratacao))] : []),
+    ...(incluirAssinatura ? [""] : []),
+  ];
 
   if (raiz.tipo === "coordenador") {
     if (incluirRaiz) {
-      rows.push([
-        "COORDENADOR",
-        raiz.nome,
-        telefone(raiz.telefone),
-        dinheiro(Number(raiz.valor_contratacao)),
-      ]);
+      rows.push(criarLinha("COORDENADOR", raiz));
     }
     cabosDiretos
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-      .forEach((cabo) =>
-        rows.push([
-          "  CABO DIRETO",
-          cabo.nome,
-          telefone(cabo.telefone),
-          dinheiro(Number(cabo.valor_contratacao)),
-        ]),
-      );
+      .forEach((cabo) => rows.push(criarLinha("  CABO DIRETO", cabo)));
   }
   lideresVisiveis.forEach((lider) => {
     if (idsSelecionados.has(lider.id)) {
-      rows.push([
-        raiz.tipo === "coordenador" ? "LIDER" : "LIDER",
-        lider.nome,
-        telefone(lider.telefone),
-        dinheiro(Number(lider.valor_contratacao)),
-      ]);
+      rows.push(criarLinha("LIDER", lider));
     }
     (cabosPorLider.get(lider.id) || []).forEach((cabo) =>
-      rows.push([
-        "CABO",
-        cabo.nome,
-        telefone(cabo.telefone),
-        dinheiro(Number(cabo.valor_contratacao)),
-      ]),
+      rows.push(criarLinha("CABO", cabo)),
     );
   });
   if (!rows.length) {
@@ -231,13 +220,50 @@ export async function gerarRaizPagamentoPdf(
   doc.setFontSize(11);
   doc.text(`Local: ${raiz.cidade || raiz.regiao || "Nao informado"}`, margin, 103);
   doc.text(`Contratados: ${contratados.length}`, margin, 124);
-  doc.setTextColor(5, 120, 70);
-  doc.text(`TOTAL PARA PAGAMENTO: ${dinheiro(total)}`, width - margin, 124, { align: "right" });
+  if (exibirValor) {
+    doc.setTextColor(5, 120, 70);
+    doc.text(`TOTAL PARA PAGAMENTO: ${dinheiro(total)}`, width - margin, 124, { align: "right" });
+  }
+
+  const cabecalho = [
+    "NIVEL",
+    "NOME",
+    "TELEFONE",
+    ...(exibirValor ? ["VALOR"] : []),
+    ...(incluirAssinatura ? ["ASSINATURA"] : []),
+  ];
+  const columnStyles: Record<number, Record<string, unknown>> = incluirAssinatura
+    ? exibirValor
+      ? {
+          0: { cellWidth: 70, fontStyle: "bold" },
+          1: { cellWidth: 150 },
+          2: { cellWidth: 90 },
+          3: { cellWidth: 75, halign: "right", fontStyle: "bold" },
+          4: { cellWidth: 134 },
+        }
+      : {
+          0: { cellWidth: 80, fontStyle: "bold" },
+          1: { cellWidth: 170 },
+          2: { cellWidth: 100 },
+          3: { cellWidth: 169 },
+        }
+    : exibirValor
+      ? {
+          0: { cellWidth: 80, fontStyle: "bold" },
+          1: { cellWidth: 239 },
+          2: { cellWidth: 100 },
+          3: { cellWidth: 100, halign: "right", fontStyle: "bold" },
+        }
+      : {
+          0: { cellWidth: 90, fontStyle: "bold" },
+          1: { cellWidth: 309 },
+          2: { cellWidth: 120 },
+        };
 
   autoTable(doc, {
     startY: 146,
     margin: { top: 95, left: margin, right: margin, bottom: 38 },
-    head: [["NIVEL", "NOME", "TELEFONE", "VALOR"]],
+    head: [cabecalho],
     body: rows,
     theme: "grid",
     showHead: "everyPage",
@@ -248,14 +274,10 @@ export async function gerarRaizPagamentoPdf(
       lineColor: [203, 213, 225],
       lineWidth: 0.5,
       valign: "middle",
+      minCellHeight: incluirAssinatura ? 39 : undefined,
     },
     headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: "bold" },
-    columnStyles: {
-      0: { cellWidth: 80, fontStyle: "bold" },
-      1: { cellWidth: 200 },
-      2: { cellWidth: 100 },
-      3: { cellWidth: 100, halign: "right", fontStyle: "bold" },
-    },
+    columnStyles,
     didParseCell: (data: any) => {
       if (data.section === "body" && String(data.row.raw?.[0] || "").trim() === "LIDER") {
         data.cell.styles.fillColor = [219, 234, 254];
@@ -273,19 +295,21 @@ export async function gerarRaizPagamentoPdf(
     },
   });
 
-  const finalY = (doc as any).lastAutoTable?.finalY || 146;
-  let totalY = finalY + 14;
-  if (totalY > height - 80) {
-    doc.addPage("a4", "portrait");
-    drawHeader();
-    totalY = 105;
+  if (exibirValor) {
+    const finalY = (doc as any).lastAutoTable?.finalY || 146;
+    let totalY = finalY + 14;
+    if (totalY > height - 80) {
+      doc.addPage("a4", "portrait");
+      drawHeader();
+      totalY = 105;
+    }
+    doc.setFillColor(240, 253, 244);
+    doc.roundedRect(width - margin - 235, totalY, 235, 42, 4, 4, "F");
+    doc.setTextColor(5, 120, 70);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(`TOTAL: ${dinheiro(total)}`, width - margin - 12, totalY + 26, { align: "right" });
   }
-  doc.setFillColor(240, 253, 244);
-  doc.roundedRect(width - margin - 235, totalY, 235, 42, 4, 4, "F");
-  doc.setTextColor(5, 120, 70);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text(`TOTAL: ${dinheiro(total)}`, width - margin - 12, totalY + 26, { align: "right" });
 
   const prefixo = raiz.tipo === "coordenador" ? "Raiz Pagamento" : "Pagamento Lider";
   const nome = `${prefixo} - ${raiz.nome}`;
