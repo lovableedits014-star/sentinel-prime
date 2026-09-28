@@ -204,11 +204,11 @@ export async function gerarRaizPagamentoPdf(
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
-    const titulo = "RAIZ PARA PAGAMENTO";
+    const titulo = "EQUIPE";
     doc.text(titulo, margin, 31);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
-    doc.text(`Responsavel: ${raiz.nome}`, margin, 51);
+    doc.text(`${raiz.tipo === "coordenador" ? "Coordenador" : "Lider"}: ${raiz.nome}`, margin, 51);
     doc.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, width - margin, 51, {
       align: "right",
     });
