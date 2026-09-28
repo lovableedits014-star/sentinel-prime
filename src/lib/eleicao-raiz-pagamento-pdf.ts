@@ -274,7 +274,7 @@ export async function gerarRaizPagamentoPdf(
       lineColor: [203, 213, 225],
       lineWidth: 0.5,
       valign: "middle",
-      minCellHeight: incluirAssinatura ? 39 : undefined,
+      ...(incluirAssinatura ? { minCellHeight: 39 } : {}),
     },
     headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: "bold" },
     columnStyles,
