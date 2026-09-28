@@ -120,8 +120,8 @@ import {
   gerarFormularioCabosPdf,
   type LiderFormularioCabos,
 } from "@/lib/eleicao-cabos-formulario-pdf";
-import { gerarReciboDocumentacaoPdf } from "@/lib/eleicao-recibo-documentacao-pdf";
 import RaizPagamentoDialog from "@/components/eleicao/RaizPagamentoDialog";
+import RaizDocumentacaoDialog from "@/components/eleicao/RaizDocumentacaoDialog";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -380,6 +380,7 @@ export default function Eleicao() {
   const [posCadastroOpen, setPosCadastroOpen] = useState(false);
   const [posCadastroPessoa, setPosCadastroPessoa] = useState<Pessoa | null>(null);
   const [editing, setEditing] = useState<Pessoa | null>(null);
+  const [raizDocumentacao, setRaizDocumentacao] = useState<Pessoa | null>(null);
   const [propagarRaiz, setPropagarRaiz] = useState<{
     raiz: Pessoa;
     parceiroId: string | null;
@@ -1701,16 +1702,8 @@ export default function Eleicao() {
     }
   };
 
-  const baixarRaizDocumentacao = async (raiz: Pessoa) => {
-    if (raiz.tipo === "cabo") return;
-    try {
-      const result = await gerarReciboDocumentacaoPdf(raiz, pessoas);
-      toast.success(`Raiz de documentação gerada para ${result.contratados} contratado(s).`);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Erro ao gerar a raiz de documentação.",
-      );
-    }
+  const baixarRaizDocumentacao = (raiz: Pessoa) => {
+    if (raiz.tipo !== "cabo") setRaizDocumentacao(raiz);
   };
 
   const abrirNovoCabo = (responsavel: Pessoa) => {
@@ -3236,6 +3229,16 @@ export default function Eleicao() {
             }))}
             onExport={handleExport}
           />
+          {raizDocumentacao && (
+            <RaizDocumentacaoDialog
+              open
+              onOpenChange={(aberto) => {
+                if (!aberto) setRaizDocumentacao(null);
+              }}
+              raiz={raizDocumentacao}
+              pessoas={pessoas}
+            />
+          )}
         </div>
       </EleicaoSearchContext.Provider>
     </EleicaoActionsContext.Provider>

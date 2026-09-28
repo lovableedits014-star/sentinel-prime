@@ -11,11 +11,73 @@ export type ReciboDocumentacaoPessoa = {
   arquivado_em?: string | null;
 };
 
+export type NivelDocumentacao = "coordenador" | "lider" | "cabo";
+
+export type FiltrosDocumentacao = {
+  niveis: NivelDocumentacao[];
+};
+
+export type ResumoDocumentacao = {
+  pessoas: ReciboDocumentacaoPessoa[];
+  linhas: number;
+  porNivel: Record<NivelDocumentacao, number>;
+};
+
 const slug = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   .replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 const contratado = (pessoa: ReciboDocumentacaoPessoa) =>
   !pessoa.arquivado_em && !pessoa.is_voluntario && Number(pessoa.valor_contratacao || 0) > 0;
+
+const pessoasNoEscopo = (
+  raiz: ReciboDocumentacaoPessoa,
+  pessoas: ReciboDocumentacaoPessoa[],
+) => {
+  const ativos = pessoas.filter((pessoa) => !pessoa.arquivado_em);
+  if (raiz.tipo === "lider") {
+    return [raiz, ...ativos.filter((pessoa) => pessoa.tipo === "cabo" && pessoa.parent_id === raiz.id)];
+  }
+  const lideres = ativos.filter(
+    (pessoa) => pessoa.tipo === "lider" && pessoa.parent_id === raiz.id,
+  );
+  const idsLideres = new Set(lideres.map((lider) => lider.id));
+  return [
+    raiz,
+    ...lideres,
+    ...ativos.filter(
+      (pessoa) =>
+        pessoa.tipo === "cabo" &&
+        (pessoa.parent_id === raiz.id || (pessoa.parent_id && idsLideres.has(pessoa.parent_id))),
+    ),
+  ];
+};
+
+export function resumirDocumentacao(
+  raiz: ReciboDocumentacaoPessoa,
+  pessoas: ReciboDocumentacaoPessoa[],
+  filtros: FiltrosDocumentacao,
+): ResumoDocumentacao {
+  const niveis = new Set(filtros.niveis);
+  const selecionadas = pessoasNoEscopo(raiz, pessoas).filter(
+    (pessoa) => contratado(pessoa) && niveis.has(pessoa.tipo),
+  );
+  const idsCabos = new Set(
+    selecionadas.filter((pessoa) => pessoa.tipo === "cabo").map((pessoa) => pessoa.parent_id),
+  );
+  const referencias = pessoasNoEscopo(raiz, pessoas).filter(
+    (pessoa) => pessoa.tipo === "lider" && idsCabos.has(pessoa.id) && !selecionadas.includes(pessoa),
+  ).length;
+
+  return {
+    pessoas: selecionadas,
+    linhas: selecionadas.length + referencias,
+    porNivel: {
+      coordenador: selecionadas.filter((pessoa) => pessoa.tipo === "coordenador").length,
+      lider: selecionadas.filter((pessoa) => pessoa.tipo === "lider").length,
+      cabo: selecionadas.filter((pessoa) => pessoa.tipo === "cabo").length,
+    },
+  };
+}
 
 const telefone = (value?: string | null) => {
   const digits = String(value || "").replace(/\D/g, "");
@@ -27,6 +89,7 @@ const telefone = (value?: string | null) => {
 export async function gerarReciboDocumentacaoPdf(
   raiz: ReciboDocumentacaoPessoa,
   pessoas: ReciboDocumentacaoPessoa[],
+  filtros: FiltrosDocumentacao,
 ) {
   if (raiz.tipo === "cabo") {
     throw new Error("A raiz de documentação deve ser um coordenador ou líder.");
@@ -42,28 +105,25 @@ export async function gerarReciboDocumentacaoPdf(
   const height = doc.internal.pageSize.getHeight();
   const margin = 38;
   const ativos = pessoas.filter((p) => !p.arquivado_em);
+  const resumo = resumirDocumentacao(raiz, pessoas, filtros);
+  const idsSelecionados = new Set(resumo.pessoas.map((pessoa) => pessoa.id));
   const lideres = raiz.tipo === "coordenador"
     ? ativos.filter((p) => p.tipo === "lider" && p.parent_id === raiz.id)
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
     : [raiz];
   const cabosDiretos = raiz.tipo === "coordenador"
-    ? ativos.filter((p) => p.tipo === "cabo" && p.parent_id === raiz.id && contratado(p))
+    ? ativos.filter((p) => p.tipo === "cabo" && p.parent_id === raiz.id && idsSelecionados.has(p.id))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
     : [];
   const cabosPorLider = new Map(lideres.map((lider) => [
     lider.id,
-    ativos.filter((p) => p.tipo === "cabo" && p.parent_id === lider.id && contratado(p))
+    ativos.filter((p) => p.tipo === "cabo" && p.parent_id === lider.id && idsSelecionados.has(p.id))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
   ]));
   const lideresVisiveis = lideres.filter((lider) =>
-    contratado(lider) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
+    idsSelecionados.has(lider.id) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
   );
-  const contratados = [
-    ...(contratado(raiz) ? [raiz] : []),
-    ...cabosDiretos,
-    ...lideresVisiveis.filter(contratado),
-    ...lideresVisiveis.flatMap((lider) => cabosPorLider.get(lider.id) || []),
-  ].filter((pessoa, index, lista) => lista.findIndex((item) => item.id === pessoa.id) === index);
+  const contratados = resumo.pessoas;
 
   if (!contratados.length) {
     throw new Error("Esta raiz não possui pessoas contratadas para receber documentação.");
@@ -71,7 +131,7 @@ export async function gerarReciboDocumentacaoPdf(
 
   type Linha = [string, string, string, string];
   const rows: Linha[] = [];
-  if (raiz.tipo === "coordenador" && contratado(raiz)) {
+  if (raiz.tipo === "coordenador" && idsSelecionados.has(raiz.id)) {
     rows.push(["COORDENADOR", raiz.nome, telefone(raiz.telefone), ""]);
   }
   cabosDiretos.forEach((cabo) =>
@@ -81,7 +141,7 @@ export async function gerarReciboDocumentacaoPdf(
       raiz.tipo === "coordenador" ? "  LÍDER" : "LÍDER",
       lider.nome,
       telefone(lider.telefone),
-      contratado(lider) ? "" : "SEM CONTRATO",
+      idsSelecionados.has(lider.id) ? "" : "REFERÊNCIA",
     ]);
     (cabosPorLider.get(lider.id) || []).forEach((cabo) =>
       rows.push([raiz.tipo === "coordenador" ? "    CABO" : "  CABO", cabo.nome, telefone(cabo.telefone), ""]));
@@ -137,7 +197,7 @@ export async function gerarReciboDocumentacaoPdf(
         data.cell.styles.fontStyle = "bold";
         data.cell.styles.lineColor = [147, 197, 253];
       }
-      if (String(data.row.raw?.[3] || "") === "SEM CONTRATO") {
+      if (String(data.row.raw?.[3] || "") === "REFERÊNCIA") {
         data.cell.styles.minCellHeight = 28;
       }
     },
