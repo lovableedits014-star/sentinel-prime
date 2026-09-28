@@ -11,7 +11,18 @@ export type PessoaRaizPagamento = {
   arquivado_em?: string | null;
 };
 
-export type TipoRaizPagamento = "cabo_eleitoral" | "cabo_virtual" | "lideres" | "completa";
+export type NivelRaizPagamento = "coordenador" | "lider" | "cabo";
+
+export type FiltrosRaizPagamento = {
+  niveis: NivelRaizPagamento[];
+  valores: number[];
+};
+
+export type ResumoRaizPagamento = {
+  pessoas: PessoaRaizPagamento[];
+  total: number;
+  porNivel: Record<NivelRaizPagamento, number>;
+};
 
 const slug = (value: string) =>
   value
@@ -29,6 +40,68 @@ const dinheiro = (value: number) =>
 const contratado = (pessoa: PessoaRaizPagamento) =>
   !pessoa.arquivado_em && !pessoa.is_voluntario && Number(pessoa.valor_contratacao || 0) > 0;
 
+const pessoasNoEscopo = (raiz: PessoaRaizPagamento, pessoas: PessoaRaizPagamento[]) => {
+  const ativos = pessoas.filter((pessoa) => !pessoa.arquivado_em);
+  if (raiz.tipo === "lider") {
+    return [
+      raiz,
+      ...ativos.filter((pessoa) => pessoa.tipo === "cabo" && pessoa.parent_id === raiz.id),
+    ];
+  }
+
+  const lideres = ativos.filter(
+    (pessoa) => pessoa.tipo === "lider" && pessoa.parent_id === raiz.id,
+  );
+  const idsLideres = new Set(lideres.map((lider) => lider.id));
+  const cabos = ativos.filter(
+    (pessoa) =>
+      pessoa.tipo === "cabo" &&
+      (pessoa.parent_id === raiz.id || (pessoa.parent_id && idsLideres.has(pessoa.parent_id))),
+  );
+  return [raiz, ...lideres, ...cabos];
+};
+
+export function listarValoresRaizPagamento(
+  raiz: PessoaRaizPagamento,
+  pessoas: PessoaRaizPagamento[],
+) {
+  return Array.from(
+    new Set(
+      pessoasNoEscopo(raiz, pessoas)
+        .filter(contratado)
+        .map((pessoa) => Number(pessoa.valor_contratacao)),
+    ),
+  ).sort((a, b) => a - b);
+}
+
+export function resumirRaizPagamento(
+  raiz: PessoaRaizPagamento,
+  pessoas: PessoaRaizPagamento[],
+  filtros: FiltrosRaizPagamento,
+): ResumoRaizPagamento {
+  const niveis = new Set(filtros.niveis);
+  const valores = new Set(filtros.valores.map(Number));
+  const selecionadas = pessoasNoEscopo(raiz, pessoas).filter(
+    (pessoa) =>
+      contratado(pessoa) &&
+      niveis.has(pessoa.tipo) &&
+      valores.has(Number(pessoa.valor_contratacao)),
+  );
+
+  return {
+    pessoas: selecionadas,
+    total: selecionadas.reduce(
+      (soma, pessoa) => soma + Number(pessoa.valor_contratacao || 0),
+      0,
+    ),
+    porNivel: {
+      coordenador: selecionadas.filter((pessoa) => pessoa.tipo === "coordenador").length,
+      lider: selecionadas.filter((pessoa) => pessoa.tipo === "lider").length,
+      cabo: selecionadas.filter((pessoa) => pessoa.tipo === "cabo").length,
+    },
+  };
+}
+
 const telefone = (value?: string | null) => {
   const digits = String(value || "").replace(/\D/g, "");
   if (digits.length === 11)
@@ -41,7 +114,7 @@ const telefone = (value?: string | null) => {
 export async function gerarRaizPagamentoPdf(
   raiz: PessoaRaizPagamento,
   pessoas: PessoaRaizPagamento[],
-  tipo: TipoRaizPagamento = "completa",
+  filtros: FiltrosRaizPagamento,
 ) {
   if (raiz.tipo === "cabo")
     throw new Error("A raiz para pagamento deve ser um coordenador ou lider.");
@@ -55,19 +128,16 @@ export async function gerarRaizPagamentoPdf(
   const height = doc.internal.pageSize.getHeight();
   const margin = 38;
   const ativos = pessoas.filter((p) => !p.arquivado_em);
+  const resumo = resumirRaizPagamento(raiz, pessoas, filtros);
+  const idsSelecionados = new Set(resumo.pessoas.map((pessoa) => pessoa.id));
   const lideres =
     raiz.tipo === "coordenador"
       ? ativos
           .filter((p) => p.tipo === "lider" && p.parent_id === raiz.id)
           .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
       : [raiz];
-  const valorCabo = tipo === "cabo_eleitoral" ? 150 : tipo === "cabo_virtual" ? 100 : null;
-  const caboDoRelatorio = (pessoa: PessoaRaizPagamento) =>
-    contratado(pessoa) &&
-    tipo !== "lideres" &&
-    (valorCabo === null || Number(pessoa.valor_contratacao) === valorCabo);
-  const incluirRaiz = tipo === "completa";
-  const incluirLideres = tipo === "completa" || tipo === "lideres";
+  const caboDoRelatorio = (pessoa: PessoaRaizPagamento) => idsSelecionados.has(pessoa.id);
+  const incluirRaiz = idsSelecionados.has(raiz.id);
   const cabosDiretos =
     raiz.tipo === "coordenador"
       ? ativos.filter((p) => p.tipo === "cabo" && p.parent_id === raiz.id && caboDoRelatorio(p))
@@ -82,7 +152,7 @@ export async function gerarRaizPagamentoPdf(
   );
   const lideresVisiveis = lideres.filter(
     (lider) =>
-      (incluirLideres && contratado(lider)) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
+      idsSelecionados.has(lider.id) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
   );
   const membros =
     raiz.tipo === "coordenador"
@@ -93,18 +163,12 @@ export async function gerarRaizPagamentoPdf(
           ...lideresVisiveis.flatMap((l) => cabosPorLider.get(l.id) || []),
         ]
       : [raiz, ...(cabosPorLider.get(raiz.id) || [])];
-  const contratados = membros.filter((pessoa) =>
-    pessoa.tipo === "cabo"
-      ? caboDoRelatorio(pessoa)
-      : pessoa.tipo === "lider"
-        ? incluirLideres && contratado(pessoa)
-        : incluirRaiz && contratado(pessoa),
-  );
-  const total = contratados.reduce((sum, pessoa) => sum + Number(pessoa.valor_contratacao || 0), 0);
+  const contratados = resumo.pessoas;
+  const total = resumo.total;
   const rows: Array<Array<string>> = [];
 
   if (raiz.tipo === "coordenador") {
-    if (incluirRaiz && contratado(raiz)) {
+    if (incluirRaiz) {
       rows.push([
         "COORDENADOR",
         raiz.nome,
@@ -124,7 +188,7 @@ export async function gerarRaizPagamentoPdf(
       );
   }
   lideresVisiveis.forEach((lider) => {
-    if (incluirLideres && contratado(lider)) {
+    if (idsSelecionados.has(lider.id)) {
       rows.push([
         raiz.tipo === "coordenador" ? "LIDER" : "LIDER",
         lider.nome,
@@ -151,14 +215,7 @@ export async function gerarRaizPagamentoPdf(
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
-    const titulo =
-      tipo === "cabo_eleitoral"
-        ? "CABOS ELEITORAIS - R$ 150,00"
-        : tipo === "cabo_virtual"
-          ? "CABOS VIRTUAIS - R$ 100,00"
-          : tipo === "lideres"
-            ? "LIDERES PARA PAGAMENTO"
-            : "RAIZ PARA PAGAMENTO";
+    const titulo = "RAIZ PARA PAGAMENTO";
     doc.text(titulo, margin, 31);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
@@ -230,16 +287,7 @@ export async function gerarRaizPagamentoPdf(
   doc.setFontSize(11);
   doc.text(`TOTAL: ${dinheiro(total)}`, width - margin - 12, totalY + 26, { align: "right" });
 
-  const prefixo =
-    tipo === "cabo_eleitoral"
-      ? "Cabos Eleitorais 150"
-      : tipo === "cabo_virtual"
-        ? "Cabos Virtuais 100"
-        : tipo === "lideres"
-          ? "Lideres para Pagamento"
-          : raiz.tipo === "coordenador"
-            ? "Raiz Pagamento"
-            : "Pagamento Lider";
+  const prefixo = raiz.tipo === "coordenador" ? "Raiz Pagamento" : "Pagamento Lider";
   const nome = `${prefixo} - ${raiz.nome}`;
   doc.save(`${slug(nome)}.pdf`);
   return { total, contratados: contratados.length, membros: membros.length };
