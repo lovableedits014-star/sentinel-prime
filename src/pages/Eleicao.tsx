@@ -136,25 +136,25 @@ const initials = (nome: string) =>
 const fmtBRL = (n?: number | null) =>
   (n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-const onlyDigits = (s: string) => s.replace(/\D/g, "");
+const onlyDigits = (s?: string | null) => (s || "").replace(/\D/g, "");
 const parseValorContratacao = (s: string) => {
   const valor = s.trim();
   if (valor.includes(",")) return Number(valor.replace(/\./g, "").replace(",", ".")) || 0;
   return Number(valor) || 0;
 };
 
-const waLink = (telefone: string) => {
+const waLink = (telefone?: string | null) => {
   const d = onlyDigits(telefone);
   if (!d) return "";
   const full = d.startsWith("55") ? d : `55${d}`;
   return `https://wa.me/${full}`;
 };
 
-const fmtPhone = (s: string) => {
+const fmtPhone = (s?: string | null) => {
   const d = onlyDigits(s);
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return s;
+  return s || "";
 };
 
 async function sendCoordBoasVindas(pessoaId: string) {
@@ -272,7 +272,7 @@ interface Pessoa {
   regiao: Regiao | null;
   cidade: string | null;
   nome: string;
-  telefone: string;
+  telefone: string | null;
   endereco: string;
   rua: string | null;
   numero: string | null;
@@ -521,7 +521,7 @@ export default function Eleicao() {
       regiao: (p.regiao || "centro") as Regiao,
       cidade: p.cidade || "",
       nome: p.nome,
-      telefone: p.telefone,
+      telefone: p.telefone || "",
       rua: p.rua || ruaFallback,
       numero: p.numero || "",
       bairro: p.bairro || "",
@@ -1098,7 +1098,7 @@ export default function Eleicao() {
     const q = search.toLowerCase();
     return (
       p.nome.toLowerCase().includes(q) ||
-      p.telefone.includes(search) ||
+      (p.telefone || "").includes(search) ||
       (p.endereco || "").toLowerCase().includes(q)
     );
   };
