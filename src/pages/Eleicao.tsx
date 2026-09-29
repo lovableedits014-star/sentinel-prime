@@ -122,6 +122,7 @@ import {
 } from "@/lib/eleicao-cabos-formulario-pdf";
 import RaizPagamentoDialog from "@/components/eleicao/RaizPagamentoDialog";
 import RaizDocumentacaoDialog from "@/components/eleicao/RaizDocumentacaoDialog";
+import ContatosRegiaoDialog from "@/components/eleicao/ContatosRegiaoDialog";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -2226,6 +2227,9 @@ export default function Eleicao() {
                         key={r.value}
                         title={r.label}
                         pessoas={list}
+                        pessoasContatos={pessoas.filter(
+                          (p) => p.escopo === "campo_grande" && p.regiao === r.value,
+                        )}
                         defaultOpen={regiaoFilter !== "all" || !!search}
                         onAdd={() => openNew({ escopo: "campo_grande", regiao: r.value })}
                         onEdit={openEdit}
@@ -2275,6 +2279,9 @@ export default function Eleicao() {
                       key={cidade}
                       title={cidade}
                       pessoas={escopoList.filter((p) => p.cidade === cidade)}
+                      pessoasContatos={pessoas.filter(
+                        (p) => p.escopo === "interior" && p.cidade === cidade,
+                      )}
                       defaultOpen={!!search}
                       onAdd={() => openNew({ escopo: "interior", cidade })}
                       onEdit={openEdit}
@@ -3248,6 +3255,7 @@ export default function Eleicao() {
 function RegionBlock({
   title,
   pessoas,
+  pessoasContatos,
   onAdd,
   onEdit,
   onDelete,
@@ -3259,6 +3267,7 @@ function RegionBlock({
 }: {
   title: string;
   pessoas: Pessoa[];
+  pessoasContatos?: Pessoa[];
   onAdd: () => void;
   onEdit: (p: Pessoa) => void;
   onCredentials: (p: Pessoa) => void;
@@ -3268,6 +3277,7 @@ function RegionBlock({
   interior?: boolean;
   defaultOpen?: boolean;
 }) {
+  const [contatosOpen, setContatosOpen] = useState(false);
   const coords = pessoas.filter((p) => p.tipo === "coordenador");
   const lideres = pessoas.filter((p) => p.tipo === "lider");
   const cabos = pessoas.filter((p) => p.tipo === "cabo");
@@ -3342,6 +3352,21 @@ function RegionBlock({
             </span>
           )}
         </div>
+        {hasContent && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-[11px] gap-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              setContatosOpen(true);
+            }}
+            title={`Baixar lista de contatos de ${title}`}
+          >
+            <FileDown className="w-3 h-3" />
+            <span className="hidden lg:inline">Lista de contatos</span>
+          </Button>
+        )}
         {hasContent && (
           <Button
             size="sm"
@@ -3458,6 +3483,12 @@ function RegionBlock({
           )}
         </div>
       )}
+      <ContatosRegiaoDialog
+        open={contatosOpen}
+        onOpenChange={setContatosOpen}
+        regiao={title}
+        pessoas={pessoasContatos || pessoas}
+      />
     </Card>
   );
 }
@@ -3489,17 +3520,15 @@ function CoordBlock({
   const hasTeam = totalEquipe > 0;
   const allDoTime = [coord, ...lideres, ...cabosDir, ...cabosLid];
   const valorCoordenador = isEleicaoContratado(coord) ? Number(coord.valor_contratacao || 0) : 0;
-  const valorLideres = lideres.filter(isEleicaoContratado).reduce(
-    (total, pessoa) => total + Number(pessoa.valor_contratacao || 0),
-    0,
-  );
+  const valorLideres = lideres
+    .filter(isEleicaoContratado)
+    .reduce((total, pessoa) => total + Number(pessoa.valor_contratacao || 0), 0);
   const todosCabos = [...cabosDir, ...cabosLid];
   const lideresContratados = lideres.filter(isEleicaoContratado);
   const todosCabosContratados = todosCabos.filter(isEleicaoContratado);
-  const valorCabos = todosCabos.filter(isEleicaoContratado).reduce(
-    (total, pessoa) => total + Number(pessoa.valor_contratacao || 0),
-    0,
-  );
+  const valorCabos = todosCabos
+    .filter(isEleicaoContratado)
+    .reduce((total, pessoa) => total + Number(pessoa.valor_contratacao || 0), 0);
   const valorTotalArvore = valorCoordenador + valorLideres + valorCabos;
 
   const { searchActive, matchedIds } = React.useContext(EleicaoSearchContext);
@@ -4073,9 +4102,7 @@ function PessoaRow({
             </DropdownMenuItem>
           )}
           {(p.tipo === "coordenador" || p.tipo === "lider") &&
-            (onExportPaymentRoot || onReciboDocumentacao) && (
-            <DropdownMenuSeparator />
-          )}
+            (onExportPaymentRoot || onReciboDocumentacao) && <DropdownMenuSeparator />}
           <EnviarFluxoMenu pessoa={p as any} />
           <DropdownMenuSeparator />
           {p.tipo === "lider" && onFormularioCabos && (
