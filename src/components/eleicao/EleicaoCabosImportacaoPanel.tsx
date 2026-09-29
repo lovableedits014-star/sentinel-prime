@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client-selfhosted";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -206,6 +207,10 @@ type QuickParentForm = {
   cidade: string;
   coordenadorId: string;
 };
+type IndividualCaboForm = {
+  nome: string; cpf: string; telefone: string; endereco: string; bairro: string;
+  valor: string; parentId: string; inicio: string; fim: string; autorizarSemTelefone: boolean;
+};
 
 // As tabelas/RPCs passam a integrar os tipos gerados depois que a migration for aplicada.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -329,6 +334,12 @@ export default function EleicaoCabosImportacaoPanel({
   const [start, setStart] = useState(format(new Date(), "yyyy-MM-dd"));
   const [end, setEnd] = useState("");
   const [parentId, setParentId] = useState("");
+  const [allowMissingPhone, setAllowMissingPhone] = useState(false);
+  const [individualOpen, setIndividualOpen] = useState(false);
+  const [individual, setIndividual] = useState<IndividualCaboForm>({
+    nome: "", cpf: "", telefone: "", endereco: "", bairro: "", valor: "",
+    parentId: "", inicio: format(new Date(), "yyyy-MM-dd"), fim: "", autorizarSemTelefone: false,
+  });
   const [quickParentOpen, setQuickParentOpen] = useState(false);
   const [quickParent, setQuickParent] = useState<QuickParentForm>({
     tipo: "lider", nome: "", telefone: "", valor: "", escopo: "campo_grande",
@@ -639,6 +650,7 @@ export default function EleicaoCabosImportacaoPanel({
     p_regiao: selectedParent?.escopo === "campo_grande" ? selectedParent.regiao : null,
     p_cidade: selectedParent?.escopo === "interior" ? selectedParent.cidade : null,
     p_linhas: rows,
+    p_permitir_sem_telefone: allowMissingPhone,
   });
 
   const analyze = async () => {
@@ -653,7 +665,7 @@ export default function EleicaoCabosImportacaoPanel({
       return toast.error("O responsável selecionado não possui cidade cadastrada.");
     setBusy(true);
     try {
-      const { data, error } = await db.rpc("eleicao_cabo_import_analisar", analyzeParams());
+      const { data, error } = await db.rpc("eleicao_cabo_import_analisar_excepcional", analyzeParams());
       if (error) throw error;
       const preview = data as Analysis;
       const { error: discardError } = await db.rpc("eleicao_cabo_import_descartar", {
@@ -675,13 +687,13 @@ export default function EleicaoCabosImportacaoPanel({
     let pendingLotId: string | null = null;
     try {
       const { data: analyzedData, error: analyzeError } = await db.rpc(
-        "eleicao_cabo_import_analisar",
+        "eleicao_cabo_import_analisar_excepcional",
         analyzeParams(),
       );
       if (analyzeError) throw analyzeError;
       pendingLotId = (analyzedData as Analysis).lote.id;
 
-      const { data, error } = await db.rpc("eleicao_cabo_import_confirmar", {
+      const { data, error } = await db.rpc("eleicao_cabo_import_confirmar_excepcional", {
         p_lote_id: pendingLotId,
       });
       if (error) throw error;
@@ -693,6 +705,7 @@ export default function EleicaoCabosImportacaoPanel({
       setName("");
       setValue("");
       setParentId("");
+      setAllowMissingPhone(false);
       await loadBase();
       onChanged();
     } catch (error: unknown) {
@@ -700,6 +713,70 @@ export default function EleicaoCabosImportacaoPanel({
         await db.rpc("eleicao_cabo_import_descartar", { p_lote_id: pendingLotId });
       }
       toast.error(errorMessage(error, "Falha ao confirmar a importação."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openIndividual = () => {
+    setIndividual({
+      nome: "", cpf: "", telefone: "", endereco: "", bairro: "", valor: value,
+      parentId, inicio: start, fim: end, autorizarSemTelefone: false,
+    });
+    setIndividualOpen(true);
+  };
+
+  const saveIndividual = async () => {
+    const parent = parents.find((item) => item.id === individual.parentId);
+    const unitValue = Number(individual.valor.replace(/\./g, "").replace(",", "."));
+    const telefone = digits(individual.telefone);
+    const cpf = digits(individual.cpf);
+    if (!individual.nome.trim()) return toast.error("Informe o nome do cabo.");
+    if (!parent) return toast.error("Selecione o responsável.");
+    if (!unitValue || unitValue <= 0) return toast.error("Informe um valor maior que zero.");
+    if (telefone && telefone.length < 10) return toast.error("Informe um telefone com DDD ou deixe-o vazio.");
+    if (!telefone && !individual.autorizarSemTelefone)
+      return toast.error("Marque a autorização para cadastrar sem telefone.");
+    if (cpf && cpf.length !== 11) return toast.error("O CPF deve possuir 11 dígitos.");
+
+    setBusy(true);
+    let loteId: string | null = null;
+    try {
+      const { data: preview, error: analyzeError } = await db.rpc(
+        "eleicao_cabo_import_analisar_excepcional",
+        {
+          p_client_id: clientId,
+          p_nome: `Cadastro individual - ${individual.nome.trim()}`,
+          p_arquivo_nome: "cadastro-individual",
+          p_valor_unitario: unitValue,
+          p_data_inicio: individual.inicio,
+          p_data_fim: individual.fim || null,
+          p_parent_id: parent.id,
+          p_escopo: parent.escopo,
+          p_regiao: parent.escopo === "campo_grande" ? parent.regiao : null,
+          p_cidade: parent.escopo === "interior" ? parent.cidade : null,
+          p_linhas: [{
+            nome: individual.nome.trim(), cpf, telefone,
+            endereco: individual.endereco.trim(), bairro: individual.bairro.trim(),
+          }],
+          p_permitir_sem_telefone: individual.autorizarSemTelefone,
+        },
+      );
+      if (analyzeError) throw analyzeError;
+      loteId = (preview as Analysis).lote.id;
+      const item = (preview as Analysis).itens[0];
+      if (!item || !["elegivel", "cadastro_sem_contrato"].includes(item.classificacao))
+        throw new Error(item?.motivo || "O cadastro não passou pela validação.");
+      const { error: confirmError } = await db.rpc("eleicao_cabo_import_confirmar_excepcional", { p_lote_id: loteId });
+      if (confirmError) throw confirmError;
+      loteId = null;
+      setIndividualOpen(false);
+      await loadBase();
+      onChanged();
+      toast.success("Cabo cadastrado e vinculado ao responsável.");
+    } catch (error: unknown) {
+      if (loteId) await db.rpc("eleicao_cabo_import_descartar", { p_lote_id: loteId });
+      toast.error(errorMessage(error, "Não foi possível cadastrar o cabo."));
     } finally {
       setBusy(false);
     }
@@ -885,7 +962,12 @@ export default function EleicaoCabosImportacaoPanel({
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Importar cabos eleitorais</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>Importar cabos eleitorais</CardTitle>
+            <Button type="button" variant="outline" onClick={openIndividual}>
+              <Plus className="mr-2 h-4 w-4" />Cadastrar cabo individual
+            </Button>
+          </div>
           <CardDescription>
             Envie Excel ou CSV, defina o valor e confira duplicados antes de alterar a previsão de
             custos.
@@ -969,11 +1051,15 @@ export default function EleicaoCabosImportacaoPanel({
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span>
-              Obrigatórios: nome e telefone/celular/WhatsApp. Opcionais: CPF, endereço/rua, número,
-              complemento e bairro. Escopo, região ou cidade serão herdados automaticamente do
-              responsável.
-            </span>
+            <div className="space-y-2">
+              <span className="block">
+                Obrigatórios: nome e telefone/celular/WhatsApp. Opcionais: CPF e endereço. A localização será herdada do responsável.
+              </span>
+              <label className="flex max-w-3xl items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-foreground dark:bg-amber-950/20">
+                <Checkbox checked={allowMissingPhone} onCheckedChange={(checked) => setAllowMissingPhone(checked === true)} />
+                <span><strong>Autorizar cabos sem telefone nesta lista.</strong> A exceção ficará registrada individualmente na auditoria.</span>
+              </label>
+            </div>
             <Button onClick={analyze} disabled={busy || !rows.length}>
               {busy ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1744,6 +1830,25 @@ export default function EleicaoCabosImportacaoPanel({
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={individualOpen} onOpenChange={setIndividualOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Cadastrar cabo individual</DialogTitle><DialogDescription>O cabo será contratado e vinculado ao responsável selecionado.</DialogDescription></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1"><Label>Nome</Label><Input value={individual.nome} onChange={(e) => setIndividual({ ...individual, nome: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Telefone</Label><Input inputMode="tel" placeholder="Opcional com autorização" value={individual.telefone} onChange={(e) => setIndividual({ ...individual, telefone: e.target.value })} /></div>
+            <div className="space-y-1"><Label>CPF (opcional)</Label><Input inputMode="numeric" value={individual.cpf} onChange={(e) => setIndividual({ ...individual, cpf: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Valor</Label><Input inputMode="decimal" value={individual.valor} onChange={(e) => setIndividual({ ...individual, valor: e.target.value })} /></div>
+            <div className="space-y-1 sm:col-span-2"><Label>Responsável</Label><Select value={individual.parentId} onValueChange={(parentId) => setIndividual({ ...individual, parentId })}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{parents.map((parent) => <SelectItem key={parent.id} value={parent.id}>{parent.nome} · {roleLabel(parent.tipo)}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><Label>Endereço (opcional)</Label><Input value={individual.endereco} onChange={(e) => setIndividual({ ...individual, endereco: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Bairro (opcional)</Label><Input value={individual.bairro} onChange={(e) => setIndividual({ ...individual, bairro: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Início</Label><Input type="date" value={individual.inicio} onChange={(e) => setIndividual({ ...individual, inicio: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Término (opcional)</Label><Input type="date" min={individual.inicio} value={individual.fim} onChange={(e) => setIndividual({ ...individual, fim: e.target.value })} /></div>
+            {!digits(individual.telefone) && <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm sm:col-span-2 dark:bg-amber-950/20"><Checkbox checked={individual.autorizarSemTelefone} onCheckedChange={(checked) => setIndividual({ ...individual, autorizarSemTelefone: checked === true })} /><span>Autorizo excepcionalmente este cadastro sem telefone. A decisão ficará registrada na auditoria.</span></label>}
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setIndividualOpen(false)}>Cancelar</Button><Button disabled={busy} onClick={() => void saveIndividual()}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cadastrar e vincular</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={quickParentOpen} onOpenChange={setQuickParentOpen}>
         <DialogContent className="sm:max-w-xl">
