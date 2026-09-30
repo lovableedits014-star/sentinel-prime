@@ -193,27 +193,29 @@ export default function RaizPagamentoDialog({
             )}
           </section>
 
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold">Campos do PDF</h3>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-3 text-sm">
-                Exibir valores
-                <Switch
-                  checked={exibirValor}
-                  onCheckedChange={setExibirValor}
-                  aria-label="Exibir valores no PDF"
-                />
-              </label>
-              <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-3 text-sm">
-                Campo de assinatura
-                <Switch
-                  checked={incluirAssinatura}
-                  onCheckedChange={setIncluirAssinatura}
-                  aria-label="Adicionar campo de assinatura"
-                />
-              </label>
-            </div>
-          </section>
+          {!modoGeral && (
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold">Campos do PDF</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                  Exibir valores
+                  <Switch
+                    checked={exibirValor}
+                    onCheckedChange={setExibirValor}
+                    aria-label="Exibir valores no PDF"
+                  />
+                </label>
+                <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                  Campo de assinatura
+                  <Switch
+                    checked={incluirAssinatura}
+                    onCheckedChange={setIncluirAssinatura}
+                    aria-label="Adicionar campo de assinatura"
+                  />
+                </label>
+              </div>
+            </section>
+          )}
 
           <section className="rounded-lg border bg-muted/40 p-4" aria-live="polite">
             <div className="flex items-start justify-between gap-4">

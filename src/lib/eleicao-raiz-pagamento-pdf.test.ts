@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   listarValoresRaizPagamento,
+  resumirPagamentoGeral,
   resumirRaizPagamento,
   type PessoaRaizPagamento,
 } from "./eleicao-raiz-pagamento-pdf";
@@ -71,5 +72,85 @@ describe("filtros da raiz de pagamento", () => {
     });
 
     expect(resumo.pessoas.map((pessoa) => pessoa.id)).toEqual(["cabo-1"]);
+  });
+});
+
+describe("resumo do pagamento geral", () => {
+  it("agrupa coordenador, lideres e cabos por faixa de valor", () => {
+    const equipe: PessoaRaizPagamento[] = [
+      { id: "c", tipo: "coordenador", nome: "Fulano", regiao: "sul", valor_contratacao: 500 },
+      {
+        id: "l1",
+        tipo: "lider",
+        nome: "Lider 1",
+        parent_id: "c",
+        regiao: "sul",
+        valor_contratacao: 200,
+      },
+      {
+        id: "l2",
+        tipo: "lider",
+        nome: "Lider 2",
+        parent_id: "c",
+        regiao: "sul",
+        valor_contratacao: 200,
+      },
+      {
+        id: "cb1",
+        tipo: "cabo",
+        nome: "Cabo 1",
+        parent_id: "l1",
+        regiao: "sul",
+        valor_contratacao: 150,
+      },
+      {
+        id: "cb2",
+        tipo: "cabo",
+        nome: "Cabo 2",
+        parent_id: "l2",
+        regiao: "sul",
+        valor_contratacao: 100,
+      },
+      {
+        id: "cb3",
+        tipo: "cabo",
+        nome: "Cabo 3",
+        parent_id: "c",
+        regiao: "sul",
+        valor_contratacao: 100,
+      },
+    ];
+
+    const [regiao] = resumirPagamentoGeral(equipe, equipe);
+    const [grupo] = regiao.grupos;
+
+    expect(grupo.responsavel?.nome).toBe("Fulano");
+    expect(grupo.lideres).toHaveLength(2);
+    expect(grupo.faixasCabos).toEqual([
+      { quantidade: 1, valorUnitario: 150, subtotal: 150 },
+      { quantidade: 2, valorUnitario: 100, subtotal: 200 },
+    ]);
+    expect(grupo.total).toBe(1250);
+    expect(regiao.total).toBe(1250);
+  });
+
+  it("separa lider avulso e inclui os cabos dele", () => {
+    const equipe: PessoaRaizPagamento[] = [
+      { id: "l", tipo: "lider", nome: "Avulso", regiao: "norte", valor_contratacao: 250 },
+      {
+        id: "cb",
+        tipo: "cabo",
+        nome: "Cabo",
+        parent_id: "l",
+        regiao: "norte",
+        valor_contratacao: 100,
+      },
+    ];
+
+    const [regiao] = resumirPagamentoGeral(equipe, equipe);
+
+    expect(regiao.grupos[0].tipo).toBe("lider_avulso");
+    expect(regiao.grupos[0].cabos).toHaveLength(1);
+    expect(regiao.grupos[0].total).toBe(350);
   });
 });
