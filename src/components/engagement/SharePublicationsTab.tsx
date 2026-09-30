@@ -64,8 +64,11 @@ export default function SharePublicationsTab({ clientId }: { clientId: string })
     [postsQuery.data],
   );
   const sourceText = sanitizeText(facebook?.post_message || instagram?.post_message || "");
+  const engagementCall =
+    "Acesse nossas redes sociais pelos links abaixo, curta, comente e compartilhe esta publicação. Sua participação é muito importante! 💙";
   const generatedMessage = [
     sourceText,
+    facebook || instagram ? engagementCall : "",
     facebook?.post_permalink_url ? `Facebook: ${facebook.post_permalink_url}` : "",
     instagram?.post_permalink_url ? `Instagram: ${instagram.post_permalink_url}` : "",
   ]
