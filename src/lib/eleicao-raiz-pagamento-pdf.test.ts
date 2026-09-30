@@ -12,7 +12,14 @@ const pessoas: PessoaRaizPagamento[] = [
   { id: "lider-2", tipo: "lider", nome: "Líder 2", parent_id: "coord", valor_contratacao: 100 },
   { id: "cabo-1", tipo: "cabo", nome: "Cabo 1", parent_id: "lider-1", valor_contratacao: 100 },
   { id: "cabo-2", tipo: "cabo", nome: "Cabo 2", parent_id: "coord", valor_contratacao: 150 },
-  { id: "fora", tipo: "cabo", nome: "Fora", parent_id: "outra-raiz", valor_contratacao: 100 },
+  {
+    id: "fora",
+    tipo: "cabo",
+    nome: "Fora",
+    parent_id: "outra-raiz",
+    valor_contratacao: 100,
+    escopo: "interior",
+  },
   {
     id: "voluntario",
     tipo: "cabo",
@@ -53,5 +60,16 @@ describe("filtros da raiz de pagamento", () => {
     });
 
     expect(resumo.pessoas.map((pessoa) => pessoa.id)).toEqual(["cabo-1", "fora"]);
+  });
+
+  it("permite gerar somente Campo Grande sem os contratados do Interior", () => {
+    const resumo = resumirRaizPagamento(pessoas[0], pessoas, {
+      niveis: ["cabo"],
+      valores: [100],
+      todasRegioes: true,
+      incluirInterior: false,
+    });
+
+    expect(resumo.pessoas.map((pessoa) => pessoa.id)).toEqual(["cabo-1"]);
   });
 });

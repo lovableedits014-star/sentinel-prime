@@ -5,6 +5,7 @@ export type PessoaRaizPagamento = {
   telefone?: string | null;
   cidade?: string | null;
   regiao?: string | null;
+  escopo?: "campo_grande" | "interior" | string | null;
   parent_id?: string | null;
   valor_contratacao?: number | null;
   is_voluntario?: boolean | null;
@@ -17,6 +18,7 @@ export type FiltrosRaizPagamento = {
   niveis: NivelRaizPagamento[];
   valores: number[];
   todasRegioes?: boolean;
+  incluirInterior?: boolean;
   exibirValor?: boolean;
   incluirAssinatura?: boolean;
 };
@@ -68,17 +70,23 @@ const pessoasDoRelatorio = (
   raiz: PessoaRaizPagamento,
   pessoas: PessoaRaizPagamento[],
   todasRegioes = false,
+  incluirInterior = true,
 ) =>
-  todasRegioes ? pessoas.filter((pessoa) => !pessoa.arquivado_em) : pessoasNoEscopo(raiz, pessoas);
+  todasRegioes
+    ? pessoas.filter(
+        (pessoa) => !pessoa.arquivado_em && (incluirInterior || pessoa.escopo !== "interior"),
+      )
+    : pessoasNoEscopo(raiz, pessoas);
 
 export function listarValoresRaizPagamento(
   raiz: PessoaRaizPagamento,
   pessoas: PessoaRaizPagamento[],
   todasRegioes = false,
+  incluirInterior = true,
 ) {
   return Array.from(
     new Set(
-      pessoasDoRelatorio(raiz, pessoas, todasRegioes)
+      pessoasDoRelatorio(raiz, pessoas, todasRegioes, incluirInterior)
         .filter(contratado)
         .map((pessoa) => Number(pessoa.valor_contratacao)),
     ),
@@ -92,7 +100,12 @@ export function resumirRaizPagamento(
 ): ResumoRaizPagamento {
   const niveis = new Set(filtros.niveis);
   const valores = new Set(filtros.valores.map(Number));
-  const selecionadas = pessoasDoRelatorio(raiz, pessoas, filtros.todasRegioes).filter(
+  const selecionadas = pessoasDoRelatorio(
+    raiz,
+    pessoas,
+    filtros.todasRegioes,
+    filtros.incluirInterior,
+  ).filter(
     (pessoa) =>
       contratado(pessoa) &&
       niveis.has(pessoa.tipo) &&
@@ -135,7 +148,9 @@ export async function gerarRaizPagamentoPdf(
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
   const margin = 38;
-  const ativos = pessoas.filter((p) => !p.arquivado_em);
+  const ativos = filtros.todasRegioes
+    ? pessoasDoRelatorio(raiz, pessoas, true, filtros.incluirInterior)
+    : pessoas.filter((p) => !p.arquivado_em);
   const resumo = resumirRaizPagamento(raiz, pessoas, filtros);
   const idsSelecionados = new Set(resumo.pessoas.map((pessoa) => pessoa.id));
   const lideres =
@@ -179,25 +194,125 @@ export async function gerarRaizPagamentoPdf(
   const criarLinha = (nivel: string, pessoa: PessoaRaizPagamento) => [
     nivel,
     pessoa.nome,
-    ...(todasRegioes ? [pessoa.cidade || pessoa.regiao || "Nao informado"] : []),
     telefone(pessoa.telefone),
     ...(exibirValor ? [dinheiro(Number(pessoa.valor_contratacao))] : []),
     ...(incluirAssinatura ? [""] : []),
   ];
 
   if (todasRegioes) {
-    const ordemNivel: Record<NivelRaizPagamento, number> = { coordenador: 0, lider: 1, cabo: 2 };
-    [...contratados]
-      .sort((a, b) => {
-        const localA = a.cidade || a.regiao || "";
-        const localB = b.cidade || b.regiao || "";
-        return (
-          localA.localeCompare(localB, "pt-BR") ||
-          ordemNivel[a.tipo] - ordemNivel[b.tipo] ||
-          a.nome.localeCompare(b.nome, "pt-BR")
+    const selecionados = new Set(contratados.map((pessoa) => pessoa.id));
+    const ativosPorId = new Map(ativos.map((pessoa) => [pessoa.id, pessoa]));
+    const localDaPessoa = (pessoa: PessoaRaizPagamento) => {
+      let atual: PessoaRaizPagamento | undefined = pessoa;
+      let local = pessoa.cidade || pessoa.regiao || "Nao informado";
+      const visitados = new Set<string>();
+      while (atual?.parent_id && !visitados.has(atual.parent_id)) {
+        visitados.add(atual.parent_id);
+        atual = ativosPorId.get(atual.parent_id);
+        if (atual) local = atual.cidade || atual.regiao || local;
+      }
+      return local;
+    };
+    const locais = Array.from(new Set(contratados.map(localDaPessoa))).sort((a, b) =>
+      a.localeCompare(b, "pt-BR"),
+    );
+    const noLocal = (pessoa: PessoaRaizPagamento, local: string) => localDaPessoa(pessoa) === local;
+    const ordenarNome = (a: PessoaRaizPagamento, b: PessoaRaizPagamento) =>
+      a.nome.localeCompare(b.nome, "pt-BR");
+    const linhaRegiao = (local: string) => [
+      `REGIAO: ${local}`,
+      "",
+      "",
+      ...(exibirValor ? [""] : []),
+      ...(incluirAssinatura ? [""] : []),
+    ];
+    const linhaGrupo = (nivel: string, nome: string) => [
+      nivel,
+      nome,
+      "-",
+      ...(exibirValor ? [""] : []),
+      ...(incluirAssinatura ? [""] : []),
+    ];
+
+    locais.forEach((local) => {
+      const pessoasLocal = ativos.filter((pessoa) => noLocal(pessoa, local));
+      const coords = pessoasLocal
+        .filter((pessoa) => pessoa.tipo === "coordenador")
+        .sort(ordenarNome);
+      const idsCoords = new Set(coords.map((pessoa) => pessoa.id));
+      const lideresOrfaos = pessoasLocal
+        .filter(
+          (pessoa) =>
+            pessoa.tipo === "lider" && (!pessoa.parent_id || !idsCoords.has(pessoa.parent_id)),
+        )
+        .sort(ordenarNome);
+
+      rows.push(linhaRegiao(local));
+      coords.forEach((coord) => {
+        const lideresCoord = pessoasLocal
+          .filter((pessoa) => pessoa.tipo === "lider" && pessoa.parent_id === coord.id)
+          .sort(ordenarNome);
+        const idsLideres = new Set(lideresCoord.map((pessoa) => pessoa.id));
+        const cabosDiretosCoord = pessoasLocal
+          .filter((pessoa) => pessoa.tipo === "cabo" && pessoa.parent_id === coord.id)
+          .sort(ordenarNome);
+        const possuiSelecionado =
+          selecionados.has(coord.id) ||
+          lideresCoord.some((lider) => selecionados.has(lider.id)) ||
+          cabosDiretosCoord.some((cabo) => selecionados.has(cabo.id)) ||
+          pessoasLocal.some(
+            (pessoa) =>
+              pessoa.tipo === "cabo" &&
+              !!pessoa.parent_id &&
+              idsLideres.has(pessoa.parent_id) &&
+              selecionados.has(pessoa.id),
+          );
+        if (!possuiSelecionado) return;
+        rows.push(
+          selecionados.has(coord.id)
+            ? criarLinha("COORDENADOR", coord)
+            : linhaGrupo("COORDENADOR", coord.nome),
         );
-      })
-      .forEach((pessoa) => rows.push(criarLinha(pessoa.tipo.toUpperCase(), pessoa)));
+        cabosDiretosCoord
+          .filter((cabo) => selecionados.has(cabo.id))
+          .forEach((cabo) => rows.push(criarLinha("  CABO DIRETO", cabo)));
+        lideresCoord.forEach((lider) => {
+          const cabosLider = pessoasLocal
+            .filter((pessoa) => pessoa.tipo === "cabo" && pessoa.parent_id === lider.id)
+            .sort(ordenarNome);
+          if (selecionados.has(lider.id)) rows.push(criarLinha("  LIDER", lider));
+          else if (cabosLider.some((cabo) => selecionados.has(cabo.id))) {
+            rows.push(linhaGrupo("  LIDER", lider.nome));
+          }
+          cabosLider
+            .filter((cabo) => selecionados.has(cabo.id))
+            .forEach((cabo) => rows.push(criarLinha("    CABO", cabo)));
+        });
+      });
+
+      lideresOrfaos.forEach((lider) => {
+        const cabos = pessoasLocal
+          .filter((pessoa) => pessoa.tipo === "cabo" && pessoa.parent_id === lider.id)
+          .sort(ordenarNome);
+        if (selecionados.has(lider.id)) rows.push(criarLinha("LIDER AVULSO", lider));
+        else if (cabos.some((cabo) => selecionados.has(cabo.id))) {
+          rows.push(linhaGrupo("LIDER AVULSO", lider.nome));
+        }
+        cabos
+          .filter((cabo) => selecionados.has(cabo.id))
+          .forEach((cabo) => rows.push(criarLinha("  CABO", cabo)));
+      });
+
+      pessoasLocal
+        .filter(
+          (pessoa) =>
+            pessoa.tipo === "cabo" &&
+            selecionados.has(pessoa.id) &&
+            (!pessoa.parent_id || !pessoasLocal.some((item) => item.id === pessoa.parent_id)),
+        )
+        .sort(ordenarNome)
+        .forEach((cabo) => rows.push(criarLinha("CABO SEM RESPONSAVEL", cabo)));
+    });
   } else if (raiz.tipo === "coordenador") {
     if (incluirRaiz) {
       rows.push(criarLinha("COORDENADOR", raiz));
@@ -228,7 +343,9 @@ export async function gerarRaizPagamentoPdf(
     doc.setFontSize(9.5);
     doc.text(
       todasRegioes
-        ? "Todos os contratados - todas as regioes"
+        ? filtros.incluirInterior
+          ? "Todos os contratados - Campo Grande e Interior"
+          : "Todos os contratados - Campo Grande"
         : `${raiz.tipo === "coordenador" ? "Coordenador" : "Lider"}: ${raiz.nome}`,
       margin,
       51,
@@ -244,7 +361,9 @@ export async function gerarRaizPagamentoPdf(
   doc.setFontSize(11);
   doc.text(
     todasRegioes
-      ? "Abrangencia: todas as regioes"
+      ? filtros.incluirInterior
+        ? "Abrangencia: Campo Grande e Interior"
+        : "Abrangencia: somente Campo Grande"
       : `Local: ${raiz.cidade || raiz.regiao || "Nao informado"}`,
     margin,
     103,
@@ -258,70 +377,37 @@ export async function gerarRaizPagamentoPdf(
   const cabecalho = [
     "NIVEL",
     "NOME",
-    ...(todasRegioes ? ["REGIAO / CIDADE"] : []),
     "TELEFONE",
     ...(exibirValor ? ["VALOR"] : []),
     ...(incluirAssinatura ? ["ASSINATURA"] : []),
   ];
-  const columnStyles: Record<number, Record<string, unknown>> = todasRegioes
-    ? incluirAssinatura
-      ? exibirValor
-        ? {
-            0: { cellWidth: 62 },
-            1: { cellWidth: 118 },
-            2: { cellWidth: 100 },
-            3: { cellWidth: 82 },
-            4: { cellWidth: 70, halign: "right" },
-            5: { cellWidth: 87 },
-          }
-        : {
-            0: { cellWidth: 65 },
-            1: { cellWidth: 130 },
-            2: { cellWidth: 110 },
-            3: { cellWidth: 90 },
-            4: { cellWidth: 124 },
-          }
-      : exibirValor
-        ? {
-            0: { cellWidth: 65 },
-            1: { cellWidth: 150 },
-            2: { cellWidth: 120 },
-            3: { cellWidth: 94 },
-            4: { cellWidth: 90, halign: "right" },
-          }
-        : {
-            0: { cellWidth: 70 },
-            1: { cellWidth: 175 },
-            2: { cellWidth: 145 },
-            3: { cellWidth: 129 },
-          }
-    : incluirAssinatura
-      ? exibirValor
-        ? {
-            0: { cellWidth: 70, fontStyle: "bold" },
-            1: { cellWidth: 150 },
-            2: { cellWidth: 90 },
-            3: { cellWidth: 75, halign: "right", fontStyle: "bold" },
-            4: { cellWidth: 134 },
-          }
-        : {
-            0: { cellWidth: 80, fontStyle: "bold" },
-            1: { cellWidth: 170 },
-            2: { cellWidth: 100 },
-            3: { cellWidth: 169 },
-          }
-      : exibirValor
-        ? {
-            0: { cellWidth: 80, fontStyle: "bold" },
-            1: { cellWidth: 239 },
-            2: { cellWidth: 100 },
-            3: { cellWidth: 100, halign: "right", fontStyle: "bold" },
-          }
-        : {
-            0: { cellWidth: 90, fontStyle: "bold" },
-            1: { cellWidth: 309 },
-            2: { cellWidth: 120 },
-          };
+  const columnStyles: Record<number, Record<string, unknown>> = incluirAssinatura
+    ? exibirValor
+      ? {
+          0: { cellWidth: 70, fontStyle: "bold" },
+          1: { cellWidth: 150 },
+          2: { cellWidth: 90 },
+          3: { cellWidth: 75, halign: "right", fontStyle: "bold" },
+          4: { cellWidth: 134 },
+        }
+      : {
+          0: { cellWidth: 80, fontStyle: "bold" },
+          1: { cellWidth: 170 },
+          2: { cellWidth: 100 },
+          3: { cellWidth: 169 },
+        }
+    : exibirValor
+      ? {
+          0: { cellWidth: 80, fontStyle: "bold" },
+          1: { cellWidth: 239 },
+          2: { cellWidth: 100 },
+          3: { cellWidth: 100, halign: "right", fontStyle: "bold" },
+        }
+      : {
+          0: { cellWidth: 90, fontStyle: "bold" },
+          1: { cellWidth: 309 },
+          2: { cellWidth: 120 },
+        };
 
   autoTable(doc, {
     startY: 146,
@@ -342,7 +428,16 @@ export async function gerarRaizPagamentoPdf(
     headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: "bold" },
     columnStyles,
     didParseCell: (data: any) => {
-      if (data.section === "body" && String(data.row.raw?.[0] || "").trim() === "LIDER") {
+      const nivel = String(data.row.raw?.[0] || "").trim();
+      if (data.section === "body" && nivel.startsWith("REGIAO:")) {
+        data.cell.styles.fillColor = [15, 52, 120];
+        data.cell.styles.textColor = [255, 255, 255];
+        data.cell.styles.fontStyle = "bold";
+      } else if (data.section === "body" && nivel === "COORDENADOR") {
+        data.cell.styles.fillColor = [226, 232, 240];
+        data.cell.styles.textColor = [15, 52, 120];
+        data.cell.styles.fontStyle = "bold";
+      } else if (data.section === "body" && (nivel === "LIDER" || nivel === "LIDER AVULSO")) {
         data.cell.styles.fillColor = [219, 234, 254];
         data.cell.styles.textColor = [30, 64, 175];
         data.cell.styles.fontStyle = "bold";
@@ -375,7 +470,11 @@ export async function gerarRaizPagamentoPdf(
   }
 
   const prefixo = raiz.tipo === "coordenador" ? "Raiz Pagamento" : "Pagamento Lider";
-  const nome = todasRegioes ? "Pagamento - Todas as Regioes" : `${prefixo} - ${raiz.nome}`;
+  const nome = todasRegioes
+    ? filtros.incluirInterior
+      ? "Pagamento - Campo Grande e Interior"
+      : "Pagamento - Campo Grande"
+    : `${prefixo} - ${raiz.nome}`;
   doc.save(`${slug(nome)}.pdf`);
   return { total, contratados: contratados.length, membros: membros.length };
 }

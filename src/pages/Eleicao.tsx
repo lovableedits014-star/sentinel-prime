@@ -84,7 +84,15 @@ import PosCadastroEnvioDialog from "@/components/eleicao/PosCadastroEnvioDialog"
 import EleicaoConfigPanel from "@/components/eleicao/EleicaoConfigPanel";
 
 import { gerarContratoIndividual, gerarLoteZip, downloadBlob } from "@/lib/eleicao-contrato-docx";
-import { FileDown, Package, FileText, FileSpreadsheet, Printer, CalendarDays } from "lucide-react";
+import {
+  Banknote,
+  FileDown,
+  Package,
+  FileText,
+  FileSpreadsheet,
+  Printer,
+  CalendarDays,
+} from "lucide-react";
 import {
   exportEleicaoPdf,
   exportEleicaoCsv,
@@ -1250,6 +1258,17 @@ export default function Eleicao() {
   }, [pessoas, form.tipo, form.escopo, form.regiao, form.cidade]);
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [pagamentoGeralOpen, setPagamentoGeralOpen] = useState(false);
+  const raizPagamentoGeral = useMemo(
+    () =>
+      pessoas.find((p) => p.tipo === "coordenador") ||
+      pessoas.find((p) => p.tipo === "lider") || {
+        id: "pagamento-geral",
+        tipo: "coordenador" as const,
+        nome: "Todas as regiões",
+      },
+    [pessoas],
+  );
 
   async function handleExport(cfg: ExportConfig) {
     // O diálogo de exportação é a fonte única dos filtros do arquivo. A busca e
@@ -1762,7 +1781,7 @@ export default function Eleicao() {
                 Coordenadores, líderes e cabos eleitorais da campanha
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {clientId && <EleicaoContractTemplates clientId={clientId} />}
               {clientId && <ContratosCabosTextoDialog clientId={clientId} />}
               {view === "cadastros" && (
@@ -1774,6 +1793,10 @@ export default function Eleicao() {
                   <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
                     <FileDown className="w-4 h-4 mr-2" />
                     Exportar
+                  </Button>
+                  <Button variant="outline" onClick={() => setPagamentoGeralOpen(true)}>
+                    <Banknote className="w-4 h-4 mr-2" />
+                    Pagamento geral
                   </Button>
                   {/* consigo exportar um relatorio? */}
                   <Button onClick={() => openNew()}>
@@ -2227,7 +2250,6 @@ export default function Eleicao() {
                         key={r.value}
                         title={r.label}
                         pessoas={list}
-                        todasPessoas={pessoas}
                         pessoasContatos={pessoas.filter(
                           (p) => p.escopo === "campo_grande" && p.regiao === r.value,
                         )}
@@ -2280,7 +2302,6 @@ export default function Eleicao() {
                       key={cidade}
                       title={cidade}
                       pessoas={escopoList.filter((p) => p.cidade === cidade)}
-                      todasPessoas={pessoas}
                       pessoasContatos={pessoas.filter(
                         (p) => p.escopo === "interior" && p.cidade === cidade,
                       )}
@@ -3238,6 +3259,14 @@ export default function Eleicao() {
             }))}
             onExport={handleExport}
           />
+          <RaizPagamentoDialog
+            open={pagamentoGeralOpen}
+            onOpenChange={setPagamentoGeralOpen}
+            raiz={raizPagamentoGeral}
+            pessoas={pessoas}
+            todasPessoas={pessoas}
+            modoGeral
+          />
           {raizDocumentacao && (
             <RaizDocumentacaoDialog
               open
@@ -3257,7 +3286,6 @@ export default function Eleicao() {
 function RegionBlock({
   title,
   pessoas,
-  todasPessoas,
   pessoasContatos,
   onAdd,
   onEdit,
@@ -3270,7 +3298,6 @@ function RegionBlock({
 }: {
   title: string;
   pessoas: Pessoa[];
-  todasPessoas: Pessoa[];
   pessoasContatos?: Pessoa[];
   onAdd: () => void;
   onEdit: (p: Pessoa) => void;
@@ -3407,7 +3434,6 @@ function RegionBlock({
               key={c.id}
               coord={c}
               all={pessoas}
-              todasPessoas={todasPessoas}
               onEdit={onEdit}
               onDelete={onDelete}
               onCredentials={onCredentials}
@@ -3459,7 +3485,6 @@ function RegionBlock({
                   key={l.id}
                   lider={l}
                   all={pessoas}
-                  todasPessoas={todasPessoas}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onCredentials={onCredentials}
@@ -3502,7 +3527,6 @@ function RegionBlock({
 function CoordBlock({
   coord,
   all,
-  todasPessoas,
   onEdit,
   onDelete,
   onCredentials,
@@ -3511,7 +3535,6 @@ function CoordBlock({
 }: {
   coord: Pessoa;
   all: Pessoa[];
-  todasPessoas: Pessoa[];
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   onCredentials: (p: Pessoa) => void;
@@ -3611,7 +3634,6 @@ function CoordBlock({
         onOpenChange={setRaizPagamentoOpen}
         raiz={coord}
         pessoas={allDoTime}
-        todasPessoas={todasPessoas}
       />
       {expanded && hasTeam && (
         <div className="bg-muted/10 pb-1">
@@ -3632,7 +3654,6 @@ function CoordBlock({
               key={l.id}
               lider={l}
               all={all}
-              todasPessoas={todasPessoas}
               onEdit={onEdit}
               onDelete={onDelete}
               onCredentials={onCredentials}
@@ -3649,7 +3670,6 @@ function CoordBlock({
 function LiderBlock({
   lider,
   all,
-  todasPessoas,
   onEdit,
   onDelete,
   onCredentials,
@@ -3658,7 +3678,6 @@ function LiderBlock({
 }: {
   lider: Pessoa;
   all: Pessoa[];
-  todasPessoas: Pessoa[];
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   onCredentials: (p: Pessoa) => void;
@@ -3700,7 +3719,6 @@ function LiderBlock({
         onOpenChange={setRaizPagamentoOpen}
         raiz={lider}
         pessoas={[lider, ...cabos]}
-        todasPessoas={todasPessoas}
       />
       {open &&
         cabos.map((cb) => (

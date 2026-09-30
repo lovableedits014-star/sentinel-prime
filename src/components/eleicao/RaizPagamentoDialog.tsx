@@ -19,6 +19,7 @@ type Props = {
   raiz: PessoaRaizPagamento;
   pessoas: PessoaRaizPagamento[];
   todasPessoas?: PessoaRaizPagamento[];
+  modoGeral?: boolean;
 };
 
 const dinheiro = (valor: number) =>
@@ -36,8 +37,10 @@ export default function RaizPagamentoDialog({
   raiz,
   pessoas,
   todasPessoas,
+  modoGeral = false,
 }: Props) {
-  const [todasRegioes, setTodasRegioes] = useState(false);
+  const [todasRegioes, setTodasRegioes] = useState(modoGeral);
+  const [incluirInterior, setIncluirInterior] = useState(false);
   const pessoasDisponiveis = todasRegioes ? todasPessoas || pessoas : pessoas;
   const niveisDaRaiz = useMemo<NivelRaizPagamento[]>(
     () => (raiz.tipo === "coordenador" ? ["coordenador", "lider", "cabo"] : ["lider", "cabo"]),
@@ -48,8 +51,8 @@ export default function RaizPagamentoDialog({
     [niveisDaRaiz, todasRegioes],
   );
   const valoresDisponiveis = useMemo(
-    () => listarValoresRaizPagamento(raiz, pessoasDisponiveis, todasRegioes),
-    [raiz, pessoasDisponiveis, todasRegioes],
+    () => listarValoresRaizPagamento(raiz, pessoasDisponiveis, todasRegioes, incluirInterior),
+    [raiz, pessoasDisponiveis, todasRegioes, incluirInterior],
   );
   const [niveis, setNiveis] = useState<NivelRaizPagamento[]>(niveisDisponiveis);
   const [valores, setValores] = useState<number[]>(valoresDisponiveis);
@@ -62,16 +65,24 @@ export default function RaizPagamentoDialog({
     setNiveis(niveisDaRaiz);
     setExibirValor(true);
     setIncluirAssinatura(false);
-    setTodasRegioes(false);
-  }, [open, niveisDaRaiz]);
+    setTodasRegioes(modoGeral);
+    setIncluirInterior(false);
+    if (modoGeral) setNiveis(["coordenador", "lider", "cabo"]);
+  }, [open, niveisDaRaiz, modoGeral]);
 
   useEffect(() => {
     if (open) setValores(valoresDisponiveis);
   }, [open, valoresDisponiveis]);
 
   const resumo = useMemo(
-    () => resumirRaizPagamento(raiz, pessoasDisponiveis, { niveis, valores, todasRegioes }),
-    [raiz, pessoasDisponiveis, niveis, valores, todasRegioes],
+    () =>
+      resumirRaizPagamento(raiz, pessoasDisponiveis, {
+        niveis,
+        valores,
+        todasRegioes,
+        incluirInterior,
+      }),
+    [raiz, pessoasDisponiveis, niveis, valores, todasRegioes, incluirInterior],
   );
 
   const alternarNivel = (nivel: NivelRaizPagamento, marcado: boolean) =>
@@ -84,11 +95,6 @@ export default function RaizPagamentoDialog({
       marcado ? Array.from(new Set([...atuais, valor])) : atuais.filter((item) => item !== valor),
     );
 
-  const alternarTodasRegioes = (marcado: boolean) => {
-    setTodasRegioes(marcado);
-    setNiveis(marcado ? ["coordenador", "lider", "cabo"] : niveisDaRaiz);
-  };
-
   const gerar = async () => {
     setGerando(true);
     try {
@@ -98,6 +104,7 @@ export default function RaizPagamentoDialog({
         exibirValor,
         incluirAssinatura,
         todasRegioes,
+        incluirInterior,
       });
       toast.success(`PDF gerado com ${result.contratados} contratado(s) para pagamento.`);
       onOpenChange(false);
@@ -112,27 +119,36 @@ export default function RaizPagamentoDialog({
     <Dialog open={open} onOpenChange={(next) => !gerando && onOpenChange(next)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Gerar raiz de pagamento</DialogTitle>
+          <DialogTitle>
+            {modoGeral ? "Pagamento geral por regiões" : "Gerar raiz de pagamento"}
+          </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Escolha quem e quais valores deseja exportar da raiz de <strong>{raiz.nome}</strong>.
+          {modoGeral ? (
+            "Gere um arquivo organizado por região, coordenador, líderes e cabos."
+          ) : (
+            <>
+              Escolha quem e quais valores deseja exportar da raiz de <strong>{raiz.nome}</strong>.
+            </>
+          )}
         </p>
 
         <div className="space-y-4 pt-2">
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
-            <span>
-              <strong>Todas as regiões</strong>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                Gera um único arquivo com todos os contratados do sistema.
+          {modoGeral && (
+            <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+              <span>
+                <strong>Incluir Interior</strong>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Desligado: somente Campo Grande. Ligado: Campo Grande e Interior juntos.
+                </span>
               </span>
-            </span>
-            <Switch
-              checked={todasRegioes}
-              onCheckedChange={alternarTodasRegioes}
-              aria-label="Incluir todas as regiões"
-            />
-          </label>
-
+              <Switch
+                checked={incluirInterior}
+                onCheckedChange={setIncluirInterior}
+                aria-label="Incluir Interior no arquivo"
+              />
+            </label>
+          )}
           <section className="space-y-2">
             <h3 className="text-sm font-semibold">Quem incluir</h3>
             <div className="grid gap-2 sm:grid-cols-3">
