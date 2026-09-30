@@ -35,6 +35,7 @@ import CampaignTeamManagement from "@/components/engagement/CampaignTeamManageme
 import EngagementHistory from "@/components/engagement/EngagementHistory";
 import EngagementDailySettings from "@/components/engagement/EngagementDailySettings";
 import DigitalGroupsTab from "@/components/engagement/DigitalGroupsTab";
+import SharePublicationsTab from "@/components/engagement/SharePublicationsTab";
 
 
 
@@ -48,7 +49,7 @@ type EngagementConfig = {
   inactivity_days: number;
 };
 
-type EngagementTab = "hoje" | "equipe" | "digital" | "historico" | "ajustes" | "visao" | "acessos" | "publico" | "checkin" | "influenciadores" | "time" | "cobranca" | "monitoramento" | "config";
+type EngagementTab = "hoje" | "compartilhar" | "equipe" | "digital" | "historico" | "ajustes" | "visao" | "acessos" | "publico" | "checkin" | "influenciadores" | "time" | "cobranca" | "monitoramento" | "config";
 
 type EngagementProps = {
   initialTab?: EngagementTab;
@@ -57,7 +58,7 @@ type EngagementProps = {
 export default function Engagement({ initialTab = "hoje" }: EngagementProps) {
   const [configForm, setConfigForm] = useState<Partial<EngagementConfig>>({});
   const [activeTab, setActiveTab] = useState<EngagementTab>(
-    (["hoje", "checkin", "equipe", "digital", "historico", "ajustes"] as EngagementTab[]).includes(initialTab) ? initialTab : "hoje",
+    (["hoje", "compartilhar", "checkin", "equipe", "digital", "historico", "ajustes"] as EngagementTab[]).includes(initialTab) ? initialTab : "hoje",
   );
 
   const { data: client } = useQuery({
@@ -127,6 +128,7 @@ export default function Engagement({ initialTab = "hoje" }: EngagementProps) {
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EngagementTab)} className="space-y-4">
         <TabsList className="w-full sm:w-auto flex-wrap h-auto">
           <TabsTrigger value="hoje" className="gap-1.5"><Gauge className="h-4 w-4" /> Hoje</TabsTrigger>
+          <TabsTrigger value="compartilhar" className="gap-1.5"><Share2 className="h-4 w-4" /> Compartilhar</TabsTrigger>
           <TabsTrigger value="checkin" className="gap-1.5"><Target className="h-4 w-4" /> Missões</TabsTrigger>
           <TabsTrigger value="equipe" className="gap-1.5"><Users className="h-4 w-4" /> Equipe</TabsTrigger>
           <TabsTrigger value="digital" className="gap-1.5"><Network className="h-4 w-4" /> Time digital</TabsTrigger>
@@ -169,6 +171,7 @@ export default function Engagement({ initialTab = "hoje" }: EngagementProps) {
         </TabsList>
 
         <TabsContent value="hoje">{client?.id ? <DailyEngagementOperations clientId={client.id} /> : null}</TabsContent>
+        <TabsContent value="compartilhar">{client?.id ? <SharePublicationsTab clientId={client.id} /> : null}</TabsContent>
         <TabsContent value="equipe">{client?.id ? <CampaignTeamManagement clientId={client.id} /> : null}</TabsContent>
         <TabsContent value="digital">{client?.id ? <DigitalGroupsTab clientId={client.id} /> : null}</TabsContent>
         <TabsContent value="historico">{client?.id ? <EngagementHistory clientId={client.id} /> : null}</TabsContent>
