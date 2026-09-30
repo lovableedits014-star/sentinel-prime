@@ -268,7 +268,7 @@ export async function gerarRelatorioOcorrenciasLotePdf(
   };
 
   cabecalho(
-    "Relatorio de ocorrencias da importacao de cabos",
+    "Relatorio para conferencia da lista de cabos",
     `${responsavel} - ${responsavelTipo} | Lote: ${nomeLote}`,
   );
   doc.setTextColor(51, 65, 85);
@@ -296,19 +296,64 @@ export async function gerarRelatorioOcorrenciasLotePdf(
     columnStyles: { 0: { cellWidth: 300 }, 1: { cellWidth: 160 } },
   });
 
+  const fimResumo = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable
+    ?.finalY;
+  autoTable(doc, {
+    startY: (fimResumo || 90) + 12,
+    margin: { left: margem, right: margem, bottom: 40 },
+    head: [["Como interpretar", "O que significa", "O que o responsável deve fazer"]],
+    body: [
+      [
+        "Pessoa com contrato ativo",
+        "A pessoa enviada já está cadastrada e contratada no sistema. Ela pode estar registrada como cabo, líder ou coordenador.",
+        "Confira o cargo e a equipe atual. Não faça um segundo cadastro. Solicite alteração somente se a vinculação estiver errada.",
+      ],
+      [
+        "Linha repetida na planilha",
+        "O mesmo CPF ou telefone apareceu antes no próprio arquivo. Isso não significa, por si só, que exista outro contrato.",
+        "Compare as duas linhas e informe qual delas contém os dados corretos.",
+      ],
+      [
+        "Dados inválidos ou incompletos",
+        "Falta algum dado obrigatório ou existe informação que precisa ser corrigida, como telefone sem DDD.",
+        "Corrija os dados no sistema ou solicite autorização para cadastrar sem telefone.",
+      ],
+    ],
+    theme: "grid",
+    styles: { fontSize: 7.8, cellPadding: 4, overflow: "linebreak", valign: "top" },
+    headStyles: { fillColor: [30, 64, 175] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 165 },
+      1: { cellWidth: 275 },
+      2: { cellWidth: "auto" },
+    },
+  });
+
+  const fimOrientacoes = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable
+    ?.finalY;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(
+    "Importante: uma ocorrência não gera pagamento nem cria um novo contrato automaticamente.",
+    margem,
+    (fimOrientacoes || 90) + 14,
+  );
+
   if (duplicadosAtivos.length) {
     const finalResumo = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable
       ?.finalY;
     autoTable(doc, {
-      startY: (finalResumo || 90) + 16,
+      startY: Math.max((finalResumo || 90) + 16, (fimOrientacoes || 90) + 24),
       margin: { left: margem, right: margem, bottom: 40 },
       head: [
         [
-          "Cabo recusado",
-          "Solicitado por",
-          "Contrato ativo encontrado",
-          "Onde já está contratado",
-          "Justificativa da recusa",
+          "Pessoa enviada nesta lista",
+          "Responsável por esta lista",
+          "Cadastro já existente no sistema",
+          "Equipe atual",
+          "Explicação",
         ],
       ],
       body: duplicadosAtivos.map((item) => {
@@ -325,7 +370,7 @@ export async function gerarRelatorioOcorrenciasLotePdf(
           `${item.responsavel_tentativa_nome || responsavel}\n${papel(item.responsavel_tentativa_tipo || contexto?.responsavel_tentativa_tipo || null)}`,
           `${duplicado.nome}\nCargo: ${papel(duplicado.tipo)}\nTelefone: ${duplicado.telefone || "-"}\n${valor}\n${dataBr(duplicado.contrato_inicio) || "início não informado"} até ${dataBr(duplicado.contrato_fim) || "sem término"}`,
           destino,
-          `Não cadastrado para ${item.responsavel_tentativa_nome || responsavel} porque já possui contrato ativo com ${destino}.`,
+          `Não foi cadastrada novamente porque já possui contrato ativo. Confira o cargo e a equipe atual antes de solicitar transferência ou alteração.`,
         ];
       }),
       theme: "grid",
@@ -349,14 +394,14 @@ export async function gerarRelatorioOcorrenciasLotePdf(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.text(
-      "Estas linhas repetem CPF ou telefone informado anteriormente no mesmo arquivo; nao representam outro contrato ativo.",
+      "Estas linhas repetem CPF ou telefone informado anteriormente no mesmo arquivo. Compare os dados e indique qual linha deve ser mantida.",
       margem,
       78,
     );
     autoTable(doc, {
       startY: 90,
       margin: { left: margem, right: margem, bottom: 40 },
-      head: [["Linha repetida", "Pessoa", "Contato/documento", "Primeira ocorrencia", "Motivo"]],
+      head: [["Linha repetida", "Pessoa", "Telefone ou CPF", "Compare com esta linha", "O que fazer"]],
       body: repetidosArquivo.map((item) => {
         const original = item.repetido_no_arquivo;
         return [
@@ -366,7 +411,7 @@ export async function gerarRelatorioOcorrenciasLotePdf(
           original
             ? `Linha ${original.numero_linha + 1}: ${original.nome || "Sem nome"}\nTelefone: ${original.telefone_normalizado || "-"}\nCPF: ${original.cpf_normalizado || "-"}`
             : "Primeira linha nao localizada",
-          item.motivo || "Repetido dentro da planilha",
+          "Conferir as duas linhas e manter somente os dados corretos.",
         ];
       }),
       theme: "grid",
@@ -390,20 +435,22 @@ export async function gerarRelatorioOcorrenciasLotePdf(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.text(
-      "Estes itens sao erros de dados ou conflitos de identidade; nao representam outro contrato ativo.",
+      "Estas linhas precisam de correcao antes da contratacao. Veja abaixo o problema encontrado e a orientacao para resolver.",
       margem,
       78,
     );
     autoTable(doc, {
       startY: 90,
       margin: { left: margem, right: margem, bottom: 40 },
-      head: [["Linha", "Pessoa", "Contato/documento", "Situação", "Motivo"]],
+      head: [["Linha", "Pessoa", "Telefone ou CPF", "Problema encontrado", "Como resolver"]],
       body: outrasOcorrencias.map((item) => [
         String(item.numero_linha + 1),
         item.nome || "Sem nome",
         item.telefone_normalizado || item.cpf_normalizado || "Sem documento",
-        item.classificacao.replaceAll("_", " "),
-        item.motivo || "-",
+        item.motivo || item.classificacao.replaceAll("_", " "),
+        item.classificacao === "dados_invalidos"
+          ? "Corrigir os dados no gerenciamento do lote ou autorizar o cadastro sem telefone."
+          : "Conferir os dados informados e corrigir a identidade antes de contratar.",
       ]),
       theme: "grid",
       styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak", valign: "top" },
