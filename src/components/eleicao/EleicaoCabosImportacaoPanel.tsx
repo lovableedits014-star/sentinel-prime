@@ -150,8 +150,23 @@ type ManagedContract = {
   conflito_pessoa_id?: string | null; conflito_nome?: string | null;
   conflito_telefone?: string | null; conflito_cpf?: string | null;
   conflito_responsavel?: string | null;
+  repetido_no_arquivo?: {
+    item_id: number;
+    numero_linha: number;
+    nome: string | null;
+    cpf: string | null;
+    telefone: string | null;
+  } | null;
 };
 type ContractEdit = ManagedContract & { valorTexto: string; ativo: boolean };
+type InvalidItemCorrection = {
+  itemId: number;
+  nome: string;
+  cpf: string;
+  telefone: string;
+  autorizarSemTelefone: boolean;
+  motivo: string;
+};
 type LotValueEdit = { id: string; valor: string; parentId: string; motivo: string };
 type DuplicateCorrection = {
   id: number;
@@ -231,6 +246,19 @@ const key = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
+const canApproveSharedPhone = (item: ManagedContract) => {
+  if (!item.telefone_importado) return false;
+  if (item.classificacao === "duplicado_contrato_ativo") return true;
+  if (item.classificacao !== "duplicado_no_arquivo" || !item.repetido_no_arquivo) return false;
+
+  const repetido = item.repetido_no_arquivo;
+  const mesmoTelefone = digits(repetido.telefone) === digits(item.telefone_importado);
+  const mesmoCpf = !!item.cpf_importado &&
+    !!repetido.cpf &&
+    digits(repetido.cpf) === digits(item.cpf_importado);
+  const mesmaPessoa = key(repetido.nome || "") === key(item.nome_importado || "");
+  return mesmoTelefone && !mesmoCpf && !mesmaPessoa;
+};
 const roleLabel = (role: string | null) =>
   role === "coordenador" ? "Coordenador" : role === "lider" ? "Líder" : "Sem responsável";
 const duplicateOwnerKey = (person: DuplicatePerson) => person.responsavel_id || "sem-responsavel";
@@ -324,6 +352,7 @@ export default function EleicaoCabosImportacaoPanel({
   const [managedLot, setManagedLot] = useState<string | null>(null);
   const [managedContracts, setManagedContracts] = useState<ManagedContract[]>([]);
   const [contractEdit, setContractEdit] = useState<ContractEdit | null>(null);
+  const [invalidCorrection, setInvalidCorrection] = useState<InvalidItemCorrection | null>(null);
   const [expandedOccurrence, setExpandedOccurrence] = useState<number | null>(null);
   const [exceptionReason, setExceptionReason] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -843,11 +872,65 @@ export default function EleicaoCabosImportacaoPanel({
       setManagedContracts(Array.isArray(data) ? data : []);
       setManagedLot(lotId);
       setContractEdit(null);
+      setInvalidCorrection(null);
       setExpandedOccurrence(null);
       setExceptionReason("");
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Não foi possível carregar os contratos do lote."));
     } finally { setBusy(false); }
+  };
+
+  const startInvalidCorrection = (item: ManagedContract) => {
+    setInvalidCorrection({
+      itemId: item.item_id,
+      nome: item.nome_importado || item.nome || "",
+      cpf: item.cpf_importado || item.cpf || "",
+      telefone: item.telefone_importado || item.telefone || "",
+      autorizarSemTelefone: false,
+      motivo: "Correção dos dados informados na planilha",
+    });
+  };
+
+  const saveInvalidCorrection = async () => {
+    if (!managedLot || !invalidCorrection) return;
+    const phone = digits(invalidCorrection.telefone);
+    if (!invalidCorrection.nome.trim()) return toast.error("Informe o nome do cabo.");
+    if (!invalidCorrection.motivo.trim()) return toast.error("Informe o motivo da correção.");
+    if (!invalidCorrection.autorizarSemTelefone && phone.length < 10) {
+      return toast.error("Informe um telefone com DDD ou autorize o cadastro sem telefone.");
+    }
+    if (!window.confirm(
+      invalidCorrection.autorizarSemTelefone
+        ? `Autorizar a contratação de ${invalidCorrection.nome} sem telefone? A exceção ficará auditada.`
+        : `Salvar os dados corrigidos e contratar ${invalidCorrection.nome}?`,
+    )) return;
+
+    setBusy(true);
+    try {
+      const { data, error } = await db.rpc("eleicao_cabo_import_corrigir_item_invalido", {
+        p_lote_id: managedLot,
+        p_item_id: invalidCorrection.itemId,
+        p_nome: invalidCorrection.nome.trim(),
+        p_cpf: invalidCorrection.cpf || null,
+        p_telefone: invalidCorrection.telefone || null,
+        p_autorizar_sem_telefone: invalidCorrection.autorizarSemTelefone,
+        p_motivo: invalidCorrection.motivo.trim(),
+      });
+      if (error) throw error;
+      setInvalidCorrection(null);
+      setExpandedOccurrence(null);
+      await Promise.all([loadManagedContracts(managedLot), loadBase()]);
+      onChanged();
+      toast.success(
+        data?.sem_telefone
+          ? "Contrato criado sem telefone, com autorização registrada."
+          : "Dados corrigidos e contrato criado.",
+      );
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível corrigir e contratar esta linha."));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const saveManagedContract = async () => {
@@ -1784,9 +1867,145 @@ export default function EleicaoCabosImportacaoPanel({
               </div>
               <div className="max-h-[520px] overflow-auto rounded-md border">
                 <Table><TableHeader><TableRow><TableHead>Linha</TableHead><TableHead>Nome</TableHead><TableHead>Telefone/CPF</TableHead><TableHead>Situação</TableHead><TableHead>Responsável</TableHead><TableHead>Valor</TableHead><TableHead /></TableRow></TableHeader>
-                  <TableBody>{managedContracts.map((item) => <Fragment key={item.item_id}><TableRow><TableCell>{item.numero_linha}</TableCell><TableCell><p className="font-medium">{item.nome || item.nome_importado || "—"}</p>{!item.pertence_ao_lote && item.lote_contrato_nome && <p className="text-xs text-muted-foreground">Contrato no lote: {item.lote_contrato_nome}</p>}</TableCell><TableCell className="text-xs"><p>{item.telefone || item.telefone_importado || "—"}</p><p>{item.cpf || item.cpf_importado || "—"}</p></TableCell><TableCell><Badge variant={item.arquivado_em ? "secondary" : item.pertence_ao_lote ? "default" : "outline"}>{item.pessoa_id ? item.arquivado_em ? "Arquivado" : "Ativo" : classificationLabel[item.classificacao] || item.classificacao}</Badge><p className="mt-1 max-w-48 text-xs text-muted-foreground">{item.motivo}</p></TableCell><TableCell>{item.responsavel_nome || "—"}</TableCell><TableCell>{item.valor ? money(item.valor) : "—"}</TableCell><TableCell><div className="flex gap-1">{item.pertence_ao_lote && item.pessoa_id && <Button size="sm" variant="outline" onClick={() => setContractEdit({ ...item, valorTexto: Number(item.valor || 0).toFixed(2).replace(".", ","), ativo: !item.arquivado_em })}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button>}{!item.pertence_ao_lote && <Button size="sm" variant="outline" onClick={() => { setExpandedOccurrence(expandedOccurrence === item.item_id ? null : item.item_id); setExceptionReason(""); }}>Ver ocorrência</Button>}</div></TableCell></TableRow>
+                  <TableBody>{managedContracts.map((item) => <Fragment key={item.item_id}><TableRow><TableCell>{item.numero_linha + 1}</TableCell><TableCell><p className="font-medium">{item.nome || item.nome_importado || "—"}</p>{!item.pertence_ao_lote && item.lote_contrato_nome && <p className="text-xs text-muted-foreground">Contrato no lote: {item.lote_contrato_nome}</p>}</TableCell><TableCell className="text-xs"><p>{item.telefone || item.telefone_importado || "—"}</p><p>{item.cpf || item.cpf_importado || "—"}</p></TableCell><TableCell><Badge variant={item.arquivado_em ? "secondary" : item.pertence_ao_lote ? "default" : "outline"}>{item.pessoa_id ? item.arquivado_em ? "Arquivado" : "Ativo" : classificationLabel[item.classificacao] || item.classificacao}</Badge><p className="mt-1 max-w-48 text-xs text-muted-foreground">{item.motivo}</p></TableCell><TableCell>{item.responsavel_nome || "—"}</TableCell><TableCell>{item.valor ? money(item.valor) : "—"}</TableCell><TableCell><div className="flex gap-1">{item.pertence_ao_lote && item.pessoa_id && <Button size="sm" variant="outline" onClick={() => setContractEdit({ ...item, valorTexto: Number(item.valor || 0).toFixed(2).replace(".", ","), ativo: !item.arquivado_em })}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button>}{!item.pertence_ao_lote && <Button size="sm" variant="outline" onClick={() => { setExpandedOccurrence(expandedOccurrence === item.item_id ? null : item.item_id); setExceptionReason(""); }}>Ver ocorrência</Button>}</div></TableCell></TableRow>
                     {contractEdit?.item_id === item.item_id && <TableRow className="bg-muted/30"><TableCell colSpan={7}><div className="grid gap-3 rounded-md border bg-background p-3 md:grid-cols-3"><div><Label>Nome</Label><Input value={contractEdit.nome || ""} onChange={(e) => setContractEdit({ ...contractEdit, nome: e.target.value })} /></div><div><Label>Telefone</Label><Input value={contractEdit.telefone || ""} onChange={(e) => setContractEdit({ ...contractEdit, telefone: e.target.value })} /></div><div><Label>CPF</Label><Input value={contractEdit.cpf || ""} onChange={(e) => setContractEdit({ ...contractEdit, cpf: e.target.value })} /></div><div><Label>Valor</Label><Input value={contractEdit.valorTexto} onChange={(e) => setContractEdit({ ...contractEdit, valorTexto: e.target.value })} /></div><div><Label>Responsável</Label><Select value={contractEdit.responsavel_id || ""} onValueChange={(responsavel_id) => setContractEdit({ ...contractEdit, responsavel_id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{parents.map((parent) => <SelectItem key={parent.id} value={parent.id}>{parent.nome} · {roleLabel(parent.tipo)}</SelectItem>)}</SelectContent></Select></div><div><Label>Status</Label><Select value={contractEdit.ativo ? "ativo" : "arquivado"} onValueChange={(status) => setContractEdit({ ...contractEdit, ativo: status === "ativo" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ativo">Ativo</SelectItem><SelectItem value="arquivado">Excluído/arquivado</SelectItem></SelectContent></Select></div><div><Label>Início</Label><Input type="date" value={contractEdit.contrato_inicio || ""} onChange={(e) => setContractEdit({ ...contractEdit, contrato_inicio: e.target.value })} /></div><div><Label>Término</Label><Input type="date" value={contractEdit.contrato_fim || ""} onChange={(e) => setContractEdit({ ...contractEdit, contrato_fim: e.target.value || null })} /></div><div className="flex items-end gap-2"><Button disabled={busy} onClick={() => void saveManagedContract()}><Save className="mr-2 h-4 w-4" />Salvar</Button><Button variant="outline" onClick={() => setContractEdit(null)}>Cancelar</Button></div></div></TableCell></TableRow>}
-                    {expandedOccurrence === item.item_id && <TableRow className="bg-amber-50/60 dark:bg-amber-950/20"><TableCell colSpan={7}><div className="space-y-3 rounded-md border border-amber-300 p-3"><div><p className="font-semibold">Ocorrência deste contrato</p><p className="text-sm">{item.motivo || "Registro bloqueado pela validação automática."}</p></div><div className="grid gap-3 text-sm md:grid-cols-2"><div><p className="font-medium">Pessoa da planilha</p><p>{item.nome_importado || "—"}</p><p>Telefone: {item.telefone_importado || "—"}</p><p>CPF: {item.cpf_importado || "—"}</p></div><div><p className="font-medium">Cadastro que causou o bloqueio</p><p>{item.conflito_nome || "—"}</p><p>Telefone: {item.conflito_telefone || "—"}</p><p>CPF: {item.conflito_cpf || "—"}</p><p>Responsável: {item.conflito_responsavel || "—"}</p><p>Lote: {item.lote_contrato_nome || "Sem lote vinculado"}</p></div></div>{["duplicado_no_arquivo", "duplicado_contrato_ativo"].includes(item.classificacao) && item.telefone_importado && <div className="space-y-2 border-t pt-3"><p className="text-xs text-muted-foreground">Use somente quando forem pessoas diferentes que compartilham o mesmo telefone. CPF repetido continuará bloqueado.</p><Label>Motivo da exceção manual</Label><Input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} placeholder="Ex.: telefone compartilhado com o marido" /><Button disabled={busy || !exceptionReason.trim()} onClick={() => void approveSharedPhone(item)}><CheckCircle2 className="mr-2 h-4 w-4" />Validar contrato mesmo assim</Button></div>}</div></TableCell></TableRow>}
+                    {expandedOccurrence === item.item_id && (
+                      <TableRow className="bg-amber-50/60 dark:bg-amber-950/20">
+                        <TableCell colSpan={7}>
+                          <div className="space-y-3 rounded-md border border-amber-300 p-3">
+                            <div>
+                              <p className="font-semibold">Ocorrência desta linha</p>
+                              <p className="text-sm">
+                                {item.motivo || "Registro bloqueado pela validação automática."}
+                              </p>
+                            </div>
+                            <div className="grid gap-3 text-sm md:grid-cols-2">
+                              <div>
+                                <p className="font-medium">Linha analisada</p>
+                                <p>Linha {item.numero_linha + 1}: {item.nome_importado || "—"}</p>
+                                <p>Telefone: {item.telefone_importado || "—"}</p>
+                                <p>CPF: {item.cpf_importado || "—"}</p>
+                              </div>
+                              {item.classificacao === "dados_invalidos" ? (
+                                <div>
+                                  <p className="font-medium">Validação da linha</p>
+                                  <p className="text-muted-foreground">
+                                    Não existe outro cadastro causando este bloqueio. Corrija os dados abaixo ou autorize explicitamente o cadastro sem telefone.
+                                  </p>
+                                </div>
+                              ) : item.classificacao === "duplicado_no_arquivo" ? (
+                                <div>
+                                  <p className="font-medium">Primeira ocorrência na mesma planilha</p>
+                                  {item.repetido_no_arquivo ? (
+                                    <>
+                                      <p>Linha {item.repetido_no_arquivo.numero_linha + 1}: {item.repetido_no_arquivo.nome || "—"}</p>
+                                      <p>Telefone: {item.repetido_no_arquivo.telefone || "—"}</p>
+                                      <p>CPF: {item.repetido_no_arquivo.cpf || "—"}</p>
+                                    </>
+                                  ) : (
+                                    <p className="text-muted-foreground">
+                                      A versão do banco ainda não retornou a linha de origem. Aplique a migração corretiva e abra o lote novamente.
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="font-medium">Cadastro existente que causou o bloqueio</p>
+                                  <p>{item.conflito_nome || "—"}</p>
+                                  <p>Telefone: {item.conflito_telefone || "—"}</p>
+                                  <p>CPF: {item.conflito_cpf || "—"}</p>
+                                  <p>Responsável: {item.conflito_responsavel || "—"}</p>
+                                  <p>Lote: {item.lote_contrato_nome || "Sem lote vinculado"}</p>
+                                </div>
+                              )}
+                            </div>
+                            {item.classificacao === "dados_invalidos" && (
+                              invalidCorrection?.itemId === item.item_id ? (
+                                <div className="space-y-3 border-t pt-3">
+                                  <div className="grid gap-3 md:grid-cols-3">
+                                    <div className="space-y-1">
+                                      <Label>Nome</Label>
+                                      <Input
+                                        value={invalidCorrection.nome}
+                                        onChange={(event) => setInvalidCorrection({ ...invalidCorrection, nome: event.target.value })}
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>CPF</Label>
+                                      <Input
+                                        value={invalidCorrection.cpf}
+                                        onChange={(event) => setInvalidCorrection({ ...invalidCorrection, cpf: event.target.value })}
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Telefone com DDD</Label>
+                                      <Input
+                                        value={invalidCorrection.telefone}
+                                        disabled={invalidCorrection.autorizarSemTelefone}
+                                        onChange={(event) => setInvalidCorrection({ ...invalidCorrection, telefone: event.target.value })}
+                                      />
+                                    </div>
+                                  </div>
+                                  <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50/60 p-3 text-sm dark:bg-amber-950/20">
+                                    <Checkbox
+                                      checked={invalidCorrection.autorizarSemTelefone}
+                                      onCheckedChange={(checked) => setInvalidCorrection({
+                                        ...invalidCorrection,
+                                        autorizarSemTelefone: checked === true,
+                                      })}
+                                    />
+                                    <span>
+                                      <strong>Autorizar contratação sem telefone</strong>
+                                      <span className="block text-xs text-muted-foreground">
+                                        Use apenas quando o cabo realmente não possuir telefone. O número incompleto será descartado e a autorização ficará auditada.
+                                      </span>
+                                    </span>
+                                  </label>
+                                  <div className="space-y-1">
+                                    <Label>Motivo da correção ou autorização</Label>
+                                    <Input
+                                      value={invalidCorrection.motivo}
+                                      onChange={(event) => setInvalidCorrection({ ...invalidCorrection, motivo: event.target.value })}
+                                    />
+                                  </div>
+                                  <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" disabled={busy} onClick={() => setInvalidCorrection(null)}>
+                                      Cancelar
+                                    </Button>
+                                    <Button disabled={busy || !invalidCorrection.nome.trim() || !invalidCorrection.motivo.trim()} onClick={() => void saveInvalidCorrection()}>
+                                      {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                      {invalidCorrection.autorizarSemTelefone ? "Autorizar e contratar" : "Corrigir e contratar"}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex justify-end border-t pt-3">
+                                  <Button variant="outline" disabled={busy} onClick={() => startInvalidCorrection(item)}>
+                                    <Pencil className="mr-2 h-4 w-4" />Corrigir dados ou autorizar sem telefone
+                                  </Button>
+                                </div>
+                              )
+                            )}
+                            {canApproveSharedPhone(item) ? (
+                              <div className="space-y-2 border-t pt-3">
+                                <p className="text-xs text-muted-foreground">
+                                  Use somente quando forem pessoas diferentes que compartilham o mesmo telefone. CPF repetido continuará bloqueado.
+                                </p>
+                                <Label>Motivo da exceção manual</Label>
+                                <Input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} placeholder="Ex.: telefone compartilhado com o marido" />
+                                <Button disabled={busy || !exceptionReason.trim()} onClick={() => void approveSharedPhone(item)}>
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />Validar contrato mesmo assim
+                                </Button>
+                              </div>
+                            ) : item.classificacao === "duplicado_no_arquivo" && item.repetido_no_arquivo ? (
+                              <p className="border-t pt-3 text-xs text-muted-foreground">
+                                Esta linha repete a mesma pessoa ou o mesmo CPF da planilha e permanecerá bloqueada para evitar contrato duplicado.
+                              </p>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </Fragment>)}</TableBody></Table>
               </div>
             </div>
