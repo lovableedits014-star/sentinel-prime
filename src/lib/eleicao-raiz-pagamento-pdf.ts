@@ -16,6 +16,7 @@ export type NivelRaizPagamento = "coordenador" | "lider" | "cabo";
 export type FiltrosRaizPagamento = {
   niveis: NivelRaizPagamento[];
   valores: number[];
+  todasRegioes?: boolean;
   exibirValor?: boolean;
   incluirAssinatura?: boolean;
 };
@@ -63,13 +64,21 @@ const pessoasNoEscopo = (raiz: PessoaRaizPagamento, pessoas: PessoaRaizPagamento
   return [raiz, ...lideres, ...cabos];
 };
 
+const pessoasDoRelatorio = (
+  raiz: PessoaRaizPagamento,
+  pessoas: PessoaRaizPagamento[],
+  todasRegioes = false,
+) =>
+  todasRegioes ? pessoas.filter((pessoa) => !pessoa.arquivado_em) : pessoasNoEscopo(raiz, pessoas);
+
 export function listarValoresRaizPagamento(
   raiz: PessoaRaizPagamento,
   pessoas: PessoaRaizPagamento[],
+  todasRegioes = false,
 ) {
   return Array.from(
     new Set(
-      pessoasNoEscopo(raiz, pessoas)
+      pessoasDoRelatorio(raiz, pessoas, todasRegioes)
         .filter(contratado)
         .map((pessoa) => Number(pessoa.valor_contratacao)),
     ),
@@ -83,7 +92,7 @@ export function resumirRaizPagamento(
 ): ResumoRaizPagamento {
   const niveis = new Set(filtros.niveis);
   const valores = new Set(filtros.valores.map(Number));
-  const selecionadas = pessoasNoEscopo(raiz, pessoas).filter(
+  const selecionadas = pessoasDoRelatorio(raiz, pessoas, filtros.todasRegioes).filter(
     (pessoa) =>
       contratado(pessoa) &&
       niveis.has(pessoa.tipo) &&
@@ -92,10 +101,7 @@ export function resumirRaizPagamento(
 
   return {
     pessoas: selecionadas,
-    total: selecionadas.reduce(
-      (soma, pessoa) => soma + Number(pessoa.valor_contratacao || 0),
-      0,
-    ),
+    total: selecionadas.reduce((soma, pessoa) => soma + Number(pessoa.valor_contratacao || 0), 0),
     porNivel: {
       coordenador: selecionadas.filter((pessoa) => pessoa.tipo === "coordenador").length,
       lider: selecionadas.filter((pessoa) => pessoa.tipo === "lider").length,
@@ -153,8 +159,7 @@ export async function gerarRaizPagamentoPdf(
     ]),
   );
   const lideresVisiveis = lideres.filter(
-    (lider) =>
-      idsSelecionados.has(lider.id) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
+    (lider) => idsSelecionados.has(lider.id) || (cabosPorLider.get(lider.id)?.length || 0) > 0,
   );
   const membros =
     raiz.tipo === "coordenador"
@@ -169,16 +174,31 @@ export async function gerarRaizPagamentoPdf(
   const total = resumo.total;
   const exibirValor = filtros.exibirValor !== false;
   const incluirAssinatura = filtros.incluirAssinatura === true;
+  const todasRegioes = filtros.todasRegioes === true;
   const rows: Array<Array<string>> = [];
   const criarLinha = (nivel: string, pessoa: PessoaRaizPagamento) => [
     nivel,
     pessoa.nome,
+    ...(todasRegioes ? [pessoa.cidade || pessoa.regiao || "Nao informado"] : []),
     telefone(pessoa.telefone),
     ...(exibirValor ? [dinheiro(Number(pessoa.valor_contratacao))] : []),
     ...(incluirAssinatura ? [""] : []),
   ];
 
-  if (raiz.tipo === "coordenador") {
+  if (todasRegioes) {
+    const ordemNivel: Record<NivelRaizPagamento, number> = { coordenador: 0, lider: 1, cabo: 2 };
+    [...contratados]
+      .sort((a, b) => {
+        const localA = a.cidade || a.regiao || "";
+        const localB = b.cidade || b.regiao || "";
+        return (
+          localA.localeCompare(localB, "pt-BR") ||
+          ordemNivel[a.tipo] - ordemNivel[b.tipo] ||
+          a.nome.localeCompare(b.nome, "pt-BR")
+        );
+      })
+      .forEach((pessoa) => rows.push(criarLinha(pessoa.tipo.toUpperCase(), pessoa)));
+  } else if (raiz.tipo === "coordenador") {
     if (incluirRaiz) {
       rows.push(criarLinha("COORDENADOR", raiz));
     }
@@ -190,9 +210,7 @@ export async function gerarRaizPagamentoPdf(
     if (idsSelecionados.has(lider.id)) {
       rows.push(criarLinha("LIDER", lider));
     }
-    (cabosPorLider.get(lider.id) || []).forEach((cabo) =>
-      rows.push(criarLinha("CABO", cabo)),
-    );
+    (cabosPorLider.get(lider.id) || []).forEach((cabo) => rows.push(criarLinha("CABO", cabo)));
   });
   if (!rows.length) {
     throw new Error("Esta raiz nao possui contratos com valor para pagamento.");
@@ -208,7 +226,13 @@ export async function gerarRaizPagamentoPdf(
     doc.text(titulo, margin, 31);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
-    doc.text(`${raiz.tipo === "coordenador" ? "Coordenador" : "Lider"}: ${raiz.nome}`, margin, 51);
+    doc.text(
+      todasRegioes
+        ? "Todos os contratados - todas as regioes"
+        : `${raiz.tipo === "coordenador" ? "Coordenador" : "Lider"}: ${raiz.nome}`,
+      margin,
+      51,
+    );
     doc.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, width - margin, 51, {
       align: "right",
     });
@@ -218,7 +242,13 @@ export async function gerarRaizPagamentoPdf(
   doc.setTextColor(15, 23, 42);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(`Local: ${raiz.cidade || raiz.regiao || "Nao informado"}`, margin, 103);
+  doc.text(
+    todasRegioes
+      ? "Abrangencia: todas as regioes"
+      : `Local: ${raiz.cidade || raiz.regiao || "Nao informado"}`,
+    margin,
+    103,
+  );
   doc.text(`Contratados: ${contratados.length}`, margin, 124);
   if (exibirValor) {
     doc.setTextColor(5, 120, 70);
@@ -228,37 +258,70 @@ export async function gerarRaizPagamentoPdf(
   const cabecalho = [
     "NIVEL",
     "NOME",
+    ...(todasRegioes ? ["REGIAO / CIDADE"] : []),
     "TELEFONE",
     ...(exibirValor ? ["VALOR"] : []),
     ...(incluirAssinatura ? ["ASSINATURA"] : []),
   ];
-  const columnStyles: Record<number, Record<string, unknown>> = incluirAssinatura
-    ? exibirValor
-      ? {
-          0: { cellWidth: 70, fontStyle: "bold" },
-          1: { cellWidth: 150 },
-          2: { cellWidth: 90 },
-          3: { cellWidth: 75, halign: "right", fontStyle: "bold" },
-          4: { cellWidth: 134 },
-        }
-      : {
-          0: { cellWidth: 80, fontStyle: "bold" },
-          1: { cellWidth: 170 },
-          2: { cellWidth: 100 },
-          3: { cellWidth: 169 },
-        }
-    : exibirValor
-      ? {
-          0: { cellWidth: 80, fontStyle: "bold" },
-          1: { cellWidth: 239 },
-          2: { cellWidth: 100 },
-          3: { cellWidth: 100, halign: "right", fontStyle: "bold" },
-        }
-      : {
-          0: { cellWidth: 90, fontStyle: "bold" },
-          1: { cellWidth: 309 },
-          2: { cellWidth: 120 },
-        };
+  const columnStyles: Record<number, Record<string, unknown>> = todasRegioes
+    ? incluirAssinatura
+      ? exibirValor
+        ? {
+            0: { cellWidth: 62 },
+            1: { cellWidth: 118 },
+            2: { cellWidth: 100 },
+            3: { cellWidth: 82 },
+            4: { cellWidth: 70, halign: "right" },
+            5: { cellWidth: 87 },
+          }
+        : {
+            0: { cellWidth: 65 },
+            1: { cellWidth: 130 },
+            2: { cellWidth: 110 },
+            3: { cellWidth: 90 },
+            4: { cellWidth: 124 },
+          }
+      : exibirValor
+        ? {
+            0: { cellWidth: 65 },
+            1: { cellWidth: 150 },
+            2: { cellWidth: 120 },
+            3: { cellWidth: 94 },
+            4: { cellWidth: 90, halign: "right" },
+          }
+        : {
+            0: { cellWidth: 70 },
+            1: { cellWidth: 175 },
+            2: { cellWidth: 145 },
+            3: { cellWidth: 129 },
+          }
+    : incluirAssinatura
+      ? exibirValor
+        ? {
+            0: { cellWidth: 70, fontStyle: "bold" },
+            1: { cellWidth: 150 },
+            2: { cellWidth: 90 },
+            3: { cellWidth: 75, halign: "right", fontStyle: "bold" },
+            4: { cellWidth: 134 },
+          }
+        : {
+            0: { cellWidth: 80, fontStyle: "bold" },
+            1: { cellWidth: 170 },
+            2: { cellWidth: 100 },
+            3: { cellWidth: 169 },
+          }
+      : exibirValor
+        ? {
+            0: { cellWidth: 80, fontStyle: "bold" },
+            1: { cellWidth: 239 },
+            2: { cellWidth: 100 },
+            3: { cellWidth: 100, halign: "right", fontStyle: "bold" },
+          }
+        : {
+            0: { cellWidth: 90, fontStyle: "bold" },
+            1: { cellWidth: 309 },
+            2: { cellWidth: 120 },
+          };
 
   autoTable(doc, {
     startY: 146,
@@ -312,7 +375,7 @@ export async function gerarRaizPagamentoPdf(
   }
 
   const prefixo = raiz.tipo === "coordenador" ? "Raiz Pagamento" : "Pagamento Lider";
-  const nome = `${prefixo} - ${raiz.nome}`;
+  const nome = todasRegioes ? "Pagamento - Todas as Regioes" : `${prefixo} - ${raiz.nome}`;
   doc.save(`${slug(nome)}.pdf`);
   return { total, contratados: contratados.length, membros: membros.length };
 }

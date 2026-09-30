@@ -18,6 +18,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   raiz: PessoaRaizPagamento;
   pessoas: PessoaRaizPagamento[];
+  todasPessoas?: PessoaRaizPagamento[];
 };
 
 const dinheiro = (valor: number) =>
@@ -29,14 +30,26 @@ const ROTULOS: Record<NivelRaizPagamento, string> = {
   cabo: "Cabos",
 };
 
-export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas }: Props) {
-  const niveisDisponiveis = useMemo<NivelRaizPagamento[]>(
+export default function RaizPagamentoDialog({
+  open,
+  onOpenChange,
+  raiz,
+  pessoas,
+  todasPessoas,
+}: Props) {
+  const [todasRegioes, setTodasRegioes] = useState(false);
+  const pessoasDisponiveis = todasRegioes ? todasPessoas || pessoas : pessoas;
+  const niveisDaRaiz = useMemo<NivelRaizPagamento[]>(
     () => (raiz.tipo === "coordenador" ? ["coordenador", "lider", "cabo"] : ["lider", "cabo"]),
     [raiz.tipo],
   );
+  const niveisDisponiveis = useMemo<NivelRaizPagamento[]>(
+    () => (todasRegioes ? ["coordenador", "lider", "cabo"] : niveisDaRaiz),
+    [niveisDaRaiz, todasRegioes],
+  );
   const valoresDisponiveis = useMemo(
-    () => listarValoresRaizPagamento(raiz, pessoas),
-    [raiz, pessoas],
+    () => listarValoresRaizPagamento(raiz, pessoasDisponiveis, todasRegioes),
+    [raiz, pessoasDisponiveis, todasRegioes],
   );
   const [niveis, setNiveis] = useState<NivelRaizPagamento[]>(niveisDisponiveis);
   const [valores, setValores] = useState<number[]>(valoresDisponiveis);
@@ -46,15 +59,19 @@ export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas 
 
   useEffect(() => {
     if (!open) return;
-    setNiveis(niveisDisponiveis);
-    setValores(valoresDisponiveis);
+    setNiveis(niveisDaRaiz);
     setExibirValor(true);
     setIncluirAssinatura(false);
-  }, [open, niveisDisponiveis, valoresDisponiveis]);
+    setTodasRegioes(false);
+  }, [open, niveisDaRaiz]);
+
+  useEffect(() => {
+    if (open) setValores(valoresDisponiveis);
+  }, [open, valoresDisponiveis]);
 
   const resumo = useMemo(
-    () => resumirRaizPagamento(raiz, pessoas, { niveis, valores }),
-    [raiz, pessoas, niveis, valores],
+    () => resumirRaizPagamento(raiz, pessoasDisponiveis, { niveis, valores, todasRegioes }),
+    [raiz, pessoasDisponiveis, niveis, valores, todasRegioes],
   );
 
   const alternarNivel = (nivel: NivelRaizPagamento, marcado: boolean) =>
@@ -67,14 +84,20 @@ export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas 
       marcado ? Array.from(new Set([...atuais, valor])) : atuais.filter((item) => item !== valor),
     );
 
+  const alternarTodasRegioes = (marcado: boolean) => {
+    setTodasRegioes(marcado);
+    setNiveis(marcado ? ["coordenador", "lider", "cabo"] : niveisDaRaiz);
+  };
+
   const gerar = async () => {
     setGerando(true);
     try {
-      const result = await gerarRaizPagamentoPdf(raiz, pessoas, {
+      const result = await gerarRaizPagamentoPdf(raiz, pessoasDisponiveis, {
         niveis,
         valores,
         exibirValor,
         incluirAssinatura,
+        todasRegioes,
       });
       toast.success(`PDF gerado com ${result.contratados} contratado(s) para pagamento.`);
       onOpenChange(false);
@@ -96,6 +119,20 @@ export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas 
         </p>
 
         <div className="space-y-4 pt-2">
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+            <span>
+              <strong>Todas as regiões</strong>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Gera um único arquivo com todos os contratados do sistema.
+              </span>
+            </span>
+            <Switch
+              checked={todasRegioes}
+              onCheckedChange={alternarTodasRegioes}
+              aria-label="Incluir todas as regiões"
+            />
+          </label>
+
           <section className="space-y-2">
             <h3 className="text-sm font-semibold">Quem incluir</h3>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -134,7 +171,9 @@ export default function RaizPagamentoDialog({ open, onOpenChange, raiz, pessoas 
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Não há contratos remunerados nesta raiz.</p>
+              <p className="text-sm text-muted-foreground">
+                Não há contratos remunerados nesta raiz.
+              </p>
             )}
           </section>
 

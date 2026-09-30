@@ -44,4 +44,14 @@ describe("filtros da raiz de pagamento", () => {
     expect(resumo.pessoas.map((pessoa) => pessoa.id)).toEqual(["cabo-1"]);
     expect(listarValoresRaizPagamento(pessoas[0], pessoas)).toEqual([100, 150]);
   });
+
+  it("reune contratados de todas as regioes quando a opcao esta ativa", () => {
+    const resumo = resumirRaizPagamento(pessoas[0], pessoas, {
+      niveis: ["cabo"],
+      valores: [100],
+      todasRegioes: true,
+    });
+
+    expect(resumo.pessoas.map((pessoa) => pessoa.id)).toEqual(["cabo-1", "fora"]);
+  });
 });

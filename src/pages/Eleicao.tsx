@@ -2227,6 +2227,7 @@ export default function Eleicao() {
                         key={r.value}
                         title={r.label}
                         pessoas={list}
+                        todasPessoas={pessoas}
                         pessoasContatos={pessoas.filter(
                           (p) => p.escopo === "campo_grande" && p.regiao === r.value,
                         )}
@@ -2279,6 +2280,7 @@ export default function Eleicao() {
                       key={cidade}
                       title={cidade}
                       pessoas={escopoList.filter((p) => p.cidade === cidade)}
+                      todasPessoas={pessoas}
                       pessoasContatos={pessoas.filter(
                         (p) => p.escopo === "interior" && p.cidade === cidade,
                       )}
@@ -3255,6 +3257,7 @@ export default function Eleicao() {
 function RegionBlock({
   title,
   pessoas,
+  todasPessoas,
   pessoasContatos,
   onAdd,
   onEdit,
@@ -3267,6 +3270,7 @@ function RegionBlock({
 }: {
   title: string;
   pessoas: Pessoa[];
+  todasPessoas: Pessoa[];
   pessoasContatos?: Pessoa[];
   onAdd: () => void;
   onEdit: (p: Pessoa) => void;
@@ -3403,6 +3407,7 @@ function RegionBlock({
               key={c.id}
               coord={c}
               all={pessoas}
+              todasPessoas={todasPessoas}
               onEdit={onEdit}
               onDelete={onDelete}
               onCredentials={onCredentials}
@@ -3454,6 +3459,7 @@ function RegionBlock({
                   key={l.id}
                   lider={l}
                   all={pessoas}
+                  todasPessoas={todasPessoas}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onCredentials={onCredentials}
@@ -3496,6 +3502,7 @@ function RegionBlock({
 function CoordBlock({
   coord,
   all,
+  todasPessoas,
   onEdit,
   onDelete,
   onCredentials,
@@ -3504,6 +3511,7 @@ function CoordBlock({
 }: {
   coord: Pessoa;
   all: Pessoa[];
+  todasPessoas: Pessoa[];
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   onCredentials: (p: Pessoa) => void;
@@ -3603,6 +3611,7 @@ function CoordBlock({
         onOpenChange={setRaizPagamentoOpen}
         raiz={coord}
         pessoas={allDoTime}
+        todasPessoas={todasPessoas}
       />
       {expanded && hasTeam && (
         <div className="bg-muted/10 pb-1">
@@ -3623,6 +3632,7 @@ function CoordBlock({
               key={l.id}
               lider={l}
               all={all}
+              todasPessoas={todasPessoas}
               onEdit={onEdit}
               onDelete={onDelete}
               onCredentials={onCredentials}
@@ -3639,6 +3649,7 @@ function CoordBlock({
 function LiderBlock({
   lider,
   all,
+  todasPessoas,
   onEdit,
   onDelete,
   onCredentials,
@@ -3647,6 +3658,7 @@ function LiderBlock({
 }: {
   lider: Pessoa;
   all: Pessoa[];
+  todasPessoas: Pessoa[];
   onEdit: (p: Pessoa) => void;
   onDelete: (id: string) => void;
   onCredentials: (p: Pessoa) => void;
@@ -3688,6 +3700,7 @@ function LiderBlock({
         onOpenChange={setRaizPagamentoOpen}
         raiz={lider}
         pessoas={[lider, ...cabos]}
+        todasPessoas={todasPessoas}
       />
       {open &&
         cabos.map((cb) => (
