@@ -53,6 +53,24 @@ const dinheiro = (value: number) =>
     currency: "BRL",
   });
 
+const REGIAO_CAMPO_GRANDE_LABELS: Record<string, string> = {
+  anhanduizinho: "Anhanduizinho",
+  bandeira: "Bandeira",
+  centro: "Centro",
+  imbirussu: "Imbirussu",
+  lagoa: "Lagoa",
+  moreninha: "Moreninha",
+  prosa: "Prosa",
+  segredo: "Segredo",
+};
+
+const localPagamento = (pessoa: PessoaRaizPagamento) => {
+  const local =
+    pessoa.escopo === "interior" ? pessoa.cidade || pessoa.regiao : pessoa.regiao || pessoa.cidade;
+  if (!local) return "Nao informado";
+  return REGIAO_CAMPO_GRANDE_LABELS[local.toLocaleLowerCase("pt-BR")] || local;
+};
+
 const contratado = (pessoa: PessoaRaizPagamento) =>
   !pessoa.arquivado_em && !pessoa.is_voluntario && Number(pessoa.valor_contratacao || 0) > 0;
 
@@ -156,12 +174,12 @@ export function resumirPagamentoGeral(
   const selecionados = new Set(pessoasSelecionadas.map((pessoa) => pessoa.id));
   const localDaPessoa = (pessoa: PessoaRaizPagamento) => {
     let atual: PessoaRaizPagamento | undefined = pessoa;
-    let local = pessoa.cidade || pessoa.regiao || "Nao informado";
+    let local = localPagamento(pessoa);
     const visitados = new Set<string>();
     while (atual?.parent_id && !visitados.has(atual.parent_id)) {
       visitados.add(atual.parent_id);
       atual = porId.get(atual.parent_id);
-      if (atual) local = atual.cidade || atual.regiao || local;
+      if (atual) local = localPagamento(atual);
     }
     return local;
   };

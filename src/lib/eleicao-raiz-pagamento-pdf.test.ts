@@ -153,4 +153,58 @@ describe("resumo do pagamento geral", () => {
     expect(regiao.grupos[0].cabos).toHaveLength(1);
     expect(regiao.grupos[0].total).toBe(350);
   });
+
+  it("separa Campo Grande por regiao urbana em ordem alfabetica", () => {
+    const equipe: PessoaRaizPagamento[] = [
+      {
+        id: "prosa",
+        tipo: "coordenador",
+        nome: "Coord Prosa",
+        escopo: "campo_grande",
+        cidade: "Campo Grande",
+        regiao: "prosa",
+        valor_contratacao: 100,
+      },
+      {
+        id: "anhanduizinho",
+        tipo: "coordenador",
+        nome: "Coord Anhanduizinho",
+        escopo: "campo_grande",
+        cidade: "Campo Grande",
+        regiao: "anhanduizinho",
+        valor_contratacao: 100,
+      },
+      {
+        id: "centro",
+        tipo: "coordenador",
+        nome: "Coord Centro",
+        escopo: "campo_grande",
+        cidade: "Campo Grande",
+        regiao: "centro",
+        valor_contratacao: 100,
+      },
+    ];
+
+    expect(resumirPagamentoGeral(equipe, equipe).map((item) => item.local)).toEqual([
+      "Anhanduizinho",
+      "Centro",
+      "Prosa",
+    ]);
+  });
+
+  it("continua agrupando o Interior pela cidade", () => {
+    const equipe: PessoaRaizPagamento[] = [
+      {
+        id: "interior",
+        tipo: "coordenador",
+        nome: "Coord Interior",
+        escopo: "interior",
+        cidade: "Dourados",
+        regiao: "centro",
+        valor_contratacao: 100,
+      },
+    ];
+
+    expect(resumirPagamentoGeral(equipe, equipe)[0].local).toBe("Dourados");
+  });
 });
