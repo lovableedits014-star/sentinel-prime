@@ -967,7 +967,7 @@ export default function EleicaoCabosImportacaoPanel({
     const valorContrato = Number(contractEdit.valorTexto.replace(/\./g, "").replace(",", "."));
     setBusy(true);
     try {
-      const { error } = await db.rpc("eleicao_cabo_import_editar_contrato", {
+      const { data, error } = await db.rpc("eleicao_cabo_import_editar_contrato", {
         p_lote_id: managedLot, p_item_id: contractEdit.item_id,
         p_nome: contractEdit.nome, p_cpf: contractEdit.cpf || null,
         p_telefone: contractEdit.telefone, p_valor: valorContrato,
@@ -976,6 +976,9 @@ export default function EleicaoCabosImportacaoPanel({
         p_ativo: contractEdit.ativo,
       });
       if (error) throw error;
+      if (data?.responsavel_id !== contractEdit.responsavel_id) {
+        throw new Error("O responsável selecionado não foi aplicado ao contrato.");
+      }
       await Promise.all([loadManagedContracts(managedLot), loadBase()]);
       onChanged();
       toast.success(contractEdit.ativo ? "Contrato salvo e ativo." : "Contrato arquivado.");
