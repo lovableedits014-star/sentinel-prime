@@ -632,7 +632,10 @@ export default function Eleicao() {
     }
 
     const telLimpo = onlyDigits(form.telefone);
-    const dupe = pessoas.find((p) => p.id !== editing?.id && onlyDigits(p.telefone) === telLimpo);
+    const telefoneFoiAlterado = !editing || onlyDigits(editing.telefone) !== telLimpo;
+    const dupe = telefoneFoiAlterado
+      ? pessoas.find((p) => p.id !== editing?.id && onlyDigits(p.telefone) === telLimpo)
+      : undefined;
     if (dupe) {
       // Buscar o nome do coordenador/pai se houver
       let vinculadoA = "base geral (avulso)";
@@ -714,6 +717,17 @@ export default function Eleicao() {
       missao_facebook_ativo: form.missao_facebook_ativo,
       missao_instagram_ativo: form.missao_instagram_ativo,
     };
+
+    // Cadastros antigos podem ter telefone compartilhado autorizado. Ao editar
+    // apenas contrato, endereco ou vinculo, nao envie novamente os campos de
+    // identidade: isso evita revalidar uma duplicidade historica que nao mudou.
+    // Se nome, telefone, CPF ou tipo forem alterados, a validacao continua ativa.
+    if (editing) {
+      if (payload.nome === editing.nome) delete payload.nome;
+      if (onlyDigits(payload.telefone) === onlyDigits(editing.telefone)) delete payload.telefone;
+      if (onlyDigits(payload.cpf) === onlyDigits(editing.cpf)) delete payload.cpf;
+      if (payload.tipo === editing.tipo) delete payload.tipo;
+    }
 
     // Dobradinha:
     // - Raiz nova: inclui no payload (não há descendentes pra propagar).
