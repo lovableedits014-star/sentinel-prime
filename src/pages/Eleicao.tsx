@@ -131,6 +131,7 @@ import {
 import RaizPagamentoDialog from "@/components/eleicao/RaizPagamentoDialog";
 import RaizDocumentacaoDialog from "@/components/eleicao/RaizDocumentacaoDialog";
 import ContatosRegiaoDialog from "@/components/eleicao/ContatosRegiaoDialog";
+import { particionarPessoasDaArvore } from "@/lib/eleicao-arvore";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -467,8 +468,51 @@ export default function Eleicao() {
       rows.push(...page);
       if (page.length < pageSize) break;
     }
-    rows.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
-    setPessoas(rows);
+    const pessoasCarregadas = Array.from(new Map(rows.map((pessoa) => [pessoa.id, pessoa])).values());
+    pessoasCarregadas.sort((a, b) =>
+      (b.created_at || "").localeCompare(a.created_at || "") || b.id.localeCompare(a.id),
+    );
+
+    const { data: auditoria, error: auditoriaError } = await supabase.rpc(
+      "eleicao_auditar_integridade_cadastros" as any,
+      { p_client_id: clientId! },
+    );
+    if (auditoriaError) {
+      console.error("[Eleicao] Falha na auditoria de integridade", auditoriaError);
+      toast.error("Não foi possível auditar todos os cadastros e valores financeiros.");
+    } else if (auditoria) {
+      const ativosCarregados = pessoasCarregadas.filter((p) => !p.arquivado_em);
+      const investimentoCarregado = ativosCarregados
+        .filter((p) => !p.is_voluntario)
+        .reduce((total, p) => total + Number(p.valor_contratacao || 0), 0);
+      const totalEsperado = Number((auditoria as any).total_registros || 0);
+      const ativosEsperados = Number((auditoria as any).total_ativos || 0);
+      const investimentoEsperado = Number((auditoria as any).investimento_ativo || 0);
+      const divergente =
+        pessoasCarregadas.length !== totalEsperado ||
+        ativosCarregados.length !== ativosEsperados ||
+        Math.abs(investimentoCarregado - investimentoEsperado) > 0.005;
+
+      if (divergente) {
+        console.error("[Eleicao] Divergência entre banco, tela e financeiro", {
+          auditoria,
+          carregados: pessoasCarregadas.length,
+          ativosCarregados: ativosCarregados.length,
+          investimentoCarregado,
+        });
+        toast.error("Divergência detectada entre cadastros, árvore e financeiro.", {
+          description: "A tela não confirmou a carga integral. Recarregue e avise o suporte.",
+          duration: 15000,
+        });
+      } else if (Number((auditoria as any).vinculos_invalidos || 0) > 0) {
+        toast.warning("Existem vínculos antigos ou fora da área do responsável.", {
+          description: "Essas pessoas continuam visíveis na árvore e contabilizadas no financeiro.",
+          duration: 9000,
+        });
+      }
+    }
+
+    setPessoas(pessoasCarregadas);
     setLoading(false);
   }
 
@@ -3309,11 +3353,13 @@ function RegionBlock({
   defaultOpen?: boolean;
 }) {
   const [contatosOpen, setContatosOpen] = useState(false);
-  const coords = pessoas.filter((p) => p.tipo === "coordenador");
+  const particaoArvore = useMemo(() => particionarPessoasDaArvore(pessoas), [pessoas]);
+  const coords = particaoArvore.coordenadores;
   const lideres = pessoas.filter((p) => p.tipo === "lider");
   const cabos = pessoas.filter((p) => p.tipo === "cabo");
-  const lideresOrfaos = lideres.filter((p) => !p.parent_id);
-  const cabosOrfaos = cabos.filter((p) => !p.parent_id);
+  const lideresOrfaos = particaoArvore.lideresRaiz;
+  const cabosOrfaos = particaoArvore.cabosRaiz;
+  const pessoasNaoRenderizadas = pessoas.filter((p) => particaoArvore.idsOmitidos.includes(p.id));
   const hasContent = pessoas.length > 0;
   const [open, setOpen] = useState(defaultOpen ?? hasContent);
 
@@ -3447,7 +3493,7 @@ function RegionBlock({
                 <div className="flex items-center gap-2 min-w-0">
                   <Star className="w-3 h-3 text-amber-600 shrink-0" />
                   <p className="text-[10px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-400 truncate">
-                    Líderes avulsos (sem coordenador) · {lideresOrfaos.length}
+                    Líderes avulsos ou sem coordenador nesta área · {lideresOrfaos.length}
                     {(() => {
                       const tot = lideresOrfaos.reduce((s, p) => s + (p.valor_contratacao || 0), 0);
                       const sv = lideresOrfaos.filter(
@@ -3497,12 +3543,30 @@ function RegionBlock({
           {cabosOrfaos.length > 0 && (
             <div className="px-3 py-2 border-t border-dashed">
               <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">
-                Cabos sem líder
+                Cabos sem responsável válido nesta área
               </p>
               {cabosOrfaos.map((c) => (
                 <PessoaRow
                   key={c.id}
                   p={c}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onCredentials={onCredentials}
+                  onSend={onSend}
+                  sendingId={sendingId}
+                />
+              ))}
+            </div>
+          )}
+          {pessoasNaoRenderizadas.length > 0 && (
+            <div className="px-3 py-2 border-t border-dashed border-red-300 bg-red-500/5">
+              <p className="text-[10px] uppercase tracking-wide font-semibold text-red-700 mb-1">
+                Cadastros recuperados por segurança
+              </p>
+              {pessoasNaoRenderizadas.map((pessoa) => (
+                <PessoaRow
+                  key={pessoa.id}
+                  p={pessoa}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onCredentials={onCredentials}
