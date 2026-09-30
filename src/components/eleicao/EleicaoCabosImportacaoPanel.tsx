@@ -148,8 +148,10 @@ type ManagedContract = {
   responsavel_id: string | null; responsavel_nome: string | null; arquivado_em: string | null;
   pertence_ao_lote: boolean; lote_contrato_nome: string | null;
   conflito_pessoa_id?: string | null; conflito_nome?: string | null;
+  conflito_tipo?: string | null;
   conflito_telefone?: string | null; conflito_cpf?: string | null;
   conflito_responsavel?: string | null;
+  conflito_responsavel_tipo?: string | null;
   repetido_no_arquivo?: {
     item_id: number;
     numero_linha: number;
@@ -260,7 +262,13 @@ const canApproveSharedPhone = (item: ManagedContract) => {
   return mesmoTelefone && !mesmoCpf && !mesmaPessoa;
 };
 const roleLabel = (role: string | null) =>
-  role === "coordenador" ? "Coordenador" : role === "lider" ? "Líder" : "Sem responsável";
+  role === "coordenador"
+    ? "Coordenador"
+    : role === "lider"
+      ? "Líder"
+      : role === "cabo"
+        ? "Cabo eleitoral"
+        : "Não identificado";
 const duplicateOwnerKey = (person: DuplicatePerson) => person.responsavel_id || "sem-responsavel";
 const duplicateOwnerLabel = (person: DuplicatePerson) =>
   person.responsavel_nome
@@ -859,6 +867,27 @@ export default function EleicaoCabosImportacaoPanel({
       setAuditLot(lotId);
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Falha ao abrir a auditoria."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadLotOccurrences = async (lot: ImportLot) => {
+    setBusy(true);
+    try {
+      const { data, error } = await db.rpc("eleicao_cabo_import_ocorrencias", {
+        p_lote_id: lot.id,
+      });
+      if (error) throw error;
+      const occurrences = Array.isArray(data) ? (data as ImportItem[]) : [];
+      if (!occurrences.length) {
+        toast.info("Este lote não possui ocorrências para exportar.");
+        return;
+      }
+      await gerarRelatorioOcorrenciasLotePdf(lot.nome, occurrences);
+      toast.success(`PDF gerado com ${occurrences.length} ocorrência(s) deste lote.`);
+    } catch (error: unknown) {
+      toast.error(errorMessage(error, "Não foi possível gerar o PDF de ocorrências."));
     } finally {
       setBusy(false);
     }
@@ -1741,6 +1770,21 @@ export default function EleicaoCabosImportacaoPanel({
                         >
                           Ver ocorrências
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={
+                            busy ||
+                            (!lot.total_duplicados &&
+                              !lot.total_repetidos_arquivo &&
+                              !lot.total_invalidos)
+                          }
+                          title="Baixar somente as ocorrências deste lote"
+                          onClick={() => void downloadLotOccurrences(lot)}
+                        >
+                          <Download className="mr-1 h-3.5 w-3.5" />
+                          PDF ocorrências
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1912,9 +1956,15 @@ export default function EleicaoCabosImportacaoPanel({
                                 <div>
                                   <p className="font-medium">Cadastro existente que causou o bloqueio</p>
                                   <p>{item.conflito_nome || "—"}</p>
+                                  <p>Cargo: {item.conflito_tipo ? roleLabel(item.conflito_tipo) : "—"}</p>
                                   <p>Telefone: {item.conflito_telefone || "—"}</p>
                                   <p>CPF: {item.conflito_cpf || "—"}</p>
-                                  <p>Responsável: {item.conflito_responsavel || "—"}</p>
+                                  <p>
+                                    Responsável: {item.conflito_responsavel || "—"}
+                                    {item.conflito_responsavel_tipo
+                                      ? ` (${roleLabel(item.conflito_responsavel_tipo).toLowerCase()})`
+                                      : ""}
+                                  </p>
                                   <p>Lote: {item.lote_contrato_nome || "Sem lote vinculado"}</p>
                                 </div>
                               )}
@@ -2144,7 +2194,7 @@ function ItemTable({ items }: { items: ImportItem[] }) {
                   {item.duplicado ? (
                     <div className="space-y-1 rounded-md border border-destructive/20 bg-destructive/5 p-2">
                       <p>
-                        <strong>{item.duplicado.nome}</strong> ({item.duplicado.tipo})
+                        <strong>{item.duplicado.nome}</strong> ({roleLabel(item.duplicado.tipo)})
                       </p>
                       <p>
                         Responsável: {item.duplicado.responsavel_nome || "sem responsável"}

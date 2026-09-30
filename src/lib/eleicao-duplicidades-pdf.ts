@@ -53,7 +53,13 @@ export type OcorrenciaImportacaoPdf = {
 };
 
 const papel = (tipo: string | null) =>
-  tipo === "coordenador" ? "Coordenador" : tipo === "lider" ? "Líder" : "Sem responsável";
+  tipo === "coordenador"
+    ? "Coordenador"
+    : tipo === "lider"
+      ? "Líder"
+      : tipo === "cabo"
+        ? "Cabo eleitoral"
+        : "Não identificado";
 
 const contratoDaPessoa = (pessoa: DuplicidadePessoaPdf) => {
   if (pessoa.is_voluntario) return "Voluntário";
@@ -317,7 +323,7 @@ export async function gerarRelatorioOcorrenciasLotePdf(
         return [
           `${item.nome || "Sem nome"}\nTelefone: ${item.telefone_normalizado || "-"}\nCPF: ${item.cpf_normalizado || "-"}\nLinha ${item.numero_linha + 1}`,
           `${item.responsavel_tentativa_nome || responsavel}\n${papel(item.responsavel_tentativa_tipo || contexto?.responsavel_tentativa_tipo || null)}`,
-          `${duplicado.nome} (${duplicado.tipo})\nTelefone: ${duplicado.telefone || "-"}\n${valor}\n${dataBr(duplicado.contrato_inicio) || "início não informado"} até ${dataBr(duplicado.contrato_fim) || "sem término"}`,
+          `${duplicado.nome}\nCargo: ${papel(duplicado.tipo)}\nTelefone: ${duplicado.telefone || "-"}\n${valor}\n${dataBr(duplicado.contrato_inicio) || "início não informado"} até ${dataBr(duplicado.contrato_fim) || "sem término"}`,
           destino,
           `Não cadastrado para ${item.responsavel_tentativa_nome || responsavel} porque já possui contrato ativo com ${destino}.`,
         ];
