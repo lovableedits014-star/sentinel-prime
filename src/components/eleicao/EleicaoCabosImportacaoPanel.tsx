@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Save,
+  Search,
   Trash2,
   Upload,
   X,
@@ -379,6 +380,7 @@ export default function EleicaoCabosImportacaoPanel({
   const [parents, setParents] = useState<Parent[]>([]);
   const [historyParents, setHistoryParents] = useState<Parent[]>([]);
   const [history, setHistory] = useState<ImportLot[]>([]);
+  const [historySearch, setHistorySearch] = useState("");
   const [databaseDuplicates, setDatabaseDuplicates] = useState<DuplicateGroup[]>([]);
   const [duplicateCases, setDuplicateCases] = useState<DuplicateCase[]>([]);
   const [selectedCaseIds, setSelectedCaseIds] = useState<Set<number>>(new Set());
@@ -425,30 +427,63 @@ export default function EleicaoCabosImportacaoPanel({
     coordenadorId: "",
   });
 
+  const loadAllHistory = async () => {
+    const allLots: ImportLot[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    for (;;) {
+      const { data, error, count } = await db
+        .from("eleicao_cabo_import_lotes")
+        .select("*", { count: "exact" })
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data || []) as ImportLot[];
+      allLots.push(...page);
+      if (!page.length || (typeof count === "number" && allLots.length >= count)) break;
+      from += page.length;
+    }
+    return Array.from(new Map(allLots.map((lot) => [lot.id, lot])).values());
+  };
+
+  const loadAllHistoryParents = async () => {
+    const allParents: Parent[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    for (;;) {
+      const { data, error, count } = await db
+        .from("eleicao_pessoas")
+        .select("id,nome,tipo,escopo,regiao,cidade,arquivado_em", { count: "exact" })
+        .eq("client_id", clientId)
+        .in("tipo", ["coordenador", "lider"])
+        .order("nome")
+        .order("id")
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data || []) as Parent[];
+      allParents.push(...page);
+      if (!page.length || (typeof count === "number" && allParents.length >= count)) break;
+      from += page.length;
+    }
+    return Array.from(new Map(allParents.map((parent) => [parent.id, parent])).values());
+  };
+
   const loadBase = async () => {
     await db.rpc("eleicao_cabo_import_limpar_rascunhos", { p_client_id: clientId });
     const [parentResult, lotsResult, duplicatesResult, casesResult] = await Promise.all([
-      db
-        .from("eleicao_pessoas")
-        .select("id,nome,tipo,escopo,regiao,cidade,arquivado_em")
-        .eq("client_id", clientId)
-        .in("tipo", ["coordenador", "lider"])
-        .order("nome"),
-      db
-        .from("eleicao_cabo_import_lotes")
-        .select("*")
-        .eq("client_id", clientId)
-        .order("created_at", { ascending: false })
-        .limit(100),
+      loadAllHistoryParents(),
+      loadAllHistory(),
       db.rpc("eleicao_auditar_duplicidades", { p_client_id: clientId }),
       db.rpc("eleicao_casos_duplicados_ativos", { p_client_id: clientId }),
     ]);
-    if (!parentResult.error) {
-      const responsaveis = (parentResult.data || []) as Parent[];
+    if (Array.isArray(parentResult)) {
+      const responsaveis = parentResult;
       setHistoryParents(responsaveis);
       setParents(responsaveis.filter((parent) => !parent.arquivado_em));
     }
-    if (!lotsResult.error) setHistory(lotsResult.data || []);
+    if (Array.isArray(lotsResult)) setHistory(lotsResult);
     if (!duplicatesResult.error)
       setDatabaseDuplicates(Array.isArray(duplicatesResult.data) ? duplicatesResult.data : []);
     if (!casesResult.error)
@@ -456,7 +491,9 @@ export default function EleicaoCabosImportacaoPanel({
   };
 
   useEffect(() => {
-    void loadBase();
+    void loadBase().catch((error: unknown) =>
+      toast.error(errorMessage(error, "Não foi possível carregar todo o histórico.")),
+    );
     // loadBase depende apenas do clientId recebido pelo painel.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
@@ -496,8 +533,34 @@ export default function EleicaoCabosImportacaoPanel({
     [contractsAtRisk],
   );
   const activeHistory = useMemo(
-    () => history.filter((lot) => lot.status === "confirmado"),
+    () => history.filter((lot) => lot.status !== "cancelado"),
     [history],
+  );
+  const historyParentById = useMemo(
+    () => new Map(historyParents.map((parent) => [parent.id, parent])),
+    [historyParents],
+  );
+  const matchesHistorySearch = (lot: ImportLot) => {
+    const searchKey = key(historySearch);
+    if (!searchKey) return true;
+    const responsavel = lot.parent_id_padrao ? historyParentById.get(lot.parent_id_padrao) : null;
+    return key(
+      [
+        lot.nome,
+        lot.arquivo_nome,
+        lot.status,
+        lot.created_at,
+        format(new Date(lot.created_at), "dd/MM/yyyy HH:mm"),
+        responsavel?.nome,
+        responsavel?.tipo,
+      ].join(" "),
+    ).includes(searchKey);
+  };
+  const visibleActiveHistory = useMemo(
+    () => activeHistory.filter(matchesHistorySearch),
+    // A busca e o mapa de responsaveis determinam a lista visivel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeHistory, historyParentById, historySearch],
   );
   const coordenadores = useMemo(
     () => parents.filter((parent) => parent.tipo === "coordenador"),
@@ -582,6 +645,11 @@ export default function EleicaoCabosImportacaoPanel({
   const canceledHistory = useMemo(
     () => history.filter((lot) => lot.status === "cancelado"),
     [history],
+  );
+  const visibleCanceledHistory = useMemo(
+    () => canceledHistory.filter(matchesHistorySearch),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canceledHistory, historyParentById, historySearch],
   );
   const selectedCases = useMemo(
     () => duplicateCases.filter((item) => selectedCaseIds.has(item.id)),
@@ -1849,6 +1917,32 @@ export default function EleicaoCabosImportacaoPanel({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full max-w-xl">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={historySearch}
+                  onChange={(event) => setHistorySearch(event.target.value)}
+                  placeholder="Pesquisar responsável, lote, arquivo, data ou status"
+                  className="pl-9 pr-9"
+                />
+                {historySearch && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                    onClick={() => setHistorySearch("")}
+                    title="Limpar pesquisa"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+              <p className="whitespace-nowrap text-xs text-muted-foreground">
+                Mostrando {visibleActiveHistory.length} de {activeHistory.length} lotes
+              </p>
+            </div>
             <div className="sticky top-14 z-10 rounded-t-md border border-b-0 bg-background px-2 pt-1 shadow-sm">
               <p className="mb-1 text-[11px] text-muted-foreground">
                 Deslize para ver as acoes do historico
@@ -1892,7 +1986,7 @@ export default function EleicaoCabosImportacaoPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activeHistory.map((lot) => (
+                  {visibleActiveHistory.map((lot) => (
                     <Fragment key={lot.id}>
                       <TableRow>
                         <TableCell>
@@ -1900,9 +1994,9 @@ export default function EleicaoCabosImportacaoPanel({
                         </TableCell>
                         <TableCell>
                           {(() => {
-                            const responsavel = historyParents.find(
-                              (item) => item.id === lot.parent_id_padrao,
-                            );
+                            const responsavel = lot.parent_id_padrao
+                              ? historyParentById.get(lot.parent_id_padrao)
+                              : null;
                             return responsavel ? (
                               <>
                                 <p className="font-medium">{responsavel.nome}</p>
@@ -1941,7 +2035,7 @@ export default function EleicaoCabosImportacaoPanel({
                             <Button
                               size="sm"
                               variant="ghost"
-                              disabled={busy}
+                              disabled={busy || lot.status !== "confirmado"}
                               title="Editar valor ou responsável do lote"
                               onClick={() =>
                                 setLotValueEdit({
@@ -1960,7 +2054,7 @@ export default function EleicaoCabosImportacaoPanel({
                             <Button
                               size="sm"
                               variant="ghost"
-                              disabled={busy}
+                              disabled={busy || lot.status !== "confirmado"}
                               onClick={() => void loadManagedContracts(lot.id)}
                             >
                               Gerenciar contratos
@@ -2071,28 +2165,34 @@ export default function EleicaoCabosImportacaoPanel({
                       )}
                     </Fragment>
                   ))}
-                  {!activeHistory.length && (
+                  {!visibleActiveHistory.length && (
                     <TableRow>
                       <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
-                        Nenhuma importação realizada.
+                        {historySearch
+                          ? `Nenhum lote encontrado para “${historySearch}”.`
+                          : "Nenhuma importação realizada."}
                       </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
-            {!!canceledHistory.length && (
-              <details className="rounded-lg border border-dashed bg-muted/20">
+            {!!visibleCanceledHistory.length && (
+              <details
+                className="rounded-lg border border-dashed bg-muted/20"
+                open={historySearch ? true : undefined}
+              >
                 <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-                  Análises canceladas ({canceledHistory.length}) — sem alteração de cadastros ou
-                  custos
+                  Análises canceladas ({visibleCanceledHistory.length}
+                  {historySearch ? ` de ${canceledHistory.length}` : ""}) — sem alteração de
+                  cadastros ou custos
                 </summary>
                 <div className="space-y-2 border-t px-4 py-3">
                   <p className="text-xs text-muted-foreground">
                     Estes arquivos foram apenas analisados e depois cancelados. Não criaram
                     contratos e não entram na auditoria financeira.
                   </p>
-                  {canceledHistory.map((lot) => (
+                  {visibleCanceledHistory.map((lot) => (
                     <div
                       key={lot.id}
                       className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm"
