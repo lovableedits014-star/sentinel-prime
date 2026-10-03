@@ -134,6 +134,7 @@ import RaizPagamentoDialog from "@/components/eleicao/RaizPagamentoDialog";
 import RaizDocumentacaoDialog from "@/components/eleicao/RaizDocumentacaoDialog";
 import ContatosRegiaoDialog from "@/components/eleicao/ContatosRegiaoDialog";
 import { incluirDescendentesDaArvore, particionarPessoasDaArvore } from "@/lib/eleicao-arvore";
+import { correspondeBuscaEleicao } from "@/lib/eleicao-busca";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -1163,13 +1164,7 @@ export default function Eleicao() {
   const matchesTipo = (p: Pessoa) => tipoFilter === "todos" || p.tipo === tipoFilter;
 
   const matchesSearch = (p: Pessoa) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      p.nome.toLowerCase().includes(q) ||
-      (p.telefone || "").includes(search) ||
-      (p.endereco || "").toLowerCase().includes(q)
-    );
+    return correspondeBuscaEleicao(p, search);
   };
 
   // Índice global de pessoas para resolver ancestrais (mesmo escopo) e nomes de pais
@@ -1205,27 +1200,6 @@ export default function Eleicao() {
           cur = parent.parent_id || null;
         }
       });
-
-      const childrenByParent = new Map<string, Pessoa[]>();
-      pessoas.forEach((p) => {
-        if ((escopoTab !== "geral" && p.escopo !== escopo) || !p.parent_id) return;
-        const children = childrenByParent.get(p.parent_id) || [];
-        children.push(p);
-        childrenByParent.set(p.parent_id, children);
-      });
-      baseFiltered.forEach((match) => {
-        const pending = [...(childrenByParent.get(match.id) || [])];
-        const visited = new Set<string>();
-        while (pending.length > 0) {
-          const child = pending.shift()!;
-          if (visited.has(child.id)) continue;
-          visited.add(child.id);
-          // Os filtros continuam valendo; somente o texto da busca é ignorado
-          // para a equipe que está abaixo da pessoa encontrada.
-          if (matchesStatus(child) && matchesTipo(child)) visible.add(child.id);
-          pending.push(...(childrenByParent.get(child.id) || []));
-        }
-      });
     }
     return visible;
   }, [pessoas, escopo, escopoTab, search, statusFilter, tipoFilter, pessoaById]);
@@ -1242,13 +1216,16 @@ export default function Eleicao() {
   // o filtro "Avulsos" mantinha os lideres e escondia todos os seus cabos.
   const treeEscopoList = useMemo(() => {
     const pessoasDoEscopo = pessoas.filter((p) => escopoTab === "geral" || p.escopo === escopo);
+    if (search.trim()) {
+      return pessoasDoEscopo.filter((p) => visibleIds.has(p.id));
+    }
     const idsDaArvore = incluirDescendentesDaArvore(
       pessoasDoEscopo,
       visibleIds,
       (p) => statusFilter === "arquivados" || !p.arquivado_em,
     );
     return pessoasDoEscopo.filter((p) => idsDaArvore.has(p.id));
-  }, [pessoas, escopo, escopoTab, visibleIds, statusFilter]);
+  }, [pessoas, escopo, escopoTab, visibleIds, statusFilter, search]);
 
   // Ids que realmente correspondem à busca (sem contar ancestrais visíveis por contexto).
   const matchedIds = useMemo(() => {
