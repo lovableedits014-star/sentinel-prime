@@ -361,6 +361,9 @@ const EleicaoActionsContext = React.createContext<EleicaoActions | null>(null);
 type EleicaoSearchCtx = {
   searchActive: boolean;
   matchedIds: Set<string>;
+  expandedTeamIds: Set<string>;
+  descendantCountById: Map<string, number>;
+  toggleSearchTeam: (id: string) => void;
   nameById: Map<string, string>;
   tipoById: Map<string, Tipo>;
   parentById: Map<string, string | null>;
@@ -368,6 +371,9 @@ type EleicaoSearchCtx = {
 const EleicaoSearchContext = React.createContext<EleicaoSearchCtx>({
   searchActive: false,
   matchedIds: new Set(),
+  expandedTeamIds: new Set(),
+  descendantCountById: new Map(),
+  toggleSearchTeam: () => undefined,
   nameById: new Map(),
   tipoById: new Map(),
   parentById: new Map(),
@@ -378,11 +384,16 @@ export default function Eleicao() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [expandedSearchTeamIds, setExpandedSearchTeamIds] = useState<Set<string>>(new Set());
   const [escopo, setEscopo] = useState<Escopo>("campo_grande");
   const [escopoTab, setEscopoTab] = useState<EscopoTab>("geral");
   const [regiaoFilter, setRegiaoFilter] = useState<Regiao | "all">("all");
   const { regioes: REGIOES } = useRegioesEleicao(clientId || undefined);
   const { parceirosAtivos: PARCEIROS } = useCandidatosParceiros(clientId || undefined);
+
+  useEffect(() => {
+    setExpandedSearchTeamIds(new Set());
+  }, [search]);
 
   // dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1217,7 +1228,14 @@ export default function Eleicao() {
   const treeEscopoList = useMemo(() => {
     const pessoasDoEscopo = pessoas.filter((p) => escopoTab === "geral" || p.escopo === escopo);
     if (search.trim()) {
-      return pessoasDoEscopo.filter((p) => visibleIds.has(p.id));
+      const descendentesAbertos = incluirDescendentesDaArvore(
+        pessoasDoEscopo,
+        expandedSearchTeamIds,
+        (p) => statusFilter === "arquivados" || !p.arquivado_em,
+      );
+      return pessoasDoEscopo.filter(
+        (p) => visibleIds.has(p.id) || descendentesAbertos.has(p.id),
+      );
     }
     const idsDaArvore = incluirDescendentesDaArvore(
       pessoasDoEscopo,
@@ -1225,7 +1243,7 @@ export default function Eleicao() {
       (p) => statusFilter === "arquivados" || !p.arquivado_em,
     );
     return pessoasDoEscopo.filter((p) => idsDaArvore.has(p.id));
-  }, [pessoas, escopo, escopoTab, visibleIds, statusFilter, search]);
+  }, [pessoas, escopo, escopoTab, visibleIds, statusFilter, search, expandedSearchTeamIds]);
 
   // Ids que realmente correspondem à busca (sem contar ancestrais visíveis por contexto).
   const matchedIds = useMemo(() => {
@@ -1252,8 +1270,44 @@ export default function Eleicao() {
       tipoById.set(p.id, p.tipo);
       parentById.set(p.id, p.parent_id || null);
     });
-    return { searchActive: !!search, matchedIds, nameById, tipoById, parentById };
-  }, [pessoas, search, matchedIds]);
+    const filhosPorPai = new Map<string, string[]>();
+    pessoas.forEach((p) => {
+      if (!p.parent_id || p.arquivado_em) return;
+      const filhos = filhosPorPai.get(p.parent_id) || [];
+      filhos.push(p.id);
+      filhosPorPai.set(p.parent_id, filhos);
+    });
+    const descendantCountById = new Map<string, number>();
+    pessoas.forEach((p) => {
+      const pendentes = [...(filhosPorPai.get(p.id) || [])];
+      const visitados = new Set<string>();
+      while (pendentes.length > 0) {
+        const id = pendentes.shift()!;
+        if (visitados.has(id)) continue;
+        visitados.add(id);
+        pendentes.push(...(filhosPorPai.get(id) || []));
+      }
+      descendantCountById.set(p.id, visitados.size);
+    });
+    const toggleSearchTeam = (id: string) => {
+      setExpandedSearchTeamIds((atuais) => {
+        const proximos = new Set(atuais);
+        if (proximos.has(id)) proximos.delete(id);
+        else proximos.add(id);
+        return proximos;
+      });
+    };
+    return {
+      searchActive: !!search.trim(),
+      matchedIds,
+      expandedTeamIds: expandedSearchTeamIds,
+      descendantCountById,
+      toggleSearchTeam,
+      nameById,
+      tipoById,
+      parentById,
+    };
+  }, [pessoas, search, matchedIds, expandedSearchTeamIds]);
 
   const cgRegioes = useMemo(() => {
     if (escopo !== "campo_grande") return [];
@@ -3948,8 +4002,18 @@ function PessoaRow({
   const onReciboDocumentacao = actions?.onReciboDocumentacao;
   const onNovoLider = actions?.onNovoLider;
   const onNovoCabo = actions?.onNovoCabo;
-  const { searchActive, matchedIds, nameById, tipoById } = React.useContext(EleicaoSearchContext);
+  const {
+    searchActive,
+    matchedIds,
+    expandedTeamIds,
+    descendantCountById,
+    toggleSearchTeam,
+    nameById,
+    tipoById,
+  } = React.useContext(EleicaoSearchContext);
   const isMatch = searchActive && matchedIds.has(p.id);
+  const searchTeamCount = descendantCountById.get(p.id) || 0;
+  const searchTeamExpanded = expandedTeamIds.has(p.id);
   const parentName = p.parent_id ? nameById.get(p.parent_id) : null;
   const parentTipo = p.parent_id ? tipoById.get(p.parent_id) : null;
 
@@ -4162,6 +4226,25 @@ function PessoaRow({
           <Search className="w-2.5 h-2.5" />
           {matchInTeam} na equipe
         </Badge>
+      )}
+      {isMatch && searchTeamCount > 0 && (
+        <Button
+          size="sm"
+          variant={searchTeamExpanded ? "secondary" : "outline"}
+          className="h-7 px-2 text-[11px] gap-1 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSearchTeam(p.id);
+          }}
+          title={
+            searchTeamExpanded
+              ? "Ocultar pessoas abaixo deste cadastro"
+              : "Ver toda a equipe abaixo deste cadastro"
+          }
+        >
+          <Users className="w-3 h-3" />
+          <span>{searchTeamExpanded ? "Ocultar equipe" : `Ver equipe (${searchTeamCount})`}</span>
+        </Button>
       )}
       {bulkAction && (
         <Button
