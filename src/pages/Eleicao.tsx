@@ -131,7 +131,7 @@ import {
 import RaizPagamentoDialog from "@/components/eleicao/RaizPagamentoDialog";
 import RaizDocumentacaoDialog from "@/components/eleicao/RaizDocumentacaoDialog";
 import ContatosRegiaoDialog from "@/components/eleicao/ContatosRegiaoDialog";
-import { particionarPessoasDaArvore } from "@/lib/eleicao-arvore";
+import { incluirDescendentesDaArvore, particionarPessoasDaArvore } from "@/lib/eleicao-arvore";
 
 // ─── Helpers visuais ────────────────────────────────────────────
 const initials = (nome: string) =>
@@ -1234,6 +1234,19 @@ export default function Eleicao() {
     [pessoas, escopo, escopoTab, visibleIds],
   );
 
+  // A lista plana continua obedecendo literalmente aos filtros. Na arvore,
+  // porem, uma raiz selecionada sempre carrega a equipe abaixo dela. Sem isso,
+  // o filtro "Avulsos" mantinha os lideres e escondia todos os seus cabos.
+  const treeEscopoList = useMemo(() => {
+    const pessoasDoEscopo = pessoas.filter((p) => escopoTab === "geral" || p.escopo === escopo);
+    const idsDaArvore = incluirDescendentesDaArvore(
+      pessoasDoEscopo,
+      visibleIds,
+      (p) => statusFilter === "arquivados" || !p.arquivado_em,
+    );
+    return pessoasDoEscopo.filter((p) => idsDaArvore.has(p.id));
+  }, [pessoas, escopo, escopoTab, visibleIds, statusFilter]);
+
   // Ids que realmente correspondem à busca (sem contar ancestrais visíveis por contexto).
   const matchedIds = useMemo(() => {
     if (!search) return new Set<string>();
@@ -2301,7 +2314,7 @@ export default function Eleicao() {
                   />
                 ) : (
                   cgRegioes.map((r) => {
-                    const list = escopoList.filter((p) => p.regiao === r.value);
+                    const list = treeEscopoList.filter((p) => p.regiao === r.value);
                     if (list.length === 0 && regiaoFilter === "all") return null;
                     return (
                       <RegionBlock
@@ -2359,7 +2372,7 @@ export default function Eleicao() {
                     <RegionBlock
                       key={cidade}
                       title={cidade}
-                      pessoas={escopoList.filter((p) => p.cidade === cidade)}
+                      pessoas={treeEscopoList.filter((p) => p.cidade === cidade)}
                       pessoasContatos={pessoas.filter(
                         (p) => p.escopo === "interior" && p.cidade === cidade,
                       )}

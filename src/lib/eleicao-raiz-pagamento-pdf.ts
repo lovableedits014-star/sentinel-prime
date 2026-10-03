@@ -3,6 +3,10 @@ export type PessoaRaizPagamento = {
   tipo: "coordenador" | "lider" | "cabo";
   nome: string;
   telefone?: string | null;
+  endereco?: string | null;
+  rua?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
   cidade?: string | null;
   regiao?: string | null;
   escopo?: "campo_grande" | "interior" | string | null;
@@ -27,6 +31,17 @@ export type ResumoRaizPagamento = {
   pessoas: PessoaRaizPagamento[];
   total: number;
   porNivel: Record<NivelRaizPagamento, number>;
+};
+
+export type FiltrosListaContatos = {
+  niveis: NivelRaizPagamento[];
+  incluirInterior?: boolean;
+  locais?: string[];
+};
+
+export type GrupoListaContatos = {
+  local: string;
+  pessoas: PessoaRaizPagamento[];
 };
 
 export type FaixaPagamento = { quantidade: number; valorUnitario: number; subtotal: number };
@@ -70,6 +85,57 @@ const localPagamento = (pessoa: PessoaRaizPagamento) => {
   if (!local) return "Nao informado";
   return REGIAO_CAMPO_GRANDE_LABELS[local.toLocaleLowerCase("pt-BR")] || local;
 };
+
+const localDaHierarquia = (
+  pessoa: PessoaRaizPagamento,
+  porId: Map<string, PessoaRaizPagamento>,
+) => {
+  let atual: PessoaRaizPagamento | undefined = pessoa;
+  let local = localPagamento(pessoa);
+  const visitados = new Set<string>();
+  while (atual?.parent_id && !visitados.has(atual.parent_id)) {
+    visitados.add(atual.parent_id);
+    atual = porId.get(atual.parent_id);
+    if (atual) local = localPagamento(atual);
+  }
+  return local;
+};
+
+export function resumirListaContatos(
+  pessoas: PessoaRaizPagamento[],
+  filtros: FiltrosListaContatos,
+): GrupoListaContatos[] {
+  const ativos = pessoas.filter(
+    (pessoa) => !pessoa.arquivado_em && (filtros.incluirInterior || pessoa.escopo !== "interior"),
+  );
+  const porId = new Map(ativos.map((pessoa) => [pessoa.id, pessoa]));
+  const niveis = new Set(filtros.niveis);
+  const locais = filtros.locais ? new Set(filtros.locais) : null;
+  const grupos = new Map<string, PessoaRaizPagamento[]>();
+  const ordemNivel: Record<NivelRaizPagamento, number> = { coordenador: 0, lider: 1, cabo: 2 };
+
+  ativos
+    .filter((pessoa) => niveis.has(pessoa.tipo))
+    .forEach((pessoa) => {
+      const local = localDaHierarquia(pessoa, porId);
+      if (locais && !locais.has(local)) return;
+      grupos.set(local, [...(grupos.get(local) || []), pessoa]);
+    });
+
+  return Array.from(grupos, ([local, pessoasDoLocal]) => ({
+    local,
+    pessoas: pessoasDoLocal.sort(
+      (a, b) => ordemNivel[a.tipo] - ordemNivel[b.tipo] || a.nome.localeCompare(b.nome, "pt-BR"),
+    ),
+  })).sort((a, b) => a.local.localeCompare(b.local, "pt-BR"));
+}
+
+export function listarLocaisContatos(pessoas: PessoaRaizPagamento[], incluirInterior = false) {
+  return resumirListaContatos(pessoas, {
+    niveis: ["coordenador", "lider", "cabo"],
+    incluirInterior,
+  }).map((grupo) => grupo.local);
+}
 
 const contratado = (pessoa: PessoaRaizPagamento) =>
   !pessoa.arquivado_em && !pessoa.is_voluntario && Number(pessoa.valor_contratacao || 0) > 0;
@@ -172,17 +238,7 @@ export function resumirPagamentoGeral(
   const ativos = pessoasAtivas.filter((pessoa) => !pessoa.arquivado_em);
   const porId = new Map(ativos.map((pessoa) => [pessoa.id, pessoa]));
   const selecionados = new Set(pessoasSelecionadas.map((pessoa) => pessoa.id));
-  const localDaPessoa = (pessoa: PessoaRaizPagamento) => {
-    let atual: PessoaRaizPagamento | undefined = pessoa;
-    let local = localPagamento(pessoa);
-    const visitados = new Set<string>();
-    while (atual?.parent_id && !visitados.has(atual.parent_id)) {
-      visitados.add(atual.parent_id);
-      atual = porId.get(atual.parent_id);
-      if (atual) local = localPagamento(atual);
-    }
-    return local;
-  };
+  const localDaPessoa = (pessoa: PessoaRaizPagamento) => localDaHierarquia(pessoa, porId);
   const locais = Array.from(new Set(pessoasSelecionadas.map(localDaPessoa))).sort((a, b) =>
     a.localeCompare(b, "pt-BR"),
   );
@@ -280,6 +336,105 @@ const telefone = (value?: string | null) => {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
   return value || "-";
 };
+
+const enderecoCompleto = (pessoa: PessoaRaizPagamento) => {
+  const ruaNumero = [pessoa.rua, pessoa.numero].filter(Boolean).join(", ");
+  return [ruaNumero || pessoa.endereco, pessoa.bairro].filter(Boolean).join(" - ") || "-";
+};
+
+export async function gerarListaContatosPdf(
+  pessoas: PessoaRaizPagamento[],
+  filtros: FiltrosListaContatos,
+) {
+  const grupos = resumirListaContatos(pessoas, filtros);
+  const total = grupos.reduce((soma, grupo) => soma + grupo.pessoas.length, 0);
+  if (!total) throw new Error("Nenhum contato encontrado com os filtros selecionados.");
+
+  const [pdfModule, tableModule] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+  const jsPDF =
+    (pdfModule as any).jsPDF || (pdfModule as any).default?.jsPDF || (pdfModule as any).default;
+  const autoTable = (tableModule as any).default?.default || (tableModule as any).default;
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const margin = 36;
+  const rotulos: Record<NivelRaizPagamento, string> = {
+    coordenador: "Coordenador",
+    lider: "Lider",
+    cabo: "Cabo eleitoral",
+  };
+  const rows: string[][] = [];
+  grupos.forEach((grupo) => {
+    rows.push([`REGIAO / CIDADE: ${grupo.local}`, "", "", ""]);
+    grupo.pessoas.forEach((pessoa) =>
+      rows.push([
+        rotulos[pessoa.tipo],
+        pessoa.nome,
+        telefone(pessoa.telefone),
+        enderecoCompleto(pessoa),
+      ]),
+    );
+  });
+
+  const drawHeader = () => {
+    doc.setFillColor(15, 52, 120);
+    doc.rect(0, 0, width, 70, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(17);
+    doc.text("LISTA DE CONTATOS", margin, 29);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.text(`${total} contato(s) em ${grupos.length} regiao(oes) / cidade(s)`, margin, 49);
+    doc.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, width - margin, 49, {
+      align: "right",
+    });
+  };
+  drawHeader();
+
+  autoTable(doc, {
+    startY: 88,
+    margin: { top: 86, left: margin, right: margin, bottom: 32 },
+    head: [["CARGO", "NOME", "TELEFONE", "ENDERECO"]],
+    body: rows,
+    theme: "grid",
+    showHead: "everyPage",
+    styles: {
+      font: "helvetica",
+      fontSize: 8.5,
+      cellPadding: 5,
+      lineColor: [203, 213, 225],
+      lineWidth: 0.5,
+      valign: "middle",
+      overflow: "linebreak",
+    },
+    headStyles: { fillColor: [226, 232, 240], textColor: [15, 23, 42], fontStyle: "bold" },
+    columnStyles: {
+      0: { cellWidth: 90, fontStyle: "bold" },
+      1: { cellWidth: 190 },
+      2: { cellWidth: 105 },
+      3: { cellWidth: 344 },
+    },
+    didParseCell: (data: any) => {
+      const primeiraColuna = String(data.row.raw?.[0] || "");
+      if (data.section === "body" && primeiraColuna.startsWith("REGIAO / CIDADE:")) {
+        data.cell.styles.fillColor = [15, 52, 120];
+        data.cell.styles.textColor = [255, 255, 255];
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
+    didDrawPage: (data: any) => {
+      if (data.pageNumber > 1) drawHeader();
+      doc.setTextColor(100, 116, 139);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text(`Pagina ${data.pageNumber}`, width - margin, height - 15, { align: "right" });
+    },
+  });
+
+  doc.save("Lista-de-contatos-por-regiao.pdf");
+  return { contatos: total, regioes: grupos.length };
+}
 
 export async function gerarRaizPagamentoPdf(
   raiz: PessoaRaizPagamento,

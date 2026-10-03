@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { particionarPessoasDaArvore, type PessoaArvore } from "./eleicao-arvore";
+import {
+  incluirDescendentesDaArvore,
+  particionarPessoasDaArvore,
+  type PessoaArvore,
+} from "./eleicao-arvore";
 
 const pessoa = (
   id: string,
@@ -47,5 +51,51 @@ describe("particionarPessoasDaArvore", () => {
     expect(resultado.cabosRaiz).toHaveLength(1);
     expect(resultado.idsRenderizados.size).toBe(pessoas.length);
     expect(resultado.idsOmitidos).toEqual([]);
+  });
+});
+
+describe("incluirDescendentesDaArvore", () => {
+  it("preserva toda a equipe quando o filtro seleciona somente o lider avulso", () => {
+    const pessoas = [
+      pessoa("lider", "lider"),
+      pessoa("cabo-1", "cabo", "lider"),
+      pessoa("cabo-2", "cabo", "lider"),
+    ];
+
+    expect([...incluirDescendentesDaArvore(pessoas, ["lider"])]).toEqual([
+      "lider",
+      "cabo-1",
+      "cabo-2",
+    ]);
+  });
+
+  it("percorre coordenador, lider e cabo sem entrar em ciclo", () => {
+    const pessoas = [
+      pessoa("coord", "coordenador"),
+      pessoa("lider", "lider", "coord"),
+      pessoa("cabo", "cabo", "lider"),
+      pessoa("ciclo", "cabo", "ciclo"),
+    ];
+
+    expect([...incluirDescendentesDaArvore(pessoas, ["coord"])]).toEqual([
+      "coord",
+      "lider",
+      "cabo",
+    ]);
+  });
+
+  it("respeita a regra de inclusao de registros arquivados", () => {
+    const pessoas = [
+      pessoa("lider", "lider"),
+      { ...pessoa("cabo-ativo", "cabo", "lider"), arquivado: false },
+      { ...pessoa("cabo-arquivado", "cabo", "lider"), arquivado: true },
+    ];
+
+    const ids = incluirDescendentesDaArvore(
+      pessoas,
+      ["lider"],
+      (registro) => !(registro as PessoaArvore & { arquivado?: boolean }).arquivado,
+    );
+    expect([...ids]).toEqual(["lider", "cabo-ativo"]);
   });
 });

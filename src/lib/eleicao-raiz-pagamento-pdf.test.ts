@@ -1,11 +1,52 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  listarLocaisContatos,
   listarValoresRaizPagamento,
   resumirPagamentoGeral,
+  resumirListaContatos,
   resumirRaizPagamento,
   type PessoaRaizPagamento,
 } from "./eleicao-raiz-pagamento-pdf";
+
+describe("lista geral de contatos", () => {
+  const contatos: PessoaRaizPagamento[] = [
+    { id: "c", tipo: "coordenador", nome: "Coord", escopo: "campo_grande", regiao: "prosa" },
+    {
+      id: "l",
+      tipo: "lider",
+      nome: "Lider",
+      parent_id: "c",
+      escopo: "campo_grande",
+      regiao: "prosa",
+    },
+    {
+      id: "cb",
+      tipo: "cabo",
+      nome: "Cabo sem contrato",
+      parent_id: "l",
+      escopo: "campo_grande",
+      regiao: "prosa",
+      valor_contratacao: null,
+    },
+    { id: "i", tipo: "cabo", nome: "Interior", escopo: "interior", cidade: "Dourados" },
+  ];
+
+  it("inclui ativos sem contrato e filtra pelos cargos escolhidos", () => {
+    const grupos = resumirListaContatos(contatos, {
+      niveis: ["lider", "cabo"],
+      incluirInterior: false,
+      locais: ["Prosa"],
+    });
+
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].pessoas.map((pessoa) => pessoa.id)).toEqual(["l", "cb"]);
+  });
+
+  it("lista regioes urbanas e cidades do interior separadamente", () => {
+    expect(listarLocaisContatos(contatos, true)).toEqual(["Dourados", "Prosa"]);
+  });
+});
 
 const pessoas: PessoaRaizPagamento[] = [
   { id: "coord", tipo: "coordenador", nome: "Coord", valor_contratacao: 150 },

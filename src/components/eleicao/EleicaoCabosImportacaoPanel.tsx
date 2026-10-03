@@ -141,15 +141,30 @@ type ImportLot = {
 
 type Analysis = { lote: ImportLot; itens: ImportItem[] };
 type ManagedContract = {
-  item_id: number; numero_linha: number; classificacao: string; motivo: string | null;
-  nome_importado: string | null; cpf_importado: string | null; telefone_importado: string | null;
-  pessoa_id: string | null; nome: string | null; cpf: string | null; telefone: string | null;
-  valor: number | null; contrato_inicio: string | null; contrato_fim: string | null;
-  responsavel_id: string | null; responsavel_nome: string | null; arquivado_em: string | null;
-  pertence_ao_lote: boolean; lote_contrato_nome: string | null;
-  conflito_pessoa_id?: string | null; conflito_nome?: string | null;
+  item_id: number;
+  numero_linha: number;
+  classificacao: string;
+  motivo: string | null;
+  nome_importado: string | null;
+  cpf_importado: string | null;
+  telefone_importado: string | null;
+  pessoa_id: string | null;
+  nome: string | null;
+  cpf: string | null;
+  telefone: string | null;
+  valor: number | null;
+  contrato_inicio: string | null;
+  contrato_fim: string | null;
+  responsavel_id: string | null;
+  responsavel_nome: string | null;
+  arquivado_em: string | null;
+  pertence_ao_lote: boolean;
+  lote_contrato_nome: string | null;
+  conflito_pessoa_id?: string | null;
+  conflito_nome?: string | null;
   conflito_tipo?: string | null;
-  conflito_telefone?: string | null; conflito_cpf?: string | null;
+  conflito_telefone?: string | null;
+  conflito_cpf?: string | null;
   conflito_responsavel?: string | null;
   conflito_responsavel_tipo?: string | null;
   repetido_no_arquivo?: {
@@ -225,8 +240,16 @@ type QuickParentForm = {
   coordenadorId: string;
 };
 type IndividualCaboForm = {
-  nome: string; cpf: string; telefone: string; endereco: string; bairro: string;
-  valor: string; parentId: string; inicio: string; fim: string; autorizarSemTelefone: boolean;
+  nome: string;
+  cpf: string;
+  telefone: string;
+  endereco: string;
+  bairro: string;
+  valor: string;
+  parentId: string;
+  inicio: string;
+  fim: string;
+  autorizarSemTelefone: boolean;
 };
 
 // As tabelas/RPCs passam a integrar os tipos gerados depois que a migration for aplicada.
@@ -255,9 +278,8 @@ const canApproveSharedPhone = (item: ManagedContract) => {
 
   const repetido = item.repetido_no_arquivo;
   const mesmoTelefone = digits(repetido.telefone) === digits(item.telefone_importado);
-  const mesmoCpf = !!item.cpf_importado &&
-    !!repetido.cpf &&
-    digits(repetido.cpf) === digits(item.cpf_importado);
+  const mesmoCpf =
+    !!item.cpf_importado && !!repetido.cpf && digits(repetido.cpf) === digits(item.cpf_importado);
   const mesmaPessoa = key(repetido.nome || "") === key(item.nome_importado || "");
   return mesmoTelefone && !mesmoCpf && !mesmaPessoa;
 };
@@ -345,6 +367,10 @@ export default function EleicaoCabosImportacaoPanel({
   onChanged: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const importRef = useRef<HTMLDivElement>(null);
+  const refusedRef = useRef<HTMLDivElement>(null);
+  const conflictsRef = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
   const { regioes } = useRegioesEleicao(clientId);
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
@@ -374,13 +400,27 @@ export default function EleicaoCabosImportacaoPanel({
   const [allowMissingPhone, setAllowMissingPhone] = useState(false);
   const [individualOpen, setIndividualOpen] = useState(false);
   const [individual, setIndividual] = useState<IndividualCaboForm>({
-    nome: "", cpf: "", telefone: "", endereco: "", bairro: "", valor: "",
-    parentId: "", inicio: format(new Date(), "yyyy-MM-dd"), fim: "", autorizarSemTelefone: false,
+    nome: "",
+    cpf: "",
+    telefone: "",
+    endereco: "",
+    bairro: "",
+    valor: "",
+    parentId: "",
+    inicio: format(new Date(), "yyyy-MM-dd"),
+    fim: "",
+    autorizarSemTelefone: false,
   });
   const [quickParentOpen, setQuickParentOpen] = useState(false);
   const [quickParent, setQuickParent] = useState<QuickParentForm>({
-    tipo: "lider", nome: "", telefone: "", valor: "", escopo: "campo_grande",
-    regiao: "", cidade: "", coordenadorId: "",
+    tipo: "lider",
+    nome: "",
+    telefone: "",
+    valor: "",
+    escopo: "campo_grande",
+    regiao: "",
+    cidade: "",
+    coordenadorId: "",
   });
 
   const loadBase = async () => {
@@ -481,12 +521,14 @@ export default function EleicaoCabosImportacaoPanel({
     const nome = quickParent.nome.trim();
     const telefone = digits(quickParent.telefone);
     const valorContratacao = Number(quickParent.valor.replace(/\./g, "").replace(",", "."));
-    const coordenador = quickParent.tipo === "lider"
-      ? coordenadores.find((item) => item.id === quickParent.coordenadorId) || null
-      : null;
+    const coordenador =
+      quickParent.tipo === "lider"
+        ? coordenadores.find((item) => item.id === quickParent.coordenadorId) || null
+        : null;
     const escopo = coordenador?.escopo || quickParent.escopo;
     const regiao = coordenador?.regiao || (escopo === "campo_grande" ? quickParent.regiao : null);
-    const cidade = coordenador?.cidade || (escopo === "interior" ? quickParent.cidade.trim() : "Campo Grande");
+    const cidade =
+      coordenador?.cidade || (escopo === "interior" ? quickParent.cidade.trim() : "Campo Grande");
 
     if (!nome || telefone.length < 10) return toast.error("Informe nome e telefone válido.");
     if (!Number.isFinite(valorContratacao) || valorContratacao <= 0)
@@ -496,29 +538,35 @@ export default function EleicaoCabosImportacaoPanel({
 
     setBusy(true);
     try {
-      const { data, error } = await db.from("eleicao_pessoas").insert({
-        client_id: clientId,
-        tipo: quickParent.tipo,
-        escopo,
-        regiao: escopo === "campo_grande" ? regiao : null,
-        cidade,
-        nome,
-        telefone,
-        endereco: "Não informado",
-        parent_id: quickParent.tipo === "lider" ? coordenador?.id || null : null,
-        valor_contratacao: valorContratacao,
-        is_voluntario: false,
-        status_contratacao: "confirmado",
-        confirmado_em: new Date().toISOString(),
-        vigencia_inicio: start || null,
-        vigencia_fim: end || null,
-        contrato_inicio: start || null,
-        contrato_fim: end || null,
-      }).select("id,nome,tipo,escopo,regiao,cidade").single();
+      const { data, error } = await db
+        .from("eleicao_pessoas")
+        .insert({
+          client_id: clientId,
+          tipo: quickParent.tipo,
+          escopo,
+          regiao: escopo === "campo_grande" ? regiao : null,
+          cidade,
+          nome,
+          telefone,
+          endereco: "Não informado",
+          parent_id: quickParent.tipo === "lider" ? coordenador?.id || null : null,
+          valor_contratacao: valorContratacao,
+          is_voluntario: false,
+          status_contratacao: "confirmado",
+          confirmado_em: new Date().toISOString(),
+          vigencia_inicio: start || null,
+          vigencia_fim: end || null,
+          contrato_inicio: start || null,
+          contrato_fim: end || null,
+        })
+        .select("id,nome,tipo,escopo,regiao,cidade")
+        .single();
       if (error) throw error;
       const novo = data as Parent;
       setParents((current) => [...current, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
-      setHistoryParents((current) => [...current, novo].sort((a, b) => a.nome.localeCompare(b.nome)));
+      setHistoryParents((current) =>
+        [...current, novo].sort((a, b) => a.nome.localeCompare(b.nome)),
+      );
       setParentId(novo.id);
       setQuickParentOpen(false);
       onChanged();
@@ -591,11 +639,14 @@ export default function EleicaoCabosImportacaoPanel({
   const archiveDuplicateCases = async (ids: number[]) => {
     if (!ids.length || busy) return;
     const quantidade = ids.length;
-    if (!window.confirm(
-      quantidade === 1
-        ? "Arquivar este caso já conferido? Ele sairá da Central, mas continuará registrado no histórico da importação."
-        : `Arquivar os ${quantidade} casos selecionados? Eles sairão da Central, mas continuarão registrados no histórico das importações.`,
-    )) return;
+    if (
+      !window.confirm(
+        quantidade === 1
+          ? "Arquivar este caso já conferido? Ele sairá da Central, mas continuará registrado no histórico da importação."
+          : `Arquivar os ${quantidade} casos selecionados? Eles sairão da Central, mas continuarão registrados no histórico das importações.`,
+      )
+    )
+      return;
 
     setBusy(true);
     try {
@@ -702,7 +753,10 @@ export default function EleicaoCabosImportacaoPanel({
       return toast.error("O responsável selecionado não possui cidade cadastrada.");
     setBusy(true);
     try {
-      const { data, error } = await db.rpc("eleicao_cabo_import_analisar_excepcional", analyzeParams());
+      const { data, error } = await db.rpc(
+        "eleicao_cabo_import_analisar_excepcional",
+        analyzeParams(),
+      );
       if (error) throw error;
       const preview = data as Analysis;
       const { error: discardError } = await db.rpc("eleicao_cabo_import_descartar", {
@@ -757,8 +811,16 @@ export default function EleicaoCabosImportacaoPanel({
 
   const openIndividual = () => {
     setIndividual({
-      nome: "", cpf: "", telefone: "", endereco: "", bairro: "", valor: value,
-      parentId, inicio: start, fim: end, autorizarSemTelefone: false,
+      nome: "",
+      cpf: "",
+      telefone: "",
+      endereco: "",
+      bairro: "",
+      valor: value,
+      parentId,
+      inicio: start,
+      fim: end,
+      autorizarSemTelefone: false,
     });
     setIndividualOpen(true);
   };
@@ -771,7 +833,8 @@ export default function EleicaoCabosImportacaoPanel({
     if (!individual.nome.trim()) return toast.error("Informe o nome do cabo.");
     if (!parent) return toast.error("Selecione o responsável.");
     if (!unitValue || unitValue <= 0) return toast.error("Informe um valor maior que zero.");
-    if (telefone && telefone.length < 10) return toast.error("Informe um telefone com DDD ou deixe-o vazio.");
+    if (telefone && telefone.length < 10)
+      return toast.error("Informe um telefone com DDD ou deixe-o vazio.");
     if (!telefone && !individual.autorizarSemTelefone)
       return toast.error("Marque a autorização para cadastrar sem telefone.");
     if (cpf && cpf.length !== 11) return toast.error("O CPF deve possuir 11 dígitos.");
@@ -792,10 +855,15 @@ export default function EleicaoCabosImportacaoPanel({
           p_escopo: parent.escopo,
           p_regiao: parent.escopo === "campo_grande" ? parent.regiao : null,
           p_cidade: parent.escopo === "interior" ? parent.cidade : null,
-          p_linhas: [{
-            nome: individual.nome.trim(), cpf, telefone,
-            endereco: individual.endereco.trim(), bairro: individual.bairro.trim(),
-          }],
+          p_linhas: [
+            {
+              nome: individual.nome.trim(),
+              cpf,
+              telefone,
+              endereco: individual.endereco.trim(),
+              bairro: individual.bairro.trim(),
+            },
+          ],
           p_permitir_sem_telefone: individual.autorizarSemTelefone,
         },
       );
@@ -804,7 +872,9 @@ export default function EleicaoCabosImportacaoPanel({
       const item = (preview as Analysis).itens[0];
       if (!item || !["elegivel", "cadastro_sem_contrato"].includes(item.classificacao))
         throw new Error(item?.motivo || "O cadastro não passou pela validação.");
-      const { error: confirmError } = await db.rpc("eleicao_cabo_import_confirmar_excepcional", { p_lote_id: loteId });
+      const { error: confirmError } = await db.rpc("eleicao_cabo_import_confirmar_excepcional", {
+        p_lote_id: loteId,
+      });
       if (confirmError) throw confirmError;
       loteId = null;
       setIndividualOpen(false);
@@ -906,7 +976,9 @@ export default function EleicaoCabosImportacaoPanel({
       setExceptionReason("");
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Não foi possível carregar os contratos do lote."));
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const startInvalidCorrection = (item: ManagedContract) => {
@@ -928,11 +1000,14 @@ export default function EleicaoCabosImportacaoPanel({
     if (!invalidCorrection.autorizarSemTelefone && phone.length < 10) {
       return toast.error("Informe um telefone com DDD ou autorize o cadastro sem telefone.");
     }
-    if (!window.confirm(
-      invalidCorrection.autorizarSemTelefone
-        ? `Autorizar a contratação de ${invalidCorrection.nome} sem telefone? A exceção ficará auditada.`
-        : `Salvar os dados corrigidos e contratar ${invalidCorrection.nome}?`,
-    )) return;
+    if (
+      !window.confirm(
+        invalidCorrection.autorizarSemTelefone
+          ? `Autorizar a contratação de ${invalidCorrection.nome} sem telefone? A exceção ficará auditada.`
+          : `Salvar os dados corrigidos e contratar ${invalidCorrection.nome}?`,
+      )
+    )
+      return;
 
     setBusy(true);
     try {
@@ -968,11 +1043,15 @@ export default function EleicaoCabosImportacaoPanel({
     setBusy(true);
     try {
       const { data, error } = await db.rpc("eleicao_cabo_import_editar_contrato", {
-        p_lote_id: managedLot, p_item_id: contractEdit.item_id,
-        p_nome: contractEdit.nome, p_cpf: contractEdit.cpf || null,
-        p_telefone: contractEdit.telefone, p_valor: valorContrato,
+        p_lote_id: managedLot,
+        p_item_id: contractEdit.item_id,
+        p_nome: contractEdit.nome,
+        p_cpf: contractEdit.cpf || null,
+        p_telefone: contractEdit.telefone,
+        p_valor: valorContrato,
         p_parent_id: contractEdit.responsavel_id,
-        p_inicio: contractEdit.contrato_inicio, p_fim: contractEdit.contrato_fim || null,
+        p_inicio: contractEdit.contrato_inicio,
+        p_fim: contractEdit.contrato_fim || null,
         p_ativo: contractEdit.ativo,
       });
       if (error) throw error;
@@ -984,46 +1063,74 @@ export default function EleicaoCabosImportacaoPanel({
       toast.success(contractEdit.ativo ? "Contrato salvo e ativo." : "Contrato arquivado.");
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Não foi possível salvar o contrato."));
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const archiveManagedLot = async () => {
-    if (!managedLot || !window.confirm("Excluir todos os contratos deste lote? Eles serão arquivados e poderão ser reativados individualmente. As linhas da importação continuarão no histórico.")) return;
+    if (
+      !managedLot ||
+      !window.confirm(
+        "Excluir todos os contratos deste lote? Eles serão arquivados e poderão ser reativados individualmente. As linhas da importação continuarão no histórico.",
+      )
+    )
+      return;
     setBusy(true);
     try {
-      const { data, error } = await db.rpc("eleicao_cabo_import_arquivar_todos", { p_lote_id: managedLot });
+      const { data, error } = await db.rpc("eleicao_cabo_import_arquivar_todos", {
+        p_lote_id: managedLot,
+      });
       if (error) throw error;
       await Promise.all([loadManagedContracts(managedLot), loadBase()]);
       onChanged();
       toast.success(`${Number(data?.arquivados || 0)} contrato(s) arquivado(s).`);
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Não foi possível excluir os contratos do lote."));
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const approveSharedPhone = async (item: ManagedContract) => {
-    if (!managedLot || !exceptionReason.trim()) return toast.error("Informe por que o telefone pode ser compartilhado.");
-    if (!window.confirm(`Validar o contrato de ${item.nome_importado || item.nome} mesmo usando o telefone de ${item.conflito_nome || "outra pessoa"}? Esta exceção ficará registrada.`)) return;
+    if (!managedLot || !exceptionReason.trim())
+      return toast.error("Informe por que o telefone pode ser compartilhado.");
+    if (
+      !window.confirm(
+        `Validar o contrato de ${item.nome_importado || item.nome} mesmo usando o telefone de ${item.conflito_nome || "outra pessoa"}? Esta exceção ficará registrada.`,
+      )
+    )
+      return;
     setBusy(true);
     try {
       const { error } = await db.rpc("eleicao_cabo_import_aprovar_telefone_compartilhado", {
-        p_lote_id: managedLot, p_item_id: item.item_id, p_motivo: exceptionReason.trim(),
+        p_lote_id: managedLot,
+        p_item_id: item.item_id,
+        p_motivo: exceptionReason.trim(),
       });
       if (error) throw error;
-      setExpandedOccurrence(null); setExceptionReason("");
+      setExpandedOccurrence(null);
+      setExceptionReason("");
       await Promise.all([loadManagedContracts(managedLot), loadBase()]);
-      onChanged(); toast.success("Contrato validado com telefone compartilhado.");
+      onChanged();
+      toast.success("Contrato validado com telefone compartilhado.");
     } catch (error: unknown) {
       const message = errorMessage(error, "Não foi possível validar a exceção.");
-      if (message.includes("CPF ou telefone duplicado") || message.includes("Telefone ja cadastrado")) {
+      if (
+        message.includes("CPF ou telefone duplicado") ||
+        message.includes("Telefone ja cadastrado")
+      ) {
         toast.error("A atualização de telefone compartilhado ainda não foi aplicada no banco.", {
-          description: "Aplique a migration 20260924210000 e tente novamente. O cadastro continua protegido até essa atualização.",
+          description:
+            "Aplique a migration 20260924210000 e tente novamente. O cadastro continua protegido até essa atualização.",
           duration: 9000,
         });
       } else {
         toast.error(message);
       }
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const resolveActiveDuplicate = async (group: DuplicateGroup, keep: DuplicatePerson) => {
@@ -1074,118 +1181,165 @@ export default function EleicaoCabosImportacaoPanel({
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Importar cabos eleitorais</CardTitle>
-            <Button type="button" variant="outline" onClick={openIndividual}>
-              <Plus className="mr-2 h-4 w-4" />Cadastrar cabo individual
+    <div className="min-w-0 space-y-4">
+      <div className="sticky top-2 z-20 overflow-x-auto rounded-lg border bg-background/95 p-2 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
+        <div className="flex min-w-max items-center gap-2">
+          <span className="px-2 text-xs font-medium text-muted-foreground">Ir para:</span>
+          {[
+            ["Nova importacao", importRef],
+            [`Recusados (${duplicateCases.length})`, refusedRef],
+            [`Conflitos (${activeContractDuplicates.length})`, conflictsRef],
+            [`Historico (${activeHistory.length})`, historyRef],
+          ].map(([label, ref]) => (
+            <Button
+              key={String(label)}
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                (ref as React.RefObject<HTMLDivElement>).current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                })
+              }
+            >
+              {String(label)}
             </Button>
-          </div>
-          <CardDescription>
-            Envie Excel ou CSV, defina o valor e confira duplicados antes de alterar a previsão de
-            custos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-1">
-              <Label>Nome da importação</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ex.: Cabos Região Lagoa"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Valor por cabo</Label>
-              <Input
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                inputMode="decimal"
-                placeholder="500,00"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Início</Label>
-              <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Término (opcional)</Label>
-              <Input type="date" min={start} value={end} onChange={(e) => setEnd(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Responsável padrão</Label>
-              <Select value={parentId} onValueChange={setParentId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um líder ou coordenador" />
-                </SelectTrigger>
-                <SelectContent>
-                  {parents.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nome} · {p.tipo}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button type="button" variant="link" className="h-auto px-0 py-1" onClick={openQuickParent}>
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                Cadastrar líder ou coordenador
+          ))}
+        </div>
+      </div>
+
+      <div ref={importRef} className="scroll-mt-20">
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>Importar cabos eleitorais</CardTitle>
+              <Button type="button" variant="outline" onClick={openIndividual}>
+                <Plus className="mr-2 h-4 w-4" />
+                Cadastrar cabo individual
               </Button>
             </div>
-            <div className="space-y-1">
-              <Label>Local herdado do responsável</Label>
-              <div className="flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm">
-                {selectedParent
-                  ? selectedParent.escopo === "interior"
-                    ? selectedParent.cidade || "Cidade não cadastrada"
-                    : `Campo Grande · ${selectedParent.regiao || "região não cadastrada"}`
-                  : "Selecione o responsável"}
+            <CardDescription>
+              Envie Excel ou CSV, defina o valor e confira duplicados antes de alterar a previsão de
+              custos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1">
+                <Label>Nome da importação</Label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ex.: Cabos Região Lagoa"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Valor por cabo</Label>
+                <Input
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="500,00"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Início</Label>
+                <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Término (opcional)</Label>
+                <Input
+                  type="date"
+                  min={start}
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Responsável padrão</Label>
+                <Select value={parentId} onValueChange={setParentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um líder ou coordenador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {parents.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome} · {p.tipo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto px-0 py-1"
+                  onClick={openQuickParent}
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  Cadastrar líder ou coordenador
+                </Button>
+              </div>
+              <div className="space-y-1">
+                <Label>Local herdado do responsável</Label>
+                <div className="flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm">
+                  {selectedParent
+                    ? selectedParent.escopo === "interior"
+                      ? selectedParent.cidade || "Cidade não cadastrada"
+                      : `Campo Grande · ${selectedParent.regiao || "região não cadastrada"}`
+                    : "Selecione o responsável"}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Planilha</Label>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={(e) => e.target.files?.[0] && void readFile(e.target.files[0])}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => inputRef.current?.click()}
+                  disabled={busy}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {file ? file.name : "Selecionar Excel ou CSV"}
+                </Button>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>Planilha</Label>
-              <input
-                ref={inputRef}
-                type="file"
-                className="hidden"
-                accept=".xlsx,.xls,.csv"
-                onChange={(e) => e.target.files?.[0] && void readFile(e.target.files[0])}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => inputRef.current?.click()}
-                disabled={busy}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {file ? file.name : "Selecionar Excel ou CSV"}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+              <div className="space-y-2">
+                <span className="block">
+                  Obrigatórios: nome e telefone/celular/WhatsApp. Opcionais: CPF e endereço. A
+                  localização será herdada do responsável.
+                </span>
+                <label className="flex max-w-3xl items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-foreground dark:bg-amber-950/20">
+                  <Checkbox
+                    checked={allowMissingPhone}
+                    onCheckedChange={(checked) => setAllowMissingPhone(checked === true)}
+                  />
+                  <span>
+                    <strong>Autorizar cabos sem telefone nesta lista.</strong> A exceção ficará
+                    registrada individualmente na auditoria.
+                  </span>
+                </label>
+              </div>
+              <Button onClick={analyze} disabled={busy || !rows.length}>
+                {busy ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                )}
+                Analisar {rows.length || ""} registros
               </Button>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-            <div className="space-y-2">
-              <span className="block">
-                Obrigatórios: nome e telefone/celular/WhatsApp. Opcionais: CPF e endereço. A localização será herdada do responsável.
-              </span>
-              <label className="flex max-w-3xl items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-foreground dark:bg-amber-950/20">
-                <Checkbox checked={allowMissingPhone} onCheckedChange={(checked) => setAllowMissingPhone(checked === true)} />
-                <span><strong>Autorizar cabos sem telefone nesta lista.</strong> A exceção ficará registrada individualmente na auditoria.</span>
-              </label>
-            </div>
-            <Button onClick={analyze} disabled={busy || !rows.length}>
-              {busy ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="mr-2 h-4 w-4" />
-              )}
-              Analisar {rows.length || ""} registros
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {totals && (
         <Card className="border-primary/30">
@@ -1275,850 +1429,1347 @@ export default function EleicaoCabosImportacaoPanel({
         </Card>
       )}
 
-      <Card className="border-amber-300">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <CardTitle>Central de duplicados recusados</CardTitle>
-              <CardDescription>
-                Somente tentativas recusadas porque o cabo já possuía contrato ativo.
-              </CardDescription>
+      <div ref={refusedRef} className="scroll-mt-20">
+        <Card className="border-amber-300">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>Central de duplicados recusados</CardTitle>
+                <CardDescription>
+                  Somente tentativas recusadas porque o cabo já possuía contrato ativo.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!duplicateCases.length}
+                  onClick={() =>
+                    setSelectedCaseIds(
+                      selectedCaseIds.size === duplicateCases.length
+                        ? new Set()
+                        : new Set(duplicateCases.map((item) => item.id)),
+                    )
+                  }
+                >
+                  {selectedCaseIds.size === duplicateCases.length
+                    ? "Limpar seleção"
+                    : "Selecionar todos"}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!selectedCases.length}
+                  onClick={() => void gerarRelatorioCasosRecusadosPdf(selectedCases)}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Gerar relatório ({selectedCases.length})
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!selectedCases.length || busy}
+                  onClick={() => void archiveDuplicateCases(selectedCases.map((item) => item.id))}
+                >
+                  {busy ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Archive className="mr-2 h-4 w-4" />
+                  )}
+                  Arquivar selecionados ({selectedCases.length})
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!duplicateCases.length}
-                onClick={() =>
-                  setSelectedCaseIds(
-                    selectedCaseIds.size === duplicateCases.length
-                      ? new Set()
-                      : new Set(duplicateCases.map((item) => item.id)),
-                  )
-                }
-              >
-                {selectedCaseIds.size === duplicateCases.length
-                  ? "Limpar seleção"
-                  : "Selecionar todos"}
-              </Button>
-              <Button
-                size="sm"
-                disabled={!selectedCases.length}
-                onClick={() => void gerarRelatorioCasosRecusadosPdf(selectedCases)}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Gerar relatório ({selectedCases.length})
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!selectedCases.length || busy}
-                onClick={() => void archiveDuplicateCases(selectedCases.map((item) => item.id))}
-              >
-                {busy ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Archive className="mr-2 h-4 w-4" />
-                )}
-                Arquivar selecionados ({selectedCases.length})
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {!duplicateCases.length ? (
-            <div className="flex items-center gap-2 text-sm text-emerald-700">
-              <CheckCircle2 className="h-4 w-4" />
-              Nenhuma tentativa recusada por contrato ativo.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {duplicateCases.map((item) => (
-                <div key={item.id} className="flex items-start gap-3 rounded-lg border p-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-4 w-4"
-                    checked={selectedCaseIds.has(item.id)}
-                    onChange={() => toggleCase(item.id)}
-                    aria-label={`Selecionar caso de ${item.nome_tentativa || "cabo"}`}
-                  />
-                  <details className="min-w-0 flex-1">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="font-semibold">{item.nome_tentativa || "Sem nome"}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Tentativa para {item.responsavel_tentativa_nome || "sem responsável"} •{" "}
-                            {format(new Date(item.data_tentativa), "dd/MM/yyyy HH:mm")}
+          </CardHeader>
+          <CardContent>
+            {!duplicateCases.length ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" />
+                Nenhuma tentativa recusada por contrato ativo.
+              </div>
+            ) : (
+              <div className="max-h-[min(68vh,720px)] space-y-2 overflow-y-auto overscroll-contain pr-1">
+                {duplicateCases.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 rounded-lg border p-3">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4"
+                      checked={selectedCaseIds.has(item.id)}
+                      onChange={() => toggleCase(item.id)}
+                      aria-label={`Selecionar caso de ${item.nome_tentativa || "cabo"}`}
+                    />
+                    <details className="min-w-0 flex-1">
+                      <summary className="cursor-pointer list-none">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">{item.nome_tentativa || "Sem nome"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Tentativa para {item.responsavel_tentativa_nome || "sem responsável"}{" "}
+                              • {format(new Date(item.data_tentativa), "dd/MM/yyyy HH:mm")}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline">
+                              Coincidência por{" "}
+                              {item.fatores_duplicidade?.length
+                                ? item.fatores_duplicidade
+                                    .map((fator) =>
+                                      fator === "cpf"
+                                        ? "CPF"
+                                        : fator === "nome_telefone"
+                                          ? "nome + telefone"
+                                          : "telefone",
+                                    )
+                                    .join(" e ")
+                                : "nome + telefone, telefone ou CPF"}
+                            </Badge>
+                            <Badge variant="destructive">Contrato ativo encontrado</Badge>
+                          </div>
+                        </div>
+                      </summary>
+                      <div className="mt-3 grid gap-3 border-t pt-3 md:grid-cols-2">
+                        <div className="rounded-md bg-muted/40 p-3 text-sm">
+                          <p className="font-medium">Tentativa recusada</p>
+                          <p>Líder/coordenador: {item.responsavel_tentativa_nome || "—"}</p>
+                          <p>Telefone informado: {item.telefone_tentativa || "—"}</p>
+                          <p>CPF informado: {item.cpf_tentativa || "—"}</p>
+                          <p>Arquivo: {item.arquivo_nome}</p>
+                          <p>Linha: {item.numero_linha + 1}</p>
+                        </div>
+                        <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm">
+                          <p className="font-medium">Onde já está contratado</p>
+                          <p>{item.cadastro_existente_nome}</p>
+                          <p>Telefone: {item.cadastro_existente_telefone || "—"}</p>
+                          <p>CPF: {item.cadastro_existente_cpf || "—"}</p>
+                          <p>
+                            Responsável: {item.responsavel_existente_nome || "sem responsável"}
+                            {item.responsavel_existente_tipo
+                              ? ` (${roleLabel(item.responsavel_existente_tipo).toLowerCase()})`
+                              : ""}
+                          </p>
+                          <p>Contrato: {money(item.valor_contratacao)}</p>
+                          <p>
+                            Período:{" "}
+                            {item.contrato_inicio
+                              ? format(new Date(`${item.contrato_inicio}T12:00:00`), "dd/MM/yyyy")
+                              : "não informado"}
+                            {" até "}
+                            {item.contrato_fim
+                              ? format(new Date(`${item.contrato_fim}T12:00:00`), "dd/MM/yyyy")
+                              : "sem término"}
                           </p>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline">
-                            Coincidência por{" "}
-                            {item.fatores_duplicidade?.length
-                              ? item.fatores_duplicidade
-                                  .map((fator) =>
-                                    fator === "cpf"
-                                      ? "CPF"
-                                      : fator === "nome_telefone"
-                                        ? "nome + telefone"
-                                        : "telefone",
-                                  )
-                                  .join(" e ")
-                              : "nome + telefone, telefone ou CPF"}
-                          </Badge>
-                          <Badge variant="destructive">Contrato ativo encontrado</Badge>
-                        </div>
                       </div>
-                    </summary>
-                    <div className="mt-3 grid gap-3 border-t pt-3 md:grid-cols-2">
-                      <div className="rounded-md bg-muted/40 p-3 text-sm">
-                        <p className="font-medium">Tentativa recusada</p>
-                        <p>Líder/coordenador: {item.responsavel_tentativa_nome || "—"}</p>
-                        <p>Telefone informado: {item.telefone_tentativa || "—"}</p>
-                        <p>CPF informado: {item.cpf_tentativa || "—"}</p>
-                        <p>Arquivo: {item.arquivo_nome}</p>
-                        <p>Linha: {item.numero_linha + 1}</p>
-                      </div>
-                      <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm">
-                        <p className="font-medium">Onde já está contratado</p>
-                        <p>{item.cadastro_existente_nome}</p>
-                        <p>Telefone: {item.cadastro_existente_telefone || "—"}</p>
-                        <p>CPF: {item.cadastro_existente_cpf || "—"}</p>
-                        <p>
-                          Responsável: {item.responsavel_existente_nome || "sem responsável"}
-                          {item.responsavel_existente_tipo
-                            ? ` (${roleLabel(item.responsavel_existente_tipo).toLowerCase()})`
-                            : ""}
-                        </p>
-                        <p>Contrato: {money(item.valor_contratacao)}</p>
-                        <p>
-                          Período:{" "}
-                          {item.contrato_inicio
-                            ? format(new Date(`${item.contrato_inicio}T12:00:00`), "dd/MM/yyyy")
-                            : "não informado"}
-                          {" até "}
-                          {item.contrato_fim
-                            ? format(new Date(`${item.contrato_fim}T12:00:00`), "dd/MM/yyyy")
-                            : "sem término"}
-                        </p>
-                      </div>
-                    </div>
-                    {duplicateCorrection?.id === item.id ? (
-                      <div className="mt-3 rounded-md border border-amber-300 bg-amber-50/50 p-3">
-                        <div className="mb-3">
-                          <p className="font-medium">Corrigir dados e revalidar contratação</p>
-                          <p className="text-xs text-muted-foreground">
-                            A contratação continuará bloqueada se o CPF ou telefone corrigido ainda
-                            pertencer a qualquer cadastro ativo.
-                          </p>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                          <div className="space-y-1">
-                            <Label>Nome</Label>
-                            <Input
-                              value={duplicateCorrection.nome}
-                              onChange={(event) =>
-                                setDuplicateCorrection({
-                                  ...duplicateCorrection,
-                                  nome: event.target.value,
-                                })
-                              }
-                            />
+                      {duplicateCorrection?.id === item.id ? (
+                        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50/50 p-3">
+                          <div className="mb-3">
+                            <p className="font-medium">Corrigir dados e revalidar contratação</p>
+                            <p className="text-xs text-muted-foreground">
+                              A contratação continuará bloqueada se o CPF ou telefone corrigido
+                              ainda pertencer a qualquer cadastro ativo.
+                            </p>
                           </div>
-                          <div className="space-y-1">
-                            <Label>CPF</Label>
-                            <Input
-                              value={duplicateCorrection.cpf}
-                              onChange={(event) =>
-                                setDuplicateCorrection({
-                                  ...duplicateCorrection,
-                                  cpf: event.target.value,
-                                })
-                              }
-                            />
+                          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                            <div className="space-y-1">
+                              <Label>Nome</Label>
+                              <Input
+                                value={duplicateCorrection.nome}
+                                onChange={(event) =>
+                                  setDuplicateCorrection({
+                                    ...duplicateCorrection,
+                                    nome: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label>CPF</Label>
+                              <Input
+                                value={duplicateCorrection.cpf}
+                                onChange={(event) =>
+                                  setDuplicateCorrection({
+                                    ...duplicateCorrection,
+                                    cpf: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label>Telefone com DDD</Label>
+                              <Input
+                                value={duplicateCorrection.telefone}
+                                onChange={(event) =>
+                                  setDuplicateCorrection({
+                                    ...duplicateCorrection,
+                                    telefone: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label>Motivo da correção</Label>
+                              <Input
+                                value={duplicateCorrection.motivo}
+                                onChange={(event) =>
+                                  setDuplicateCorrection({
+                                    ...duplicateCorrection,
+                                    motivo: event.target.value,
+                                  })
+                                }
+                              />
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <Label>Telefone com DDD</Label>
-                            <Input
-                              value={duplicateCorrection.telefone}
-                              onChange={(event) =>
-                                setDuplicateCorrection({
-                                  ...duplicateCorrection,
-                                  telefone: event.target.value,
-                                })
+                          <div className="mt-3 flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() => setDuplicateCorrection(null)}
+                            >
+                              <X className="mr-2 h-4 w-4" />
+                              Cancelar
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={
+                                busy ||
+                                !duplicateCorrection.nome.trim() ||
+                                !duplicateCorrection.telefone.trim() ||
+                                !duplicateCorrection.motivo.trim()
                               }
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label>Motivo da correção</Label>
-                            <Input
-                              value={duplicateCorrection.motivo}
-                              onChange={(event) =>
-                                setDuplicateCorrection({
-                                  ...duplicateCorrection,
-                                  motivo: event.target.value,
-                                })
-                              }
-                            />
+                              onClick={() => void saveDuplicateCorrection()}
+                            >
+                              {busy ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                              )}
+                              Revalidar e contratar
+                            </Button>
                           </div>
                         </div>
-                        <div className="mt-3 flex justify-end gap-2">
+                      ) : (
+                        <div className="mt-3 flex flex-wrap justify-end gap-2">
                           <Button
                             size="sm"
                             variant="ghost"
                             disabled={busy}
-                            onClick={() => setDuplicateCorrection(null)}
+                            onClick={() => void archiveDuplicateCases([item.id])}
                           >
-                            <X className="mr-2 h-4 w-4" />
-                            Cancelar
+                            <Archive className="mr-2 h-4 w-4" />
+                            Arquivar caso
                           </Button>
                           <Button
                             size="sm"
-                            disabled={
-                              busy ||
-                              !duplicateCorrection.nome.trim() ||
-                              !duplicateCorrection.telefone.trim() ||
-                              !duplicateCorrection.motivo.trim()
-                            }
-                            onClick={() => void saveDuplicateCorrection()}
-                          >
-                            {busy ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="mr-2 h-4 w-4" />
-                            )}
-                            Revalidar e contratar
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() => void archiveDuplicateCases([item.id])}
-                        >
-                          <Archive className="mr-2 h-4 w-4" />
-                          Arquivar caso
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() => startDuplicateCorrection(item)}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Corrigir dados e tentar contratar
-                        </Button>
-                      </div>
-                    )}
-                  </details>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card
-        className={activeContractDuplicates.length ? "border-destructive/60" : "border-emerald-300"}
-      >
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Conflitos financeiros pendentes</CardTitle>
-            <div className="flex items-center gap-2">
-              {!!activeContractDuplicates.length && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void gerarRelatorioDuplicidadesPdf(activeContractDuplicates)}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Baixar relatório completo
-                </Button>
-              )}
-              <Badge variant={activeContractDuplicates.length ? "destructive" : "outline"}>
-                {activeContractDuplicates.length} conflito(s) financeiro(s)
-              </Badge>
-            </div>
-          </div>
-          <CardDescription>
-            Visão global de contratos ainda não resolvidos. Telefones compartilhados aprovados em
-            “Contratos e linhas do lote” deixam de aparecer aqui automaticamente.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!activeContractDuplicates.length ? (
-            <div className="flex items-center gap-2 text-sm text-emerald-700">
-              <CheckCircle2 className="h-4 w-4" />
-              Nenhum contrato ativo duplicado encontrado. Existem {databaseDuplicates.length}{" "}
-              conflito(s) cadastral(is) sem risco de pagamento duplo.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg border bg-destructive/5 p-3">
-                  <p className="text-xs text-muted-foreground">Conflitos financeiros</p>
-                  <p className="text-xl font-bold text-destructive">
-                    {activeContractDuplicates.length}
-                  </p>
-                </div>
-                <div className="rounded-lg border bg-destructive/5 p-3">
-                  <p className="text-xs text-muted-foreground">Contratos sob revisão</p>
-                  <p className="text-xl font-bold text-destructive">{contractsAtRisk.length}</p>
-                </div>
-                <div className="rounded-lg border bg-destructive/5 p-3">
-                  <p className="text-xs text-muted-foreground">Valor total sob risco</p>
-                  <p className="text-xl font-bold text-destructive">{money(riskValue)}</p>
-                </div>
-              </div>
-              {duplicateFolders.map((folder) => (
-                <details key={folder.key} className="group rounded-lg border bg-background">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40">
-                    <span className="flex min-w-0 items-center gap-2 font-medium">
-                      <Folder className="h-5 w-5 shrink-0 text-amber-500" />
-                      <span className="truncate">{folder.name}</span>
-                      <Badge variant="outline">{roleLabel(folder.role)}</Badge>
-                    </span>
-                    <Badge variant="secondary">{folder.groups.length} conflito(s)</Badge>
-                  </summary>
-                  <div className="max-h-[420px] space-y-3 overflow-y-auto border-t p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Duplicidades dos cadastros que pertencem a {folder.name} (
-                      {roleLabel(folder.role).toLowerCase()}).
-                    </p>
-                    {folder.groups.map((group) => (
-                      <div
-                        key={`${folder.key}:${group.tipo}:${group.chave}`}
-                        className="rounded-lg border p-3"
-                      >
-                        <p className="mb-2 text-sm font-semibold">
-                          Mesmo {group.tipo}:{" "}
-                          {group.tipo === "cpf" ? `***${group.chave.slice(-4)}` : group.chave}
-                        </p>
-                        <div className="mb-3 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs">
-                          <strong>Duplicado também encontrado em:</strong>{" "}
-                          {Array.from(
-                            new Set(
-                              group.cadastros
-                                .filter((person) => duplicateOwnerKey(person) !== folder.key)
-                                .map(duplicateOwnerLabel),
-                            ),
-                          ).join(", ") || "na própria equipe"}
-                        </div>
-                        <div className="space-y-2">
-                          {group.cadastros.map((person) => (
-                            <div
-                              key={person.id}
-                              className="rounded-md bg-muted/40 px-3 py-2 text-sm"
-                            >
-                              <div className="flex flex-wrap items-center gap-2">
-                                <strong>{person.nome}</strong>
-                                <Badge variant="outline">{person.tipo}</Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {person.is_voluntario
-                                    ? "Voluntário"
-                                    : Number(person.valor_contratacao || 0) > 0
-                                      ? `Contrato de ${money(person.valor_contratacao || 0)}`
-                                      : "Sem contrato"}
-                                </span>
-                                <Badge
-                                  variant={
-                                    duplicateOwnerKey(person) === folder.key
-                                      ? "secondary"
-                                      : "destructive"
-                                  }
-                                >
-                                  {duplicateOwnerKey(person) === folder.key
-                                    ? "Cadastro desta equipe"
-                                    : "Duplicado em outra equipe"}
-                                </Badge>
-                              </div>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                Localização do cadastro: {duplicateOwnerLabel(person)}
-                              </p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                Contrato: {money(person.valor_contratacao || 0)}
-                                {person.contrato_inicio
-                                  ? ` • início ${format(new Date(`${person.contrato_inicio}T12:00:00`), "dd/MM/yyyy")}`
-                                  : ""}
-                                {person.contrato_fim
-                                  ? ` • término ${format(new Date(`${person.contrato_fim}T12:00:00`), "dd/MM/yyyy")}`
-                                  : " • sem término"}
-                                {person.importacao_lote_nome
-                                  ? ` • lote ${person.importacao_lote_nome}`
-                                  : " • cadastro manual"}
-                              </p>
-                              {group.cadastros
-                                .filter((other) => other.id !== person.id)
-                                .every((other) => other.tipo === "cabo") && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="mt-2"
-                                  disabled={busy}
-                                  onClick={() => void resolveActiveDuplicate(group, person)}
-                                >
-                                  Manter {person.nome} e arquivar os outros
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Histórico</CardTitle>
-          <CardDescription>
-            Lotes analisados e confirmados. Use “Ver ocorrências” para abrir os duplicados e
-            inválidos encontrados em cada planilha.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead>Lote</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Linhas</TableHead>
-                <TableHead>Contratos ativos</TableHead>
-                <TableHead>Repetidos na planilha</TableHead>
-                <TableHead>Inválidos</TableHead>
-                <TableHead className="text-right">Custo</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {activeHistory.map((lot) => (
-                <Fragment key={lot.id}>
-                  <TableRow>
-                    <TableCell>{format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")}</TableCell>
-                    <TableCell>
-                      {(() => {
-                        const responsavel = historyParents.find((item) => item.id === lot.parent_id_padrao);
-                        return responsavel ? <><p className="font-medium">{responsavel.nome}</p><p className="text-xs text-muted-foreground">{roleLabel(responsavel.tipo)}{responsavel.arquivado_em ? " · arquivado" : ""}</p></> : <span className="text-muted-foreground">Não identificado</span>;
-                      })()}
-                    </TableCell>
-                    <TableCell>
-                      <p className="font-medium">{lot.nome}</p>
-                      <p className="text-xs text-muted-foreground">{lot.arquivo_nome}</p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{lot.status}</Badge>
-                    </TableCell>
-                    <TableCell>{lot.total_linhas}</TableCell>
-                    <TableCell>{lot.total_elegiveis}</TableCell>
-                    <TableCell>{lot.total_repetidos_arquivo || 0}</TableCell>
-                    <TableCell>{lot.total_invalidos}</TableCell>
-                    <TableCell className="text-right">
-                      {money(
-                        lot.status === "confirmado"
-                          ? lot.custo_confirmado
-                          : lot.status === "cancelado"
-                            ? 0
-                            : lot.custo_previsto,
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          title="Editar valor ou responsável do lote"
-                          onClick={() =>
-                            setLotValueEdit({
-                              id: lot.id,
-                              valor: Number(lot.valor_unitario || 0)
-                                .toFixed(2)
-                                .replace(".", ","),
-                              parentId: lot.parent_id_padrao || "",
-                              motivo: "",
-                            })
-                          }
-                        >
-                          <Pencil className="mr-1 h-3.5 w-3.5" />
-                          Editar lote
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() => void loadManagedContracts(lot.id)}
-                        >
-                          Gerenciar contratos
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={
-                            !lot.total_duplicados &&
-                            !lot.total_repetidos_arquivo &&
-                            !lot.total_invalidos
-                          }
-                          onClick={() => void loadAudit(lot.id)}
-                        >
-                          Ver ocorrências
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={
-                            busy ||
-                            (!lot.total_duplicados &&
-                              !lot.total_repetidos_arquivo &&
-                              !lot.total_invalidos)
-                          }
-                          title="Baixar somente as ocorrências deste lote"
-                          onClick={() => void downloadLotOccurrences(lot)}
-                        >
-                          <Download className="mr-1 h-3.5 w-3.5" />
-                          PDF ocorrências
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {lotValueEdit?.id === lot.id && (
-                    <TableRow className="bg-muted/30">
-                      <TableCell colSpan={10}>
-                        <div className="flex flex-wrap items-end gap-3 rounded-md border bg-background p-3">
-                          <div className="min-w-40 space-y-1">
-                            <Label htmlFor={`valor-lote-${lot.id}`}>Novo valor por cabo</Label>
-                            <Input
-                              id={`valor-lote-${lot.id}`}
-                              inputMode="decimal"
-                              value={lotValueEdit.valor}
-                              onChange={(event) =>
-                                setLotValueEdit((current) =>
-                                  current ? { ...current, valor: event.target.value } : current,
-                                )
-                              }
-                            />
-                          </div>
-                          <div className="min-w-64 space-y-1">
-                            <Label>Responsável pelo lote</Label>
-                            <Select
-                              value={lotValueEdit.parentId}
-                              onValueChange={(parentId) =>
-                                setLotValueEdit((current) =>
-                                  current ? { ...current, parentId } : current,
-                                )
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione um responsável" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {parents.map((parent) => (
-                                  <SelectItem key={parent.id} value={parent.id}>
-                                    {parent.nome} · {roleLabel(parent.tipo)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="min-w-64 flex-1 space-y-1">
-                            <Label htmlFor={`motivo-lote-${lot.id}`}>Motivo da alteração</Label>
-                            <Input
-                              id={`motivo-lote-${lot.id}`}
-                              placeholder="Ex.: valor informado incorretamente na importação"
-                              value={lotValueEdit.motivo}
-                              onChange={(event) =>
-                                setLotValueEdit((current) =>
-                                  current ? { ...current, motivo: event.target.value } : current,
-                                )
-                              }
-                            />
-                          </div>
-                          <Button disabled={busy} onClick={() => void saveLotValue()}>
-                            {busy ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="mr-2 h-4 w-4" />
-                            )}
-                            Salvar alteração
-                          </Button>
-                          <Button
                             variant="outline"
                             disabled={busy}
-                            onClick={() => setLotValueEdit(null)}
+                            onClick={() => startDuplicateCorrection(item)}
                           >
-                            <X className="mr-2 h-4 w-4" />
-                            Cancelar
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Corrigir dados e tentar contratar
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </Fragment>
-              ))}
-              {!activeHistory.length && (
-                <TableRow>
-                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
-                    Nenhuma importação realizada.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-          {!!canceledHistory.length && (
-            <details className="rounded-lg border border-dashed bg-muted/20">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-                Análises canceladas ({canceledHistory.length}) — sem alteração de cadastros ou
-                custos
-              </summary>
-              <div className="space-y-2 border-t px-4 py-3">
-                <p className="text-xs text-muted-foreground">
-                  Estes arquivos foram apenas analisados e depois cancelados. Não criaram contratos
-                  e não entram na auditoria financeira.
-                </p>
-                {canceledHistory.map((lot) => (
-                  <div
-                    key={lot.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium">{lot.nome}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")} • {lot.arquivo_nome}{" "}
-                        • {lot.total_linhas} linhas
-                      </p>
-                    </div>
-                    <Badge variant="outline">Cancelado — R$ 0,00</Badge>
+                      )}
+                    </details>
                   </div>
                 ))}
               </div>
-            </details>
-          )}
-          {managedLot && (
-            <div className="space-y-3 rounded-lg border p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div><p className="font-medium">Contratos e linhas do lote</p><p className="text-xs text-muted-foreground">Todos os registros são exibidos. Contratos originados em outro lote aparecem somente para consulta.</p></div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="destructive" disabled={busy || !managedContracts.some((item) => item.pertence_ao_lote && !item.arquivado_em)} onClick={() => void archiveManagedLot()}><Trash2 className="mr-2 h-4 w-4" />Excluir todos os contratos deste lote</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setManagedLot(null); setManagedContracts([]); setContractEdit(null); setExpandedOccurrence(null); setExceptionReason(""); }}>Fechar</Button>
-                </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div ref={conflictsRef} className="scroll-mt-20">
+        <Card
+          className={
+            activeContractDuplicates.length ? "border-destructive/60" : "border-emerald-300"
+          }
+        >
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>Conflitos financeiros pendentes</CardTitle>
+              <div className="flex items-center gap-2">
+                {!!activeContractDuplicates.length && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void gerarRelatorioDuplicidadesPdf(activeContractDuplicates)}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Baixar relatório completo
+                  </Button>
+                )}
+                <Badge variant={activeContractDuplicates.length ? "destructive" : "outline"}>
+                  {activeContractDuplicates.length} conflito(s) financeiro(s)
+                </Badge>
               </div>
-              <div className="max-h-[520px] overflow-auto rounded-md border">
-                <Table><TableHeader><TableRow><TableHead>Linha</TableHead><TableHead>Nome</TableHead><TableHead>Telefone/CPF</TableHead><TableHead>Situação</TableHead><TableHead>Responsável</TableHead><TableHead>Valor</TableHead><TableHead /></TableRow></TableHeader>
-                  <TableBody>{managedContracts.map((item) => <Fragment key={item.item_id}><TableRow><TableCell>{item.numero_linha + 1}</TableCell><TableCell><p className="font-medium">{item.nome || item.nome_importado || "—"}</p>{!item.pertence_ao_lote && item.lote_contrato_nome && <p className="text-xs text-muted-foreground">Contrato no lote: {item.lote_contrato_nome}</p>}</TableCell><TableCell className="text-xs"><p>{item.telefone || item.telefone_importado || "—"}</p><p>{item.cpf || item.cpf_importado || "—"}</p></TableCell><TableCell><Badge variant={item.arquivado_em ? "secondary" : item.pertence_ao_lote ? "default" : "outline"}>{item.pessoa_id ? item.arquivado_em ? "Arquivado" : "Ativo" : classificationLabel[item.classificacao] || item.classificacao}</Badge><p className="mt-1 max-w-48 text-xs text-muted-foreground">{item.motivo}</p></TableCell><TableCell>{item.responsavel_nome || "—"}</TableCell><TableCell>{item.valor ? money(item.valor) : "—"}</TableCell><TableCell><div className="flex gap-1">{item.pertence_ao_lote && item.pessoa_id && <Button size="sm" variant="outline" onClick={() => setContractEdit({ ...item, valorTexto: Number(item.valor || 0).toFixed(2).replace(".", ","), ativo: !item.arquivado_em })}><Pencil className="mr-1 h-3.5 w-3.5" />Editar</Button>}{!item.pertence_ao_lote && <Button size="sm" variant="outline" onClick={() => { setExpandedOccurrence(expandedOccurrence === item.item_id ? null : item.item_id); setExceptionReason(""); }}>Ver ocorrência</Button>}</div></TableCell></TableRow>
-                    {contractEdit?.item_id === item.item_id && <TableRow className="bg-muted/30"><TableCell colSpan={7}><div className="grid gap-3 rounded-md border bg-background p-3 md:grid-cols-3"><div><Label>Nome</Label><Input value={contractEdit.nome || ""} onChange={(e) => setContractEdit({ ...contractEdit, nome: e.target.value })} /></div><div><Label>Telefone</Label><Input value={contractEdit.telefone || ""} onChange={(e) => setContractEdit({ ...contractEdit, telefone: e.target.value })} /></div><div><Label>CPF</Label><Input value={contractEdit.cpf || ""} onChange={(e) => setContractEdit({ ...contractEdit, cpf: e.target.value })} /></div><div><Label>Valor</Label><Input value={contractEdit.valorTexto} onChange={(e) => setContractEdit({ ...contractEdit, valorTexto: e.target.value })} /></div><div><Label>Responsável</Label><Select value={contractEdit.responsavel_id || ""} onValueChange={(responsavel_id) => setContractEdit({ ...contractEdit, responsavel_id })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{parents.map((parent) => <SelectItem key={parent.id} value={parent.id}>{parent.nome} · {roleLabel(parent.tipo)}</SelectItem>)}</SelectContent></Select></div><div><Label>Status</Label><Select value={contractEdit.ativo ? "ativo" : "arquivado"} onValueChange={(status) => setContractEdit({ ...contractEdit, ativo: status === "ativo" })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ativo">Ativo</SelectItem><SelectItem value="arquivado">Excluído/arquivado</SelectItem></SelectContent></Select></div><div><Label>Início</Label><Input type="date" value={contractEdit.contrato_inicio || ""} onChange={(e) => setContractEdit({ ...contractEdit, contrato_inicio: e.target.value })} /></div><div><Label>Término</Label><Input type="date" value={contractEdit.contrato_fim || ""} onChange={(e) => setContractEdit({ ...contractEdit, contrato_fim: e.target.value || null })} /></div><div className="flex items-end gap-2"><Button disabled={busy} onClick={() => void saveManagedContract()}><Save className="mr-2 h-4 w-4" />Salvar</Button><Button variant="outline" onClick={() => setContractEdit(null)}>Cancelar</Button></div></div></TableCell></TableRow>}
-                    {expandedOccurrence === item.item_id && (
-                      <TableRow className="bg-amber-50/60 dark:bg-amber-950/20">
-                        <TableCell colSpan={7}>
-                          <div className="space-y-3 rounded-md border border-amber-300 p-3">
-                            <div>
-                              <p className="font-semibold">Ocorrência desta linha</p>
-                              <p className="text-sm">
-                                {item.motivo || "Registro bloqueado pela validação automática."}
-                              </p>
-                            </div>
-                            <div className="grid gap-3 text-sm md:grid-cols-2">
-                              <div>
-                                <p className="font-medium">Linha analisada</p>
-                                <p>Linha {item.numero_linha + 1}: {item.nome_importado || "—"}</p>
-                                <p>Telefone: {item.telefone_importado || "—"}</p>
-                                <p>CPF: {item.cpf_importado || "—"}</p>
-                              </div>
-                              {item.classificacao === "dados_invalidos" ? (
-                                <div>
-                                  <p className="font-medium">Validação da linha</p>
-                                  <p className="text-muted-foreground">
-                                    Não existe outro cadastro causando este bloqueio. Corrija os dados abaixo ou autorize explicitamente o cadastro sem telefone.
-                                  </p>
+            </div>
+            <CardDescription>
+              Visão global de contratos ainda não resolvidos. Telefones compartilhados aprovados em
+              “Contratos e linhas do lote” deixam de aparecer aqui automaticamente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!activeContractDuplicates.length ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-700">
+                <CheckCircle2 className="h-4 w-4" />
+                Nenhum contrato ativo duplicado encontrado. Existem {databaseDuplicates.length}{" "}
+                conflito(s) cadastral(is) sem risco de pagamento duplo.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border bg-destructive/5 p-3">
+                    <p className="text-xs text-muted-foreground">Conflitos financeiros</p>
+                    <p className="text-xl font-bold text-destructive">
+                      {activeContractDuplicates.length}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-destructive/5 p-3">
+                    <p className="text-xs text-muted-foreground">Contratos sob revisão</p>
+                    <p className="text-xl font-bold text-destructive">{contractsAtRisk.length}</p>
+                  </div>
+                  <div className="rounded-lg border bg-destructive/5 p-3">
+                    <p className="text-xs text-muted-foreground">Valor total sob risco</p>
+                    <p className="text-xl font-bold text-destructive">{money(riskValue)}</p>
+                  </div>
+                </div>
+                {duplicateFolders.map((folder) => (
+                  <details key={folder.key} className="group rounded-lg border bg-background">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40">
+                      <span className="flex min-w-0 items-center gap-2 font-medium">
+                        <Folder className="h-5 w-5 shrink-0 text-amber-500" />
+                        <span className="truncate">{folder.name}</span>
+                        <Badge variant="outline">{roleLabel(folder.role)}</Badge>
+                      </span>
+                      <Badge variant="secondary">{folder.groups.length} conflito(s)</Badge>
+                    </summary>
+                    <div className="max-h-[420px] space-y-3 overflow-y-auto border-t p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Duplicidades dos cadastros que pertencem a {folder.name} (
+                        {roleLabel(folder.role).toLowerCase()}).
+                      </p>
+                      {folder.groups.map((group) => (
+                        <div
+                          key={`${folder.key}:${group.tipo}:${group.chave}`}
+                          className="rounded-lg border p-3"
+                        >
+                          <p className="mb-2 text-sm font-semibold">
+                            Mesmo {group.tipo}:{" "}
+                            {group.tipo === "cpf" ? `***${group.chave.slice(-4)}` : group.chave}
+                          </p>
+                          <div className="mb-3 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs">
+                            <strong>Duplicado também encontrado em:</strong>{" "}
+                            {Array.from(
+                              new Set(
+                                group.cadastros
+                                  .filter((person) => duplicateOwnerKey(person) !== folder.key)
+                                  .map(duplicateOwnerLabel),
+                              ),
+                            ).join(", ") || "na própria equipe"}
+                          </div>
+                          <div className="space-y-2">
+                            {group.cadastros.map((person) => (
+                              <div
+                                key={person.id}
+                                className="rounded-md bg-muted/40 px-3 py-2 text-sm"
+                              >
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <strong>{person.nome}</strong>
+                                  <Badge variant="outline">{person.tipo}</Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {person.is_voluntario
+                                      ? "Voluntário"
+                                      : Number(person.valor_contratacao || 0) > 0
+                                        ? `Contrato de ${money(person.valor_contratacao || 0)}`
+                                        : "Sem contrato"}
+                                  </span>
+                                  <Badge
+                                    variant={
+                                      duplicateOwnerKey(person) === folder.key
+                                        ? "secondary"
+                                        : "destructive"
+                                    }
+                                  >
+                                    {duplicateOwnerKey(person) === folder.key
+                                      ? "Cadastro desta equipe"
+                                      : "Duplicado em outra equipe"}
+                                  </Badge>
                                 </div>
-                              ) : item.classificacao === "duplicado_no_arquivo" ? (
-                                <div>
-                                  <p className="font-medium">Primeira ocorrência na mesma planilha</p>
-                                  {item.repetido_no_arquivo ? (
-                                    <>
-                                      <p>Linha {item.repetido_no_arquivo.numero_linha + 1}: {item.repetido_no_arquivo.nome || "—"}</p>
-                                      <p>Telefone: {item.repetido_no_arquivo.telefone || "—"}</p>
-                                      <p>CPF: {item.repetido_no_arquivo.cpf || "—"}</p>
-                                    </>
-                                  ) : (
-                                    <p className="text-muted-foreground">
-                                      A versão do banco ainda não retornou a linha de origem. Aplique a migração corretiva e abra o lote novamente.
-                                    </p>
-                                  )}
-                                </div>
-                              ) : (
-                                <div>
-                                  <p className="font-medium">Cadastro existente que causou o bloqueio</p>
-                                  <p>{item.conflito_nome || "—"}</p>
-                                  <p>Cargo: {item.conflito_tipo ? roleLabel(item.conflito_tipo) : "—"}</p>
-                                  <p>Telefone: {item.conflito_telefone || "—"}</p>
-                                  <p>CPF: {item.conflito_cpf || "—"}</p>
-                                  <p>
-                                    Responsável: {item.conflito_responsavel || "—"}
-                                    {item.conflito_responsavel_tipo
-                                      ? ` (${roleLabel(item.conflito_responsavel_tipo).toLowerCase()})`
-                                      : ""}
-                                  </p>
-                                  <p>Lote: {item.lote_contrato_nome || "Sem lote vinculado"}</p>
-                                </div>
-                              )}
-                            </div>
-                            {item.classificacao === "dados_invalidos" && (
-                              invalidCorrection?.itemId === item.item_id ? (
-                                <div className="space-y-3 border-t pt-3">
-                                  <div className="grid gap-3 md:grid-cols-3">
-                                    <div className="space-y-1">
-                                      <Label>Nome</Label>
-                                      <Input
-                                        value={invalidCorrection.nome}
-                                        onChange={(event) => setInvalidCorrection({ ...invalidCorrection, nome: event.target.value })}
-                                      />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label>CPF</Label>
-                                      <Input
-                                        value={invalidCorrection.cpf}
-                                        onChange={(event) => setInvalidCorrection({ ...invalidCorrection, cpf: event.target.value })}
-                                      />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label>Telefone com DDD</Label>
-                                      <Input
-                                        value={invalidCorrection.telefone}
-                                        disabled={invalidCorrection.autorizarSemTelefone}
-                                        onChange={(event) => setInvalidCorrection({ ...invalidCorrection, telefone: event.target.value })}
-                                      />
-                                    </div>
-                                  </div>
-                                  <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50/60 p-3 text-sm dark:bg-amber-950/20">
-                                    <Checkbox
-                                      checked={invalidCorrection.autorizarSemTelefone}
-                                      onCheckedChange={(checked) => setInvalidCorrection({
-                                        ...invalidCorrection,
-                                        autorizarSemTelefone: checked === true,
-                                      })}
-                                    />
-                                    <span>
-                                      <strong>Autorizar contratação sem telefone</strong>
-                                      <span className="block text-xs text-muted-foreground">
-                                        Use apenas quando o cabo realmente não possuir telefone. O número incompleto será descartado e a autorização ficará auditada.
-                                      </span>
-                                    </span>
-                                  </label>
-                                  <div className="space-y-1">
-                                    <Label>Motivo da correção ou autorização</Label>
-                                    <Input
-                                      value={invalidCorrection.motivo}
-                                      onChange={(event) => setInvalidCorrection({ ...invalidCorrection, motivo: event.target.value })}
-                                    />
-                                  </div>
-                                  <div className="flex justify-end gap-2">
-                                    <Button variant="ghost" disabled={busy} onClick={() => setInvalidCorrection(null)}>
-                                      Cancelar
-                                    </Button>
-                                    <Button disabled={busy || !invalidCorrection.nome.trim() || !invalidCorrection.motivo.trim()} onClick={() => void saveInvalidCorrection()}>
-                                      {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                                      {invalidCorrection.autorizarSemTelefone ? "Autorizar e contratar" : "Corrigir e contratar"}
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex justify-end border-t pt-3">
-                                  <Button variant="outline" disabled={busy} onClick={() => startInvalidCorrection(item)}>
-                                    <Pencil className="mr-2 h-4 w-4" />Corrigir dados ou autorizar sem telefone
-                                  </Button>
-                                </div>
-                              )
-                            )}
-                            {canApproveSharedPhone(item) ? (
-                              <div className="space-y-2 border-t pt-3">
-                                <p className="text-xs text-muted-foreground">
-                                  Use somente quando forem pessoas diferentes que compartilham o mesmo telefone. CPF repetido continuará bloqueado.
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  Localização do cadastro: {duplicateOwnerLabel(person)}
                                 </p>
-                                <Label>Motivo da exceção manual</Label>
-                                <Input value={exceptionReason} onChange={(e) => setExceptionReason(e.target.value)} placeholder="Ex.: telefone compartilhado com o marido" />
-                                <Button disabled={busy || !exceptionReason.trim()} onClick={() => void approveSharedPhone(item)}>
-                                  <CheckCircle2 className="mr-2 h-4 w-4" />Validar contrato mesmo assim
-                                </Button>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  Contrato: {money(person.valor_contratacao || 0)}
+                                  {person.contrato_inicio
+                                    ? ` • início ${format(new Date(`${person.contrato_inicio}T12:00:00`), "dd/MM/yyyy")}`
+                                    : ""}
+                                  {person.contrato_fim
+                                    ? ` • término ${format(new Date(`${person.contrato_fim}T12:00:00`), "dd/MM/yyyy")}`
+                                    : " • sem término"}
+                                  {person.importacao_lote_nome
+                                    ? ` • lote ${person.importacao_lote_nome}`
+                                    : " • cadastro manual"}
+                                </p>
+                                {group.cadastros
+                                  .filter((other) => other.id !== person.id)
+                                  .every((other) => other.tipo === "cabo") && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="mt-2"
+                                    disabled={busy}
+                                    onClick={() => void resolveActiveDuplicate(group, person)}
+                                  >
+                                    Manter {person.nome} e arquivar os outros
+                                  </Button>
+                                )}
                               </div>
-                            ) : item.classificacao === "duplicado_no_arquivo" && item.repetido_no_arquivo ? (
-                              <p className="border-t pt-3 text-xs text-muted-foreground">
-                                Esta linha repete a mesma pessoa ou o mesmo CPF da planilha e permanecerá bloqueada para evitar contrato duplicado.
-                              </p>
-                            ) : null}
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div ref={historyRef} className="scroll-mt-20">
+        <Card>
+          <CardHeader>
+            <CardTitle>Histórico</CardTitle>
+            <CardDescription>
+              Lotes analisados e confirmados. Use “Ver ocorrências” para abrir os duplicados e
+              inválidos encontrados em cada planilha.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="max-h-[min(62vh,640px)] overflow-auto overscroll-contain rounded-md border">
+              <Table className="min-w-[1180px]">
+                <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Lote</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Linhas</TableHead>
+                    <TableHead>Contratos ativos</TableHead>
+                    <TableHead>Repetidos na planilha</TableHead>
+                    <TableHead>Inválidos</TableHead>
+                    <TableHead className="text-right">Custo</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeHistory.map((lot) => (
+                    <Fragment key={lot.id}>
+                      <TableRow>
+                        <TableCell>
+                          {format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const responsavel = historyParents.find(
+                              (item) => item.id === lot.parent_id_padrao,
+                            );
+                            return responsavel ? (
+                              <>
+                                <p className="font-medium">{responsavel.nome}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {roleLabel(responsavel.tipo)}
+                                  {responsavel.arquivado_em ? " · arquivado" : ""}
+                                </p>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">Não identificado</span>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">{lot.nome}</p>
+                          <p className="text-xs text-muted-foreground">{lot.arquivo_nome}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{lot.status}</Badge>
+                        </TableCell>
+                        <TableCell>{lot.total_linhas}</TableCell>
+                        <TableCell>{lot.total_elegiveis}</TableCell>
+                        <TableCell>{lot.total_repetidos_arquivo || 0}</TableCell>
+                        <TableCell>{lot.total_invalidos}</TableCell>
+                        <TableCell className="text-right">
+                          {money(
+                            lot.status === "confirmado"
+                              ? lot.custo_confirmado
+                              : lot.status === "cancelado"
+                                ? 0
+                                : lot.custo_previsto,
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              title="Editar valor ou responsável do lote"
+                              onClick={() =>
+                                setLotValueEdit({
+                                  id: lot.id,
+                                  valor: Number(lot.valor_unitario || 0)
+                                    .toFixed(2)
+                                    .replace(".", ","),
+                                  parentId: lot.parent_id_padrao || "",
+                                  motivo: "",
+                                })
+                              }
+                            >
+                              <Pencil className="mr-1 h-3.5 w-3.5" />
+                              Editar lote
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              onClick={() => void loadManagedContracts(lot.id)}
+                            >
+                              Gerenciar contratos
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={
+                                !lot.total_duplicados &&
+                                !lot.total_repetidos_arquivo &&
+                                !lot.total_invalidos
+                              }
+                              onClick={() => void loadAudit(lot.id)}
+                            >
+                              Ver ocorrências
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                busy ||
+                                (!lot.total_duplicados &&
+                                  !lot.total_repetidos_arquivo &&
+                                  !lot.total_invalidos)
+                              }
+                              title="Baixar somente as ocorrências deste lote"
+                              onClick={() => void downloadLotOccurrences(lot)}
+                            >
+                              <Download className="mr-1 h-3.5 w-3.5" />
+                              PDF ocorrências
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
-                    )}
-                  </Fragment>)}</TableBody></Table>
-              </div>
-            </div>
-          )}
-          {auditLot && (
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="font-medium">Duplicados e inválidos do lote</p>
-                <div className="flex items-center gap-2">
-                  {!!auditItems.length && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        void gerarRelatorioOcorrenciasLotePdf(
-                          history.find((lot) => lot.id === auditLot)?.nome || "Importação",
-                          auditItems,
-                        )
-                      }
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      {auditItems[0]?.responsavel_tentativa_nome
-                        ? `Baixar relatório para ${auditItems[0].responsavel_tentativa_nome}`
-                        : "Baixar relatório deste lote"}
-                    </Button>
+                      {lotValueEdit?.id === lot.id && (
+                        <TableRow className="bg-muted/30">
+                          <TableCell colSpan={10}>
+                            <div className="flex flex-wrap items-end gap-3 rounded-md border bg-background p-3">
+                              <div className="min-w-40 space-y-1">
+                                <Label htmlFor={`valor-lote-${lot.id}`}>Novo valor por cabo</Label>
+                                <Input
+                                  id={`valor-lote-${lot.id}`}
+                                  inputMode="decimal"
+                                  value={lotValueEdit.valor}
+                                  onChange={(event) =>
+                                    setLotValueEdit((current) =>
+                                      current ? { ...current, valor: event.target.value } : current,
+                                    )
+                                  }
+                                />
+                              </div>
+                              <div className="min-w-64 space-y-1">
+                                <Label>Responsável pelo lote</Label>
+                                <Select
+                                  value={lotValueEdit.parentId}
+                                  onValueChange={(parentId) =>
+                                    setLotValueEdit((current) =>
+                                      current ? { ...current, parentId } : current,
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione um responsável" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {parents.map((parent) => (
+                                      <SelectItem key={parent.id} value={parent.id}>
+                                        {parent.nome} · {roleLabel(parent.tipo)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="min-w-64 flex-1 space-y-1">
+                                <Label htmlFor={`motivo-lote-${lot.id}`}>Motivo da alteração</Label>
+                                <Input
+                                  id={`motivo-lote-${lot.id}`}
+                                  placeholder="Ex.: valor informado incorretamente na importação"
+                                  value={lotValueEdit.motivo}
+                                  onChange={(event) =>
+                                    setLotValueEdit((current) =>
+                                      current
+                                        ? { ...current, motivo: event.target.value }
+                                        : current,
+                                    )
+                                  }
+                                />
+                              </div>
+                              <Button disabled={busy} onClick={() => void saveLotValue()}>
+                                {busy ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Save className="mr-2 h-4 w-4" />
+                                )}
+                                Salvar alteração
+                              </Button>
+                              <Button
+                                variant="outline"
+                                disabled={busy}
+                                onClick={() => setLotValueEdit(null)}
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Cancelar
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  ))}
+                  {!activeHistory.length && (
+                    <TableRow>
+                      <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
+                        Nenhuma importação realizada.
+                      </TableCell>
+                    </TableRow>
                   )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setAuditLot(null);
-                      setAuditItems([]);
-                    }}
-                  >
-                    Fechar
-                  </Button>
-                </div>
-              </div>
-              <ItemTable items={auditItems} />
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {!!canceledHistory.length && (
+              <details className="rounded-lg border border-dashed bg-muted/20">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+                  Análises canceladas ({canceledHistory.length}) — sem alteração de cadastros ou
+                  custos
+                </summary>
+                <div className="space-y-2 border-t px-4 py-3">
+                  <p className="text-xs text-muted-foreground">
+                    Estes arquivos foram apenas analisados e depois cancelados. Não criaram
+                    contratos e não entram na auditoria financeira.
+                  </p>
+                  {canceledHistory.map((lot) => (
+                    <div
+                      key={lot.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium">{lot.nome}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(lot.created_at), "dd/MM/yyyy HH:mm")} •{" "}
+                          {lot.arquivo_nome} • {lot.total_linhas} linhas
+                        </p>
+                      </div>
+                      <Badge variant="outline">Cancelado — R$ 0,00</Badge>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+            {managedLot && (
+              <Dialog
+                open
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setManagedLot(null);
+                    setManagedContracts([]);
+                    setContractEdit(null);
+                    setExpandedOccurrence(null);
+                    setExceptionReason("");
+                  }
+                }}
+              >
+                <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-7xl flex-col overflow-hidden p-0">
+                  <div className="space-y-3 overflow-y-auto p-5 pt-10">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium">Contratos e linhas do lote</p>
+                        <p className="text-xs text-muted-foreground">
+                          Todos os registros são exibidos. Contratos originados em outro lote
+                          aparecem somente para consulta.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={
+                            busy ||
+                            !managedContracts.some(
+                              (item) => item.pertence_ao_lote && !item.arquivado_em,
+                            )
+                          }
+                          onClick={() => void archiveManagedLot()}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir todos os contratos deste lote
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setManagedLot(null);
+                            setManagedContracts([]);
+                            setContractEdit(null);
+                            setExpandedOccurrence(null);
+                            setExceptionReason("");
+                          }}
+                        >
+                          Fechar
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="max-h-[520px] overflow-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Linha</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Telefone/CPF</TableHead>
+                            <TableHead>Situação</TableHead>
+                            <TableHead>Responsável</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {managedContracts.map((item) => (
+                            <Fragment key={item.item_id}>
+                              <TableRow>
+                                <TableCell>{item.numero_linha + 1}</TableCell>
+                                <TableCell>
+                                  <p className="font-medium">
+                                    {item.nome || item.nome_importado || "—"}
+                                  </p>
+                                  {!item.pertence_ao_lote && item.lote_contrato_nome && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Contrato no lote: {item.lote_contrato_nome}
+                                    </p>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-xs">
+                                  <p>{item.telefone || item.telefone_importado || "—"}</p>
+                                  <p>{item.cpf || item.cpf_importado || "—"}</p>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={
+                                      item.arquivado_em
+                                        ? "secondary"
+                                        : item.pertence_ao_lote
+                                          ? "default"
+                                          : "outline"
+                                    }
+                                  >
+                                    {item.pessoa_id
+                                      ? item.arquivado_em
+                                        ? "Arquivado"
+                                        : "Ativo"
+                                      : classificationLabel[item.classificacao] ||
+                                        item.classificacao}
+                                  </Badge>
+                                  <p className="mt-1 max-w-48 text-xs text-muted-foreground">
+                                    {item.motivo}
+                                  </p>
+                                </TableCell>
+                                <TableCell>{item.responsavel_nome || "—"}</TableCell>
+                                <TableCell>{item.valor ? money(item.valor) : "—"}</TableCell>
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    {item.pertence_ao_lote && item.pessoa_id && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          setContractEdit({
+                                            ...item,
+                                            valorTexto: Number(item.valor || 0)
+                                              .toFixed(2)
+                                              .replace(".", ","),
+                                            ativo: !item.arquivado_em,
+                                          })
+                                        }
+                                      >
+                                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                                        Editar
+                                      </Button>
+                                    )}
+                                    {!item.pertence_ao_lote && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setExpandedOccurrence(
+                                            expandedOccurrence === item.item_id
+                                              ? null
+                                              : item.item_id,
+                                          );
+                                          setExceptionReason("");
+                                        }}
+                                      >
+                                        Ver ocorrência
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                              {contractEdit?.item_id === item.item_id && (
+                                <TableRow className="bg-muted/30">
+                                  <TableCell colSpan={7}>
+                                    <div className="grid gap-3 rounded-md border bg-background p-3 md:grid-cols-3">
+                                      <div>
+                                        <Label>Nome</Label>
+                                        <Input
+                                          value={contractEdit.nome || ""}
+                                          onChange={(e) =>
+                                            setContractEdit({
+                                              ...contractEdit,
+                                              nome: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label>Telefone</Label>
+                                        <Input
+                                          value={contractEdit.telefone || ""}
+                                          onChange={(e) =>
+                                            setContractEdit({
+                                              ...contractEdit,
+                                              telefone: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label>CPF</Label>
+                                        <Input
+                                          value={contractEdit.cpf || ""}
+                                          onChange={(e) =>
+                                            setContractEdit({
+                                              ...contractEdit,
+                                              cpf: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label>Valor</Label>
+                                        <Input
+                                          value={contractEdit.valorTexto}
+                                          onChange={(e) =>
+                                            setContractEdit({
+                                              ...contractEdit,
+                                              valorTexto: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label>Responsável</Label>
+                                        <Select
+                                          value={contractEdit.responsavel_id || ""}
+                                          onValueChange={(responsavel_id) =>
+                                            setContractEdit({ ...contractEdit, responsavel_id })
+                                          }
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {parents.map((parent) => (
+                                              <SelectItem key={parent.id} value={parent.id}>
+                                                {parent.nome} · {roleLabel(parent.tipo)}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div>
+                                        <Label>Status</Label>
+                                        <Select
+                                          value={contractEdit.ativo ? "ativo" : "arquivado"}
+                                          onValueChange={(status) =>
+                                            setContractEdit({
+                                              ...contractEdit,
+                                              ativo: status === "ativo",
+                                            })
+                                          }
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="ativo">Ativo</SelectItem>
+                                            <SelectItem value="arquivado">
+                                              Excluído/arquivado
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div>
+                                        <Label>Início</Label>
+                                        <Input
+                                          type="date"
+                                          value={contractEdit.contrato_inicio || ""}
+                                          onChange={(e) =>
+                                            setContractEdit({
+                                              ...contractEdit,
+                                              contrato_inicio: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label>Término</Label>
+                                        <Input
+                                          type="date"
+                                          value={contractEdit.contrato_fim || ""}
+                                          onChange={(e) =>
+                                            setContractEdit({
+                                              ...contractEdit,
+                                              contrato_fim: e.target.value || null,
+                                            })
+                                          }
+                                        />
+                                      </div>
+                                      <div className="flex items-end gap-2">
+                                        <Button
+                                          disabled={busy}
+                                          onClick={() => void saveManagedContract()}
+                                        >
+                                          <Save className="mr-2 h-4 w-4" />
+                                          Salvar
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          onClick={() => setContractEdit(null)}
+                                        >
+                                          Cancelar
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                              {expandedOccurrence === item.item_id && (
+                                <TableRow className="bg-amber-50/60 dark:bg-amber-950/20">
+                                  <TableCell colSpan={7}>
+                                    <div className="space-y-3 rounded-md border border-amber-300 p-3">
+                                      <div>
+                                        <p className="font-semibold">Ocorrência desta linha</p>
+                                        <p className="text-sm">
+                                          {item.motivo ||
+                                            "Registro bloqueado pela validação automática."}
+                                        </p>
+                                      </div>
+                                      <div className="grid gap-3 text-sm md:grid-cols-2">
+                                        <div>
+                                          <p className="font-medium">Linha analisada</p>
+                                          <p>
+                                            Linha {item.numero_linha + 1}:{" "}
+                                            {item.nome_importado || "—"}
+                                          </p>
+                                          <p>Telefone: {item.telefone_importado || "—"}</p>
+                                          <p>CPF: {item.cpf_importado || "—"}</p>
+                                        </div>
+                                        {item.classificacao === "dados_invalidos" ? (
+                                          <div>
+                                            <p className="font-medium">Validação da linha</p>
+                                            <p className="text-muted-foreground">
+                                              Não existe outro cadastro causando este bloqueio.
+                                              Corrija os dados abaixo ou autorize explicitamente o
+                                              cadastro sem telefone.
+                                            </p>
+                                          </div>
+                                        ) : item.classificacao === "duplicado_no_arquivo" ? (
+                                          <div>
+                                            <p className="font-medium">
+                                              Primeira ocorrência na mesma planilha
+                                            </p>
+                                            {item.repetido_no_arquivo ? (
+                                              <>
+                                                <p>
+                                                  Linha {item.repetido_no_arquivo.numero_linha + 1}:{" "}
+                                                  {item.repetido_no_arquivo.nome || "—"}
+                                                </p>
+                                                <p>
+                                                  Telefone:{" "}
+                                                  {item.repetido_no_arquivo.telefone || "—"}
+                                                </p>
+                                                <p>CPF: {item.repetido_no_arquivo.cpf || "—"}</p>
+                                              </>
+                                            ) : (
+                                              <p className="text-muted-foreground">
+                                                A versão do banco ainda não retornou a linha de
+                                                origem. Aplique a migração corretiva e abra o lote
+                                                novamente.
+                                              </p>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <p className="font-medium">
+                                              Cadastro existente que causou o bloqueio
+                                            </p>
+                                            <p>{item.conflito_nome || "—"}</p>
+                                            <p>
+                                              Cargo:{" "}
+                                              {item.conflito_tipo
+                                                ? roleLabel(item.conflito_tipo)
+                                                : "—"}
+                                            </p>
+                                            <p>Telefone: {item.conflito_telefone || "—"}</p>
+                                            <p>CPF: {item.conflito_cpf || "—"}</p>
+                                            <p>
+                                              Responsável: {item.conflito_responsavel || "—"}
+                                              {item.conflito_responsavel_tipo
+                                                ? ` (${roleLabel(item.conflito_responsavel_tipo).toLowerCase()})`
+                                                : ""}
+                                            </p>
+                                            <p>
+                                              Lote:{" "}
+                                              {item.lote_contrato_nome || "Sem lote vinculado"}
+                                            </p>
+                                          </div>
+                                        )}
+                                      </div>
+                                      {item.classificacao === "dados_invalidos" &&
+                                        (invalidCorrection?.itemId === item.item_id ? (
+                                          <div className="space-y-3 border-t pt-3">
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                              <div className="space-y-1">
+                                                <Label>Nome</Label>
+                                                <Input
+                                                  value={invalidCorrection.nome}
+                                                  onChange={(event) =>
+                                                    setInvalidCorrection({
+                                                      ...invalidCorrection,
+                                                      nome: event.target.value,
+                                                    })
+                                                  }
+                                                />
+                                              </div>
+                                              <div className="space-y-1">
+                                                <Label>CPF</Label>
+                                                <Input
+                                                  value={invalidCorrection.cpf}
+                                                  onChange={(event) =>
+                                                    setInvalidCorrection({
+                                                      ...invalidCorrection,
+                                                      cpf: event.target.value,
+                                                    })
+                                                  }
+                                                />
+                                              </div>
+                                              <div className="space-y-1">
+                                                <Label>Telefone com DDD</Label>
+                                                <Input
+                                                  value={invalidCorrection.telefone}
+                                                  disabled={invalidCorrection.autorizarSemTelefone}
+                                                  onChange={(event) =>
+                                                    setInvalidCorrection({
+                                                      ...invalidCorrection,
+                                                      telefone: event.target.value,
+                                                    })
+                                                  }
+                                                />
+                                              </div>
+                                            </div>
+                                            <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50/60 p-3 text-sm dark:bg-amber-950/20">
+                                              <Checkbox
+                                                checked={invalidCorrection.autorizarSemTelefone}
+                                                onCheckedChange={(checked) =>
+                                                  setInvalidCorrection({
+                                                    ...invalidCorrection,
+                                                    autorizarSemTelefone: checked === true,
+                                                  })
+                                                }
+                                              />
+                                              <span>
+                                                <strong>Autorizar contratação sem telefone</strong>
+                                                <span className="block text-xs text-muted-foreground">
+                                                  Use apenas quando o cabo realmente não possuir
+                                                  telefone. O número incompleto será descartado e a
+                                                  autorização ficará auditada.
+                                                </span>
+                                              </span>
+                                            </label>
+                                            <div className="space-y-1">
+                                              <Label>Motivo da correção ou autorização</Label>
+                                              <Input
+                                                value={invalidCorrection.motivo}
+                                                onChange={(event) =>
+                                                  setInvalidCorrection({
+                                                    ...invalidCorrection,
+                                                    motivo: event.target.value,
+                                                  })
+                                                }
+                                              />
+                                            </div>
+                                            <div className="flex justify-end gap-2">
+                                              <Button
+                                                variant="ghost"
+                                                disabled={busy}
+                                                onClick={() => setInvalidCorrection(null)}
+                                              >
+                                                Cancelar
+                                              </Button>
+                                              <Button
+                                                disabled={
+                                                  busy ||
+                                                  !invalidCorrection.nome.trim() ||
+                                                  !invalidCorrection.motivo.trim()
+                                                }
+                                                onClick={() => void saveInvalidCorrection()}
+                                              >
+                                                {busy ? (
+                                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                  <Save className="mr-2 h-4 w-4" />
+                                                )}
+                                                {invalidCorrection.autorizarSemTelefone
+                                                  ? "Autorizar e contratar"
+                                                  : "Corrigir e contratar"}
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex justify-end border-t pt-3">
+                                            <Button
+                                              variant="outline"
+                                              disabled={busy}
+                                              onClick={() => startInvalidCorrection(item)}
+                                            >
+                                              <Pencil className="mr-2 h-4 w-4" />
+                                              Corrigir dados ou autorizar sem telefone
+                                            </Button>
+                                          </div>
+                                        ))}
+                                      {canApproveSharedPhone(item) ? (
+                                        <div className="space-y-2 border-t pt-3">
+                                          <p className="text-xs text-muted-foreground">
+                                            Use somente quando forem pessoas diferentes que
+                                            compartilham o mesmo telefone. CPF repetido continuará
+                                            bloqueado.
+                                          </p>
+                                          <Label>Motivo da exceção manual</Label>
+                                          <Input
+                                            value={exceptionReason}
+                                            onChange={(e) => setExceptionReason(e.target.value)}
+                                            placeholder="Ex.: telefone compartilhado com o marido"
+                                          />
+                                          <Button
+                                            disabled={busy || !exceptionReason.trim()}
+                                            onClick={() => void approveSharedPhone(item)}
+                                          >
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            Validar contrato mesmo assim
+                                          </Button>
+                                        </div>
+                                      ) : item.classificacao === "duplicado_no_arquivo" &&
+                                        item.repetido_no_arquivo ? (
+                                        <p className="border-t pt-3 text-xs text-muted-foreground">
+                                          Esta linha repete a mesma pessoa ou o mesmo CPF da
+                                          planilha e permanecerá bloqueada para evitar contrato
+                                          duplicado.
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </Fragment>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+            {auditLot && (
+              <Dialog
+                open
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setAuditLot(null);
+                    setAuditItems([]);
+                  }
+                }}
+              >
+                <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-7xl flex-col overflow-hidden p-0">
+                  <div className="overflow-y-auto p-5 pt-10">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="font-medium">Duplicados e inválidos do lote</p>
+                      <div className="flex items-center gap-2">
+                        {!!auditItems.length && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              void gerarRelatorioOcorrenciasLotePdf(
+                                history.find((lot) => lot.id === auditLot)?.nome || "Importação",
+                                auditItems,
+                              )
+                            }
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            {auditItems[0]?.responsavel_tentativa_nome
+                              ? `Baixar relatório para ${auditItems[0].responsavel_tentativa_nome}`
+                              : "Baixar relatório deste lote"}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setAuditLot(null);
+                            setAuditItems([]);
+                          }}
+                        >
+                          Fechar
+                        </Button>
+                      </div>
+                    </div>
+                    <ItemTable items={auditItems} />
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={individualOpen} onOpenChange={setIndividualOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>Cadastrar cabo individual</DialogTitle><DialogDescription>O cabo será contratado e vinculado ao responsável selecionado.</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Cadastrar cabo individual</DialogTitle>
+            <DialogDescription>
+              O cabo será contratado e vinculado ao responsável selecionado.
+            </DialogDescription>
+          </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1"><Label>Nome</Label><Input value={individual.nome} onChange={(e) => setIndividual({ ...individual, nome: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Telefone</Label><Input inputMode="tel" placeholder="Opcional com autorização" value={individual.telefone} onChange={(e) => setIndividual({ ...individual, telefone: e.target.value })} /></div>
-            <div className="space-y-1"><Label>CPF (opcional)</Label><Input inputMode="numeric" value={individual.cpf} onChange={(e) => setIndividual({ ...individual, cpf: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Valor</Label><Input inputMode="decimal" value={individual.valor} onChange={(e) => setIndividual({ ...individual, valor: e.target.value })} /></div>
-            <div className="space-y-1 sm:col-span-2"><Label>Responsável</Label><Select value={individual.parentId} onValueChange={(parentId) => setIndividual({ ...individual, parentId })}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{parents.map((parent) => <SelectItem key={parent.id} value={parent.id}>{parent.nome} · {roleLabel(parent.tipo)}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1"><Label>Endereço (opcional)</Label><Input value={individual.endereco} onChange={(e) => setIndividual({ ...individual, endereco: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Bairro (opcional)</Label><Input value={individual.bairro} onChange={(e) => setIndividual({ ...individual, bairro: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Início</Label><Input type="date" value={individual.inicio} onChange={(e) => setIndividual({ ...individual, inicio: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Término (opcional)</Label><Input type="date" min={individual.inicio} value={individual.fim} onChange={(e) => setIndividual({ ...individual, fim: e.target.value })} /></div>
-            {!digits(individual.telefone) && <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm sm:col-span-2 dark:bg-amber-950/20"><Checkbox checked={individual.autorizarSemTelefone} onCheckedChange={(checked) => setIndividual({ ...individual, autorizarSemTelefone: checked === true })} /><span>Autorizo excepcionalmente este cadastro sem telefone. A decisão ficará registrada na auditoria.</span></label>}
+            <div className="space-y-1">
+              <Label>Nome</Label>
+              <Input
+                value={individual.nome}
+                onChange={(e) => setIndividual({ ...individual, nome: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Telefone</Label>
+              <Input
+                inputMode="tel"
+                placeholder="Opcional com autorização"
+                value={individual.telefone}
+                onChange={(e) => setIndividual({ ...individual, telefone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>CPF (opcional)</Label>
+              <Input
+                inputMode="numeric"
+                value={individual.cpf}
+                onChange={(e) => setIndividual({ ...individual, cpf: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Valor</Label>
+              <Input
+                inputMode="decimal"
+                value={individual.valor}
+                onChange={(e) => setIndividual({ ...individual, valor: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Responsável</Label>
+              <Select
+                value={individual.parentId}
+                onValueChange={(parentId) => setIndividual({ ...individual, parentId })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {parents.map((parent) => (
+                    <SelectItem key={parent.id} value={parent.id}>
+                      {parent.nome} · {roleLabel(parent.tipo)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Endereço (opcional)</Label>
+              <Input
+                value={individual.endereco}
+                onChange={(e) => setIndividual({ ...individual, endereco: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Bairro (opcional)</Label>
+              <Input
+                value={individual.bairro}
+                onChange={(e) => setIndividual({ ...individual, bairro: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Início</Label>
+              <Input
+                type="date"
+                value={individual.inicio}
+                onChange={(e) => setIndividual({ ...individual, inicio: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Término (opcional)</Label>
+              <Input
+                type="date"
+                min={individual.inicio}
+                value={individual.fim}
+                onChange={(e) => setIndividual({ ...individual, fim: e.target.value })}
+              />
+            </div>
+            {!digits(individual.telefone) && (
+              <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm sm:col-span-2 dark:bg-amber-950/20">
+                <Checkbox
+                  checked={individual.autorizarSemTelefone}
+                  onCheckedChange={(checked) =>
+                    setIndividual({ ...individual, autorizarSemTelefone: checked === true })
+                  }
+                />
+                <span>
+                  Autorizo excepcionalmente este cadastro sem telefone. A decisão ficará registrada
+                  na auditoria.
+                </span>
+              </label>
+            )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIndividualOpen(false)}>Cancelar</Button><Button disabled={busy} onClick={() => void saveIndividual()}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cadastrar e vincular</Button></DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIndividualOpen(false)}>
+              Cancelar
+            </Button>
+            <Button disabled={busy} onClick={() => void saveIndividual()}>
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cadastrar e vincular
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -2127,24 +2778,148 @@ export default function EleicaoCabosImportacaoPanel({
           <DialogHeader>
             <DialogTitle>Cadastrar responsável</DialogTitle>
             <DialogDescription>
-              Cadastre sem sair da importação. Ao salvar, o novo responsável será selecionado automaticamente.
+              Cadastre sem sair da importação. Ao salvar, o novo responsável será selecionado
+              automaticamente.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1"><Label>Tipo</Label><Select value={quickParent.tipo} onValueChange={(tipo: "coordenador" | "lider") => setQuickParent({ ...quickParent, tipo, coordenadorId: tipo === "coordenador" ? "" : quickParent.coordenadorId })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="lider">Líder</SelectItem><SelectItem value="coordenador">Coordenador</SelectItem></SelectContent></Select></div>
-            <div className="space-y-1"><Label>Nome</Label><Input value={quickParent.nome} onChange={(e) => setQuickParent({ ...quickParent, nome: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Telefone</Label><Input value={quickParent.telefone} onChange={(e) => setQuickParent({ ...quickParent, telefone: e.target.value })} inputMode="tel" placeholder="(67) 99999-9999" /></div>
-            <div className="space-y-1"><Label>Valor da contratação</Label><Input value={quickParent.valor} onChange={(e) => setQuickParent({ ...quickParent, valor: e.target.value })} inputMode="decimal" placeholder="Ex.: 1.000,00" /><p className="text-xs text-muted-foreground">A vigência usará as datas de início e término desta importação.</p></div>
-            {quickParent.tipo === "lider" && <div className="space-y-1 sm:col-span-2"><Label>Coordenador acima do líder (opcional)</Label><Select value={quickParent.coordenadorId || "avulso"} onValueChange={(coordenadorId) => setQuickParent({ ...quickParent, coordenadorId: coordenadorId === "avulso" ? "" : coordenadorId })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="avulso">Líder avulso</SelectItem>{coordenadores.map((item) => <SelectItem key={item.id} value={item.id}>{item.nome}</SelectItem>)}</SelectContent></Select></div>}
-            {!(quickParent.tipo === "lider" && quickParent.coordenadorId) && <>
-              <div className="space-y-1"><Label>Local</Label><Select value={quickParent.escopo} onValueChange={(escopo: "campo_grande" | "interior") => setQuickParent({ ...quickParent, escopo })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="campo_grande">Campo Grande</SelectItem><SelectItem value="interior">Interior</SelectItem></SelectContent></Select></div>
-              {quickParent.escopo === "campo_grande" ? <div className="space-y-1"><Label>Região</Label><Select value={quickParent.regiao} onValueChange={(regiao) => setQuickParent({ ...quickParent, regiao })}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{regioes.map((item) => <SelectItem key={item.id} value={item.value}>{item.label}</SelectItem>)}</SelectContent></Select></div> : <div className="space-y-1"><Label>Cidade</Label><Input value={quickParent.cidade} onChange={(e) => setQuickParent({ ...quickParent, cidade: e.target.value })} /></div>}
-            </>}
-            {quickParent.tipo === "lider" && quickParent.coordenadorId && <p className="text-sm text-muted-foreground sm:col-span-2">O líder herdará automaticamente a cidade ou região do coordenador selecionado.</p>}
+            <div className="space-y-1">
+              <Label>Tipo</Label>
+              <Select
+                value={quickParent.tipo}
+                onValueChange={(tipo: "coordenador" | "lider") =>
+                  setQuickParent({
+                    ...quickParent,
+                    tipo,
+                    coordenadorId: tipo === "coordenador" ? "" : quickParent.coordenadorId,
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lider">Líder</SelectItem>
+                  <SelectItem value="coordenador">Coordenador</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Nome</Label>
+              <Input
+                value={quickParent.nome}
+                onChange={(e) => setQuickParent({ ...quickParent, nome: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Telefone</Label>
+              <Input
+                value={quickParent.telefone}
+                onChange={(e) => setQuickParent({ ...quickParent, telefone: e.target.value })}
+                inputMode="tel"
+                placeholder="(67) 99999-9999"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Valor da contratação</Label>
+              <Input
+                value={quickParent.valor}
+                onChange={(e) => setQuickParent({ ...quickParent, valor: e.target.value })}
+                inputMode="decimal"
+                placeholder="Ex.: 1.000,00"
+              />
+              <p className="text-xs text-muted-foreground">
+                A vigência usará as datas de início e término desta importação.
+              </p>
+            </div>
+            {quickParent.tipo === "lider" && (
+              <div className="space-y-1 sm:col-span-2">
+                <Label>Coordenador acima do líder (opcional)</Label>
+                <Select
+                  value={quickParent.coordenadorId || "avulso"}
+                  onValueChange={(coordenadorId) =>
+                    setQuickParent({
+                      ...quickParent,
+                      coordenadorId: coordenadorId === "avulso" ? "" : coordenadorId,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="avulso">Líder avulso</SelectItem>
+                    {coordenadores.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {!(quickParent.tipo === "lider" && quickParent.coordenadorId) && (
+              <>
+                <div className="space-y-1">
+                  <Label>Local</Label>
+                  <Select
+                    value={quickParent.escopo}
+                    onValueChange={(escopo: "campo_grande" | "interior") =>
+                      setQuickParent({ ...quickParent, escopo })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="campo_grande">Campo Grande</SelectItem>
+                      <SelectItem value="interior">Interior</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {quickParent.escopo === "campo_grande" ? (
+                  <div className="space-y-1">
+                    <Label>Região</Label>
+                    <Select
+                      value={quickParent.regiao}
+                      onValueChange={(regiao) => setQuickParent({ ...quickParent, regiao })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {regioes.map((item) => (
+                          <SelectItem key={item.id} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <Label>Cidade</Label>
+                    <Input
+                      value={quickParent.cidade}
+                      onChange={(e) => setQuickParent({ ...quickParent, cidade: e.target.value })}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+            {quickParent.tipo === "lider" && quickParent.coordenadorId && (
+              <p className="text-sm text-muted-foreground sm:col-span-2">
+                O líder herdará automaticamente a cidade ou região do coordenador selecionado.
+              </p>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setQuickParentOpen(false)}>Cancelar</Button>
-            <Button disabled={busy} onClick={() => void saveQuickParent()}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cadastrar e selecionar</Button>
+            <Button variant="outline" onClick={() => setQuickParentOpen(false)}>
+              Cancelar
+            </Button>
+            <Button disabled={busy} onClick={() => void saveQuickParent()}>
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cadastrar e selecionar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -7,6 +7,43 @@ export interface PessoaArvore {
   valor_contratacao?: number | null;
 }
 
+/**
+ * Completa uma selecao de raizes com todos os seus descendentes.
+ *
+ * Filtros de busca/status/tipo escolhem a raiz da arvore, mas nao podem
+ * desmontar a equipe removendo filhos que naturalmente possuem outro tipo.
+ */
+export function incluirDescendentesDaArvore<T extends PessoaArvore>(
+  pessoas: T[],
+  idsIniciais: Iterable<string>,
+  podeIncluir: (pessoa: T) => boolean = () => true,
+): Set<string> {
+  const ids = new Set(idsIniciais);
+  const filhosPorPai = new Map<string, T[]>();
+
+  pessoas.forEach((pessoa) => {
+    if (!pessoa.parent_id) return;
+    const filhos = filhosPorPai.get(pessoa.parent_id) || [];
+    filhos.push(pessoa);
+    filhosPorPai.set(pessoa.parent_id, filhos);
+  });
+
+  const pendentes = [...ids];
+  const visitados = new Set<string>();
+  while (pendentes.length > 0) {
+    const paiId = pendentes.shift()!;
+    if (visitados.has(paiId)) continue;
+    visitados.add(paiId);
+    for (const filho of filhosPorPai.get(paiId) || []) {
+      if (!podeIncluir(filho)) continue;
+      ids.add(filho.id);
+      pendentes.push(filho.id);
+    }
+  }
+
+  return ids;
+}
+
 export interface ParticaoArvore<T extends PessoaArvore> {
   coordenadores: T[];
   lideresRaiz: T[];
