@@ -301,7 +301,12 @@ export default function EleicaoConferenciaListasPanel({ clientId }: { clientId: 
       setPage(0);
       toast.success("Pente-fino concluído. O resultado foi salvo no histórico.");
     } catch (error) {
-      toast.error(erro(error));
+      const message = erro(error);
+      toast.error(
+        message.toLowerCase().includes("statement timeout")
+          ? "A comparação excedeu o tempo do banco. Aplique a migration de otimização e tente novamente."
+          : message,
+      );
     } finally {
       setBusy(false);
     }
@@ -476,7 +481,8 @@ export default function EleicaoConferenciaListasPanel({ clientId }: { clientId: 
             <FileSpreadsheet className="h-5 w-5" /> Nova conferência de lista
           </CardTitle>
           <CardDescription>
-            Suba Excel ou CSV com Nome e Telefone. Nenhum cadastro ou contrato será alterado.
+            Suba Excel ou CSV com Nome e Telefone. A ferramenta grava somente este histórico de
+            conferência; cadastros, contratos, valores e lideranças não são alterados.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -1883,7 +1883,8 @@ export default function Eleicao() {
           </div>
 
           <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-            <TabsList className="grid h-auto grid-cols-2 sm:grid-cols-4 lg:grid-cols-12 w-full max-w-7xl">
+            <div className="overflow-x-auto pb-1">
+              <TabsList className="flex h-auto w-max min-w-full justify-start gap-1">
               <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
               <TabsTrigger value="funnel" className="gap-1.5">
                 <Handshake className="w-3.5 h-3.5" />
@@ -1924,7 +1925,8 @@ export default function Eleicao() {
               </TabsTrigger>
               <TabsTrigger value="custos">Previsão de custos</TabsTrigger>
               <TabsTrigger value="config">Configurações</TabsTrigger>
-            </TabsList>
+              </TabsList>
+            </div>
           </Tabs>
 
           {view === "reunioes" ? (
