@@ -92,6 +92,7 @@ import {
   FileSpreadsheet,
   Printer,
   CalendarDays,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   exportEleicaoPdf,
@@ -124,6 +125,7 @@ import {
 } from "@/lib/eleicao-situacao";
 import ContratadosCumprimentoReport from "@/components/eleicao/ContratadosCumprimentoReport";
 import EleicaoCabosImportacaoPanel from "@/components/eleicao/EleicaoCabosImportacaoPanel";
+import EleicaoConferenciaListasPanel from "@/components/eleicao/EleicaoConferenciaListasPanel";
 import {
   gerarFormularioCabosPdf,
   type LiderFormularioCabos,
@@ -1130,6 +1132,7 @@ export default function Eleicao() {
     | "distribuicao"
     | "relatorio_contratados"
     | "importacao_cabos"
+    | "conferencia_listas"
   >("cadastros");
   const [layoutMode, setLayoutMode] = useState<"arvore" | "lista">("arvore");
   const [statusFilter, setStatusFilter] = useState<
@@ -1880,7 +1883,7 @@ export default function Eleicao() {
           </div>
 
           <Tabs value={view} onValueChange={(v) => setView(v as any)} className="mb-4">
-            <TabsList className="grid h-auto grid-cols-2 sm:grid-cols-4 lg:grid-cols-11 w-full max-w-7xl">
+            <TabsList className="grid h-auto grid-cols-2 sm:grid-cols-4 lg:grid-cols-12 w-full max-w-7xl">
               <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
               <TabsTrigger value="funnel" className="gap-1.5">
                 <Handshake className="w-3.5 h-3.5" />
@@ -1910,6 +1913,10 @@ export default function Eleicao() {
               <TabsTrigger value="importacao_cabos" className="gap-1.5">
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 Importar cabos
+              </TabsTrigger>
+              <TabsTrigger value="conferencia_listas" className="gap-1.5">
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                Pente-fino
               </TabsTrigger>
               <TabsTrigger value="dobradinhas" className="gap-1.5">
                 <Handshake className="w-3.5 h-3.5" />
@@ -1969,6 +1976,10 @@ export default function Eleicao() {
           ) : view === "importacao_cabos" ? (
             clientId ? (
               <EleicaoCabosImportacaoPanel clientId={clientId} onChanged={load} />
+            ) : null
+          ) : view === "conferencia_listas" ? (
+            clientId ? (
+              <EleicaoConferenciaListasPanel clientId={clientId} />
             ) : null
           ) : view === "distribuicao" ? (
             clientId ? (

@@ -371,6 +371,8 @@ export default function EleicaoCabosImportacaoPanel({
   const refusedRef = useRef<HTMLDivElement>(null);
   const conflictsRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
+  const historyTopScrollRef = useRef<HTMLDivElement>(null);
+  const historyTableScrollRef = useRef<HTMLDivElement>(null);
   const { regioes } = useRegioesEleicao(clientId);
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<Record<string, string>[]>([]);
@@ -1847,7 +1849,31 @@ export default function EleicaoCabosImportacaoPanel({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="max-h-[min(62vh,640px)] overflow-auto overscroll-contain rounded-md border">
+            <div className="sticky top-14 z-10 rounded-t-md border border-b-0 bg-background px-2 pt-1 shadow-sm">
+              <p className="mb-1 text-[11px] text-muted-foreground">
+                Deslize para ver as acoes do historico
+              </p>
+              <div
+                ref={historyTopScrollRef}
+                className="overflow-x-auto overscroll-x-contain"
+                onScroll={(event) => {
+                  if (historyTableScrollRef.current) {
+                    historyTableScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+                  }
+                }}
+              >
+                <div className="h-1 w-[1180px]" />
+              </div>
+            </div>
+            <div
+              ref={historyTableScrollRef}
+              className="max-h-[min(62vh,640px)] overflow-auto overscroll-contain rounded-b-md border"
+              onScroll={(event) => {
+                if (historyTopScrollRef.current) {
+                  historyTopScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+                }
+              }}
+            >
               <Table className="min-w-[1180px]">
                 <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                   <TableRow>
@@ -1860,7 +1886,9 @@ export default function EleicaoCabosImportacaoPanel({
                     <TableHead>Repetidos na planilha</TableHead>
                     <TableHead>Inválidos</TableHead>
                     <TableHead className="text-right">Custo</TableHead>
-                    <TableHead />
+                    <TableHead className="sticky right-0 z-20 min-w-[420px] bg-background shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)]">
+                      Acoes
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1908,8 +1936,8 @@ export default function EleicaoCabosImportacaoPanel({
                                 : lot.custo_previsto,
                           )}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
+                        <TableCell className="sticky right-0 z-[5] min-w-[420px] bg-background shadow-[-8px_0_12px_-12px_rgba(0,0,0,0.45)]">
+                          <div className="flex flex-wrap items-center justify-end gap-1">
                             <Button
                               size="sm"
                               variant="ghost"
