@@ -61,6 +61,7 @@ type SyncStatus = {
 type RegionRow = { nome: string; votos: number; secoes: number; percentual: number };
 
 const CARGOS = ["Deputado Federal", "Deputado Estadual"] as const;
+const SECTION_PAGE_SIZE = 1000;
 const fmt = (value: number) => Number(value || 0).toLocaleString("pt-BR");
 const pct = (value: number) =>
   `${Number(value || 0)
@@ -159,15 +160,23 @@ export default function RelatorioEleicao2026() {
     queryKey: ["tse-candidate-sections", municipalityCode, cargo, selected],
     enabled: selected !== null && syncStatus?.status === "success",
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_tse_candidate_sections" as any, {
-        p_ano: 2026,
-        p_uf: "MS",
-        p_cod_municipio: municipalityCode,
-        p_cargo: cargo,
-        p_numero: selected,
-      });
-      if (error) throw error;
-      return ((data || []) as any[]).map((row) => ({
+      const allRows: any[] = [];
+      for (let from = 0; ; from += SECTION_PAGE_SIZE) {
+        const { data, error } = await supabase
+          .rpc("get_tse_candidate_sections" as any, {
+            p_ano: 2026,
+            p_uf: "MS",
+            p_cod_municipio: municipalityCode,
+            p_cargo: cargo,
+            p_numero: selected,
+          })
+          .range(from, from + SECTION_PAGE_SIZE - 1);
+        if (error) throw error;
+        const page = (data || []) as any[];
+        allRows.push(...page);
+        if (page.length < SECTION_PAGE_SIZE) break;
+      }
+      return allRows.map((row) => ({
         ...row,
         zona: Number(row.zona),
         secao: Number(row.secao),
@@ -384,7 +393,7 @@ export default function RelatorioEleicao2026() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={exportXlsx} disabled={!totalsMatch}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" /> XLSX
+                <FileSpreadsheet className="w-4 h-4 mr-2" /> Exportar Excel
               </Button>
               <Button onClick={exportPdf} disabled={!totalsMatch}>
                 <Download className="w-4 h-4 mr-2" /> PDF
