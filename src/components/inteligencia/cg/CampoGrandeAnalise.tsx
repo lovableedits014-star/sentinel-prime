@@ -102,15 +102,16 @@ const CampoGrandeAnalise = () => {
   }, [cargo, turno]);
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["tse-votacao", cargo, turno, "cg-5002704"],
+    queryKey: ["tse-votacao", 2024, cargo, turno, "cg-90514"],
     queryFn: async () => {
-      // BUG FIX: filtrar por município (Campo Grande/MS = 5002704).
+      // CD_MUNICIPIO da Justiça Eleitoral para Campo Grande/MS = 90514.
       // Sem este filtro, a tabela tse_votacao_zona devolvia candidatos de
       // outras cidades misturados ao ranking de CG.
       const { data, error } = await supabase
         .from("tse_votacao_zona" as any)
         .select("*")
-        .eq("cod_municipio", 5002704)
+        .eq("ano", 2024)
+        .eq("cod_municipio", 90514)
         .eq("cargo", cargo)
         .eq("turno", Number(turno))
         .order("votos", { ascending: false })
@@ -121,9 +122,11 @@ const CampoGrandeAnalise = () => {
   });
 
   const { data: locaisMeta = [] } = useQuery({
-    queryKey: ["tse-locais-meta", cargo, turno],
+    queryKey: ["tse-locais-meta", 2024, cargo, turno, 90514],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_tse_locais_summary" as any, {
+        p_ano: 2024,
+        p_cod_municipio: 90514,
         p_cargo: cargo,
         p_turno: Number(turno),
       });
@@ -140,12 +143,14 @@ const CampoGrandeAnalise = () => {
   });
 
   const { data: votosPorLocalCand = [], isLoading: loadingCand } = useQuery({
-    queryKey: ["tse-cand-locais", cargo, turno, selectedCandidato],
+    queryKey: ["tse-cand-locais", 2024, cargo, turno, selectedCandidato],
     enabled: !!selectedCandidato,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tse_votacao_local" as any)
         .select("*")
+        .eq("ano", 2024)
+        .eq("cod_municipio", 90514)
         .eq("cargo", cargo)
         .eq("turno", Number(turno))
         .eq("numero", selectedCandidato!)
@@ -157,13 +162,15 @@ const CampoGrandeAnalise = () => {
   });
 
   const { data: rankingDoLocal = [], isLoading: loadingLocal } = useQuery({
-    queryKey: ["tse-local-ranking", cargo, turno, selectedLocal],
+    queryKey: ["tse-local-ranking", 2024, cargo, turno, selectedLocal],
     enabled: !!selectedLocal,
     queryFn: async () => {
       const [zona, nr_local] = selectedLocal!.split("-").map(Number);
       const { data, error } = await supabase
         .from("tse_votacao_local" as any)
         .select("*")
+        .eq("ano", 2024)
+        .eq("cod_municipio", 90514)
         .eq("cargo", cargo)
         .eq("turno", Number(turno))
         .eq("zona", zona)

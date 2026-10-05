@@ -16,24 +16,11 @@ export default function EleitoralScopeBar() {
   // pois o Supabase limita 1000 linhas por requisição.
   const { data: dim } = useQuery({
     queryKey: ["eleitoral-dim-all"],
-    staleTime: Infinity,
+    staleTime: 60_000,
     queryFn: async () => {
-      const PAGE = 1000;
-      const MAX = 200000;
-      let from = 0;
-      const all: Row[] = [];
-      while (from < MAX) {
-        const { data, error } = await supabase
-          .from("tse_votacao_zona" as any)
-          .select("uf,municipio,cargo,ano")
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        const rows = ((data as any) as Row[]) || [];
-        all.push(...rows);
-        if (rows.length < PAGE) break;
-        from += PAGE;
-      }
-      return all;
+      const { data, error } = await supabase.rpc("get_tse_dimensions" as any);
+      if (error) throw error;
+      return ((data || []) as any[]).map((row) => ({ ...row, ano: Number(row.ano) })) as Row[];
     },
   });
 
@@ -78,12 +65,13 @@ export default function EleitoralScopeBar() {
 
   const has2022 = anosDisponiveis.includes(2022);
   const has2024 = anosDisponiveis.includes(2024);
+  const has2026 = anosDisponiveis.includes(2026);
 
   const breadcrumb: { label: string; tone?: "muted" | "primary" }[] = [
     { label: f.uf === "__all__" ? "Brasil" : f.uf, tone: "primary" },
     ...(f.municipio !== "__all__" ? [{ label: f.municipio, tone: "primary" as const }] : []),
     { label: f.cargo === "__all__" ? "Todos cargos" : f.cargo },
-    { label: f.anoMode === "ambos" ? "2022 + 2024" : f.anoMode },
+    { label: f.anoMode === "ambos" ? "2022 + 2024 + 2026" : f.anoMode },
   ];
 
   return (
@@ -157,12 +145,15 @@ export default function EleitoralScopeBar() {
           <Select value={f.anoMode} onValueChange={(v) => f.setAnoMode(v as AnoMode)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="ambos" disabled={!has2022 && !has2024}>2022 + 2024</SelectItem>
+              <SelectItem value="ambos" disabled={!has2022 && !has2024 && !has2026}>Todos os anos</SelectItem>
               <SelectItem value="2022" disabled={!has2022}>
                 Só 2022 {!has2022 ? "(sem dados)" : ""}
               </SelectItem>
               <SelectItem value="2024" disabled={!has2024}>
                 Só 2024 {!has2024 ? "(sem dados)" : ""}
+              </SelectItem>
+              <SelectItem value="2026" disabled={!has2026}>
+                Só 2026 {!has2026 ? "(sem dados)" : ""}
               </SelectItem>
             </SelectContent>
           </Select>

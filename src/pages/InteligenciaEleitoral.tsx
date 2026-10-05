@@ -22,6 +22,7 @@ import MunicipioContextoIBGE from "@/components/ibge/MunicipioContextoIBGE";
 import NarrativaPolitica from "@/components/inteligencia/narrativa/NarrativaPolitica";
 import RadarParlamentar from "@/components/inteligencia/parlamentar/RadarParlamentar";
 import BandeiraAutismoMS from "@/components/inteligencia/bandeira/BandeiraAutismoMS";
+import RelatorioEleicao2026 from "@/components/inteligencia/RelatorioEleicao2026";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 
 type CoverageRow = { ano: number; ufs: number; municipios: number; candidatos: number; votos: number };
@@ -79,44 +80,26 @@ const InteligenciaEleitoralInner = () => {
     }
   }, [clientId, etapa]);
 
-  const isCampoGrande = f.uf === "MS" && f.municipio === "Campo Grande";
+  const isCampoGrande = f.uf === "MS" && f.municipio.toLocaleUpperCase("pt-BR") === "CAMPO GRANDE";
 
   const { data: coverage } = useQuery<CoverageRow[]>({
     queryKey: ["tse-coverage-global", f.uf, f.municipio, f.anoMode, f.cargo],
-    staleTime: Infinity,
+    staleTime: 60_000,
     queryFn: async () => {
-      const PAGE = 1000;
-      const MAX_ROWS = 200000;
-      let from = 0;
-      const all: any[] = [];
-      while (from < MAX_ROWS) {
-        let q: any = supabase
-          .from("tse_votacao_zona" as any)
-          .select("ano,uf,cod_municipio,numero,partido,votos,cargo,municipio")
-          .range(from, from + PAGE - 1);
-        if (f.uf !== "__all__") q = q.eq("uf", f.uf);
-        if (f.municipio !== "__all__") q = q.eq("municipio", f.municipio);
-        if (f.cargo !== "__all__") q = q.eq("cargo", f.cargo);
-        if (f.anoMode !== "ambos") q = q.eq("ano", Number(f.anoMode));
-        const { data, error } = await q;
-        if (error) throw error;
-        const rows = (data as any[]) || [];
-        all.push(...rows);
-        if (rows.length < PAGE) break;
-        from += PAGE;
-      }
-      const byAno = new Map<number, { ufs: Set<string>; munis: Set<number>; cands: Set<string>; votos: number }>();
-      all.forEach((r) => {
-        if (!byAno.has(r.ano)) byAno.set(r.ano, { ufs: new Set(), munis: new Set(), cands: new Set(), votos: 0 });
-        const b = byAno.get(r.ano)!;
-        if (r.uf) b.ufs.add(r.uf);
-        if (r.cod_municipio) b.munis.add(r.cod_municipio);
-        if (r.numero) b.cands.add(`${r.numero}-${r.partido || ""}`);
-        b.votos += Number(r.votos || 0);
+      const { data, error } = await supabase.rpc("get_tse_coverage" as any, {
+        p_anos: f.anos,
+        p_uf: f.uf === "__all__" ? null : f.uf,
+        p_municipio: f.municipio === "__all__" ? null : f.municipio,
+        p_cargo: f.cargo === "__all__" ? null : f.cargo,
       });
-      return Array.from(byAno.entries())
-        .map(([ano, b]) => ({ ano, ufs: b.ufs.size, municipios: b.munis.size, candidatos: b.cands.size, votos: b.votos }))
-        .sort((a, b) => a.ano - b.ano);
+      if (error) throw error;
+      return ((data || []) as any[]).map((row) => ({
+        ano: Number(row.ano),
+        ufs: Number(row.ufs || 0),
+        municipios: Number(row.municipios || 0),
+        candidatos: Number(row.candidatos || 0),
+        votos: Number(row.votos || 0),
+      })) as CoverageRow[];
     },
   });
 
@@ -130,7 +113,7 @@ const InteligenciaEleitoralInner = () => {
     partes.push(f.uf === "__all__" ? "Brasil" : f.uf);
     if (f.municipio !== "__all__") partes.push(f.municipio);
     partes.push(f.cargo === "__all__" ? "todos cargos" : f.cargo);
-    partes.push(f.anoMode === "ambos" ? "2022+2024" : f.anoMode);
+    partes.push(f.anoMode === "ambos" ? "2022+2024+2026" : f.anoMode);
     return partes.join(" · ");
   }, [f]);
 
@@ -331,13 +314,15 @@ const InteligenciaEleitoralInner = () => {
             proximoPasso={{ label: proximaLabel("adversarios")!, onClick: () => proxima("adversarios") }}
           />
 
-          <Tabs defaultValue="comparar" className="w-full">
+          <Tabs defaultValue="relatorio-2026" className="w-full">
             <TabsList className="flex-wrap h-auto">
+              <TabsTrigger value="relatorio-2026" className="gap-1.5"><Vote className="w-3.5 h-3.5" /> Relatório 2026</TabsTrigger>
               <TabsTrigger value="comparar" className="gap-1.5"><Users className="w-3.5 h-3.5" /> Comparar candidatos</TabsTrigger>
               <TabsTrigger value="composicao" className="gap-1.5"><LayoutGrid className="w-3.5 h-3.5" /> Composição (2022+2024)</TabsTrigger>
               <TabsTrigger value="simulador" className="gap-1.5"><Target className="w-3.5 h-3.5" /> Simulador de chapa</TabsTrigger>
               <TabsTrigger value="parlamentar" className="gap-1.5"><Brain className="w-3.5 h-3.5" /> Atividade parlamentar</TabsTrigger>
             </TabsList>
+            <TabsContent value="relatorio-2026" className="mt-4"><RelatorioEleicao2026 /></TabsContent>
             <TabsContent value="comparar" className="mt-4"><CompararCandidatos /></TabsContent>
             <TabsContent value="composicao" className="mt-4"><ComposicaoChapa /></TabsContent>
             <TabsContent value="simulador" className="mt-4"><SimuladorChapa /></TabsContent>

@@ -21,7 +21,14 @@ type LocalImportRow = {
   numero: number; nome_candidato: string | null; votos: number; bairro: string | null;
 };
 
-const ANOS_ESPERADOS = [2018, 2020, 2022, 2024];
+const ANOS_ESPERADOS = [2018, 2020, 2022, 2024, 2026];
+const CARGOS_TSE_2026 = [
+  { codigo: "0001", nome: "Presidente" },
+  { codigo: "0003", nome: "Governador" },
+  { codigo: "0005", nome: "Senador" },
+  { codigo: "0006", nome: "Deputado Federal" },
+  { codigo: "0007", nome: "Deputado Estadual" },
+];
 const CSV_LOCAL_BATCH = 500;
 
 function parseCsvLine(line: string): string[] {
@@ -50,6 +57,7 @@ export default function TseSyncPanel() {
   const [zonas, setZonas] = useState<ZonaRow[]>([]);
   const [locais, setLocais] = useState<LocalRow[]>([]);
   const [importing, setImporting] = useState<string | null>(null);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
   const [geocoding, setGeocoding] = useState(false);
   const [importingLocais, setImportingLocais] = useState(false);
   const [municipio, setMunicipio] = useState("");
@@ -60,7 +68,7 @@ export default function TseSyncPanel() {
   const [uploadingResultados, setUploadingResultados] = useState(false);
   const [uploadedPathResultados, setUploadedPathResultados] = useState<string | null>(null);
   const [uf, setUf] = useState("MS");
-  const [ano, setAno] = useState<number>(2024);
+  const [ano, setAno] = useState<number>(2026);
   // Diagnóstico
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthChecked, setHealthChecked] = useState<string | null>(null);
@@ -69,56 +77,26 @@ export default function TseSyncPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      // Agregação client-side (sem rpc) — busca paginada simples
-      const { data: zd } = await supabase
-        .from("tse_votacao_zona" as any)
-        .select("uf, ano, zona, cod_municipio");
-      const { data: ld } = await supabase
-        .from("tse_votacao_local" as any)
-        .select("uf, ano, bairro, cod_municipio, zona, nr_local");
-
-      const zMap = new Map<string, ZonaRow>();
-      for (const r of (zd as any[]) || []) {
-        const k = `${r.uf}|${r.ano}`;
-        const cur = zMap.get(k) || { uf: r.uf, ano: r.ano, registros: 0, zonas: 0, municipios: 0 };
-        cur.registros += 1;
-        zMap.set(k, cur);
-      }
-      // recontagem distinct — fazemos num segundo loop por chave composta
-      const zSets = new Map<string, { z: Set<number>; m: Set<number> }>();
-      for (const r of (zd as any[]) || []) {
-        const k = `${r.uf}|${r.ano}`;
-        const s = zSets.get(k) || { z: new Set<number>(), m: new Set<number>() };
-        s.z.add(r.zona); s.m.add(r.cod_municipio);
-        zSets.set(k, s);
-      }
-      for (const [k, s] of zSets) {
-        const cur = zMap.get(k); if (cur) { cur.zonas = s.z.size; cur.municipios = s.m.size; }
-      }
-      setZonas([...zMap.values()].sort((a, b) => a.uf.localeCompare(b.uf) || a.ano - b.ano));
-
-      const lMap = new Map<string, LocalRow>();
-      const lSets = new Map<string, Set<number>>();
-      const localSeen = new Set<string>();
-      const localHasBairro = new Set<string>();
-      for (const r of (ld as any[]) || []) {
-        const k = `${r.uf}|${r.ano}`;
-        const localKey = `${k}|${r.cod_municipio}|${r.zona}|${r.nr_local}`;
-        const cur = lMap.get(k) || { uf: r.uf, ano: r.ano, locais: 0, com_bairro: 0, municipios: 0 };
-        if (!localSeen.has(localKey)) {
-          localSeen.add(localKey);
-          cur.locais += 1;
-        }
-        if (r.bairro && !localHasBairro.has(localKey)) {
-          localHasBairro.add(localKey);
-          cur.com_bairro += 1;
-        }
-        lMap.set(k, cur);
-        const ms = lSets.get(k) || new Set<number>();
-        ms.add(r.cod_municipio); lSets.set(k, ms);
-      }
-      for (const [k, s] of lSets) { const cur = lMap.get(k); if (cur) cur.municipios = s.size; }
-      setLocais([...lMap.values()].sort((a, b) => a.uf.localeCompare(b.uf) || a.ano - b.ano));
+      const [{ data: zoneData, error: zoneError }, { data: localData, error: localError }] = await Promise.all([
+        supabase.rpc("get_tse_admin_coverage" as any),
+        supabase.rpc("get_tse_local_coverage" as any),
+      ]);
+      if (zoneError) throw zoneError;
+      if (localError) throw localError;
+      setZonas(((zoneData || []) as any[]).map((row) => ({
+        uf: row.uf,
+        ano: Number(row.ano),
+        registros: Number(row.registros || 0),
+        zonas: Number(row.zonas || 0),
+        municipios: Number(row.municipios || 0),
+      })) as ZonaRow[]);
+      setLocais(((localData || []) as any[]).map((row) => ({
+        uf: row.uf,
+        ano: Number(row.ano),
+        locais: Number(row.locais || 0),
+        com_bairro: Number(row.com_bairro || 0),
+        municipios: Number(row.municipios || 0),
+      })) as LocalRow[]);
     } finally {
       setLoading(false);
     }
@@ -129,7 +107,26 @@ export default function TseSyncPanel() {
   const importTse = async () => {
     const key = `${uf}-${ano}`;
     setImporting(key);
+    setSyncProgress(null);
     try {
+      if (ano === 2026) {
+        let totalRows = 0;
+        for (let index = 0; index < CARGOS_TSE_2026.length; index++) {
+          const cargo = CARGOS_TSE_2026[index];
+          setSyncProgress(`${index + 1}/${CARGOS_TSE_2026.length} · ${cargo.nome}`);
+          const { data, error } = await supabase.functions.invoke("sync-tse-2026", {
+            body: { uf, cargo_codigo: cargo.codigo },
+          });
+          if (error) throw error;
+          if ((data as any)?.error) throw new Error((data as any).error);
+          totalRows += Number((data as any)?.inserted || 0);
+        }
+        toast.success(`TSE ${uf}/2026 sincronizado`, {
+          description: `${totalRows.toLocaleString("pt-BR")} registros por zona · 5 cargos oficiais`,
+        });
+        await load();
+        return;
+      }
       const { data, error } = await supabase.functions.invoke("import-tse-results", {
         body: { uf, ano, storage_path: uploadedPathResultados || undefined },
       });
@@ -141,6 +138,7 @@ export default function TseSyncPanel() {
       toast.error("Falha ao importar TSE", { description: e?.message || String(e) });
     } finally {
       setImporting(null);
+      setSyncProgress(null);
     }
   };
 
@@ -404,12 +402,15 @@ export default function TseSyncPanel() {
             <div className="flex gap-2">
               <Button onClick={importTse} disabled={!!importing} className="flex-1">
                 {importing === `${uf}-${ano}` ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                Importar TSE {uf}/{ano}
+                {ano === 2026 ? "Sincronizar API oficial TSE 2026" : `Importar TSE ${uf}/${ano}`}
               </Button>
             </div>
           </div>
+          {syncProgress && <p className="text-xs text-blue-300 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sincronizando {syncProgress}</p>}
           <p className="text-[11px] text-slate-500">
-            Tenta primeiro baixar do CDN do TSE; se a CDN bloquear (comum), envie o ZIP de <strong>resultados</strong> abaixo e a importação usará seu arquivo automaticamente.
+            {ano === 2026
+              ? "Consulta os JSON oficiais EA20 do TSE para Presidente, Governador, Senador, Deputado Federal e Deputado Estadual, cobrindo todos os municípios e zonas de MS."
+              : <>Tenta primeiro baixar do CDN do TSE; se a CDN bloquear, envie o ZIP de <strong>resultados</strong> abaixo.</>}
           </p>
 
           <div className="border-t border-slate-700 pt-3 mt-3 space-y-2">

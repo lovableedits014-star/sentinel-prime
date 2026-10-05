@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode, useCallback } from "react";
 
-export type AnoMode = "ambos" | "2022" | "2024";
+export type AnoMode = "ambos" | "2022" | "2024" | "2026";
 
 export type EleitoralFilters = {
   uf: string;            // sigla UF ou "__all__"
@@ -37,7 +37,7 @@ function readFromURL(): EleitoralFilters {
   return {
     uf: sp.get("uf") || DEFAULT.uf,
     municipio: sp.get("municipio") || DEFAULT.municipio,
-    anoMode: (ano === "2022" || ano === "2024" || ano === "ambos" ? ano : DEFAULT.anoMode) as AnoMode,
+    anoMode: (ano === "2022" || ano === "2024" || ano === "2026" || ano === "ambos" ? ano : DEFAULT.anoMode) as AnoMode,
     cargo: sp.get("cargo") || DEFAULT.cargo,
     partido: sp.get("partido") || DEFAULT.partido,
   };
@@ -80,7 +80,7 @@ export function EleitoralFiltersProvider({ children }: { children: ReactNode }) 
   const reset = useCallback(() => setState(DEFAULT), []);
 
   const anos = useMemo(
-    () => (state.anoMode === "ambos" ? [2022, 2024] : [Number(state.anoMode)]),
+    () => (state.anoMode === "ambos" ? [2022, 2024, 2026] : [Number(state.anoMode)]),
     [state.anoMode],
   );
 
