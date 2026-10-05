@@ -59,6 +59,21 @@ type SyncStatus = {
   erro: string | null;
 };
 type RegionRow = { nome: string; votos: number; secoes: number; percentual: number };
+type ReportScope = "city" | "state";
+type GeographyRow = {
+  numero: number;
+  cod_municipio: number;
+  municipio: string;
+  zona: number;
+  votos: number;
+};
+type CityRow = {
+  cod_municipio: number;
+  municipio: string;
+  votos: number;
+  zonas: number;
+  percentual: number;
+};
 
 const CARGOS = ["Deputado Federal", "Deputado Estadual"] as const;
 const SECTION_PAGE_SIZE = 1000;
@@ -77,6 +92,7 @@ const safeFileName = (value: string) =>
 
 export default function RelatorioEleicao2026() {
   const queryClient = useQueryClient();
+  const [scope, setScope] = useState<ReportScope>("city");
   const [cargo, setCargo] = useState<(typeof CARGOS)[number]>("Deputado Federal");
   const [municipalityCode, setMunicipalityCode] = useState(90514);
   const [candidateSearch, setCandidateSearch] = useState("");
@@ -111,14 +127,14 @@ export default function RelatorioEleicao2026() {
     isLoading: loadingRanking,
     error: rankingError,
   } = useQuery({
-    queryKey: ["tse-2026-ranking-city", cargo, municipality.municipio],
-    enabled: Boolean(municipality.municipio),
+    queryKey: ["tse-2026-ranking", scope, cargo, municipality.municipio],
+    enabled: scope === "state" || Boolean(municipality.municipio),
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_tse_candidate_ranking" as any, {
         p_ano: 2026,
         p_uf: "MS",
         p_cargo: cargo,
-        p_municipio: municipality.municipio,
+        p_municipio: scope === "city" ? municipality.municipio : null,
       });
       if (error) throw error;
       return ((data || []) as any[]).map((row) => ({
@@ -158,7 +174,7 @@ export default function RelatorioEleicao2026() {
     refetch: refetchSections,
   } = useQuery({
     queryKey: ["tse-candidate-sections", municipalityCode, cargo, selected],
-    enabled: selected !== null && syncStatus?.status === "success",
+    enabled: scope === "city" && selected !== null && syncStatus?.status === "success",
     queryFn: async () => {
       const allRows: any[] = [];
       for (let from = 0; ; from += SECTION_PAGE_SIZE) {
@@ -190,12 +206,46 @@ export default function RelatorioEleicao2026() {
     },
   });
 
+  const {
+    data: geography = [],
+    isLoading: loadingGeography,
+    error: geographyError,
+  } = useQuery({
+    queryKey: ["tse-candidate-geography-state", cargo, selected],
+    enabled: scope === "state" && selected !== null,
+    queryFn: async () => {
+      const allRows: any[] = [];
+      for (let from = 0; ; from += SECTION_PAGE_SIZE) {
+        const { data, error } = await supabase
+          .rpc("get_tse_candidate_geography" as any, {
+            p_ano: 2026,
+            p_uf: "MS",
+            p_cargo: cargo,
+            p_numeros: [selected],
+            p_municipio: null,
+          })
+          .range(from, from + SECTION_PAGE_SIZE - 1);
+        if (error) throw error;
+        const page = (data || []) as any[];
+        allRows.push(...page);
+        if (page.length < SECTION_PAGE_SIZE) break;
+      }
+      return allRows.map((row) => ({
+        numero: Number(row.numero),
+        cod_municipio: Number(row.cod_municipio),
+        municipio: String(row.municipio),
+        zona: Number(row.zona),
+        votos: Number(row.votos || 0),
+      })) as GeographyRow[];
+    },
+  });
+
   useEffect(() => {
     setSelected(null);
     setCandidateSearch("");
     setSectionSearch("");
     setSyncError(null);
-  }, [cargo, municipalityCode]);
+  }, [scope, cargo, municipalityCode]);
 
   const candidate = ranking.find((row) => row.numero === selected) || null;
   const filteredRanking = useMemo(() => {
@@ -239,6 +289,35 @@ export default function RelatorioEleicao2026() {
       percentual: totalSectionVotes ? (value.votos / totalSectionVotes) * 100 : 0,
     })).sort((a, b) => b.votos - a.votos);
   }, [sections, totalSectionVotes]);
+  const cityRows = useMemo<CityRow[]>(() => {
+    const grouped = new Map<
+      number,
+      { cod_municipio: number; municipio: string; votos: number; zonas: Set<number> }
+    >();
+    geography.forEach((row) => {
+      const current = grouped.get(row.cod_municipio) || {
+        cod_municipio: row.cod_municipio,
+        municipio: row.municipio,
+        votos: 0,
+        zonas: new Set<number>(),
+      };
+      current.votos += row.votos;
+      current.zonas.add(row.zona);
+      grouped.set(row.cod_municipio, current);
+    });
+    return Array.from(grouped.values())
+      .map((row) => ({
+        cod_municipio: row.cod_municipio,
+        municipio: row.municipio,
+        votos: row.votos,
+        zonas: row.zonas.size,
+        percentual: candidate?.votos ? (row.votos / candidate.votos) * 100 : 0,
+      }))
+      .sort((a, b) => b.votos - a.votos);
+  }, [candidate?.votos, geography]);
+  const totalCityVotes = cityRows.reduce((sum, row) => sum + row.votos, 0);
+  const stateTotalsMatch = Boolean(candidate && totalCityVotes === candidate.votos);
+  const canExport = scope === "city" ? totalsMatch : stateTotalsMatch;
 
   const syncSections = async () => {
     if (syncGuard.current) return;
@@ -270,15 +349,60 @@ export default function RelatorioEleicao2026() {
   };
 
   useEffect(() => {
-    if (selected !== null && syncStatus?.status !== "success" && !syncing && !syncError) {
+    if (
+      scope === "city" &&
+      selected !== null &&
+      syncStatus?.status !== "success" &&
+      !syncing &&
+      !syncError
+    ) {
       void syncSections();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, syncStatus?.status]);
+  }, [scope, selected, syncStatus?.status]);
 
   const exportXlsx = () => {
-    if (!candidate || !totalsMatch) return;
+    if (!candidate || !canExport) return;
     const workbook = XLSX.utils.book_new();
+    if (scope === "state") {
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet([
+          {
+            Ano: 2026,
+            UF: "MS",
+            Cargo: cargo,
+            Número: candidate.numero,
+            Candidato: candidate.nome_urna || candidate.nome_completo,
+            Partido: candidate.partido,
+            "Votos oficiais em MS": candidate.votos,
+            "Votos somados nos municípios": totalCityVotes,
+            Municípios: cityRows.length,
+            Conferência: "TOTAL CONFERIDO",
+          },
+        ]),
+        "Resumo",
+      );
+      XLSX.utils.book_append_sheet(
+        workbook,
+        XLSX.utils.json_to_sheet(
+          cityRows.map((row, index) => ({
+            Posição: index + 1,
+            "Código do município": row.cod_municipio,
+            Município: row.municipio,
+            Zonas: row.zonas,
+            Votos: row.votos,
+            "% do candidato em MS": Number(row.percentual.toFixed(2)),
+          })),
+        ),
+        "Votos por cidade",
+      );
+      XLSX.writeFile(
+        workbook,
+        `ms-2026-${safeFileName(cargo)}-${candidate.numero}-por-cidade.xlsx`,
+      );
+      return;
+    }
     XLSX.utils.book_append_sheet(
       workbook,
       XLSX.utils.json_to_sheet([
@@ -333,9 +457,31 @@ export default function RelatorioEleicao2026() {
   };
 
   const exportPdf = () => {
-    if (!candidate || !totalsMatch) return;
+    if (!candidate || !canExport) return;
     const doc = new jsPDF();
     const name = candidate.nome_urna || candidate.nome_completo || `#${candidate.numero}`;
+    if (scope === "state") {
+      doc.setFontSize(17);
+      doc.text("Votação por cidade — Mato Grosso do Sul", 14, 18);
+      doc.setFontSize(11);
+      doc.text(`Eleições 2026 · ${cargo} · ${name} · #${candidate.numero}`, 14, 27);
+      doc.text(`Total oficial conferido: ${fmt(totalCityVotes)} votos`, 14, 35);
+      autoTable(doc, {
+        startY: 44,
+        head: [["Pos.", "Cidade", "Zonas", "Votos", "%"]],
+        body: cityRows.map((row, index) => [
+          `${index + 1}º`,
+          row.municipio,
+          fmt(row.zonas),
+          fmt(row.votos),
+          pct(row.percentual),
+        ]),
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [37, 99, 235] },
+      });
+      doc.save(`ms-2026-${safeFileName(cargo)}-${candidate.numero}-por-cidade.pdf`);
+      return;
+    }
     doc.setFontSize(17);
     doc.text(`Votação por seção — ${municipality.municipio}/MS`, 14, 18);
     doc.setFontSize(11);
@@ -382,43 +528,64 @@ export default function RelatorioEleicao2026() {
         <CardHeader>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <Badge className="mb-2">Relatório oficial por seção</Badge>
+              <Badge className="mb-2">
+                {scope === "city" ? "Relatório oficial por seção" : "Comparativo estadual"}
+              </Badge>
               <CardTitle className="text-xl flex items-center gap-2">
                 <Vote className="w-5 h-5" /> Onde meu candidato recebeu votos?
               </CardTitle>
               <CardDescription className="mt-1">
-                Escolha cidade, cargo e candidato. O sistema baixa os boletins oficiais e mostra
-                seção, local e bairro.
+                {scope === "city"
+                  ? "Escolha uma cidade, o cargo e o candidato para ver seção, local e bairro."
+                  : "Escolha o cargo e o candidato para comparar a votação entre todas as cidades de MS."}
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={exportXlsx} disabled={!totalsMatch}>
+              <Button variant="outline" onClick={exportXlsx} disabled={!canExport}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" /> Exportar Excel
               </Button>
-              <Button onClick={exportPdf} disabled={!totalsMatch}>
+              <Button onClick={exportPdf} disabled={!canExport}>
                 <Download className="w-4 h-4 mr-2" /> PDF
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-3 gap-3">
-            <label className="space-y-1 text-sm font-medium">
-              1. Cidade
-              <select
-                className="w-full h-10 rounded-md border bg-background px-3"
-                value={municipalityCode}
-                onChange={(event) => setMunicipalityCode(Number(event.target.value))}
-              >
-                {municipalities.map((item) => (
-                  <option key={item.cod_municipio} value={item.cod_municipio}>
-                    {item.municipio}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className="grid sm:grid-cols-2 gap-2 rounded-lg bg-muted p-1">
+            <Button
+              type="button"
+              variant={scope === "city" ? "default" : "ghost"}
+              onClick={() => setScope("city")}
+            >
+              Uma cidade · por seção
+            </Button>
+            <Button
+              type="button"
+              variant={scope === "state" ? "default" : "ghost"}
+              onClick={() => setScope("state")}
+            >
+              Todas as cidades · comparativo
+            </Button>
+          </div>
+          <div className={`grid gap-3 ${scope === "city" ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+            {scope === "city" && (
+              <label className="space-y-1 text-sm font-medium">
+                1. Cidade
+                <select
+                  className="w-full h-10 rounded-md border bg-background px-3"
+                  value={municipalityCode}
+                  onChange={(event) => setMunicipalityCode(Number(event.target.value))}
+                >
+                  {municipalities.map((item) => (
+                    <option key={item.cod_municipio} value={item.cod_municipio}>
+                      {item.municipio}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="space-y-1 text-sm font-medium">
-              2. Cargo
+              {scope === "city" ? "2. Cargo" : "1. Cargo"}
               <div className="grid grid-cols-2 gap-2">
                 {CARGOS.map((item) => (
                   <Button
@@ -434,7 +601,7 @@ export default function RelatorioEleicao2026() {
               </div>
             </div>
             <label className="space-y-1 text-sm font-medium">
-              3. Candidato
+              {scope === "city" ? "3. Candidato" : "2. Candidato"}
               <div className="relative">
                 <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -462,7 +629,9 @@ export default function RelatorioEleicao2026() {
                 <TableHeader className="sticky top-0 bg-background z-10">
                   <TableRow>
                     <TableHead>Candidato</TableHead>
-                    <TableHead className="text-right">Votos na cidade</TableHead>
+                    <TableHead className="text-right">
+                      {scope === "city" ? "Votos na cidade" : "Votos em MS"}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -495,7 +664,102 @@ export default function RelatorioEleicao2026() {
         </CardContent>
       </Card>
 
-      {candidate && (syncing || syncStatus?.status !== "success") && (
+      {scope === "state" && candidate && (
+        <>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <Metric label="Votos oficiais em MS" value={fmt(candidate.votos)} />
+            <Metric
+              label="Cidades com votos"
+              value={loadingGeography ? "Carregando..." : fmt(cityRows.length)}
+            />
+            <Metric
+              label="Conferência dos totais"
+              value={
+                stateTotalsMatch
+                  ? "Total conferido"
+                  : loadingGeography
+                    ? "Conferindo..."
+                    : "Divergência"
+              }
+              ok={stateTotalsMatch}
+            />
+          </div>
+          {!loadingGeography && !stateTotalsMatch && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive flex gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              {geographyError
+                ? `Falha ao carregar o comparativo: ${(geographyError as Error).message}`
+                : `A soma das cidades (${fmt(totalCityVotes)}) ainda não fecha com o total oficial (${fmt(candidate.votos)}). A exportação fica bloqueada até a conferência.`}
+            </div>
+          )}
+          <div className="grid xl:grid-cols-[0.9fr_1.1fr] gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Cidades com mais votos</CardTitle>
+                <CardDescription>Comparativo das cidades de Mato Grosso do Sul.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[460px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={cityRows.slice(0, 15)}
+                      layout="vertical"
+                      margin={{ left: 20, right: 30 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" />
+                      <YAxis
+                        type="category"
+                        dataKey="municipio"
+                        width={130}
+                        tick={{ fontSize: 10 }}
+                      />
+                      <Tooltip formatter={(value) => [fmt(Number(value)), "Votos"]} />
+                      <Bar dataKey="votos" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Votos por cidade</CardTitle>
+                <CardDescription>
+                  O detalhamento por seção fica disponível no modo “Uma cidade”.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="max-h-[560px] overflow-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead>Pos.</TableHead>
+                        <TableHead>Cidade</TableHead>
+                        <TableHead className="text-right">Zonas</TableHead>
+                        <TableHead className="text-right">Votos</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {cityRows.map((row, index) => (
+                        <TableRow key={row.cod_municipio}>
+                          <TableCell>{index + 1}º</TableCell>
+                          <TableCell className="font-medium">{row.municipio}</TableCell>
+                          <TableCell className="text-right">{fmt(row.zonas)}</TableCell>
+                          <TableCell className="text-right font-bold">{fmt(row.votos)}</TableCell>
+                          <TableCell className="text-right">{pct(row.percentual)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+
+      {scope === "city" && candidate && (syncing || syncStatus?.status !== "success") && (
         <Card className="border-blue-500/40">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -528,7 +792,7 @@ export default function RelatorioEleicao2026() {
         </Card>
       )}
 
-      {candidate && syncStatus?.status === "success" && (
+      {scope === "city" && candidate && syncStatus?.status === "success" && (
         <>
           <div className="grid sm:grid-cols-3 gap-3">
             <Metric label="Votos oficiais na cidade" value={fmt(candidate.votos)} />
