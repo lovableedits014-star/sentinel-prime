@@ -76,3 +76,8 @@ entrypoint = "./functions/sync-tse-2026/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/sync-tse-2026/*.html" ]
+
+[functions.sync-tse-sections]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-tse-sections/index.ts"
