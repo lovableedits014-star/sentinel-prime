@@ -20,6 +20,7 @@ import {
   Target,
   Brain,
   Plus,
+  CircleDollarSign,
 } from "lucide-react";
 import ComposicaoChapa from "@/components/inteligencia/ComposicaoChapa";
 import CompararCandidatos from "@/components/inteligencia/CompararCandidatos";
@@ -38,6 +39,7 @@ import NarrativaPolitica from "@/components/inteligencia/narrativa/NarrativaPoli
 import RadarParlamentar from "@/components/inteligencia/parlamentar/RadarParlamentar";
 import BandeiraAutismoMS from "@/components/inteligencia/bandeira/BandeiraAutismoMS";
 import RelatorioEleicao2026 from "@/components/inteligencia/RelatorioEleicao2026";
+import CustoRegionalEleitoral from "@/components/inteligencia/CustoRegionalEleitoral";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 
 type CoverageRow = {
@@ -183,8 +185,23 @@ const InteligenciaEleitoralInner = () => {
         </div>
       </div>
 
-      {/* Ação principal: relatório simples e direto para Campo Grande */}
-      <RelatorioEleicao2026 />
+      {/* Ações principais: votos oficiais e eficiência financeira regional */}
+      <Tabs defaultValue="votos" className="w-full">
+        <TabsList className="grid w-full max-w-2xl grid-cols-2 h-auto">
+          <TabsTrigger value="votos" className="gap-2 py-2.5">
+            <Vote className="w-4 h-4" /> Votos por cidade e seção
+          </TabsTrigger>
+          <TabsTrigger value="custos" className="gap-2 py-2.5">
+            <CircleDollarSign className="w-4 h-4" /> Custo por região
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="votos" className="mt-4">
+          <RelatorioEleicao2026 />
+        </TabsContent>
+        <TabsContent value="custos" className="mt-4">
+          <CustoRegionalEleitoral />
+        </TabsContent>
+      </Tabs>
 
       <div className="pt-2 border-t">
         <h2 className="text-lg font-semibold">Outras análises eleitorais</h2>
