@@ -5,10 +5,7 @@ import { FileSpreadsheet, Loader2, Medal, RefreshCw, Trophy } from "lucide-react
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
-import {
-  classificarBairroCampoGrande,
-  REGIAO_CAMPO_GRANDE_LABEL,
-} from "@/lib/campo-grande-regioes";
+import { classificarLocalCampoGrande, REGIAO_CAMPO_GRANDE_LABEL } from "@/lib/campo-grande-regioes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -121,7 +118,16 @@ export default function VencedoresTerritorio({
         nr_local: Number(row.nr_local),
         nome_local: row.nome_local,
         bairro: row.bairro,
-        regiao: classificarBairroCampoGrande(row.bairro, overrideMap, REGION_KEYS).regiao,
+        regiao: classificarLocalCampoGrande(
+          {
+            nomeLocal: row.nome_local,
+            bairro: row.bairro,
+            zona: Number(row.zona),
+            nrLocal: Number(row.nr_local),
+          },
+          overrideMap,
+          REGION_KEYS,
+        ).regiao,
       })) as TerritoryOption[];
     },
   });
@@ -184,15 +190,18 @@ export default function VencedoresTerritorio({
   }, [territoryOptions, zone]);
   const selectedNeighborhoods = useMemo(() => {
     if (mode === "neighborhood") return neighborhood === "all" ? null : [neighborhood];
-    if (region === "all") return null;
+    return null;
+  }, [mode, neighborhood]);
+  const selectedLocations = useMemo(() => {
+    if (mode !== "region" || region === "all") return null;
     return Array.from(
       new Set(
         options
-          .filter((item) => item.regiao === region && item.bairro)
-          .map((item) => item.bairro as string),
+          .filter((item) => item.regiao === region)
+          .map((item) => `${item.zona}:${item.nr_local}`),
       ),
     );
-  }, [mode, neighborhood, options, region]);
+  }, [mode, options, region]);
 
   const {
     data: ranking = [],
@@ -204,20 +213,26 @@ export default function VencedoresTerritorio({
       municipalityCode,
       cargo,
       selectedNeighborhoods,
+      selectedLocations,
       zone,
       section,
       place,
     ],
-    enabled: enabled && options.length > 0 && selectedNeighborhoods?.length !== 0,
+    enabled:
+      enabled &&
+      options.length > 0 &&
+      selectedNeighborhoods?.length !== 0 &&
+      selectedLocations?.length !== 0,
     queryFn: async () => {
       const { data, error: rpcError } = await supabase.rpc(
-        "get_tse_candidate_ranking_by_territory" as any,
+        "get_tse_candidate_ranking_by_locations" as any,
         {
           p_ano: 2026,
           p_uf: "MS",
           p_cod_municipio: municipalityCode,
           p_cargo: cargo,
           p_bairros: selectedNeighborhoods,
+          p_locais: selectedLocations,
           p_zona: zone === "all" ? null : Number(zone),
           p_secao: section === "all" ? null : Number(section),
           p_nr_local: place === "all" ? null : Number(place),

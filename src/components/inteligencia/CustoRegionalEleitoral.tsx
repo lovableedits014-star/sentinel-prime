@@ -20,7 +20,7 @@ import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import { useRegioesEleicao } from "@/hooks/useRegioesEleicao";
 import { isEleicaoContratadoRemunerado } from "@/lib/eleicao-situacao";
 import {
-  classificarBairroCampoGrande,
+  classificarLocalCampoGrande,
   normalizarLocalidade,
   REGIAO_CAMPO_GRANDE_LABEL,
 } from "@/lib/campo-grande-regioes";
@@ -49,6 +49,9 @@ type Candidate = {
 type SectionRow = {
   zona: number;
   secao: number;
+  nr_local: number;
+  nome_local: string | null;
+  endereco: string | null;
   bairro: string | null;
   votos: number;
 };
@@ -178,6 +181,9 @@ export default function CustoRegionalEleitoral() {
       return rows.map((row) => ({
         zona: Number(row.zona),
         secao: Number(row.secao),
+        nr_local: Number(row.nr_local),
+        nome_local: row.nome_local,
+        endereco: row.endereco,
         bairro: row.bairro,
         votos: Number(row.votos || 0),
       })) as SectionRow[];
@@ -298,8 +304,14 @@ export default function CustoRegionalEleitoral() {
     const grouped = new Map<string, { votos: number; secoes: number }>();
     const unknown = new Map<string, { bairro: string; votos: number; secoes: number }>();
     sections.forEach((section) => {
-      const classification = classificarBairroCampoGrande(
-        section.bairro,
+      const classification = classificarLocalCampoGrande(
+        {
+          nomeLocal: section.nome_local,
+          endereco: section.endereco,
+          bairro: section.bairro,
+          zona: section.zona,
+          nrLocal: section.nr_local,
+        },
         overrideMap,
         configuredRegionKeys,
       );

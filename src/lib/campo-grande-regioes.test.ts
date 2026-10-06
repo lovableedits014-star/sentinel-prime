@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { classificarBairroCampoGrande, normalizarLocalidade } from "./campo-grande-regioes";
+import {
+  classificarBairroCampoGrande,
+  classificarLocalCampoGrande,
+  normalizarLocalidade,
+} from "./campo-grande-regioes";
 
 describe("classificarBairroCampoGrande", () => {
   it("normaliza acentos, caixa e preposicoes", () => {
@@ -31,5 +35,21 @@ describe("classificarBairroCampoGrande", () => {
       "anhanduizinho",
     );
     expect(classificarBairroCampoGrande("Distrito de Rochedinho").regiao).toBeNull();
+  });
+
+  it("mantem o distrito de Anhandui separado da regiao urbana do Anhanduizinho", () => {
+    expect(classificarBairroCampoGrande("Distrito de Anhanduí").regiao).toBe("anhandui");
+    expect(classificarBairroCampoGrande("Piratininga").regiao).toBe("anhanduizinho");
+  });
+
+  it("prioriza a identidade oficial da escola sobre um bairro legado incorreto", () => {
+    expect(
+      classificarLocalCampoGrande({
+        nomeLocal: "Escola Municipal Isauro Bento Nogueira",
+        bairro: "Piratininga",
+        zona: 8,
+        nrLocal: 1546,
+      }),
+    ).toEqual({ regiao: "anhandui", fonte: "local_oficial" });
   });
 });

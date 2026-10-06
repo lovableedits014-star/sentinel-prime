@@ -8,7 +8,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 import {
-  classificarBairroCampoGrande,
+  classificarLocalCampoGrande,
   normalizarLocalidade,
   REGIAO_CAMPO_GRANDE_LABEL,
 } from "@/lib/campo-grande-regioes";
@@ -251,7 +251,17 @@ export default function PainelComparativoEleitoral2026() {
                   bairro: row.bairro,
                   regiao:
                     municipalityCode === CAMPO_GRANDE
-                      ? classificarBairroCampoGrande(row.bairro, overrideMap, REGION_KEYS).regiao
+                      ? classificarLocalCampoGrande(
+                          {
+                            nomeLocal: row.nome_local,
+                            endereco: row.endereco,
+                            bairro: row.bairro,
+                            zona: Number(row.zona),
+                            nrLocal: Number(row.nr_local),
+                          },
+                          overrideMap,
+                          REGION_KEYS,
+                        ).regiao
                       : null,
                   votos: Number(row.votos || 0),
                 }) as SectionRow[],
@@ -831,6 +841,7 @@ function HeatMap(props: HeatProps) {
     { key: "lagoa", area: "3 / 1 / 4 / 2" },
     { key: "anhanduizinho", area: "3 / 2 / 4 / 3" },
     { key: "moreninha", area: "3 / 3 / 4 / 4" },
+    { key: "anhandui", area: "4 / 1 / 5 / 4" },
   ];
   return (
     <Card>
@@ -899,7 +910,7 @@ function HeatMap(props: HeatProps) {
             placeholder="Seção eleitoral"
           />
         </div>
-        <div className="grid min-h-[360px] grid-cols-3 grid-rows-3 gap-2 rounded-2xl border bg-slate-100 p-3 dark:bg-slate-950 md:p-6">
+        <div className="grid min-h-[430px] grid-cols-3 grid-rows-4 gap-2 rounded-2xl border bg-slate-100 p-3 dark:bg-slate-950 md:p-6">
           {blocks.map(({ key, area }) => {
             const value = props.heatByKey.get(key)?.total || 0;
             const intensity = value / props.heatMax;

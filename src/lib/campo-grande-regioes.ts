@@ -3,6 +3,7 @@ export type RegiaoCampoGrande =
   | "segredo"
   | "prosa"
   | "bandeira"
+  | "anhandui"
   | "anhanduizinho"
   | "lagoa"
   | "imbirussu"
@@ -13,6 +14,7 @@ export const REGIAO_CAMPO_GRANDE_LABEL: Record<RegiaoCampoGrande, string> = {
   segredo: "Segredo",
   prosa: "Prosa",
   bandeira: "Bandeira",
+  anhandui: "Anhanduí",
   anhanduizinho: "Anhanduizinho",
   lagoa: "Lagoa",
   imbirussu: "Imbirussu",
@@ -135,6 +137,7 @@ const ALIASES: Record<Exclude<RegiaoCampoGrande, "moreninha">, string[]> = {
     "Chácara das Mansões",
     "Conjunto Residencial Recanto dos Rouxinóis",
   ],
+  anhandui: ["Anhanduí", "Distrito de Anhanduí"],
   anhanduizinho: [
     "Taquarussu",
     "Jockey Club",
@@ -250,8 +253,34 @@ const MORENINHA_ALIASES = new Set(
 
 export type ClassificacaoBairro = {
   regiao: string | null;
-  fonte: "manual" | "planurb" | "nao_classificado";
+  fonte: "manual" | "local_oficial" | "planurb" | "nao_classificado";
 };
+
+export type LocalVotacaoCampoGrande = {
+  nomeLocal?: string | null;
+  endereco?: string | null;
+  bairro?: string | null;
+  zona?: number | null;
+  nrLocal?: number | null;
+};
+
+/**
+ * Locais cuja identificação oficial é mais confiável que o bairro legado do
+ * arquivo de locais. A chave por nome evita alterar outros locais que realmente
+ * pertencem ao bairro informado pelo TSE.
+ */
+const LOCAL_OFICIAL_REGIAO = [{ nome: "ISAURO BENTO NOGUEIRA", regiao: "anhandui" }] as const;
+
+export function classificarLocalCampoGrande(
+  local: LocalVotacaoCampoGrande,
+  overrides: Map<string, string> = new Map(),
+  regioesDisponiveis: Set<string> = new Set(),
+): ClassificacaoBairro {
+  const nome = normalizarLocalidade(local.nomeLocal);
+  const correcao = LOCAL_OFICIAL_REGIAO.find((item) => nome.includes(item.nome));
+  if (correcao) return { regiao: correcao.regiao, fonte: "local_oficial" };
+  return classificarBairroCampoGrande(local.bairro, overrides, regioesDisponiveis);
+}
 
 export function classificarBairroCampoGrande(
   bairro: string | null | undefined,
