@@ -1,483 +1,200 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { lazy, Suspense, useState } from "react";
 import {
-  Vote,
-  Map as MapIcon,
-  Users,
-  Flag,
-  Megaphone,
-  Database,
-  Trophy,
-  MapPin,
-  Building2,
-  Network,
-  LayoutGrid,
-  Target,
-  Brain,
-  Plus,
+  Activity,
+  BarChart3,
   CircleDollarSign,
+  Database,
+  FileCheck2,
+  Flag,
+  History,
+  Megaphone,
+  Vote,
 } from "lucide-react";
-import ComposicaoChapa from "@/components/inteligencia/ComposicaoChapa";
-import CompararCandidatos from "@/components/inteligencia/CompararCandidatos";
-import EvolucaoPartidos from "@/components/inteligencia/EvolucaoPartidos";
-import MapaCalorMunicipios from "@/components/inteligencia/MapaCalorMunicipios";
-import SimuladorChapa from "@/components/inteligencia/SimuladorChapa";
-import CampoGrandeAnalise from "@/components/inteligencia/cg/CampoGrandeAnalise";
-import {
-  EleitoralFiltersProvider,
-  useEleitoralFilters,
-} from "@/components/inteligencia/_shared/EleitoralFiltersContext";
-import EleitoralScopeBar from "@/components/inteligencia/_shared/EleitoralScopeBar";
-import EtapaHeader from "@/components/inteligencia/_shared/EtapaHeader";
-import MunicipioContextoIBGE from "@/components/ibge/MunicipioContextoIBGE";
-import NarrativaPolitica from "@/components/inteligencia/narrativa/NarrativaPolitica";
-import RadarParlamentar from "@/components/inteligencia/parlamentar/RadarParlamentar";
-import BandeiraAutismoMS from "@/components/inteligencia/bandeira/BandeiraAutismoMS";
-import RelatorioEleicao2026 from "@/components/inteligencia/RelatorioEleicao2026";
-import CustoRegionalEleitoral from "@/components/inteligencia/CustoRegionalEleitoral";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 
-type CoverageRow = {
-  ano: number;
-  ufs: number;
-  municipios: number;
-  candidatos: number;
-  votos: number;
-};
-const fmt = (n: number) => n.toLocaleString("pt-BR");
+const RelatorioEleicao2026 = lazy(() => import("@/components/inteligencia/RelatorioEleicao2026"));
+const CustoRegionalEleitoral = lazy(
+  () => import("@/components/inteligencia/CustoRegionalEleitoral"),
+);
+const ComparativoCiclosEleitorais = lazy(
+  () => import("@/components/inteligencia/ComparativoCiclosEleitorais"),
+);
+const CoberturaDadosEleitorais = lazy(
+  () => import("@/components/inteligencia/CoberturaDadosEleitorais"),
+);
+const RadarParlamentar = lazy(
+  () => import("@/components/inteligencia/parlamentar/RadarParlamentar"),
+);
+const BandeiraAutismoMS = lazy(
+  () => import("@/components/inteligencia/bandeira/BandeiraAutismoMS"),
+);
+const NarrativaPolitica = lazy(
+  () => import("@/components/inteligencia/narrativa/NarrativaPolitica"),
+);
 
-type EtapaId = "territorio" | "adversarios" | "bandeira" | "dossie";
+type AreaId = "resultado" | "eficiencia" | "historico" | "estrategia" | "dados";
 
-const ETAPAS: { id: EtapaId; numero: number; label: string; icone: any }[] = [
-  { id: "territorio", numero: 1, label: "Território", icone: MapIcon },
-  { id: "adversarios", numero: 2, label: "Adversários", icone: Users },
-  { id: "bandeira", numero: 3, label: "Bandeira", icone: Flag },
-  { id: "dossie", numero: 4, label: "Dossiê", icone: Megaphone },
-];
+function LoadingPanel() {
+  return <div className="h-40 animate-pulse rounded-xl border bg-muted/40" />;
+}
 
-const ETAPA_IDS: EtapaId[] = ["territorio", "adversarios", "bandeira", "dossie"];
-const isEtapaId = (v: unknown): v is EtapaId =>
-  typeof v === "string" && (ETAPA_IDS as string[]).includes(v);
+function AreaIntro({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <Card className="border-primary/20 bg-primary/[0.025]">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          {icon}
+          {title}
+        </CardTitle>
+        <CardDescription className="max-w-4xl">{description}</CardDescription>
+      </CardHeader>
+      {children && <CardContent className="pt-0">{children}</CardContent>}
+    </Card>
+  );
+}
 
-const storageKey = (clientId: string | null) => `ie:etapa-atual:${clientId || "anon"}`;
-
-const InteligenciaEleitoralInner = () => {
-  const f = useEleitoralFilters();
+export default function InteligenciaEleitoral() {
   const { data: clientId = null } = useCurrentClientId();
-
-  // Restaura etapa salva (por client) já no primeiro render para evitar flash.
-  const [etapa, setEtapa] = useState<EtapaId>(() => {
-    if (typeof window === "undefined") return "territorio";
-    try {
-      const v = window.localStorage.getItem(storageKey(clientId));
-      return isEtapaId(v) ? v : "territorio";
-    } catch {
-      return "territorio";
-    }
-  });
-
-  // Quando o client muda (troca de candidato/contexto), recarrega a etapa salva daquele client.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const v = window.localStorage.getItem(storageKey(clientId));
-      setEtapa(isEtapaId(v) ? v : "territorio");
-    } catch {
-      setEtapa("territorio");
-    }
-  }, [clientId]);
-
-  // Persiste a etapa atual sempre que muda.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(storageKey(clientId), etapa);
-    } catch {
-      /* localStorage indisponível — segue sem persistir */
-    }
-  }, [clientId, etapa]);
-
-  const isCampoGrande = f.uf === "MS" && f.municipio.toLocaleUpperCase("pt-BR") === "CAMPO GRANDE";
-
-  const { data: coverage } = useQuery<CoverageRow[]>({
-    queryKey: ["tse-coverage-global", f.uf, f.municipio, f.anoMode, f.cargo],
-    staleTime: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_tse_coverage" as any, {
-        p_anos: f.anos,
-        p_uf: f.uf === "__all__" ? null : f.uf,
-        p_municipio: f.municipio === "__all__" ? null : f.municipio,
-        p_cargo: f.cargo === "__all__" ? null : f.cargo,
-      });
-      if (error) throw error;
-      return ((data || []) as any[]).map((row) => ({
-        ano: Number(row.ano),
-        ufs: Number(row.ufs || 0),
-        municipios: Number(row.municipios || 0),
-        candidatos: Number(row.candidatos || 0),
-        votos: Number(row.votos || 0),
-      })) as CoverageRow[];
-    },
-  });
-
-  const totalVotos = (coverage || []).reduce((s, r) => s + r.votos, 0);
-  const totalMunicipios = Math.max(0, ...(coverage || []).map((r) => r.municipios));
-  const totalCandidatos = (coverage || []).reduce((s, r) => s + r.candidatos, 0);
-  const anosCobertos = (coverage || []).map((r) => r.ano);
-
-  const escopoLabel = useMemo(() => {
-    const partes: string[] = [];
-    partes.push(f.uf === "__all__" ? "Brasil" : f.uf);
-    if (f.municipio !== "__all__") partes.push(f.municipio);
-    partes.push(f.cargo === "__all__" ? "todos cargos" : f.cargo);
-    partes.push(f.anoMode === "ambos" ? "2022+2024+2026" : f.anoMode);
-    return partes.join(" · ");
-  }, [f]);
-
-  // Navegação entre etapas
-  const goNext = (atual: EtapaId): EtapaId | null => {
-    const idx = ETAPAS.findIndex((e) => e.id === atual);
-    return idx < ETAPAS.length - 1 ? ETAPAS[idx + 1].id : null;
-  };
-  const proxima = (atual: EtapaId) => {
-    const next = goNext(atual);
-    if (next) {
-      setEtapa(next);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-  const proximaLabel = (atual: EtapaId) => {
-    const next = goNext(atual);
-    if (!next) return undefined;
-    const n = ETAPAS.find((e) => e.id === next)!;
-    return `Etapa ${n.numero}: ${n.label}`;
-  };
+  const [area, setArea] = useState<AreaId>("resultado");
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header com explicação geral do funil */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="space-y-5 p-4 md:p-6">
+      <header className="space-y-3">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Vote className="w-7 h-7 text-primary" />
+          <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl">
+            <Vote className="h-7 w-7 text-primary" />
             Inteligência Eleitoral
           </h1>
-          <p className="text-muted-foreground mt-1 max-w-3xl">
-            Gere primeiro o relatório territorial do seu candidato. Depois, se precisar, explore as
-            análises avançadas de território, adversários, bandeiras e narrativa de campanha.
+          <p className="mt-1 max-w-4xl text-sm text-muted-foreground md:text-base">
+            Consulte o resultado oficial, descubra onde o candidato recebeu votos e confronte o
+            desempenho territorial com o investimento da campanha.
           </p>
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <Badge variant="secondary" className="gap-1">
-              <Database className="w-3 h-3" />
-              TSE {anosCobertos.length > 0 ? anosCobertos.join(" + ") : "—"}
-            </Badge>
-            {coverage?.map((c) => (
-              <Badge key={c.ano} variant="outline" className="text-xs">
-                {c.ano}: {c.ufs} UF · {fmt(c.municipios)} municípios
-              </Badge>
-            ))}
-          </div>
         </div>
-      </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge className="gap-1">
+            <FileCheck2 className="h-3 w-3" /> Resultado atual: 2026
+          </Badge>
+          <Badge variant="secondary">Histórico estadual/federal: 2022 × 2026</Badge>
+          <Badge variant="outline">Contexto municipal: 2024</Badge>
+        </div>
+      </header>
 
-      {/* Ações principais: votos oficiais e eficiência financeira regional */}
-      <Tabs defaultValue="votos" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-2 h-auto">
-          <TabsTrigger value="votos" className="gap-2 py-2.5">
-            <Vote className="w-4 h-4" /> Votos por cidade e seção
+      <Tabs value={area} onValueChange={(value) => setArea(value as AreaId)}>
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 md:grid-cols-5">
+          <TabsTrigger value="resultado" className="gap-1.5 py-2.5">
+            <Vote className="h-4 w-4" /> Resultado 2026
           </TabsTrigger>
-          <TabsTrigger value="custos" className="gap-2 py-2.5">
-            <CircleDollarSign className="w-4 h-4" /> Custo por região
+          <TabsTrigger value="eficiencia" className="gap-1.5 py-2.5">
+            <CircleDollarSign className="h-4 w-4" /> Eficiência regional
+          </TabsTrigger>
+          <TabsTrigger value="historico" className="gap-1.5 py-2.5">
+            <History className="h-4 w-4" /> Histórico
+          </TabsTrigger>
+          <TabsTrigger value="estrategia" className="gap-1.5 py-2.5">
+            <Megaphone className="h-4 w-4" /> Estratégia
+          </TabsTrigger>
+          <TabsTrigger value="dados" className="col-span-2 gap-1.5 py-2.5 md:col-span-1">
+            <Database className="h-4 w-4" /> Dados e cobertura
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="votos" className="mt-4">
-          <RelatorioEleicao2026 />
-        </TabsContent>
-        <TabsContent value="custos" className="mt-4">
-          <CustoRegionalEleitoral />
-        </TabsContent>
-      </Tabs>
 
-      <div className="pt-2 border-t">
-        <h2 className="text-lg font-semibold">Outras análises eleitorais</h2>
-        <p className="text-sm text-muted-foreground">
-          Use os filtros e as etapas abaixo somente quando quiser aprofundar a análise.
-        </p>
-      </div>
-
-      {/* Filtros globais */}
-      <EleitoralScopeBar />
-
-      {/* KPIs contextuais */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Trophy className="w-4 h-4" /> Total de votos · {escopoLabel}
-            </CardDescription>
-            <CardTitle className="text-2xl">{fmt(totalVotos)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Users className="w-4 h-4" /> Candidatos
-            </CardDescription>
-            <CardTitle className="text-2xl">{fmt(totalCandidatos)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" /> Municípios
-            </CardDescription>
-            <CardTitle className="text-2xl">{fmt(totalMunicipios)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Database className="w-4 h-4" /> Anos cobertos
-            </CardDescription>
-            <CardTitle className="text-2xl">{anosCobertos.length}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Indicador visual do funil */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1">
-        {ETAPAS.map((e, i) => {
-          const ativa = etapa === e.id;
-          const Icone = e.icone;
-          return (
-            <div key={e.id} className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => setEtapa(e.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
-                  ativa
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-background hover:bg-muted border-border text-muted-foreground"
-                }`}
-              >
-                <span
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${ativa ? "bg-primary-foreground text-primary" : "bg-muted-foreground/20"}`}
-                >
-                  {e.numero}
-                </span>
-                <Icone className="w-3.5 h-3.5" />
-                {e.label}
-              </button>
-              {i < ETAPAS.length - 1 && <span className="text-muted-foreground/40">→</span>}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Conteúdo da etapa */}
-      <Tabs value={etapa} onValueChange={(v) => setEtapa(v as EtapaId)} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 h-auto">
-          {ETAPAS.map((e) => {
-            const Icone = e.icone;
-            return (
-              <TabsTrigger key={e.id} value={e.id} className="flex items-center gap-2 py-2.5">
-                <span className="text-xs font-bold opacity-60">{e.numero}.</span>
-                <Icone className="w-4 h-4" />
-                <span>{e.label}</span>
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-
-        {/* ============ ETAPA 1 — TERRITÓRIO ============ */}
-        <TabsContent value="territorio" className="mt-4 space-y-4">
-          <EtapaHeader
-            numero={1}
-            titulo="Território"
-            icone={<MapIcon className="w-5 h-5" />}
-            cor="primary"
-            oqueE="A foto do mapa eleitoral: onde sua base está hoje, em quais cidades/bairros seu partido cresceu ou caiu, e qual é o perfil socioeconômico de cada lugar."
-            paraQueServe="Decidir ONDE investir comício, visita e cabo eleitoral. Identificar cidades viráveis com pouca margem e bairros onde o adversário foi fraco."
-            proximoPasso={{
-              label: proximaLabel("territorio")!,
-              onClick: () => proxima("territorio"),
-            }}
+        <TabsContent value="resultado" className="mt-4 space-y-4">
+          <AreaIntro
+            icon={<Vote className="h-5 w-5 text-primary" />}
+            title="Onde meu candidato recebeu votos?"
+            description="Escolha uma cidade para chegar às seções, escolas e bairros, ou use Todas as cidades para comparar o desempenho municipal. As exportações incluem o conjunto completo, sem o limite visual de 1.000 registros."
           />
-
-          {/* Contexto IBGE só quando município está definido */}
-          {f.uf !== "__all__" && f.municipio !== "__all__" && (
-            <MunicipioContextoIBGE nome={f.municipio} uf={f.uf} />
-          )}
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <MapIcon className="w-4 h-4 text-primary" /> Mapa de calor por município
-              </CardTitle>
-              <CardDescription>
-                Use o filtro acima para mudar UF/cargo/ano. Cores mais quentes = mais votos.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MapaCalorMunicipios />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Network className="w-4 h-4 text-primary" /> Quem subiu / quem caiu (partidos)
-              </CardTitle>
-              <CardDescription>
-                Compara votos do mesmo partido entre 2022 e 2024 no escopo escolhido — mostra para
-                onde a maré política está virando.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EvolucaoPartidos />
-            </CardContent>
-          </Card>
-
-          {/* Análise hiperlocal — só aparece quando o filtro = Campo Grande/MS */}
-          {isCampoGrande && (
-            <Card className="border-primary/40">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-primary" /> Análise rua a rua — Campo Grande/MS
-                </CardTitle>
-                <CardDescription>
-                  Granularidade máxima: zona eleitoral, escola, bairro. Disponível porque o filtro
-                  está em Campo Grande/MS.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CampoGrandeAnalise />
-              </CardContent>
-            </Card>
-          )}
-          {!isCampoGrande && f.uf === "MS" && (
-            <Card className="border-dashed">
-              <CardContent className="pt-4 text-sm text-muted-foreground flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                Para ver análise rua a rua (escola/bairro), selecione{" "}
-                <strong className="text-foreground">Campo Grande</strong> no filtro de município. É
-                a única cidade com geocodificação por local de votação no momento.
-              </CardContent>
-            </Card>
-          )}
+          <Suspense fallback={<LoadingPanel />}>
+            <RelatorioEleicao2026 />
+          </Suspense>
         </TabsContent>
 
-        {/* ============ ETAPA 2 — ADVERSÁRIOS ============ */}
-        <TabsContent value="adversarios" className="mt-4 space-y-4">
-          <EtapaHeader
-            numero={2}
-            titulo="Adversários"
-            icone={<Users className="w-5 h-5" />}
-            cor="rose"
-            oqueE="Raio-x dos seus concorrentes e potenciais aliados: votação histórica, atividade parlamentar (faltas, projetos, votações), e simulação de cenários de chapa."
-            paraQueServe="Saber quem é o REAL ameaça (não só o mais barulhento), de quem trazer pra chapa, e qual munição usar em debate (faltas, propostas opostas, queda de votos)."
-            proximoPasso={{
-              label: proximaLabel("adversarios")!,
-              onClick: () => proxima("adversarios"),
-            }}
+        <TabsContent value="eficiencia" className="mt-4 space-y-4">
+          <AreaIntro
+            icon={<CircleDollarSign className="h-5 w-5 text-primary" />}
+            title="Custo e retorno por região de Campo Grande"
+            description="Confronta votos oficiais por bairro/região com contratos remunerados, investimento e custo por voto. Bairros ainda não classificados aparecem separadamente para correção."
           />
+          <Suspense fallback={<LoadingPanel />}>
+            <CustoRegionalEleitoral />
+          </Suspense>
+        </TabsContent>
 
-          <Tabs defaultValue="comparar" className="w-full">
-            <TabsList className="flex-wrap h-auto">
-              <TabsTrigger value="comparar" className="gap-1.5">
-                <Users className="w-3.5 h-3.5" /> Comparar candidatos
-              </TabsTrigger>
-              <TabsTrigger value="composicao" className="gap-1.5">
-                <LayoutGrid className="w-3.5 h-3.5" /> Composição (2022+2024)
-              </TabsTrigger>
-              <TabsTrigger value="simulador" className="gap-1.5">
-                <Target className="w-3.5 h-3.5" /> Simulador de chapa
-              </TabsTrigger>
+        <TabsContent value="historico" className="mt-4 space-y-4">
+          <AreaIntro
+            icon={<BarChart3 className="h-5 w-5 text-primary" />}
+            title="Evolução estadual e federal"
+            description="Compara eleições equivalentes: deputado estadual ou federal em 2022 contra o mesmo cargo em 2026. A eleição municipal de 2024 não é somada a esses resultados."
+          />
+          <Suspense fallback={<LoadingPanel />}>
+            <ComparativoCiclosEleitorais />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="estrategia" className="mt-4 space-y-4">
+          <AreaIntro
+            icon={<Megaphone className="h-5 w-5 text-primary" />}
+            title="Estratégia de campanha"
+            description="Atividade parlamentar, bandeiras e produção de narrativa ficam reunidas aqui, separadas da consulta operacional de votos."
+          />
+          <Tabs defaultValue="parlamentar">
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="parlamentar" className="gap-1.5">
-                <Brain className="w-3.5 h-3.5" /> Atividade parlamentar
+                <Activity className="h-4 w-4" /> Atividade parlamentar
+              </TabsTrigger>
+              <TabsTrigger value="bandeira" className="gap-1.5">
+                <Flag className="h-4 w-4" /> Bandeira
+              </TabsTrigger>
+              <TabsTrigger value="dossie" className="gap-1.5">
+                <Megaphone className="h-4 w-4" /> Dossiê e narrativa
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="comparar" className="mt-4">
-              <CompararCandidatos />
-            </TabsContent>
-            <TabsContent value="composicao" className="mt-4">
-              <ComposicaoChapa />
-            </TabsContent>
-            <TabsContent value="simulador" className="mt-4">
-              <SimuladorChapa />
-            </TabsContent>
             <TabsContent value="parlamentar" className="mt-4">
-              <RadarParlamentar clientId={clientId} />
+              <Suspense fallback={<LoadingPanel />}>
+                <RadarParlamentar clientId={clientId} />
+              </Suspense>
+            </TabsContent>
+            <TabsContent value="bandeira" className="mt-4">
+              <Suspense fallback={<LoadingPanel />}>
+                <BandeiraAutismoMS />
+              </Suspense>
+            </TabsContent>
+            <TabsContent value="dossie" className="mt-4">
+              <Suspense fallback={<LoadingPanel />}>
+                <NarrativaPolitica />
+              </Suspense>
             </TabsContent>
           </Tabs>
         </TabsContent>
 
-        {/* ============ ETAPA 3 — BANDEIRA ============ */}
-        <TabsContent value="bandeira" className="mt-4 space-y-4">
-          <EtapaHeader
-            numero={3}
-            titulo="Bandeira"
-            icone={<Flag className="w-5 h-5" />}
-            cor="amber"
-            oqueE="A pauta-marca da campanha — o assunto que diferencia você dos demais e em que você tem autoridade pra falar. Hoje a bandeira ativa do candidato é o Autismo (TEA) em Mato Grosso do Sul."
-            paraQueServe="Transformar uma agenda em proposta concreta por município (lei CIPTEA, fila zero, CER, escola com AEE). A IA da etapa 4 vai entrelaçar esses dados no dossiê."
-            proximoPasso={{ label: proximaLabel("bandeira")!, onClick: () => proxima("bandeira") }}
+        <TabsContent value="dados" className="mt-4 space-y-4">
+          <AreaIntro
+            icon={<Database className="h-5 w-5 text-primary" />}
+            title="Cobertura, sincronização e integridade"
+            description="Mostra o que realmente existe no banco por ano e granularidade. Ausência de dados, carga parcial e erro técnico são estados diferentes."
           />
-
-          <BandeiraAutismoMS />
-
-          <Card className="border-dashed">
-            <CardContent className="pt-5 pb-5 flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                  <Plus className="w-5 h-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <div className="font-medium">Adicionar nova bandeira</div>
-                  <div className="text-xs text-muted-foreground">
-                    Educação, Segurança, Economia local, Mulheres… cada bandeira vira uma seção
-                    própria com dados do município.
-                  </div>
-                </div>
-              </div>
-              <Button variant="outline" size="sm" disabled>
-                Em breve
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ============ ETAPA 4 — DOSSIÊ ============ */}
-        <TabsContent value="dossie" className="mt-4 space-y-4">
-          <EtapaHeader
-            numero={4}
-            titulo="Dossiê de Narrativa"
-            icone={<Megaphone className="w-5 h-5" />}
-            cor="emerald"
-            oqueE="A IA junta tudo das etapas 1, 2 e 3 e GERA o material de campanha: PDF executivo, discursos prontos, posts de rede social e plano de visitas por bairro."
-            paraQueServe="Sair daqui com material PRONTO pra usar — sem precisar reescrever, sem precisar pesquisar de novo. É o ponto final do funil e a peça mais importante da plataforma."
-          />
-
-          <NarrativaPolitica />
+          <Suspense fallback={<LoadingPanel />}>
+            <CoberturaDadosEleitorais />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
-      <p className="text-xs text-muted-foreground text-center pt-4">
-        Fontes: TSE (Tribunal Superior Eleitoral) · Câmara dos Deputados · Senado Federal · IBGE ·
-        CNES/DataSUS · INEP.
+      <p className="pt-2 text-center text-xs text-muted-foreground">
+        Fontes: TSE · Câmara dos Deputados · Senado Federal · IBGE · CNES/DataSUS · INEP
       </p>
     </div>
   );
-};
-
-const InteligenciaEleitoral = () => (
-  <EleitoralFiltersProvider>
-    <InteligenciaEleitoralInner />
-  </EleitoralFiltersProvider>
-);
-
-export default InteligenciaEleitoral;
+}
