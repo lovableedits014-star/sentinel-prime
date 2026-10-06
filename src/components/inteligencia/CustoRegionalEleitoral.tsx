@@ -505,11 +505,11 @@ export default function CustoRegionalEleitoral() {
             <div>
               <Badge className="mb-2 bg-emerald-600">Campo Grande · custo e votos</Badge>
               <CardTitle className="flex items-center gap-2 text-xl">
-                <DollarSign className="w-5 h-5" /> Quanto cada região custou por voto?
+                <DollarSign className="w-5 h-5" /> Relatório gerencial por região
               </CardTitle>
               <CardDescription className="mt-1 max-w-3xl">
-                Cruza os contratos remunerados ativos com os votos oficiais por seção. Os bairros
-                são convertidos para as regiões operacionais da campanha.
+                Pronto para apresentar: coordenador responsável, investimento, votos, participação,
+                custo por voto e ranking de eficiência de cada região.
               </CardDescription>
             </div>
             <div className="flex gap-2">

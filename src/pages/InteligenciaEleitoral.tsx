@@ -97,10 +97,10 @@ export default function InteligenciaEleitoral() {
       <Tabs value={area} onValueChange={(value) => setArea(value as AreaId)}>
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 md:grid-cols-5">
           <TabsTrigger value="resultado" className="gap-1.5 py-2.5">
-            <Vote className="h-4 w-4" /> Resultado 2026
+            <Vote className="h-4 w-4" /> Comparar candidatos
           </TabsTrigger>
           <TabsTrigger value="eficiencia" className="gap-1.5 py-2.5">
-            <CircleDollarSign className="h-4 w-4" /> Eficiência regional
+            <CircleDollarSign className="h-4 w-4" /> Relatório gerencial
           </TabsTrigger>
           <TabsTrigger value="historico" className="gap-1.5 py-2.5">
             <History className="h-4 w-4" /> Histórico
@@ -116,8 +116,8 @@ export default function InteligenciaEleitoral() {
         <TabsContent value="resultado" className="mt-4 space-y-4">
           <AreaIntro
             icon={<Vote className="h-5 w-5 text-primary" />}
-            title="Onde meu candidato recebeu votos?"
-            description="Compare vários candidatos por cidade, região, bairro, zona, seção e local de votação. Em Campo Grande, o mapa de calor territorial mostra rapidamente as maiores e menores concentrações de votos."
+            title="Comparação de vários candidatos"
+            description="Marque 2, 3, 5 ou mais candidatos e compare lado a lado por cidade, região, bairro, zona, seção e local de votação. A mesma seleção é exportada em um único Excel ou PDF."
           />
           <Suspense fallback={<LoadingPanel />}>
             <RelatorioEleicao2026 />
@@ -127,8 +127,8 @@ export default function InteligenciaEleitoral() {
         <TabsContent value="eficiencia" className="mt-4 space-y-4">
           <AreaIntro
             icon={<CircleDollarSign className="h-5 w-5 text-primary" />}
-            title="Custo e retorno por região de Campo Grande"
-            description="Confronta votos oficiais por bairro/região com contratos remunerados, investimento e custo por voto. Bairros ainda não classificados aparecem separadamente para correção."
+            title="Relatório gerencial: investimento × resultado"
+            description="Relatório para apresentação com região, coordenador, investimento, votos, custo por voto, participação no total e ranking das regiões mais e menos eficientes. Exporta em Excel e PDF."
           />
           <Suspense fallback={<LoadingPanel />}>
             <CustoRegionalEleitoral />

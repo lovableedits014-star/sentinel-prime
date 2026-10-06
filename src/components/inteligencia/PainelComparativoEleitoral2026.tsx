@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import VencedoresTerritorio from "@/components/inteligencia/VencedoresTerritorio";
 import {
   Table,
   TableBody,
@@ -362,7 +363,7 @@ export default function PainelComparativoEleitoral2026() {
   const comparisonRows = scope === "state" ? cityMatrix : matrix;
   const busy = loadingSections || loadingGeography;
 
-  const syncSections = async () => {
+  const syncSections = async (restart = false) => {
     if (syncGuard.current) return;
     syncGuard.current = true;
     setSyncing(true);
@@ -370,7 +371,12 @@ export default function PainelComparativoEleitoral2026() {
     try {
       for (let batch = 0; batch < 100; batch += 1) {
         const { data, error } = await supabase.functions.invoke("sync-tse-sections", {
-          body: { uf: "MS", cod_municipio: municipalityCode, batch_size: 80 },
+          body: {
+            uf: "MS",
+            cod_municipio: municipalityCode,
+            batch_size: 80,
+            restart: restart && batch === 0,
+          },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
@@ -522,14 +528,27 @@ export default function PainelComparativoEleitoral2026() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={exportXlsx} disabled={!comparisonRows.length}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+                {selectedCandidates.length > 0 && ` (${selectedCandidates.length})`}
               </Button>
               <Button onClick={exportPdf} disabled={!comparisonRows.length}>
                 <Download className="mr-2 h-4 w-4" /> PDF
+                {selectedCandidates.length > 0 && ` (${selectedCandidates.length})`}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm md:grid-cols-3">
+            <div>
+              <strong>1.</strong> Escolha cidade e cargo
+            </div>
+            <div>
+              <strong>2.</strong> Marque dois ou mais candidatos
+            </div>
+            <div>
+              <strong>3.</strong> Compare e exporte todos juntos
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted p-1">
             <Button
               variant={scope === "city" ? "default" : "ghost"}
@@ -590,24 +609,32 @@ export default function PainelComparativoEleitoral2026() {
             />
           </div>
           {selectedCandidates.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selectedCandidates.map((candidate, index) => (
-                <Badge
-                  key={candidate.numero}
-                  variant="secondary"
-                  className="gap-2 py-1.5"
-                  style={{ borderLeft: `4px solid ${COLORS[index % COLORS.length]}` }}
-                >
-                  {candidateName(candidate)} #{candidate.numero}
-                  <button
-                    type="button"
-                    aria-label="Remover candidato"
-                    onClick={() => toggleCandidate(candidate.numero)}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <strong>{selectedCandidates.length} candidato(s) no comparativo</strong>
+                <Button variant="ghost" size="sm" onClick={() => setSelected([])}>
+                  Limpar seleção
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedCandidates.map((candidate, index) => (
+                  <Badge
+                    key={candidate.numero}
+                    variant="secondary"
+                    className="gap-2 py-1.5"
+                    style={{ borderLeft: `4px solid ${COLORS[index % COLORS.length]}` }}
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
+                    {candidateName(candidate)} #{candidate.numero}
+                    <button
+                      type="button"
+                      aria-label="Remover candidato"
+                      onClick={() => toggleCandidate(candidate.numero)}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
             </div>
           )}
           {loadingRanking ? (
@@ -683,7 +710,7 @@ export default function PainelComparativoEleitoral2026() {
               </>
             )}
             {syncError && <p className="text-sm text-destructive">{syncError}</p>}
-            <Button onClick={syncSections} disabled={syncing}>
+            <Button onClick={() => void syncSections(false)} disabled={syncing}>
               {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Tentar sincronização
             </Button>
           </CardContent>
@@ -706,6 +733,16 @@ export default function PainelComparativoEleitoral2026() {
           zones={zones}
           heatByKey={heatByKey}
           heatMax={heatMax}
+        />
+      )}
+      {scope === "city" && municipalityCode === CAMPO_GRANDE && (
+        <VencedoresTerritorio
+          cargo={cargo}
+          municipalityCode={municipalityCode}
+          municipalityName={municipality.municipio}
+          enabled={syncStatus?.status === "success"}
+          syncing={syncing}
+          onSync={() => void syncSections(true)}
         />
       )}
       {selected.length > 0 && (scope === "state" || syncStatus?.status === "success") && (
@@ -750,6 +787,19 @@ export default function PainelComparativoEleitoral2026() {
           </CardContent>
         </Card>
       )}
+      {scope === "city" &&
+        selected.length > 0 &&
+        !busy &&
+        !comparisonRows.length &&
+        syncStatus?.status === "success" && (
+          <Card className="border-amber-500/40 bg-amber-500/5">
+            <CardContent className="py-4 text-sm">
+              Os candidatos foram selecionados, mas ainda não existem votos por seção para este
+              cargo. Use <strong>Reprocessar dados territoriais</strong> acima; depois o comparativo
+              e as exportações serão liberados automaticamente.
+            </CardContent>
+          </Card>
+        )}
     </div>
   );
 }
