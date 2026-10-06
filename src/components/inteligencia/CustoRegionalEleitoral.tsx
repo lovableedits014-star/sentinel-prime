@@ -5,12 +5,15 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import {
   AlertTriangle,
   CheckCircle2,
+  Download,
   DollarSign,
   FileSpreadsheet,
   Loader2,
   Search,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
@@ -35,7 +38,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type Cargo = "Deputado Federal" | "Deputado Estadual";
+type Cargo = "Presidente" | "Governador" | "Senador" | "Deputado Federal" | "Deputado Estadual";
 type Candidate = {
   numero: number;
   nome_urna: string | null;
@@ -51,16 +54,20 @@ type SectionRow = {
 };
 type ContractRow = {
   id: string;
+  nome: string;
+  tipo: string;
   escopo: string;
   regiao: string | null;
   valor_contratacao: number | null;
   is_voluntario: boolean | null;
+  is_favorito_regiao: boolean | null;
   arquivado_em: string | null;
 };
 type OverrideRow = { bairro_normalizado: string; regiao_value: string };
 type RegionalRow = {
   key: string;
   label: string;
+  coordenador: string;
   contratos: number;
   investimento: number;
   custoMedioContrato: number;
@@ -68,9 +75,17 @@ type RegionalRow = {
   secoes: number;
   custoPorVoto: number | null;
   votosPorContratado: number | null;
+  participacao: number;
+  ranking: number;
 };
 
-const CARGOS: Cargo[] = ["Deputado Federal", "Deputado Estadual"];
+const CARGOS: Cargo[] = [
+  "Presidente",
+  "Governador",
+  "Senador",
+  "Deputado Federal",
+  "Deputado Estadual",
+];
 const PAGE_SIZE = 1000;
 const CAMPO_GRANDE_CODE = 90514;
 const fmt = (value: number) => Number(value || 0).toLocaleString("pt-BR");
@@ -260,6 +275,25 @@ export default function CustoRegionalEleitoral() {
     return grouped;
   }, [people]);
 
+  const coordinatorsByRegion = useMemo(() => {
+    const grouped = new Map<string, string[]>();
+    people
+      .filter(
+        (person) =>
+          person.escopo === "campo_grande" && person.tipo === "coordenador" && !person.arquivado_em,
+      )
+      .sort((a, b) => Number(Boolean(b.is_favorito_regiao)) - Number(Boolean(a.is_favorito_regiao)))
+      .forEach((person) => {
+        const key = String(person.regiao || "sem-regiao")
+          .trim()
+          .toLocaleLowerCase("pt-BR");
+        const names = grouped.get(key) || [];
+        if (!names.includes(person.nome)) names.push(person.nome);
+        grouped.set(key, names);
+      });
+    return new Map(Array.from(grouped, ([key, names]) => [key, names.join(" / ")]));
+  }, [people]);
+
   const { votesByRegion, unclassified } = useMemo(() => {
     const grouped = new Map<string, { votos: number; secoes: number }>();
     const unknown = new Map<string, { bairro: string; votos: number; secoes: number }>();
@@ -296,22 +330,39 @@ export default function CustoRegionalEleitoral() {
       ...votesByRegion.keys(),
     ]);
     keys.delete("sem-regiao");
-    return Array.from(keys)
+    const totalRegionalVotes = Array.from(keys).reduce(
+      (sum, key) => sum + (votesByRegion.get(key)?.votos || 0),
+      0,
+    );
+    const rows = Array.from(keys)
       .map((key) => {
         const contract = contractsByRegion.get(key) || { contratos: 0, investimento: 0 };
         const vote = votesByRegion.get(key) || { votos: 0, secoes: 0 };
         return {
           key,
           label: regionLabels.get(key) || key,
+          coordenador: coordinatorsByRegion.get(key) || "Não definido",
           ...contract,
           ...vote,
           custoMedioContrato: contract.contratos ? contract.investimento / contract.contratos : 0,
-          custoPorVoto: vote.votos ? contract.investimento / vote.votos : null,
+          custoPorVoto:
+            vote.votos && contract.investimento > 0 ? contract.investimento / vote.votos : null,
           votosPorContratado: contract.contratos ? vote.votos / contract.contratos : null,
+          participacao: totalRegionalVotes ? (100 * vote.votos) / totalRegionalVotes : 0,
+          ranking: 0,
         };
       })
-      .sort((a, b) => b.investimento - a.investimento || b.votos - a.votos);
-  }, [contractsByRegion, regionLabels, votesByRegion]);
+      .sort(
+        (a, b) =>
+          (a.custoPorVoto ?? Number.POSITIVE_INFINITY) -
+            (b.custoPorVoto ?? Number.POSITIVE_INFINITY) || b.votos - a.votos,
+      );
+    let ranking = 0;
+    return rows.map((row) => ({
+      ...row,
+      ranking: row.custoPorVoto === null ? 0 : ++ranking,
+    }));
+  }, [contractsByRegion, coordinatorsByRegion, regionLabels, votesByRegion]);
 
   const totalInvestment = regionalRows.reduce((sum, row) => sum + row.investimento, 0);
   const totalContracts = regionalRows.reduce((sum, row) => sum + row.contratos, 0);
@@ -375,11 +426,14 @@ export default function CustoRegionalEleitoral() {
       workbook,
       XLSX.utils.json_to_sheet(
         regionalRows.map((row) => ({
+          Ranking: row.ranking || null,
           Região: row.label,
+          "Coordenador responsável": row.coordenador,
           Contratados: row.contratos,
           Investimento: row.investimento,
           "Custo médio por contrato": Number(row.custoMedioContrato.toFixed(2)),
           Votos: row.votos,
+          "Participação nos votos (%)": Number(row.participacao.toFixed(2)),
           Seções: row.secoes,
           "Custo por voto": row.custoPorVoto === null ? null : Number(row.custoPorVoto.toFixed(2)),
           "Votos por contratado":
@@ -394,6 +448,52 @@ export default function CustoRegionalEleitoral() {
       "Revisar bairros",
     );
     XLSX.writeFile(workbook, `campo-grande-2026-custo-regional-${candidate.numero}.xlsx`);
+  };
+
+  const exportPdf = () => {
+    if (!candidate || !sections.length) return;
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(16);
+    doc.text("Relatório gerencial — investimento e resultado eleitoral", 14, 16);
+    doc.setFontSize(10);
+    doc.text(
+      `Campo Grande/MS · Eleições 2026 · ${cargo} · ${candidate.nome_urna || candidate.nome_completo} #${candidate.numero}`,
+      14,
+      24,
+    );
+    doc.text(
+      `Investimento: ${money(totalInvestment)} · Votos: ${fmt(totalVotes)} · Custo médio: ${money(totalVotes ? totalInvestment / totalVotes : null)}`,
+      14,
+      31,
+    );
+    autoTable(doc, {
+      startY: 39,
+      head: [
+        [
+          "Rank",
+          "Região",
+          "Coordenador",
+          "Investimento",
+          "Votos",
+          "% votos",
+          "Custo/voto",
+          "Contratados",
+        ],
+      ],
+      body: regionalRows.map((row) => [
+        row.ranking ? `${row.ranking}º` : "—",
+        row.label,
+        row.coordenador,
+        money(row.investimento),
+        fmt(row.votos),
+        `${row.participacao.toFixed(1).replace(".", ",")}%`,
+        money(row.custoPorVoto),
+        fmt(row.contratos),
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [5, 150, 105] },
+    });
+    doc.save(`campo-grande-2026-relatorio-gerencial-${candidate.numero}.pdf`);
   };
 
   return (
@@ -412,16 +512,21 @@ export default function CustoRegionalEleitoral() {
                 são convertidos para as regiões operacionais da campanha.
               </CardDescription>
             </div>
-            <Button variant="outline" onClick={exportXlsx} disabled={!voteTotalsMatch}>
-              <FileSpreadsheet className="w-4 h-4 mr-2" /> Exportar Excel
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={exportXlsx} disabled={!voteTotalsMatch}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" /> Excel
+              </Button>
+              <Button onClick={exportPdf} disabled={!voteTotalsMatch}>
+                <Download className="w-4 h-4 mr-2" /> PDF gerencial
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-3">
             <div className="space-y-1 text-sm font-medium">
               1. Cargo
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                 {CARGOS.map((item) => (
                   <Button
                     key={item}
@@ -433,7 +538,7 @@ export default function CustoRegionalEleitoral() {
                       setSelected(null);
                     }}
                   >
-                    {item.replace("Deputado ", "")}
+                    {item.replace("Deputado ", "Dep. ")}
                   </Button>
                 ))}
               </div>
@@ -597,11 +702,14 @@ export default function CustoRegionalEleitoral() {
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
+                        <TableHead className="text-center">Rank</TableHead>
                         <TableHead>Região</TableHead>
+                        <TableHead>Coordenador</TableHead>
                         <TableHead className="text-right">Contratados</TableHead>
                         <TableHead className="text-right">Investimento</TableHead>
                         <TableHead className="text-right">Média/contrato</TableHead>
                         <TableHead className="text-right">Votos</TableHead>
+                        <TableHead className="text-right">% dos votos</TableHead>
                         <TableHead className="text-right">Custo/voto</TableHead>
                         <TableHead className="text-right">Votos/contratado</TableHead>
                       </TableRow>
@@ -609,13 +717,20 @@ export default function CustoRegionalEleitoral() {
                     <TableBody>
                       {regionalRows.map((row) => (
                         <TableRow key={row.key}>
+                          <TableCell className="text-center font-bold">
+                            {row.ranking ? `${row.ranking}º` : "—"}
+                          </TableCell>
                           <TableCell className="font-medium">{row.label}</TableCell>
+                          <TableCell className="min-w-40">{row.coordenador}</TableCell>
                           <TableCell className="text-right">{fmt(row.contratos)}</TableCell>
                           <TableCell className="text-right">{money(row.investimento)}</TableCell>
                           <TableCell className="text-right">
                             {money(row.custoMedioContrato)}
                           </TableCell>
                           <TableCell className="text-right font-bold">{fmt(row.votos)}</TableCell>
+                          <TableCell className="text-right">
+                            {row.participacao.toFixed(1).replace(".", ",")}%
+                          </TableCell>
                           <TableCell className="text-right font-semibold text-emerald-700">
                             {money(row.custoPorVoto)}
                           </TableCell>

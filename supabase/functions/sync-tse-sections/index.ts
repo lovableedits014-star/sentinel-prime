@@ -14,7 +14,7 @@ const ADMIN_SYNC_TOKEN = Deno.env.get("TSE_SYNC_ADMIN_TOKEN") || "";
 const YEAR = 2026;
 const TURN = 1;
 const PLEITO = 3220;
-const ELECTION = 6259;
+const ELECTIONS = new Set([6257, 6259]);
 const TSE_BASE = "https://resultados.tse.jus.br/oficial/ele2026";
 const MAX_BATCH = 80;
 const FETCH_CONCURRENCY = 8;
@@ -103,55 +103,63 @@ function decodeBu(
 
   const elections = findElectionResults(root);
   if (!elections) throw new Error("BU sem resultados por eleicao.");
-  const election = children(elections).find((item) => integerValue(children(item)[0]) === ELECTION);
-  if (!election) throw new Error(`Eleicao ${ELECTION} ausente no BU.`);
-  const voteResults = children(election).find(
-    (node, index) =>
-      index >= 2 &&
-      isUniversal(node, 16) &&
-      children(node).some((result) => isUniversal(children(result)[0], 10)),
-  );
-  if (!voteResults) throw new Error("BU sem lista de resultados da votacao.");
-
   const rows: VoteRow[] = [];
   const now = new Date().toISOString();
-  for (const result of children(voteResults)) {
-    const cargoGroups = children(result).find((node, index) => index >= 2 && isUniversal(node, 16));
-    if (!cargoGroups) continue;
-    for (const cargoGroup of children(cargoGroups)) {
-      const cargoFields = children(cargoGroup);
-      const cargo = integerValue(cargoFields[0]);
-      if (cargo !== 6 && cargo !== 7) continue;
-      const candidateVotes = cargoFields.find((node, index) => index >= 2 && isUniversal(node, 16));
-      if (!candidateVotes) continue;
-      for (const vote of children(candidateVotes)) {
-        const voteFields = children(vote);
-        if (integerValue(voteFields.find((node) => isContext(node, 1))) !== 1) continue;
-        const candidate = voteFields.find((node) => isContext(node, 3));
-        if (!candidate) continue;
-        const candidateFields = children(candidate);
-        const number = integerValue(candidateFields[1]);
-        if (!number) continue;
-        rows.push({
-          ano: YEAR,
-          turno: TURN,
-          pleito: PLEITO,
-          eleicao: ELECTION,
-          uf,
-          cod_municipio: municipalityCode,
-          municipio: municipalityName,
-          zona: Number(target.zone),
-          secao: sectionNumber,
-          secoes_agregadas: target.aggregated,
-          nr_local: localNumber,
-          cargo,
-          numero: number,
-          partido_numero: integerValue(candidateFields[0]) || null,
-          votos: integerValue(voteFields.find((node) => isContext(node, 2))),
-          tse_hash: hash,
-          source: "resultados_tse_bu",
-          updated_at: now,
-        });
+  const electionItems = children(elections).filter((item) =>
+    ELECTIONS.has(integerValue(children(item)[0])),
+  );
+  if (!electionItems.length) throw new Error("Eleicoes 6257/6259 ausentes no BU.");
+  for (const election of electionItems) {
+    const electionId = integerValue(children(election)[0]);
+    const voteResults = children(election).find(
+      (node, index) =>
+        index >= 2 &&
+        isUniversal(node, 16) &&
+        children(node).some((result) => isUniversal(children(result)[0], 10)),
+    );
+    if (!voteResults) continue;
+    for (const result of children(voteResults)) {
+      const cargoGroups = children(result).find(
+        (node, index) => index >= 2 && isUniversal(node, 16),
+      );
+      if (!cargoGroups) continue;
+      for (const cargoGroup of children(cargoGroups)) {
+        const cargoFields = children(cargoGroup);
+        const cargo = integerValue(cargoFields[0]);
+        if (![1, 3, 5, 6, 7].includes(cargo)) continue;
+        const candidateVotes = cargoFields.find(
+          (node, index) => index >= 2 && isUniversal(node, 16),
+        );
+        if (!candidateVotes) continue;
+        for (const vote of children(candidateVotes)) {
+          const voteFields = children(vote);
+          if (integerValue(voteFields.find((node) => isContext(node, 1))) !== 1) continue;
+          const candidate = voteFields.find((node) => isContext(node, 3));
+          if (!candidate) continue;
+          const candidateFields = children(candidate);
+          const number = integerValue(candidateFields[1]);
+          if (!number) continue;
+          rows.push({
+            ano: YEAR,
+            turno: TURN,
+            pleito: PLEITO,
+            eleicao: electionId,
+            uf,
+            cod_municipio: municipalityCode,
+            municipio: municipalityName,
+            zona: Number(target.zone),
+            secao: sectionNumber,
+            secoes_agregadas: target.aggregated,
+            nr_local: localNumber,
+            cargo,
+            numero: number,
+            partido_numero: integerValue(candidateFields[0]) || null,
+            votos: integerValue(voteFields.find((node) => isContext(node, 2))),
+            tse_hash: hash,
+            source: "resultados_tse_bu",
+            updated_at: now,
+          });
+        }
       }
     }
   }

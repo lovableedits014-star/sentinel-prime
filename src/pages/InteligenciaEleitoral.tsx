@@ -15,7 +15,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCurrentClientId } from "@/hooks/ic/useCurrentClientId";
 
-const RelatorioEleicao2026 = lazy(() => import("@/components/inteligencia/RelatorioEleicao2026"));
+const RelatorioEleicao2026 = lazy(
+  () => import("@/components/inteligencia/PainelComparativoEleitoral2026"),
+);
 const CustoRegionalEleitoral = lazy(
   () => import("@/components/inteligencia/CustoRegionalEleitoral"),
 );
@@ -115,7 +117,7 @@ export default function InteligenciaEleitoral() {
           <AreaIntro
             icon={<Vote className="h-5 w-5 text-primary" />}
             title="Onde meu candidato recebeu votos?"
-            description="Escolha uma cidade para chegar às seções, escolas e bairros, ou use Todas as cidades para comparar o desempenho municipal. As exportações incluem o conjunto completo, sem o limite visual de 1.000 registros."
+            description="Compare vários candidatos por cidade, região, bairro, zona, seção e local de votação. Em Campo Grande, o mapa de calor territorial mostra rapidamente as maiores e menores concentrações de votos."
           />
           <Suspense fallback={<LoadingPanel />}>
             <RelatorioEleicao2026 />
